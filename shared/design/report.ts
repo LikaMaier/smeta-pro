@@ -1,5 +1,6 @@
 /** Данные для PDF «Эскизный проект» и подписи параметров */
 import { OBJ_LABEL, type CanopyResult, type Wall } from './canopy';
+import { snowLabel } from './snow';
 import { render3d, drawings } from './render';
 
 export const WALL_LABEL: Record<Wall, string> = { open: 'открыто', prof: 'профлист', prof_full: 'профлист на всю высоту', mesh: 'сетка', prof_mesh: 'профлист + сетка до кровли', rail: 'перила 1,0 м', poly: 'поликарбонат', sandwich: 'сэндвич-панели 100 мм', wood: 'обшивка доской', wood_low: 'доска снизу до 1,0 м' };
@@ -24,10 +25,10 @@ export function paramRows(r: CanopyResult): [string, string][] {
     rows.push([SIDE_LABEL[s], (p.attach && s === p.highSide ? 'стена дома' : WALL_LABEL[p.walls[s]] + (p.walls[s] === 'prof' || p.walls[s] === 'prof_mesh' ? ` ${p.profH} м` : '')) + (ops.length ? `, ${ops.join(', ')}` : '')]);
   }
   if (p.insulate) rows.push(['Утепление', 'минвата 100 мм, стены и кровля']);
-  rows.push(['Основание', p.base === 'slab' ? `плита ${Math.round(p.slabT * 1000)} мм, щебень ${Math.round(p.gravel * 1000)}, песок ${Math.round(p.sand * 1000)}` : p.base === 'piles' ? 'сваи под столбы' : p.base === 'deck' ? 'настил из террасной доски на винтовых сваях' : p.base === 'paving' ? 'тротуарная плитка 60 мм с бордюром' : 'нет']);
+  rows.push(['Основание', p.base === 'slab' ? `плита ${Math.round(p.slabT * 1000)} мм, щебень ${Math.round(p.gravel * 1000)}, песок ${Math.round(p.sand * 1000)}` : p.base === 'ushp' ? `УШП: плита ${Math.round(p.slabT * 1000)} мм по ЭППС ${Math.round(p.eps * 1000)} мм, песок ${Math.round(p.sand * 1000)}` : p.base === 'strip' ? `ленточный ${Math.round(p.stripW * 1000)}×${Math.round(p.stripD * 1000)} мм` : p.base === 'screw' ? 'винтовые сваи 108×2500' : p.base === 'piles' ? 'буронабивные сваи под столбы' : p.base === 'deck' ? 'настил из террасной доски на винтовых сваях' : p.base === 'paving' ? 'тротуарная плитка 60 мм с бордюром' : 'нет']);
   const extras = [p.gutter && 'водосток', p.snowGuard && 'снегозадержатели', p.lights > 0 && `освещение: ${p.lights} светильн.`].filter(Boolean);
   if (extras.length) rows.push(['Дополнительно', extras.join(', ')]);
-  rows.push(['Снеговой район / запас', `${p.snow} / ${p.waste}%`]);
+  rows.push(['Снеговой район', `${p.city ? `${p.city}: ` : ''}${snowLabel(p.snow)}`], ['Запас материалов', `${p.waste}%`]);
   return rows;
 }
 

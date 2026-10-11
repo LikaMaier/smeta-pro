@@ -18,7 +18,7 @@ type Ovr = { qty?: string; price?: string; off?: boolean; base?: number };
 const PKEY = (id: string) => `smeta_calc_prices_${id}`;
 const loadPrices = (id: string): Record<string, string> => { try { return JSON.parse(localStorage.getItem(PKEY(id)) || '{}'); } catch { return {}; } };
 
-export default function CalcResult({ calcId, suggestions, estimateTitle }: { calcId: string; suggestions: Sug[]; estimateTitle: string }) {
+export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded }: { calcId: string; suggestions: Sug[]; estimateTitle: string; onAdded?: (estimateId: string) => Promise<void> | void }) {
   const nav = useNavigate();
   const toast = useToast();
   const items = useLoad(() => get<any[]>('/items').catch(() => []), []);
@@ -94,6 +94,7 @@ export default function CalcResult({ calcId, suggestions, estimateTitle }: { cal
       let id = target;
       if (target === 'new') id = (await post('/estimates', { title: estimateTitle || 'Новая смета' })).id;
       await post(`/estimates/${id}/lines`, { lines });
+      if (onAdded) await Promise.resolve(onAdded(id)).catch(() => {});
       haptic('success');
       toast(changed.length && remember ? `Добавлено в смету. Ваши цены сохранены: ${changed.length}` : 'Добавлено в смету');
       nav(`/estimates/${id}`);

@@ -7,5 +7,5 @@ export default defineConfig({
   plugins: [react()],
   resolve: { alias: { '@shared': path.resolve(__dirname, '../shared') } },
   server: { port: 5173, proxy: { '/api': 'http://localhost:3000' }, fs: { allow: ['..'] } },
-  build: { outDir: 'dist', emptyOutDir: true },
+  build: { outDir: 'dist', emptyOutDir: true, rollupOptions: { input: { main: path.resolve(__dirname, 'index.html'), viewer: path.resolve(__dirname, 'viewer.html') } } },
 });

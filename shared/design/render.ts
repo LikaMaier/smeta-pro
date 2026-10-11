@@ -49,8 +49,14 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
 
   // плита и земля
   for (const p of res.panels) {
+    if (p.kind === 'strip') {
+      // лента фундамента: над землёй 0,2 м
+      const top = p.pts.map((q) => [q[0], q[1], 0.0] as V3), bot = p.pts.map((q) => [q[0], q[1], -0.2] as V3);
+      faces.push({ pts: top, fill: '#C9C6BF', stroke: '#9d9a93', opacity: 1, d: 0, sw: 0.6, ground: true });
+      for (let i = 0; i < 4; i++) faces.push({ pts: [top[i], top[(i + 1) % 4], bot[(i + 1) % 4], bot[i]], fill: '#A8A59E', stroke: '#8a877f', opacity: 1, d: 0, sw: 0.5, ground: true });
+    }
     if (p.kind === 'slab') {
-      const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], q[2] - res.params.slabT] as V3);
+      const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], q[2] - (res.params.base === 'ushp' ? res.params.slabT + res.params.eps : res.params.slabT)] as V3);
       faces.push({ pts: top, fill: '#C9C6BF', stroke: '#9d9a93', opacity: 1, d: 0, sw: 0.6, ground: true });
       for (let i = 0; i < 4; i++) faces.push({ pts: [top[i], top[(i + 1) % 4], bot[(i + 1) % 4], bot[i]], fill: '#A8A59E', stroke: '#8a877f', opacity: 1, d: 0, sw: 0.5, ground: true });
     }
@@ -106,7 +112,7 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
   // панели: кровля, профлист, сетка
   const col = colorOf(res.params.color);
   for (const p of res.panels) {
-    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving') continue;
+    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip') continue;
     if (p.kind === 'mesh') {
       // сетка — прозрачная, с линиями
       const [a, b, c2, d2] = p.pts;
@@ -189,8 +195,9 @@ export function drawings(res: CanopyResult): Sheet[] {
   // ---------- план ----------
   {
     const pr: Prim[] = [];
+    for (const q of res.panels.filter((x) => x.kind === 'strip')) pr.push({ t: 'poly', pts: q.pts.map((v) => [v[0], v[1]] as [number, number]), fill: '#E2DFD8', c: '#777', w: 0.6, hatch: 'concrete' });
     if (res.params.base === 'paving') { const o = res.params.slabOver; pr.push({ t: 'poly', pts: [[-o, -o], [L + o, -o], [L + o, W + o], [-o, W + o]], fill: '#E4E0D8', c: '#888', w: 0.8, hatch: 'gravel' }); }
-    if (res.params.base === 'slab') { const o = res.params.slabOver; pr.push({ t: 'poly', pts: [[-o, -o], [L + o, -o], [L + o, W + o], [-o, W + o]], fill: '#ECEAE4', c: '#888', w: 0.8, hatch: 'concrete' }); }
+    if (res.params.base === 'slab' || res.params.base === 'ushp') { const o = res.params.slabOver; pr.push({ t: 'poly', pts: [[-o, -o], [L + o, -o], [L + o, W + o], [-o, W + o]], fill: '#ECEAE4', c: '#888', w: 0.8, hatch: 'concrete' }); }
     const roof = res.panels.filter((p) => p.kind === 'roof');
     for (const r of roof) pr.push({ t: 'poly', pts: r.pts.map((q) => [q[0], q[1]] as [number, number]), c: '#555', w: 0.6 });
     for (const m of res.members) {
@@ -249,7 +256,8 @@ export function drawings(res: CanopyResult): Sheet[] {
     const width = side === 'front' || side === 'back' ? L : W;
     const pr: Prim[] = [];
     pr.push({ t: 'line', x1: -1, y1: 0, x2: width + 1, y2: 0, w: 1.2, c: '#555' });
-    if (res.params.base === 'slab') pr.push({ t: 'poly', pts: [[-res.params.slabOver, 0], [width + res.params.slabOver, 0], [width + res.params.slabOver, -res.params.slabT], [-res.params.slabOver, -res.params.slabT]], fill: '#D8D5CE', c: '#888', w: 0.6, hatch: 'concrete' });
+    if (res.params.base === 'slab' || res.params.base === 'ushp') pr.push({ t: 'poly', pts: [[-res.params.slabOver, 0], [width + res.params.slabOver, 0], [width + res.params.slabOver, -res.params.slabT], [-res.params.slabOver, -res.params.slabT]], fill: '#D8D5CE', c: '#888', w: 0.6, hatch: 'concrete' });
+    if (res.params.base === 'strip') { const w2 = res.params.stripW / 2; pr.push({ t: 'poly', pts: [[-w2, 0], [width + w2, 0], [width + w2, -0.2], [-w2, -0.2]], fill: '#D8D5CE', c: '#888', w: 0.6, hatch: 'concrete' }); }
     if (res.params.base === 'deck') pr.push({ t: 'poly', pts: [[0, 0.02], [width, 0.02], [width, -0.2], [0, -0.2]], fill: '#C49A6C', c: '#7a5232', w: 0.6 });
     if (res.params.base === 'paving') pr.push({ t: 'poly', pts: [[-res.params.slabOver, 0], [width + res.params.slabOver, 0], [width + res.params.slabOver, -0.08], [-res.params.slabOver, -0.08]], fill: '#C9C4BA', c: '#888', w: 0.6 });
     // стена дома, если видна сбоку
@@ -300,8 +308,33 @@ export function drawings(res: CanopyResult): Sheet[] {
     sheets.push({ title, x0: -2, y0: l2 ? -2.4 : -2.1, x1: width + 2, y1: zTop + 0.8, prims: pr });
   }
 
+  // ---------- разрез ленточного фундамента (масштаб ×4, подписи — в реальных мм) ----------
+  if (res.params.base === 'strip') {
+    const K = 4;
+    const w = res.params.stripW * K, h = res.params.stripD * K;
+    const pr: Prim[] = [];
+    const above = 0.2 * K, below = h - above, cush = 0.15 * K, side = 0.5 * K;
+    pr.push({ t: 'poly', pts: [[-side, 0], [w + side, 0], [w + side, -below - cush - 0.25 * K], [-side, -below - cush - 0.25 * K]], fill: '#A88F6C', c: '#776', w: 0.4, hatch: 'soil' });
+    pr.push({ t: 'poly', pts: [[-0.1 * K, -below], [w + 0.1 * K, -below], [w + 0.1 * K, -below - cush], [-0.1 * K, -below - cush]], fill: '#E7D9A8', c: '#444', w: 0.6, hatch: 'sand' });
+    pr.push({ t: 'poly', pts: [[0, above], [w, above], [w, -below], [0, -below]], fill: '#D3D0C9', c: '#333', w: 1, hatch: 'concrete' });
+    const c = 0.05 * K, r = 0.07;
+    for (const [x, y] of [[c, above - c], [w - c, above - c], [c, -below + c], [w - c, -below + c]]) pr.push({ t: 'poly', pts: [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]], fill: '#222', c: '#222', w: 0.3 });
+    pr.push({ t: 'poly', pts: [[c, -below + c], [w - c, -below + c], [w - c, above - c], [c, above - c]], c: '#555', w: 0.6 });
+    pr.push({ t: 'line', x1: -side, y1: 0, x2: w + side, y2: 0, w: 1.4, c: '#333' });
+    pr.push({ t: 'line', x1: -0.05, y1: -below, x2: -0.05, y2: above, w: 2, c: '#3a7bd5' });
+    pr.push({ t: 'text', x: -side + 0.1, y: 0.12, s: 'уровень земли', size: 0.2, anchor: 'start', c: '#333' });
+    pr.push({ t: 'dim', x1: 0, y1: -below - cush, x2: w, y2: -below - cush, off: -0.55, s: `${Math.round(res.params.stripW * 1000)} мм` });
+    pr.push({ t: 'dim', x1: w, y1: -below, x2: w, y2: above, off: side + 0.4, s: `${Math.round(res.params.stripD * 1000)} мм` });
+    const tx = w + side + 1.0;
+    pr.push({ t: 'text', x: tx, y: above - 0.2, s: 'Бетон М300', size: 0.2, anchor: 'start', bold: true });
+    pr.push({ t: 'text', x: tx, y: above - 0.5, s: '4 стержня Ø12 А500, хомуты Ø8 шаг 400', size: 0.18, anchor: 'start' });
+    pr.push({ t: 'text', x: tx, y: above - 0.8, s: 'гидроизоляция обмазочная', size: 0.18, anchor: 'start', c: '#3a7bd5' });
+    pr.push({ t: 'text', x: tx, y: -below - cush / 2 - 0.05, s: `песчаная подушка ${Math.round(150)} мм`, size: 0.18, anchor: 'start' });
+    pr.push({ t: 'text', x: tx, y: -below - cush - 0.6, s: 'обратная засыпка грунтом', size: 0.18, anchor: 'start', c: '#555' });
+    sheets.push({ title: 'Разрез ленточного фундамента', x0: -side - 0.3, y0: -below - cush - 0.25 * K - 0.9, x1: tx + 4.3, y1: above + 0.4, prims: pr });
+  }
   // ---------- разрез основания ----------
-  if (res.params.base === 'slab') {
+  if (res.params.base === 'slab' || res.params.base === 'ushp') {
     const { slabT, sand, gravel } = res.params;
     const pr: Prim[] = [];
     const w = 4, vf = 4; // толщины слоёв показаны крупнее (×4), подписи — в реальных мм
@@ -311,18 +344,22 @@ export function drawings(res: CanopyResult): Sheet[] {
       pr.push({ t: 'text', x: w + 0.25, y: z - (h * vf) / 2 + (h * vf > 0.7 ? -0.08 : 0.12), s: `${name} — ${Math.round(h * 1000)} мм`, size: 0.2, anchor: 'start' });
       z -= h * vf;
     };
-    layer(slabT, `Бетон М300, арм. ${res.params.rebar === 'composite' ? 'композит Ø8' : 'А500 Ø12'} 200×200`, 'concrete', '#D3D0C9');
-    pr.push({ t: 'line', x1: 0, y1: z, x2: w, y2: z, w: 2, c: '#3a7bd5' });
-    pr.push({ t: 'text', x: w + 0.25, y: z - 0.2, s: 'плёнка полиэтиленовая 200 мкм', size: 0.17, anchor: 'start', c: '#3a7bd5' });
-    layer(gravel, 'Щебень фр. 20–40, уплотнение', 'gravel', '#BDB6A8');
+    const ushp = res.params.base === 'ushp';
+    layer(slabT, ushp ? 'Плита УШП, бетон М300, 2 сетки А500 Ø12' : `Бетон М300, арм. ${res.params.rebar === 'composite' ? 'композит Ø8' : 'А500 Ø12'} 200×200`, 'concrete', '#D3D0C9');
+    if (ushp) layer(res.params.eps, 'Утеплитель ЭППС', undefined, '#F4CF8A');
+    else {
+      pr.push({ t: 'line', x1: 0, y1: z, x2: w, y2: z, w: 2, c: '#3a7bd5' });
+      pr.push({ t: 'text', x: w + 0.25, y: z - 0.2, s: 'плёнка полиэтиленовая 200 мкм', size: 0.17, anchor: 'start', c: '#3a7bd5' });
+      layer(gravel, 'Щебень фр. 20–40, уплотнение', 'gravel', '#BDB6A8');
+    }
     layer(sand, 'Песок крупный/средний, уплотнение', 'sand', '#E7D9A8');
     pr.push({ t: 'line', x1: 0, y1: z, x2: w, y2: z, w: 2, c: '#2a6' });
     pr.push({ t: 'text', x: w + 0.25, y: z - 0.12, s: 'Геотекстиль 200 г/м²', size: 0.18, anchor: 'start', c: '#2a6' });
     pr.push({ t: 'poly', pts: [[0, z], [w, z], [w, z - 0.6], [0, z - 0.6]], fill: '#A88F6C', c: '#776', w: 0.4, hatch: 'soil' });
     pr.push({ t: 'text', x: w + 0.25, y: z - 0.45, s: 'Уплотнённый грунт', size: 0.18, anchor: 'start', c: '#555' });
-    pr.push({ t: 'dim', x1: 0, y1: 0, x2: 0, y2: z, off: -0.45, s: `${Math.round((slabT + sand + gravel) * 1000)} мм` });
+    pr.push({ t: 'dim', x1: 0, y1: 0, x2: 0, y2: z, off: -0.45, s: `${Math.round((slabT + sand + (ushp ? res.params.eps : gravel)) * 1000)} мм` });
     z -= 0.6;
-    sheets.push({ title: 'Разрез основания (толщины условно ×4)', x0: -1.1, y0: z - 0.2, x1: w + 6.2, y1: 0.4, prims: pr });
+    sheets.push({ title: ushp ? 'Разрез УШП (толщины условно ×4)' : 'Разрез основания (толщины условно ×4)', x0: -1.1, y0: z - 0.2, x1: w + 6.2, y1: 0.4, prims: pr });
   }
   return sheets;
 }

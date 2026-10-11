@@ -8,6 +8,35 @@ import { CANOPY_AI_SCHEMA, CANOPY_AI_PROMPT, mergeAiParams } from '../../../shar
 import { chatJson } from '../ai/openai';
 import { renderDesign, fileName } from '../pdf';
 import { brandPath } from '../brand';
+import { botLink } from '../botInfo';
+import { loadEstimate } from './estimates';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { OBJ_LABEL } from '../../../shared/design/canopy';
+
+const viewUrl = (token: string) => `${env.PUBLIC_URL || ''}/v/${token}`;
+const newToken = () => crypto.randomBytes(18).toString('base64url');
+const escJson = (o: any) => JSON.stringify(o).replace(/</g, '\\u003c').replace(/\u2028|\u2029/g, '');
+const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../web/dist');
+let viewerTpl: string | null = null;
+async function viewerHtml() {
+  if (viewerTpl && process.env.NODE_ENV === 'production') return viewerTpl;
+  const f = path.join(DIST, 'viewer.html');
+  viewerTpl = fs.existsSync(f) ? await fsp.readFile(f, 'utf8') : null;
+  return viewerTpl;
+}
+async function byToken(token: string) {
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
+  return prisma.design.findFirst({ where: { shareToken: token, deletedAt: null }, include: { user: true } });
+}
+export async function designForEstimate(estimateId: string) {
+  const d = await prisma.design.findFirst({ where: { estimateId, deletedAt: null, shareToken: { not: null } }, orderBy: { updatedAt: 'desc' } });
+  return d ? `/v/${d.shareToken}` : null;
+}
 
 /** ИИ-проектировщик: проекты (параметры модели), разбор описания ИИ, PDF «Эскизный проект» */
 const paramsSchema = z.record(z.string(), z.any());
@@ -35,6 +64,64 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     if (!(await prisma.design.findFirst({ where: { id, userId: req.user.id, deletedAt: null } }))) throw notFound('Проект');
     await prisma.design.update({ where: { id }, data: { deletedAt: new Date() } });
     return { ok: true };
+  });
+
+  // ---- 3D для заказчика: ссылка без входа в Telegram ----
+  const own = async (userId: string, id: string) => {
+    const d = await prisma.design.findFirst({ where: { id, userId, deletedAt: null } });
+    if (!d) throw notFound('Проект');
+    return d;
+  };
+  const shareInfo = (d: any) => ({ url: d.shareToken ? viewUrl(d.shareToken) : null, sharedAt: d.sharedAt, viewedAt: d.viewedAt, estimateId: d.estimateId });
+
+  app.post('/api/designs/:id/share', async (req) => {
+    const d = await own(req.user.id, (req.params as any).id);
+    const upd = d.shareToken ? d : await prisma.design.update({ where: { id: d.id }, data: { shareToken: newToken(), sharedAt: new Date(), viewedAt: null } });
+    await audit(req.user.id, 'design', d.id, 'share');
+    return shareInfo(upd);
+  });
+  app.delete('/api/designs/:id/share', async (req) => {
+    const d = await own(req.user.id, (req.params as any).id);
+    return shareInfo(await prisma.design.update({ where: { id: d.id }, data: { shareToken: null } }));
+  });
+  // проект добавлен в смету — у сметы для заказчика появится кнопка «Посмотреть в 3D»
+  app.post('/api/designs/:id/link', async (req) => {
+    const d = await own(req.user.id, (req.params as any).id);
+    const { estimateId } = z.object({ estimateId: z.string().min(1).max(64) }).parse(req.body);
+    await loadEstimate(req.user.id, estimateId);
+    const upd = await prisma.design.update({ where: { id: d.id }, data: { estimateId, ...(d.shareToken ? {} : { shareToken: newToken(), sharedAt: new Date() }) } });
+    return shareInfo(upd);
+  });
+
+  app.get('/v/:token', async (req, reply) => {
+    const d = await byToken((req.params as any).token);
+    reply.header('Content-Type', 'text/html; charset=utf-8').header('X-Robots-Tag', 'noindex').header('Referrer-Policy', 'no-referrer');
+    const tpl = await viewerHtml();
+    if (!d || !tpl) return reply.status(404).send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Проект недоступен</title><body style="font:16px system-ui;padding:24px;background:#f4f1ea"><h1>Проект недоступен</h1><p>Ссылка устарела или исполнитель её отозвал. Попросите прислать новую.</p></body>`);
+    if (!d.viewedAt) {
+      const first = await prisma.design.updateMany({ where: { id: d.id, viewedAt: null }, data: { viewedAt: new Date() } });
+      if (first.count && opts.bot) await opts.bot.api.sendMessage(Number(d.user.tgId), `👀 Заказчик открыл 3D-проект «${escHtml(d.title)}».`, { parse_mode: 'HTML' }).catch(() => {});
+    }
+    const u: any = d.user;
+    let estimateUrl: string | null = null;
+    if (d.estimateId) {
+      const e = await prisma.estimate.findFirst({ where: { id: d.estimateId, userId: d.userId, deletedAt: null }, select: { shareToken: true } });
+      if (e?.shareToken) estimateUrl = `/s/${e.shareToken}`;
+    }
+    const data = {
+      title: d.title, kind: OBJ_LABEL[(d.params as any)?.kind as keyof typeof OBJ_LABEL] || 'Проект', params: d.params,
+      company: u.companyName || u.firstName || '', contacts: u.contacts || null,
+      username: u.username || null, logo: brandPath(u.logoFile) ? `/v/${d.shareToken}/logo` : null,
+      estimateUrl, botUrl: botLink('view3d'), date: d.updatedAt,
+    };
+    const html = tpl.replace('<!--DESIGN_DATA-->', () => `<script>window.__DESIGN__=${escJson(data)}</script>`).replace(/<title>[^<]*<\/title>/, () => `<title>${escHtml(d.title)} — 3D-проект</title>`);
+    return reply.send(html);
+  });
+  app.get('/v/:token/logo', async (req, reply) => {
+    const d = await byToken((req.params as any).token);
+    const p = d && brandPath(d.user.logoFile);
+    if (!p) return reply.status(404).send();
+    return reply.header('Content-Type', 'image/png').header('Cache-Control', 'public, max-age=3600').send(await fsp.readFile(p));
   });
 
   // Описание словами → параметры (ИИ только заполняет параметры; чертежи и материалы считает программа)

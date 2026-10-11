@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { get, post, put, del } from '../api';
 import { Chips, Field, NumInput, Sheet, useDebounced, useToast } from '../components/ui';
 import CalcResult from '../components/CalcResult';
+import { Viewer, Drawings } from '../components/Design3D';
 import { n, rub0, parseNum } from '../format';
-import { haptic, confirmDialog } from '../tg';
+import { haptic, confirmDialog, tg } from '../tg';
 import { useMe } from '../App';
 import { buildCanopy, CANOPY_DEFAULT, OBJ_LABEL, type CanopyParams, type ObjKind, type Side, type Wall } from '../../../shared/design/canopy';
-import { render3d, drawings, view3dToSvg, sheetToSvg, RAL } from '../../../shared/design/render';
+import { RAL } from '../../../shared/design/render';
+import { CITIES, snowByCity, snowLabel } from '../../../shared/design/snow';
 import { WALL_LABEL } from '../../../shared/design/report';
 import { PRESETS } from '../../../shared/design/presets';
 
@@ -15,11 +17,11 @@ import { PRESETS } from '../../../shared/design/presets';
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
 // пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
-const BLANK: Partial<CanopyParams> = { attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const BLANK: Partial<CanopyParams> = { stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
 const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
-const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights'] as const;
+const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps'] as const;
 type NumKey = (typeof NUMS)[number];
-const MM = new Set<NumKey>(['slabT', 'sand', 'gravel']); // в форме — в миллиметрах
+const MM = new Set<NumKey>(['slabT', 'sand', 'gravel', 'stripW', 'stripD', 'eps']); // в форме — в миллиметрах
 const toStr = (p: CanopyParams) => Object.fromEntries(NUMS.map((k) => [k, String(MM.has(k) ? Math.round(p[k] * 1000) : p[k])])) as Record<NumKey, string>;
 const SIDES: { s: Side; label: string }[] = [{ s: 'front', label: 'Спереди (въезд)' }, { s: 'back', label: 'Сзади' }, { s: 'left', label: 'Слева' }, { s: 'right', label: 'Справа' }];
 const SIDE_SHORT: Record<Side, string> = { front: 'спереди', back: 'сзади', left: 'слева', right: 'справа' };
@@ -39,7 +41,7 @@ export default function Designer() {
   const [tab, setTab] = useState<Tab>('params');
   const [text, setText] = useState('');
   const [questions, setQuestions] = useState<string[]>([]);
-  const [busy, setBusy] = useState<'' | 'ai' | 'pdf' | 'save'>('');
+  const [busy, setBusy] = useState<'' | 'ai' | 'pdf' | 'save' | 'share'>('');
   const [listOpen, setListOpen] = useState(false);
   const [list, setList] = useState<any[] | null>(null);
 
@@ -50,11 +52,18 @@ export default function Designer() {
   }, [base, nums]);
   const dp = useDebounced(params, 250);
   const res = useMemo(() => buildCanopy(dp), [dp]);
+  const cityHint = (() => {
+    const c = snowByCity(base.city);
+    if (c) return `${c.name}: снеговой район ${snowLabel(c.region)} — подставлен. Ориентировочно по СП 20.13330, границы районов проверяйте по карте.`;
+    return base.city ? 'Города нет в справочнике — укажите снеговой район вручную' : 'Снеговой район подставится сам';
+  })();
   const errors = useMemo(() => {
     const e: string[] = [];
     if (params.L < 1 || params.L > 60 || params.W < 1 || params.W > 60) e.push('Размеры в плане — от 1 до 60 м');
     if (params.hHigh < 1.2 || params.hHigh > 12 || params.hLow < 1.2 || params.hLow > 12) e.push('Высоты — от 1,2 до 12 м');
     if (params.lights < 0 || params.lights > 50) e.push('Светильников — от 0 до 50');
+    if (params.snow < 1 || params.snow > 8) e.push('Снеговой район — от 1 до 8');
+    if (params.base === 'strip' && (params.stripW < 0.2 || params.stripW > 1 || params.stripD < 0.3 || params.stripD > 2)) e.push('Лента: ширина 200–1000 мм, высота 300–2000 мм');
     if (params.postStep < 1.5 || params.postStep > 6) e.push('Шаг столбов — от 1,5 до 6 м');
     return e;
   }, [params]);
@@ -79,13 +88,32 @@ export default function Designer() {
       toast('Параметры заполнены — проверьте и поправьте при необходимости');
     } catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
   };
-  const save = async () => {
-    setBusy('save');
+  // сохранить (или обновить) проект и вернуть его id
+  const persist = async (): Promise<string> => {
     try {
       const d = designId ? await put(`/designs/${designId}`, { title, params }) : await post('/designs', { title, params, kind: 'canopy' });
-      setDesignId(d.id); haptic('success'); toast('Проект сохранён');
-    } catch (e: any) { if (e.status === 404) { setDesignId(null); toast('Проект был удалён — сохраните заново', true); } else if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
+      setDesignId(d.id); return d.id;
+    } catch (e: any) {
+      if (e.status !== 404) throw e;
+      const d = await post('/designs', { title, params, kind: 'canopy' }); setDesignId(d.id); return d.id;
+    }
   };
+  const save = async () => {
+    setBusy('save');
+    try { await persist(); haptic('success'); toast('Проект сохранён'); }
+    catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
+  };
+  const [share, setShare] = useState<{ url: string | null; viewedAt?: string | null } | null>(null);
+  const openShare = async () => {
+    if (errors.length) return toast(errors[0], true);
+    setBusy('share');
+    try { const id = await persist(); setShare(await post(`/designs/${id}/share`)); haptic('success'); }
+    catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
+  };
+  const shareText = `${title}: 3D-проект, чертежи и параметры. Покрутите модель пальцем:`;
+  const sendTg = () => { if (!share?.url) return; const u = `https://t.me/share/url?url=${encodeURIComponent(share.url)}&text=${encodeURIComponent(shareText)}`; if (tg?.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank'); };
+  const copy = async () => { if (!share?.url) return; try { await navigator.clipboard.writeText(`${shareText}\n${share.url}`); haptic('success'); toast('Скопировано — вставьте в WhatsApp, SMS или почту'); } catch { toast(share.url); } };
+  const linkToEstimate = async (estimateId: string) => { const id = await persist(); await post(`/designs/${id}/link`, { estimateId }); };
   const sendPdf = async () => {
     if (errors.length) return toast(errors[0], true);
     setBusy('pdf');
@@ -185,7 +213,9 @@ export default function Designer() {
           )}
 
           <div className="csection">Основание</div>
-          <Chips value={base.base} onChange={(v) => setB({ base: v })} options={[{ value: 'slab', label: 'Бетонная плита' }, { value: 'paving', label: 'Тротуарная плитка' }, { value: 'piles', label: 'Сваи под столбы' }, { value: 'deck', label: 'Настил на винтовых сваях' }, { value: 'none', label: 'Нет' }]} />
+          <Chips value={base.base} onChange={(v) => setB({ base: v })} options={[{ value: 'slab', label: 'Бетонная плита' }, { value: 'ushp', label: 'УШП (тёплая плита)' }, { value: 'strip', label: 'Ленточный' }, { value: 'piles', label: 'Буронабивные сваи' }, { value: 'screw', label: 'Винтовые сваи' }, { value: 'deck', label: 'Настил на винтовых сваях' }, { value: 'paving', label: 'Тротуарная плитка' }, { value: 'none', label: 'Нет' }]} />
+          {base.base === 'strip' && <div className="grid2">{num('stripW', 'Ширина ленты', 'мм')}{num('stripD', 'Высота ленты', 'мм', 'из них 200 мм над землёй')}</div>}
+          {base.base === 'ushp' && <div className="grid3">{num('slabT', 'Плита', 'мм')}{num('eps', 'ЭППС', 'мм')}{num('sand', 'Песок', 'мм')}</div>}
           {base.base === 'paving' && num('slabOver', 'Плитка шире навеса на', 'м', 'с каждой стороны')}
           {base.base === 'slab' && (
             <>
@@ -198,6 +228,11 @@ export default function Designer() {
           <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.gutter} onChange={(e) => setB({ gutter: e.target.checked })} />Водосток (желоба и трубы)</label>
           {['prof', 'tile', 'soft', 'sandwich'].includes(base.cover) && <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.snowGuard} onChange={(e) => setB({ snowGuard: e.target.checked })} />Снегозадержатели</label>}
           {num('lights', 'Освещение: светильников', 'шт', '0 — без освещения; кабель, автомат и монтаж посчитаются')}
+          <Field label="Город или посёлок" hint={cityHint}>
+            <input className="input" list="dz-cities" value={base.city} placeholder="например, Всеволожск" maxLength={80}
+              onChange={(e) => { const v = e.target.value; setB({ city: v }); const c = snowByCity(v); if (c) setNums((x) => ({ ...x, snow: String(c.region) })); }} />
+            <datalist id="dz-cities">{CITIES.map((c) => <option key={c.name} value={c.name} />)}</datalist>
+          </Field>
           <div className="grid2">{num('snow', 'Снеговой район', '1–8')}{num('waste', 'Запас материалов', '%')}</div>
         </div>
       )}
@@ -220,19 +255,32 @@ export default function Designer() {
       )}
 
       {tab === 'est' && (
-        <CalcResult calcId="design-canopy" suggestions={res.lines as any} estimateTitle={title} />
+        <CalcResult calcId="design-canopy" suggestions={res.lines as any} estimateTitle={title} onAdded={linkToEstimate} />
       )}
 
       {res.warnings.map((w) => <div key={w} className="dz-warn">{w}</div>)}
 
       <div className="stack" style={{ marginTop: 12 }}>
-        <button className="btn primary block lg" disabled={busy === 'pdf'} onClick={sendPdf}>{busy === 'pdf' ? 'Готовлю PDF…' : '📄 PDF эскизного проекта в Telegram'}</button>
+        <button className="btn primary block lg" disabled={busy === 'share'} onClick={openShare}>{busy === 'share' ? 'Готовлю ссылку…' : '🧊 3D-ссылка для заказчика'}</button>
+        <button className="btn block" disabled={busy === 'pdf'} onClick={sendPdf}>{busy === 'pdf' ? 'Готовлю PDF…' : '📄 PDF эскизного проекта в Telegram'}</button>
         <div className="grid2">
           <button className="btn" disabled={busy === 'save'} onClick={save}>{designId ? 'Сохранить' : 'Сохранить проект'}</button>
           <button className="btn" onClick={openList}>Мои проекты</button>
         </div>
         {tab !== 'est' && <button className="btn block" onClick={() => setTab('est')}>Смета по проекту · ≈ {rub0(res.lines.reduce((a, l: any) => a + l.qty * (l.price || 0), 0))}</button>}
       </div>
+
+      <Sheet open={!!share} onClose={() => setShare(null)} title="3D для заказчика">
+        <p className="small muted" style={{ marginTop: 0 }}>Заказчик откроет ссылку в любом браузере без Telegram: покрутит 3D, посмотрит чертежи и параметры. Когда откроет — придёт уведомление. Если добавить проект в смету и поделиться сметой, на странице сметы появится кнопка «Посмотреть в 3D».</p>
+        {share?.url && <input className="input" readOnly value={share.url} onFocus={(e) => e.target.select()} />}
+        {share?.viewedAt && <p className="xs muted">Заказчик открывал: {new Date(share.viewedAt).toLocaleString('ru-RU')}</p>}
+        <div className="stack" style={{ marginTop: 10 }}>
+          <button className="btn primary block" onClick={sendTg}>Отправить в Telegram</button>
+          <button className="btn block" onClick={copy}>Скопировать для WhatsApp / SMS</button>
+          {share?.url && <a className="btn block" href={share.url} target="_blank" rel="noreferrer">Открыть как заказчик</a>}
+          <button className="btn block" onClick={async () => { if (!designId) return; setShare(null); await del(`/designs/${designId}/share`); toast('Ссылка отключена'); }}>Отключить ссылку</button>
+        </div>
+      </Sheet>
 
       <Sheet open={listOpen} onClose={() => setListOpen(false)} title="Мои проекты">
         {list == null ? <p className="muted">Загрузка…</p> : !list.length ? <p className="muted">Сохранённых проектов пока нет.</p> : (
@@ -253,36 +301,3 @@ export default function Designer() {
   );
 }
 
-/** 3D: вращение пальцем/мышью */
-function Viewer({ res }: { res: ReturnType<typeof buildCanopy> }) {
-  const [ang, setAng] = useState({ yaw: -35, pitch: 24 });
-  const drag = useRef<{ x: number; y: number; yaw: number; pitch: number } | null>(null);
-  const svg = useMemo(() => view3dToSvg(render3d(res, ang.yaw, ang.pitch, 640, 440)), [res, ang]);
-  return (
-    <div className="dz-3d" style={{ touchAction: 'none' }}
-      onPointerDown={(e) => { (e.target as Element).setPointerCapture?.(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, ...ang }; }}
-      onPointerMove={(e) => { const d = drag.current; if (!d) return; setAng({ yaw: d.yaw + (e.clientX - d.x) * 0.5, pitch: Math.max(5, Math.min(70, d.pitch - (e.clientY - d.y) * 0.3)) }); }}
-      onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)}>
-      <div dangerouslySetInnerHTML={{ __html: svg }} />
-      <div className="dz-3d-bar">
-        <span className="xs muted">↔ вращайте пальцем</span>
-        {[['Спереди', -35, 24], ['Сзади', 145, 24], ['Сверху', -35, 68]].map(([l, y, p]) => <button key={l as string} className="chip" onClick={() => setAng({ yaw: y as number, pitch: p as number })}>{l}</button>)}
-      </div>
-    </div>
-  );
-}
-
-function Drawings({ res }: { res: ReturnType<typeof buildCanopy> }) {
-  const sheets = useMemo(() => drawings(res), [res]);
-  return (
-    <div className="stack">
-      {sheets.map((sh) => (
-        <div key={sh.title} className="dz-sheet">
-          <div className="dz-sheet-t">{sh.title}</div>
-          <div dangerouslySetInnerHTML={{ __html: sheetToSvg(sh, 620) }} />
-        </div>
-      ))}
-      <p className="xs muted">Размеры на чертежах — в миллиметрах. Полный комплект (3D, план, 4 фасада, разрез основания, раскрой и ведомость) — в PDF.</p>
-    </div>
-  );
-}

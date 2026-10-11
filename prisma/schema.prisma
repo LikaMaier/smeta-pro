@@ -59,11 +59,17 @@ model Design {
   kind      String    @default("canopy")
   title     String
   params    Json
+  shareToken String?
+  sharedAt   DateTime?
+  viewedAt   DateTime?
+  estimateId String?
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   @@index([userId, deletedAt])
+  @@index([shareToken])
+  @@index([estimateId])
 }
 
 // Акт выполненных работ (в т.ч. промежуточный): снимок выполненных объёмов на дату

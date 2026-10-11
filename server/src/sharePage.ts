@@ -9,7 +9,7 @@ const qty = (v: number) => String(Math.round((v || 0) * 1000) / 1000).replace('.
 
 export interface PageMeta {
   token: string; number: number; hasLogo: boolean; approvedAt: Date | null; title: string; customer?: string | null; address?: string | null;
-  date: Date; validDays: number; paymentTerms?: string | null; notes?: string | null; botUrl: string;
+  date: Date; validDays: number; paymentTerms?: string | null; notes?: string | null; botUrl: string; designUrl?: string | null;
 }
 
 /** Страница сметы для заказчика. d — данные как для PDF (без себестоимости и прибыли) */
@@ -45,6 +45,7 @@ export function estimatePage(d: any, m: PageMeta) {
     <div class="total">${money(t.total)}</div>
     <div class="muted small">итого к оплате</div>
   </div>
+  ${m.designUrl ? `<a class="btn main" href="${esc(m.designUrl)}">🧊 Посмотреть объект в 3D и чертежи</a>` : ''}
   <div class="card">${rows}
     <div class="sums">
       ${sum('Работы', t.works)}${sum('Материалы', t.materials)}${sum('Техника, услуги и прочее', t.other)}

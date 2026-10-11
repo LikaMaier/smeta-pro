@@ -9,6 +9,7 @@ import { pdfData, renderPdf, fileName } from '../pdf';
 import { brandPath } from '../brand';
 import { botLink } from '../botInfo';
 import { estimatePage, page, esc, money } from '../sharePage';
+import { designForEstimate } from './designer';
 
 /**
  * Ссылка на смету для заказчика: страница без входа в Telegram,
@@ -77,7 +78,7 @@ export async function shareRoutes(app: FastifyInstance, opts: { bot?: any } = {}
     return reply.send(estimatePage(pdfData(e, e.user, number, false, await estimatePaid(e)), {
       token: (req.params as any).token, number, hasLogo: Boolean(brandPath(e.user.logoFile)), approvedAt: e.approvedAt,
       title: e.title, customer: e.customer, address: e.address, date: e.date, validDays: e.validDays ?? 14,
-      paymentTerms: e.paymentTerms, notes: e.notes, botUrl: botLink('site'),
+      paymentTerms: e.paymentTerms, notes: e.notes, botUrl: botLink('site'), designUrl: await designForEstimate(e.id),
     }));
   });
 

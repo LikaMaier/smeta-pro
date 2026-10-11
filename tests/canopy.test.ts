@@ -127,3 +127,36 @@ test('доп. опции: водосток, снегозадержатели, о
   assert.ok(has('Монтаж водосточной системы') && has('Монтаж снегозадержателей') && has('Монтаж светильника') && has('Укладка тротуарной плитки (с основанием)'));
   assert.equal(r.lines.find((l) => l.name === 'Монтаж светильника')!.qty, 3);
 });
+
+import { snowByCity } from '../shared/design/snow';
+import { mergeAiParams } from '../shared/design/ai';
+import { CANOPY_DEFAULT } from '../shared/design/canopy';
+
+test('снеговой район по городу', () => {
+  assert.equal(snowByCity('Москва')!.region, 3);
+  assert.equal(snowByCity('г. Всеволожск')!.region, 3);
+  assert.equal(snowByCity('тихвин')!.region, 4);
+  assert.equal(snowByCity('Пермь')!.region, 5);
+  assert.equal(snowByCity('Петропавловск-Камчатский')!.region, 7);
+  assert.equal(snowByCity('Королев')!.name, 'Королёв');
+  assert.equal(snowByCity('Нигдеград'), null);
+  const p = mergeAiParams(CANOPY_DEFAULT, { city: 'Уфа', snow: null, L: 5 });
+  assert.equal(p.snow, 5); assert.equal(p.L, 5);
+});
+
+test('фундаменты: УШП, лента, винтовые сваи — свои работы, материалы и разрез', () => {
+  const base = { kind: 'garage' as const, L: 6, W: 6, roof: 'gable' as const, highSide: 'left' as const, hHigh: 3.5, hLow: 2.7, walls: { front: 'prof_full', back: 'prof_full', left: 'prof_full', right: 'prof_full' } as any };
+  const u = buildCanopy({ ...base, base: 'ushp', slabT: 0.1, eps: 0.1, sand: 0.3 });
+  assert.ok(u.lines.some((l) => l.name === 'Утепление фундамента ЭППС'));
+  assert.ok(drawings(u).some((s) => s.title.startsWith('Разрез УШП')));
+  const st = buildCanopy({ ...base, base: 'strip', stripW: 0.4, stripD: 0.7 });
+  const lf = st.lines.find((l) => l.name === 'Ленточный фундамент под ключ (без материала)')!;
+  assert.equal(lf.qty, 6.72); // 24 м × 0,4 × 0,7
+  assert.ok(st.panels.filter((p) => p.kind === 'strip').length === 4);
+  assert.ok(drawings(st).some((s) => s.title.startsWith('Разрез ленточного фундамента')));
+  const sc = buildCanopy({ ...base, base: 'screw' });
+  assert.equal(sc.lines.find((l) => l.name === 'Монтаж винтовых свай')!.qty, sc.info.posts);
+  // V снеговой район — стропила мощнее
+  const s3 = buildCanopy({ ...base, walls: undefined, snow: 3 }), s5 = buildCanopy({ ...base, walls: undefined, snow: 5 });
+  assert.ok(s5.info.steelKg > s3.info.steelKg);
+});

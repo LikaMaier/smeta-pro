@@ -11,7 +11,7 @@ import { Builder } from '../masters';
 export type V3 = [number, number, number];
 export type MemberKind = 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster' | 'brace';
 export interface Member { kind: MemberKind; profile: string; a: V3; b: V3 }
-export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving'; pts: V3[] }
+export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip'; pts: V3[] }
 export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh' | 'rail' | 'poly' | 'sandwich' | 'wood' | 'wood_low';
 export type Side = 'front' | 'back' | 'left' | 'right';
 export type ObjKind = 'canopy' | 'tko' | 'lean' | 'visor' | 'gazebo' | 'garage' | 'greenhouse' | 'woodshed';
@@ -36,7 +36,10 @@ export interface CanopyParams {
   gateW: number; gateH: number;
   door: boolean;        // дверь / калитка 0,9×2,05
   insulate: boolean;    // утепление стен и кровли (гараж, мастерская)
-  base: 'slab' | 'piles' | 'deck' | 'paving' | 'none';
+  base: 'slab' | 'ushp' | 'strip' | 'piles' | 'screw' | 'deck' | 'paving' | 'none';
+  stripW: number; stripD: number; // ленточный: ширина и высота ленты, м
+  eps: number;          // УШП: толщина ЭППС, м
+  city: string;         // город — для снегового района
   gutter: boolean;      // водосток
   snowGuard: boolean;   // снегозадержатели
   lights: number;       // светильников
@@ -51,7 +54,7 @@ export const CANOPY_DEFAULT: CanopyParams = {
   kind: 'tko', L: 10.2, W: 9.2, roof: 'single', frame: 'steel', gutter: false, snowGuard: false, lights: 0, hHigh: 6, hLow: 5, highSide: 'left', attach: false, postStep: 3, overhang: 0.3, cover: 'prof',
   walls: { front: 'open', back: 'prof_mesh', left: 'prof_mesh', right: 'prof_mesh' }, profH: 2,
   gate: 'none', gateW: 3, gateH: 2.5, door: false, insulate: false,
-  base: 'slab', slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite', snow: 3, color: 'RAL 7024', waste: 5,
+  base: 'slab', stripW: 0.4, stripD: 0.7, eps: 0.1, city: '', slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite', snow: 3, color: 'RAL 7024', waste: 5,
 };
 
 // ---------- сечения ----------
@@ -89,6 +92,8 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   if (p.attach) p.walls = { ...p.walls, [p.highSide]: 'open' };
   if (p.roof === 'arch' && p.frame === 'wood') { p.frame = 'steel'; warnings.push('Арочный каркас делается из гнутой профтрубы — каркас переключён на металл'); }
   const consoles = p.kind === 'visor';
+  // большой снег (V район и выше) — стропила и балки на размер мощнее
+  const snowK = p.snow >= 6 ? 1.4 : p.snow >= 5 ? 1.2 : 1;
   const light = p.kind === 'greenhouse' && p.frame === 'steel'; // теплица: лёгкий оцинкованный каркас
   const wood = p.frame === 'wood';
   const L = Math.max(1, p.L), W = Math.max(1, p.W);
@@ -211,7 +216,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     const isHouse = p.attach && s === p.highSide;
     let gap = p.postStep;
     for (let i = 1; i < ts.length; i++) gap = Math.max(gap, ts[i] - ts[i - 1]);
-    const prof = isHouse ? beamProfile(p.postStep) : beamProfile(gap);
+    const prof = isHouse ? beamProfile(p.postStep * snowK) : beamProfile(gap * snowK);
     if (P(prof).a > P(beamProf).a) beamProf = prof;
     if (gap > 6) warnings.push(`Пролёт обвязки ${r2(gap, 1)} м над проёмом — нужна усиленная балка или ферма, проверьте у конструктора`);
     const bps = [0, d.len, ...sideBps(s)].sort((a, b) => a - b);
@@ -244,7 +249,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     const arcUs = (u0: number, u1: number) => Array.from({ length: AN + 1 }, (_, i) => u0 + ((u1 - u0) * i) / AN);
     const polyLen = (us: number[], dz = 0) => us.slice(1).reduce((a, u, i) => a + Math.hypot(u - us[i], hAt(u) - hAt(us[i])), 0) + dz * 0;
     slopeLen = arch ? polyLen(arcUs(0, span)) / 2 : Math.hypot(halfSpan0, hHigh - hLow);
-    rafterProf = rafterProfile(slopeLen);
+    rafterProf = rafterProfile(slopeLen * snowK);
     if (truss) {
       chordProf = slopeLen <= 9 ? '60×40×3' : '80×60×3'; webProf = '40×40×2'; rafterProf = chordProf;
       const ht = Math.min(1.0, Math.max(0.4, span / 12));
@@ -309,7 +314,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     // четырёхскатная (вальмовая; при квадрате — шатровая)
     slopeLen = Math.hypot(hs / 2, hHigh - hLow);
     if (slopeLen > 6) warnings.push('Скат длиннее 6 м — для четырёхскатной кровли нужен расчёт стропильной системы');
-    rafterProf = rafterProfile(slopeLen);
+    rafterProf = rafterProfile(slopeLen * snowK);
     const hipProf = P(rafterProf).a < 80 ? '80×40×3' : '100×50×4';
     const z = (a: number, b: number) => hipZ(a, b);
     const r1: [number, number] = [hs / 2, hs / 2], rr2: [number, number] = [hl - hs / 2, hs / 2];
@@ -432,7 +437,14 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   // ---------- основание ----------
   const sx = L + 2 * p.slabOver, sy = W + 2 * p.slabOver;
   const slabArea = sx * sy;
-  if (p.base === 'slab') panels.push({ kind: 'slab', pts: [[-p.slabOver, -p.slabOver, 0], [L + p.slabOver, -p.slabOver, 0], [L + p.slabOver, W + p.slabOver, 0], [-p.slabOver, W + p.slabOver, 0]] });
+  if (p.base === 'strip') {
+    const w2 = p.stripW / 2;
+    panels.push({ kind: 'strip', pts: [[-w2, -w2, 0], [L + w2, -w2, 0], [L + w2, w2, 0], [-w2, w2, 0]] });
+    panels.push({ kind: 'strip', pts: [[-w2, W - w2, 0], [L + w2, W - w2, 0], [L + w2, W + w2, 0], [-w2, W + w2, 0]] });
+    panels.push({ kind: 'strip', pts: [[-w2, w2, 0], [w2, w2, 0], [w2, W - w2, 0], [-w2, W - w2, 0]] });
+    panels.push({ kind: 'strip', pts: [[L - w2, w2, 0], [L + w2, w2, 0], [L + w2, W - w2, 0], [L - w2, W - w2, 0]] });
+  }
+  if (p.base === 'slab' || p.base === 'ushp') panels.push({ kind: 'slab', pts: [[-p.slabOver, -p.slabOver, 0], [L + p.slabOver, -p.slabOver, 0], [L + p.slabOver, W + p.slabOver, 0], [-p.slabOver, W + p.slabOver, 0]] });
   if (p.base === 'deck') panels.push({ kind: 'deck', pts: [[0, 0, 0], [L, 0, 0], [L, W, 0], [0, W, 0]] });
   if (p.base === 'paving') panels.push({ kind: 'paving', pts: [[-p.slabOver, -p.slabOver, 0], [L + p.slabOver, -p.slabOver, 0], [L + p.slabOver, W + p.slabOver, 0], [-p.slabOver, W + p.slabOver, 0]] });
 
@@ -505,7 +517,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   } else {
     for (const s of steel) b.mat(`Труба профильная${light ? ' оцинкованная' : ''} ${s.profile} (${s.use}), хлыст ${s.stock} м`, s.bars, 'шт', Math.round(s.pricePerM * s.stock * (light ? 1.25 : 1)));
     if (nPosts && light && p.base === 'none') b.mat('Опоры-штыри для теплицы (в грунт)', nPosts, 'шт', 250);
-    else if (nPosts && (p.base === 'slab' || p.base === 'none')) b.mat('Закладные пластины 300×300×10 с анкерами', nPosts, 'шт', 1400);
+    else if (nPosts && ['slab', 'ushp', 'strip', 'none'].includes(p.base)) b.mat('Закладные пластины 300×300×10 с анкерами', nPosts, 'шт', 1400);
     b.work('Изготовление металлоконструкций', frameKg);
     b.work('Монтаж металлоконструкций', frameKg);
     if (!light) {
@@ -682,6 +694,53 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     b.mat('Масло для террасы', Math.ceil(deckArea / 15), 'л', 1200);
     b.work('Монтаж террасной доски', deckArea);
     b.sum('Настил', deckArea, 'м²').sum('Свай', piles, 'шт');
+  }
+  if (p.base === 'ushp') {
+    b.sec('Фундамент (УШП)');
+    const per = 2 * (sx + sy);
+    const depth = p.slabT + p.eps + p.sand;
+    const ribs = per * 0.3 * 0.2 + (Math.ceil(sx / 3) - 1) * sy * 0.25 * 0.15; // контурные и внутренние рёбра
+    const vol = slabArea * p.slabT + ribs;
+    const epsArea = slabArea + per * 0.5;
+    b.work('Разработка грунта экскаватором', slabArea * depth); b.work('Вывоз грунта', slabArea * depth * 1.2); b.work('Экскаватор-погрузчик', 1);
+    b.work('Укладка геотекстиля', slabArea * 1.1); b.mat('Геотекстиль 200 г/м²', slabArea * 1.25, 'м²', 45);
+    b.work('Устройство песчаной подушки с уплотнением', slabArea * p.sand); b.mat('Песок крупный/средний', slabArea * p.sand * 1.2, 'м³', 1100);
+    b.work('Утепление фундамента ЭППС', epsArea); b.mat(`ЭППС ${Math.round(p.eps * 1000)} мм (утепление плиты и Г-блоки по контуру)`, epsArea * 1.05, 'м²', Math.round(650 * p.eps / 0.1));
+    b.work('Устройство опалубки', per * (p.slabT + 0.15));
+    b.mat('Арматура А500 Ø12 (сетки и рёбра)', ((Math.ceil(sy / 0.2) + 1) * sx + (Math.ceil(sx / 0.2) + 1) * sy) * 1.1 * 0.888 / 1000 + per * 4 * 1.1 * 0.888 / 1000, 'т', 72000);
+    b.mat('Фиксаторы, вязальная проволока', Math.ceil(slabArea / 15), 'компл', 900);
+    b.work('Армирование сеткой', slabArea * 2);
+    b.mat('Бетон М300 с доставкой', vol * 1.03, 'м³', 7200);
+    b.work('Бетонирование плиты/площадки', vol);
+    if (vol > 8) b.work('Подача бетона бетононасосом', 1);
+    if (nPosts) b.work('Монтаж закладных и гильз', nPosts);
+    b.warn('УШП посчитана без коммуникаций, дренажа и тёплого пола — добавьте их отдельно');
+    b.sum('Плита УШП', slabArea, 'м²').sum('Бетон', vol, 'м³');
+  }
+  if (p.base === 'strip') {
+    b.sec('Фундамент (ленточный)');
+    const per = 2 * (L + W);
+    const w = p.stripW, h = p.stripD, below = Math.max(0.2, h - 0.2);
+    const vol = per * w * h;
+    b.work('Разработка грунта экскаватором', per * (w + 0.4) * (below + 0.15));
+    b.work('Устройство песчаной подушки с уплотнением', per * (w + 0.2) * 0.15); b.mat('Песок крупный/средний', per * (w + 0.2) * 0.15 * 1.2, 'м³', 1100);
+    b.mat('Доска опалубки 25×150', 2 * per * h * 0.025 * 0.6, 'м³', 17000);
+    b.mat('Арматура А500 Ø12 (4 стержня)', per * 4 * 1.12 * 0.888 / 1000, 'т', 72000);
+    b.mat('Арматура А240 Ø8 (хомуты через 400 мм)', (per / 0.4) * (2 * (w - 0.1) + 2 * (h - 0.1)) * 0.395 / 1000, 'т', 70000);
+    b.mat('Бетон М300 с доставкой', vol * 1.03, 'м³', 7200);
+    b.work('Ленточный фундамент под ключ (без материала)', vol);
+    b.work('Гидроизоляция фундамента обмазочная', per * (h + w)); b.mat('Мастика битумная гидроизоляционная', per * (h + w) * 1.5, 'кг', 220);
+    b.work('Обратная засыпка грунтом', per * 0.4 * below);
+    if (nPosts) b.work('Монтаж закладных и гильз', nPosts);
+    b.warn('Ленточный фундамент: пол внутри (плита или стяжка) в смету не включён');
+    b.sum('Лента', per, 'пог. м').sum('Бетон', vol, 'м³');
+  }
+  if (p.base === 'screw') {
+    b.sec('Фундамент (винтовые сваи)');
+    const n = Math.max(nPosts, 4);
+    b.mat('Свая винтовая 108×2500 с оголовком', n, 'шт', 3800);
+    b.work('Монтаж винтовых свай', n);
+    b.sum('Свай', n, 'шт');
   }
   if (p.base === 'paving') {
     b.sec('Основание (тротуарная плитка)');
