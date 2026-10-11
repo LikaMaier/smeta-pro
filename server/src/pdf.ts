@@ -9,12 +9,12 @@ import { estimateTotals } from './routes/estimates';
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../pdf/estimate_pdf.py');
 
 /** Данные для PDF заказчику: без закупочных цен, себестоимости и прибыли */
-export function pdfData(e: any, user: any, number: number) {
+export function pdfData(e: any, user: any, number: number, free = false) {
   const t = estimateTotals(e);
   return {
     company: user.companyName || [user.firstName, user.username ? `@${user.username}` : ''].filter(Boolean).join(' ') || 'Смета',
     contacts: user.contacts || '',
-    title: e.title, number: String(number), customer: e.customer, address: e.address,
+    freeMark: free, title: e.title, number: String(number), customer: e.customer, address: e.address,
     date: new Date(e.date).toISOString().slice(0, 10), validDays: e.validDays ?? 14,
     paymentTerms: e.paymentTerms, notes: e.notes,
     grouped: e.lines.some((l: any) => l.category),

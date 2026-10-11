@@ -36,8 +36,8 @@ export default function Settings() {
       <div className="panel">
         <div className="row between">
           <div>
-            <div className="title" style={{ fontWeight: 700 }}>{me.access.mode === 'trial' ? 'Пробный период' : me.access.mode === 'subscription' ? 'Подписка активна' : 'Подписка закончилась'}</div>
-            <div className="small muted">{me.access.active ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : 'Данные сохранены. Изменения доступны после продления.'}</div>
+            <div className="title" style={{ fontWeight: 700 }}>{({ subscription: 'Подписка активна', trial: 'Пробный период', admin: 'Полный доступ (владелец)', expired: 'Подписка закончилась', free: 'Бесплатный доступ' } as any)[me.access.mode]}</div>
+            <div className="small muted">{me.access.mode === 'subscription' || me.access.mode === 'trial' ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Без ограничений' : me.access.freeEstimateLeft ? 'Первая смета — бесплатно. Дальше — по подписке.' : 'Бесплатная смета использована. Данные сохранены и доступны для просмотра.'}</div>
           </div>
           <span className={`badge ${me.access.active ? 'ok' : 'bad'}`}>{me.access.active ? 'Доступ есть' : 'Нет доступа'}</span>
         </div>
@@ -46,7 +46,7 @@ export default function Settings() {
       <h2 className="section-title">Оформление</h2>
       <div className="themes">
         {THEMES.map((t) => (
-          <button key={t.id} className={`theme-card ${(me.theme || 'gold') === t.id ? 'on' : ''}`} aria-pressed={(me.theme || 'gold') === t.id}
+          <button key={t.id} className={`theme-card ${(me.theme || 'steel') === t.id ? 'on' : ''}`} aria-pressed={(me.theme || 'steel') === t.id}
             onClick={async () => { applyTheme(t.id); try { setMe(await patch('/me', { theme: t.id })); } catch (e: any) { toast(e.message, true); } }}>
             <div className="sw" style={{ background: t.bg, color: t.fg }}>СМЕТА</div>
             <div className="nm">{t.name}</div>

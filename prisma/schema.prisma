@@ -19,7 +19,8 @@ model User {
   companyName       String?
   contacts          String?
   aiEnabled         Boolean   @default(false)
-  theme             String    @default("gold")
+  theme             String    @default("steel")
+  themeChosen       Boolean   @default(false)
   trialEndsAt       DateTime
   subscriptionUntil DateTime?
   createdAt         DateTime  @default(now())

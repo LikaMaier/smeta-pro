@@ -14,12 +14,18 @@ export function createBot() {
 
   bot.command('start', async (ctx) => {
     await ctx.reply(
-      '<b>СМЕТА PRO</b>\nСчитай точно. Работай прибыльно.\n\n' +
-      '• Сметы вручную и по шаблонам\n• Личный прайс-лист с вашими ценами\n• Строительные калькуляторы\n• Учёт расходов и реальной прибыли по объектам\n\n' +
-      `Первые ${env.TRIAL_DAYS} дней — бесплатно.`,
+      '<b>СМЕТА PRO</b> — сметы и прибыль по объектам прямо в Telegram.\n\n' +
+      '📐 Смета за 5 минут: ваш прайс, 34 калькулятора, готовые шаблоны\n' +
+      '📄 PDF для заказчика в один тап\n' +
+      '💰 Расходы, оплаты и реальная прибыль по каждому объекту\n' +
+      '📷 Календарь с фото, напоминания, записная книжка\n\n' +
+      '<b>Первая смета — бесплатно.</b> Дальше — по подписке.',
       { parse_mode: 'HTML', reply_markup: appKb() },
     );
   });
+
+  // ID для настройки администратора
+  bot.command('id', (ctx) => ctx.reply(`Ваш Telegram ID: <code>${ctx.from?.id}</code>`, { parse_mode: 'HTML' }));
 
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
 
@@ -28,7 +34,7 @@ export function createBot() {
     if (ctx.message.text?.startsWith('/')) return next();
     const user = await prisma.user.findUnique({ where: { tgId: BigInt(ctx.from.id) } });
     if (!user) return ctx.reply('Сначала откройте приложение командой /start');
-    if (!accessOf(user).active) return ctx.reply('Подписка закончилась. Данные сохранены — продлите подписку в разделе «Настройки».', { reply_markup: appKb() });
+    if (!accessOf(user).active) return ctx.reply('ИИ-сметчик доступен по подписке. Первая смета — бесплатно, её можно составить вручную в приложении.', { reply_markup: appKb() });
     if (!user.aiEnabled) return ctx.reply('ИИ-сметчик выключен. Включите его в Настройках приложения, если нужен — или составьте смету вручную.', { reply_markup: appKb() });
     if (!env.OPENAI_API_KEY) return ctx.reply('ИИ-сметчик ещё не подключён на сервере. Пока составьте смету вручную.', { reply_markup: appKb() });
     try {
@@ -79,8 +85,20 @@ export function createBot() {
   return bot;
 }
 
+export const BOT_DESCRIPTION =
+  'СМЕТА PRO — сметы и учёт объектов для строителей.\n\n' +
+  '• Смета за 5 минут: свой прайс, калькуляторы, готовые шаблоны\n' +
+  '• PDF для заказчика в один тап\n' +
+  '• Расходы, оплаты и реальная прибыль по каждому объекту\n' +
+  '• Календарь с фото, напоминания, записная книжка\n\n' +
+  'Первая смета — бесплатно. Дальше — по подписке.';
+export const BOT_SHORT = 'Сметы, расчёты и прибыль по объектам для строителей. Первая смета — бесплатно.';
+
 export async function setupBot(bot: Bot) {
   await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }]);
+  // Тексты, которые видно до нажатия «Старт» и в профиле бота
+  await bot.api.setMyDescription(BOT_DESCRIPTION).catch(() => {});
+  await bot.api.setMyShortDescription(BOT_SHORT).catch(() => {});
   if (env.PUBLIC_URL) {
     await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'СМЕТА PRO', web_app: { url: env.PUBLIC_URL } } });
     await bot.api.setWebhook(`${env.PUBLIC_URL}/bot/webhook`, {

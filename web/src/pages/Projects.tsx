@@ -20,7 +20,7 @@ export default function Projects() {
     <>
       <div className="page-head">
         <h1 className="page-title">Объекты</h1>
-        <button className="btn primary sm" disabled={!me.access.active} onClick={() => setSp({ new: '1' })}><Icon.plus width={18} />Объект</button>
+        <button className="btn primary sm" onClick={() => setSp({ new: "1" })}><Icon.plus width={18} />Объект</button>
       </div>
       <SearchBox value={q} onChange={setQ} placeholder="Поиск по названию или заказчику" />
       <Chips value={status} onChange={setStatus} options={[{ value: '', label: 'Все' }, ...Object.entries(PROJ_STATUS).map(([value, label]) => ({ value, label }))]} />

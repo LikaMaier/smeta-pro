@@ -8,7 +8,7 @@ export const env = {
   SESSION_SECRET: process.env.SESSION_SECRET || '',
   WEBHOOK_SECRET: process.env.WEBHOOK_SECRET || '',
   ADMIN_TG_IDS: (process.env.ADMIN_TG_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
-  TRIAL_DAYS: Number(process.env.TRIAL_DAYS || 7),
+  TRIAL_DAYS: Number(process.env.TRIAL_DAYS || 0), // 0 — без пробного периода: бесплатна только первая смета
   // Только для локальной разработки вне Telegram. На проде не включать.
   DEV_AUTH: process.env.DEV_AUTH === '1',
   // ИИ-сметчик (OpenAI). Без ключа ИИ честно отключён.

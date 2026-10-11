@@ -34,7 +34,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const nav = useNavigate();
   const toast = useToast();
   const { me } = useMe();
-  const readOnly = !me.access.active;
+  const readOnly = !me.access.active && initial.id !== me.access.freeEstimateId;
   const [h, setH] = useState<H>(() => toH(initial));
   const [lines, setLines] = useState<L[]>(() => initial.lines.map(toL));
   const [dirty, setDirty] = useState(false);

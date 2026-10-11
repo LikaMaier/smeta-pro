@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma, plain, notFound, audit, num, HttpError } from '../util';
+import { prisma, plain, notFound, audit, num, HttpError, accessOf } from '../util';
 import { calcEstimate } from '../../../shared/estimate';
 import { pdfData, renderPdf, pdfLink, checkPdfSig, pdfFileName } from '../pdf';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
@@ -98,7 +98,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
   app.post('/api/estimates/:id/pdf/send', async (req) => {
     const e = await loadEstimate(req.user.id, (req.params as any).id);
     if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить PDF в чат нельзя', 'bot_not_configured');
-    const pdf = await renderPdf(pdfData(e, req.user, await estimateNumber(req.user.id, e)));
+    const pdf = await renderPdf(pdfData(e, req.user, await estimateNumber(req.user.id, e), !accessOf(req.user).active));
     const { InputFile } = await import('grammy');
     await opts.bot.api.sendDocument(Number(req.user.tgId), new InputFile(pdf, pdfFileName(e.title)), {
       caption: `Смета «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Перешлите заказчику.`,
@@ -118,7 +118,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     if (!checkPdfSig(id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте PDF из приложения заново' });
     const e = await prisma.estimate.findFirst({ where: { id, deletedAt: null }, include: { lines: { orderBy: { position: 'asc' } }, user: true } });
     if (!e) return reply.status(404).send({ error: 'Смета не найдена' });
-    const pdf = await renderPdf(pdfData(e, e.user, await estimateNumber(e.userId, e)));
+    const pdf = await renderPdf(pdfData(e, e.user, await estimateNumber(e.userId, e), !accessOf(e.user).active));
     return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(pdfFileName(e.title))}`).send(pdf);
   });
 

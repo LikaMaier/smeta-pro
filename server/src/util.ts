@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { FastifyReply } from 'fastify';
 import { ZodError } from 'zod';
+import { env } from './env';
 
 export const prisma = new PrismaClient();
 
@@ -48,15 +49,27 @@ export const DEFAULT_CATEGORIES = [
   'Водоснабжение', 'Канализация', 'Отопление', 'Газификация', 'Заборы', 'Площадки ТКО', 'Аренда техники', 'Доставка', 'Работы бригады',
 ];
 
-export function accessOf(u: { trialEndsAt: Date; subscriptionUntil: Date | null }) {
+export function accessOf(u: { trialEndsAt: Date; subscriptionUntil: Date | null; tgId?: bigint | number }) {
   const now = Date.now();
+  if (u.tgId != null && env.ADMIN_TG_IDS.includes(String(u.tgId))) {
+    return { active: true, mode: 'admin', until: new Date(now + 3650 * 864e5).toISOString(), daysLeft: 3650 };
+  }
   const sub = u.subscriptionUntil && u.subscriptionUntil.getTime() > now;
   const trial = u.trialEndsAt.getTime() > now;
   const until = sub ? u.subscriptionUntil! : trial ? u.trialEndsAt : (u.subscriptionUntil || u.trialEndsAt);
   return {
     active: Boolean(sub || trial),
-    mode: sub ? 'subscription' : trial ? 'trial' : 'expired',
+    mode: sub ? 'subscription' : trial ? 'trial' : u.subscriptionUntil ? 'expired' : 'free',
     until: until.toISOString(),
     daysLeft: Math.max(0, Math.ceil((until.getTime() - now) / 86400000)),
   };
+}
+
+/** Данные для бесплатного режима: сколько смет создано и какая была первой */
+export async function freeCtx(userId: string) {
+  const [estimateCount, first] = await Promise.all([
+    prisma.estimate.count({ where: { userId, isTemplate: false } }), // удалённые тоже считаются
+    prisma.estimate.findFirst({ where: { userId, isTemplate: false }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
+  ]);
+  return { estimateCount, firstEstimateId: first?.id || null };
 }

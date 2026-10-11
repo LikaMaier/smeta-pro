@@ -5,6 +5,7 @@ import { useMe } from '../App';
 import { useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import { CALCULATORS } from '../../../shared/calculators';
+import Hero from '../components/Hero';
 
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const MONTH_NAME = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString('ru-RU', { month: 'long' });
@@ -25,15 +26,17 @@ export default function Home() {
 
   return (
     <>
-      <Link to="/calendar" className="box" style={{ display: 'block', marginBottom: 8 }}>
-        Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span>
-        <span className="line2 small" style={{ color: 'var(--muted)', fontWeight: 500 }}>
-          {me.access.mode === 'trial' ? `Пробный период: ${me.access.daysLeft} дн.` : me.access.mode === 'subscription' ? 'Подписка активна' : 'Подписка закончилась'}
-        </span>
+      <Link to="/calendar" style={{ display: 'block' }}>
+        <Hero
+          title={<>Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span></>}
+          sub={me.access.mode === 'subscription' ? `Подписка до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный период: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? 'Первая смета — бесплатно' : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатная смета использована — оформите подписку'}
+        />
       </Link>
 
       <div className="tiles">
-        <button className="tile wide" onClick={createEstimate} disabled={busy || !me.access.active}>+ Новая смета</button>
+        <button className="tile wide" onClick={() => (me.access.active || me.access.freeEstimateLeft ? createEstimate() : nav('/settings'))} disabled={busy}>
+          + Новая смета{!me.access.active && me.access.freeEstimateLeft ? <small>первая — бесплатно</small> : null}
+        </button>
         <Link className="tile" to="/calculators">Расчёты<small>калькуляторов: {CALCULATORS.length}</small></Link>
         <Link className="tile" to="/estimates">Сметы</Link>
         <Link className="tile" to="/projects">Объекты{active ? <small>в работе: {active}</small> : null}</Link>

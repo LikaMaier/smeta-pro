@@ -19,7 +19,7 @@ const IDEAS = ['Забрать оплату у заказчика', 'Заказ�
 
 export default function Reminders() {
   const { me } = useMe();
-  const ro = !me.access.active;
+  const ro = false; // без подписки сервер ответит 402 и откроется окно с тарифами
   const toast = useToast();
   const list = useLoad(() => get<any[]>('/reminders'), []);
   const [edit, setEdit] = useState<any>(null);

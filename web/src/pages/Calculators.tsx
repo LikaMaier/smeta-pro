@@ -160,7 +160,7 @@ function AddToEstimate({ open, onClose, suggestions }: { open: boolean; onClose:
         </div>
         <div className="row between"><span className="muted">Стоимость</span><b className="num">{rub(Math.round(total * 100) / 100)}</b></div>
         {rows.some((r) => r.on && !r.price) && <p className="xs muted">Позиции без цены добавятся с ценой 0 — заполните её в смете.</p>}
-        <button className="btn primary block lg" onClick={submit} disabled={busy || !me.access.active}>{busy ? 'Добавляю…' : 'Добавить'}</button>
+        <button className="btn primary block lg" onClick={submit} disabled={busy}>{busy ? 'Добавляю…' : 'Добавить'}</button>
       </div>
     </Sheet>
   );

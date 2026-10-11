@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { User } from '@prisma/client';
 import { env } from './env';
-import { prisma, handleError, HttpError, accessOf } from './util';
+import { prisma, handleError, HttpError, accessOf, freeCtx } from './util';
+import { freeWriteAllowed, needsEstimateCtx } from '../../shared/access';
 import { verifySession } from './auth';
 import { authRoutes } from './routes/auth';
 import { catalogRoutes } from './routes/catalog';
@@ -41,7 +42,10 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
     req.user = user;
     const isWrite = req.method !== 'GET';
     if (isWrite && !OPEN_WRITE.some((r) => r.test(url)) && !accessOf(user).active) {
-      return reply.status(402).send({ error: 'Требуется подписка. Данные сохранены и доступны для просмотра.', code: 'subscription_required' });
+      const ctx = needsEstimateCtx(url) ? await freeCtx(user.id) : { estimateCount: 1, firstEstimateId: null };
+      if (!freeWriteAllowed(req.method, url, ctx)) {
+        return reply.status(402).send({ error: 'Это доступно по подписке. Первая смета — бесплатно, дальше — по подписке.', code: 'subscription_required' });
+      }
     }
   });
 

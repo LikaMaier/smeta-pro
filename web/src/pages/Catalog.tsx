@@ -11,7 +11,7 @@ const empty = { name: '', type: 'work', category: '', unit: 'м²', price: '', c
 export default function Catalog() {
   const toast = useToast();
   const { me } = useMe();
-  const ro = !me.access.active;
+  const ro = false; // справочник цен доступен и без подписки
   const lists = useLoad(() => get<any[]>('/pricelists'), []);
   const [listId, setListId] = useState('');
   useEffect(() => { if (!listId && lists.data?.length) setListId(lists.data.find((l) => l.isDefault)?.id || lists.data[0].id); }, [lists.data, listId]);

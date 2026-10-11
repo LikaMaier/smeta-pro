@@ -1,29 +1,43 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { env } from '../env';
-import { prisma, plain, accessOf, HttpError } from '../util';
+import { prisma, plain, accessOf, HttpError, freeCtx } from '../util';
 import { verifyInitData, signSession } from '../auth';
+import { STARTER_PRICES } from '../../../shared/starterPrices';
 
 async function upsertUser(tgId: number, firstName?: string, username?: string) {
   const existing = await prisma.user.findUnique({ where: { tgId: BigInt(tgId) } });
   if (existing) {
     return prisma.user.update({ where: { id: existing.id }, data: { firstName, username } });
   }
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       tgId: BigInt(tgId), firstName, username,
       trialEndsAt: new Date(Date.now() + env.TRIAL_DAYS * 86400000),
       priceLists: { create: { name: 'Основной прайс', isDefault: true } },
     },
+    include: { priceLists: true },
   });
+  // Новый пользователь сразу получает справочник работ с примерными ценами — первую смету можно собрать за минуты
+  try {
+    await prisma.catalogItem.createMany({
+      data: STARTER_PRICES.map((r) => ({
+        userId: user.id, priceListId: user.priceLists[0].id, name: r.name, category: r.category, unit: r.unit, price: r.price,
+        type: r.category === 'Аренда техники' ? 'equipment' : r.name.startsWith('Вывоз') || r.category === 'Доставка' ? 'service' : 'work',
+        notes: 'Примерная цена — проверьте и поправьте под свой регион', params: { starter: true },
+      })),
+    });
+  } catch { /* справочник можно добавить позже вручную */ }
+  return user;
 }
 
-export function meView(user: any) {
+export async function meView(user: any) {
+  const free = await freeCtx(user.id);
   return plain({
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
-    companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.theme,
+    companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen ? user.theme : 'steel',
     aiAvailable: Boolean(env.AI_PROVIDER),
-    access: accessOf(user),
+    access: { ...accessOf(user), freeEstimateLeft: free.estimateCount === 0, freeEstimateId: free.firstEstimateId },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
   });
 }
@@ -35,7 +49,7 @@ export async function authRoutes(app: FastifyInstance) {
     let tg;
     try { tg = verifyInitData(initData, env.BOT_TOKEN); } catch (e: any) { throw new HttpError(401, e.message, 'bad_init_data'); }
     const user = await upsertUser(tg.id, tg.first_name, tg.username);
-    return { token: signSession(user.id, env.SESSION_SECRET), user: meView(user) };
+    return { token: signSession(user.id, env.SESSION_SECRET), user: await meView(user) };
   });
 
   // Только для разработки вне Telegram (DEV_AUTH=1)
@@ -43,7 +57,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!env.DEV_AUTH) throw new HttpError(404, 'Не найдено');
     const { tgId, name } = z.object({ tgId: z.number().int(), name: z.string().optional() }).parse(req.body);
     const user = await upsertUser(tgId, name || 'Тест');
-    return { token: signSession(user.id, env.SESSION_SECRET || 'dev-secret'), user: meView(user) };
+    return { token: signSession(user.id, env.SESSION_SECRET || 'dev-secret'), user: await meView(user) };
   });
 
   app.get('/api/me', async (req) => meView(req.user));
@@ -51,11 +65,11 @@ export async function authRoutes(app: FastifyInstance) {
   app.patch('/api/me', async (req) => {
     const body = z.object({
       aiEnabled: z.boolean().optional(),
-      theme: z.enum(['gold', 'carbon', 'blueprint', 'malachite']).optional(),
+      theme: z.enum(['steel', 'gold', 'carbon', 'blueprint', 'malachite']).optional(),
       companyName: z.string().max(200).nullable().optional(),
       contacts: z.string().max(500).nullable().optional(),
     }).parse(req.body);
-    const user = await prisma.user.update({ where: { id: req.user.id }, data: body });
+    const user = await prisma.user.update({ where: { id: req.user.id }, data: { ...body, ...(body.theme ? { themeChosen: true } : {}) } });
     return meView(user);
   });
 }

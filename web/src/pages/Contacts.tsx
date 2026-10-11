@@ -11,7 +11,7 @@ const telHref = (p: string) => `tel:${p.replace(/[^\d+]/g, '')}`;
 
 export default function Contacts() {
   const { me } = useMe();
-  const ro = !me.access.active;
+  const ro = false; // без подписки сервер ответит 402 и откроется окно с тарифами
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
   const dq = useDebounced(q);

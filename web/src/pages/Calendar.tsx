@@ -115,7 +115,7 @@ export function CalendarDay() {
   const [sp] = useSearchParams();
   const toast = useToast();
   const { me } = useMe();
-  const ro = !me.access.active;
+  const ro = false; // без подписки сервер ответит 402 и откроется окно с тарифами
   const projects = useLoad(() => get<any[]>('/projects'), []);
   const [projectId, setProjectIdState] = useState<string>(() => {
     try { return sp.get('p') || localStorage.getItem(PROJECT_KEY) || ''; } catch { return sp.get('p') || ''; }

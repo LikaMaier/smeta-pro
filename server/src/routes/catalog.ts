@@ -152,16 +152,17 @@ export async function catalogRoutes(app: FastifyInstance) {
     await ownList(req.user.id, priceListId);
     const existing = new Set((await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId, deletedAt: null }, select: { name: true } })).map((i) => i.name.toLowerCase()));
     const rows = STARTER_PRICES.filter((p) => categories.includes(p.category) && !existing.has(p.name.toLowerCase()));
-    for (const r of rows) {
-      const item = await prisma.catalogItem.create({
-        data: {
-          userId: req.user.id, priceListId, name: r.name, category: r.category, unit: r.unit, price: r.price,
-          type: r.category === 'Аренда техники' ? 'equipment' : r.name.startsWith('Вывоз') ? 'service' : 'work',
-          notes: 'Примерная цена — проверьте и поправьте под свой регион', params: { starter: true },
-        },
-      });
-      await prisma.priceHistory.create({ data: { itemId: item.id, price: item.price } });
-    }
+    // пакетная вставка: сотни позиций за пару запросов
+    const now = new Date();
+    await prisma.catalogItem.createMany({
+      data: rows.map((r) => ({
+        userId: req.user.id, priceListId, name: r.name, category: r.category, unit: r.unit, price: r.price, priceUpdatedAt: now,
+        type: r.category === 'Аренда техники' ? 'equipment' : r.name.startsWith('Вывоз') || r.category === 'Доставка' ? 'service' : 'work',
+        notes: 'Примерная цена — проверьте и поправьте под свой регион', params: { starter: true },
+      })),
+    });
+    const created = await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId, priceUpdatedAt: now, deletedAt: null }, select: { id: true, price: true } });
+    if (created.length) await prisma.priceHistory.createMany({ data: created.map((i) => ({ itemId: i.id, price: i.price, changedAt: now })) });
     return { ok: true, added: rows.length };
   });
 

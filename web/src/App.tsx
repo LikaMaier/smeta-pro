@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { post, get, setToken, onApiError } from './api';
 import { tg, inTelegram, initTelegram } from './tg';
-import { Boundary, Icon, State, ToastProvider, useToast } from './components/ui';
+import { Boundary, Icon, Sheet, State, ToastProvider } from './components/ui';
 import QuickCalc from './components/QuickCalc';
 import Calendar, { CalendarDay } from './pages/Calendar';
 import { getCalculator } from '../../shared/calculators';
@@ -25,7 +25,7 @@ import { applyTheme } from './theme';
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
   aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean; theme?: string;
-  access: { active: boolean; mode: 'trial' | 'subscription' | 'expired'; until: string; daysLeft: number };
+  access: { active: boolean; mode: 'trial' | 'subscription' | 'expired' | 'free' | 'admin'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeEstimateId: string | null };
 }
 const MeCtx = createContext<{ me: Me; setMe: (m: Me) => void; refreshMe: () => Promise<void> }>(null as any);
 export const useMe = () => useContext(MeCtx);
@@ -89,12 +89,19 @@ function TgBack() {
   return null;
 }
 
-function ApiErrorToasts() {
-  const toast = useToast();
-  useEffect(() => onApiError((e) => {
-    if (e.code === 'subscription_required') toast('Требуется подписка. Данные сохранены — продлите доступ в настройках.', true);
-  }), [toast]);
-  return null;
+function Paywall() {
+  const [open, setOpen] = useState(false);
+  const nav = useNavigate();
+  useEffect(() => onApiError((e) => { if (e.code === 'subscription_required') setOpen(true); }), []);
+  return (
+    <Sheet open={open} onClose={() => setOpen(false)} title="Нужна подписка">
+      <div className="stack">
+        <p style={{ margin: 0 }}>Первая смета — бесплатно. Чтобы создавать новые сметы, вести объекты, деньги, календарь с фото, напоминания и записную книжку, оформите подписку.</p>
+        <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
+        <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
+      </div>
+    </Sheet>
+  );
 }
 
 function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
@@ -105,13 +112,13 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
     <MeCtx.Provider value={{ me, setMe, refreshMe }}>
       <BrowserRouter>
         <TgBack />
-        <ApiErrorToasts />
+        <Paywall />
         <TopBar onCalc={() => setCalc(true)} />
         <QuickCalc open={calc} onClose={() => setCalc(false)} />
         <div className="app">
-          {!me.access.active && (
+          {me.access.mode === 'expired' && (
             <NavLink to="/settings" className="banner bad" style={{ display: 'block' }}>
-              Подписка закончилась. Сметы и финансы доступны для просмотра, изменения — после продления. Открыть тарифы
+              Подписка закончилась. Данные сохранены и доступны для просмотра. Продлить подписку
             </NavLink>
           )}
           <Boundary>

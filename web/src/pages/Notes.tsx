@@ -7,7 +7,7 @@ import { confirmDialog } from '../tg';
 
 export default function Notes() {
   const { me } = useMe();
-  const ro = !me.access.active;
+  const ro = false; // без подписки сервер ответит 402 и откроется окно с тарифами
   const toast = useToast();
   const [q, setQ] = useState('');
   const [projectId, setProjectId] = useState('');

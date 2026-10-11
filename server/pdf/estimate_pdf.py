@@ -237,6 +237,9 @@ def build(d):
         canvas.setFillColor(MUTED)
         canvas.drawString(16 * mm, 9 * mm, (d.get("company") or "") + (f" · {d.get('title')}" if d.get("title") else ""))
         canvas.drawRightString(A4[0] - 16 * mm, 9 * mm, f"Стр. {doc_.page}")
+        if d.get("freeMark"):
+            canvas.setFillColor(GOLD)
+            canvas.drawCentredString(A4[0] / 2, 5 * mm, "Составлено в СМЕТА PRO — сметы для строителей в Telegram")
         canvas.restoreState()
 
     doc.build(els, onFirstPage=footer, onLaterPages=footer)
