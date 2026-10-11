@@ -1,4 +1,5 @@
 import { roundTo } from './money';
+import { fenceEstimate, FENCE_TYPES, MOUNTS } from './fence';
 
 /**
  * Реестр строительных калькуляторов.
@@ -33,6 +34,10 @@ export interface EstimateSuggestion {
   qty: number;
   unit: string;
   type: 'work' | 'material' | 'equipment' | 'service' | 'other';
+  price?: number;        // ориентировочная цена, если нет своей в справочнике
+  note?: string;
+  composition?: string;
+  category?: string;
 }
 
 export interface CalcOutput {
@@ -984,6 +989,42 @@ export const CALCULATORS: Calculator[] = [
     },
   },
   // ---------- БЛАГОУСТРОЙСТВО ----------
+  {
+    id: 'fence-pro', group: 'Благоустройство', title: 'Забор под ключ: все виды и способы монтажа', short: 'Мастер забора',
+    description: 'Профлист, евроштакетник, 3D/Гиттер, рабица, жалюзи, ранчо, ДПК, кирпич, блоки, габионы… Бетон, бутование, сваи, лента. Ворота и калитки',
+    fields: [
+      { key: 'type', label: 'Вид забора', type: 'select', default: 'profnastil', options: Object.entries(FENCE_TYPES).map(([value, v]) => ({ value, label: v.label })) },
+      { key: 'mount', label: 'Монтаж столбов', type: 'select', default: 'concrete', options: Object.entries(MOUNTS).map(([value, v]) => ({ value, label: v.label })) },
+      { key: 'len', label: 'Длина забора (с воротами)', unit: 'м', min: 0, default: 50 },
+      { key: 'h', label: 'Высота', unit: 'м', min: 0.5, max: 4, default: 1.8 },
+      { key: 'step', label: 'Шаг столбов', unit: 'м', min: 0, max: 4, default: 0, optional: true, hint: '0 — по виду забора (2–3 м)' },
+      { key: 'slideGates', label: 'Откатные ворота', unit: 'шт', min: 0, default: 1, integer: true },
+      { key: 'swingGates', label: 'Распашные ворота', unit: 'шт', min: 0, default: 0, integer: true },
+      { key: 'wickets', label: 'Калитки', unit: 'шт', min: 0, default: 1, integer: true },
+      { key: 'slideW', label: 'Ширина откатных ворот', unit: 'м', min: 2, max: 8, default: 4 },
+      { key: 'demolish', label: 'Демонтаж старого забора', unit: 'м', min: 0, default: 0 },
+      { key: 'automation', label: 'Автоматика ворот', type: 'select', default: 'no', options: [{ value: 'no', label: 'нет' }, { value: 'yes', label: 'да' }] },
+      { key: 'caps', label: 'Колпаки на столбы', type: 'select', default: 'yes', options: [{ value: 'yes', label: 'да' }, { value: 'no', label: 'нет' }] },
+      { key: 'slope', label: 'Участок на склоне (ступенями)', type: 'select', default: 'no', options: [{ value: 'no', label: 'нет' }, { value: 'yes', label: 'да, +15% к работам' }] },
+    ],
+    compute: (v) => {
+      const res = fenceEstimate({
+        type: v.type, mount: v.mount, len: v.len, h: v.h, step: v.step || undefined, slideGates: v.slideGates, swingGates: v.swingGates, wickets: v.wickets,
+        slideW: v.slideW, demolish: v.demolish, automation: v.automation === 'yes', caps: v.caps === 'yes', slope: v.slope === 'yes',
+      });
+      const total = res.lines.reduce((a, l) => a + l.qty * l.price, 0);
+      return {
+        rows: [
+          { label: 'Ориентировочно под ключ', value: Math.round(total), unit: '₽', primary: true },
+          ...res.summary,
+          { label: 'Позиций для сметы', value: res.lines.length, unit: 'шт' },
+        ],
+        formula: res.lines.map((l) => `${l.name}: ${l.qty} ${l.unit}`),
+        warnings: res.warnings,
+        suggestions: res.lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, type: l.type, price: l.price, note: l.note, composition: l.composition, category: l.category })),
+      };
+    },
+  },
   {
     id: 'fence', group: 'Благоустройство', title: 'Забор из профлиста', short: 'Забор',
     description: 'Столбы, лаги, листы, бетон',

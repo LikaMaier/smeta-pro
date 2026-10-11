@@ -46,7 +46,7 @@ export function pdfData(e: any, user: any, number: number, free = false, paid: n
       works: t.worksSubtotal, materials: t.materialsSubtotal, other: t.otherSubtotal,
       overhead: Math.round((t.reserve + t.markup) * 100) / 100, // резерв и наценка — одной строкой «накладные»
       delivery: t.delivery, extraCosts: t.extraCosts, discount: t.discount, discountPct: num(e.discountPct),
-      tax: t.tax, taxPct: num(e.taxPct), total: t.total,
+      tax: t.tax, taxPct: num(e.taxPct), roundAdjust: t.roundAdjust, total: t.total,
     },
   };
 }

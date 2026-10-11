@@ -77,7 +77,7 @@ export function CalculatorPage() {
         );
       })}
 
-      {priceRow && (
+      {priceRow && priceUnit !== '₽' && (
         <div className="crow">
           <span className="lbl boxed">Цена за {priceUnit}</span>
           <input className="cinput" inputMode="decimal" value={price} placeholder="—" onChange={(e) => setPrice(e.target.value.replace(/[^\d.,]/g, ''))} aria-label={`Цена за ${priceUnit}`} />
@@ -96,7 +96,7 @@ export function CalculatorPage() {
           <div className="formula num" style={{ marginTop: 8 }}>{out.formula.map((f, i) => <div key={i}>{f}</div>)}</div>
           {out.warnings.map((w, i) => <div key={i} className="banner" style={{ marginTop: 12, marginBottom: 0 }}>{w}</div>)}
           {out.suggestions.length > 0 && <button className="btn primary block lg" style={{ marginTop: 16 }} onClick={() => setAddOpen(true)}><Icon.plus width={20} />Добавить в смету</button>}
-          <AddToEstimate open={addOpen} onClose={() => setAddOpen(false)} suggestions={out.suggestions} />
+          <AddToEstimate open={addOpen} onClose={() => setAddOpen(false)} suggestions={out.suggestions} estimateTitle={calc.id === 'fence-pro' ? `Забор: ${(calc.fields[0].options || []).find((o) => o.value === values.type)?.label || ''}, ${values.len} м` : calc.title} />
         </>
       ) : (
         <div className="state">Заполните параметры — результат появится сразу.</div>
@@ -105,7 +105,7 @@ export function CalculatorPage() {
   );
 }
 
-function AddToEstimate({ open, onClose, suggestions }: { open: boolean; onClose: () => void; suggestions: any[] }) {
+function AddToEstimate({ open, onClose, suggestions, estimateTitle }: { open: boolean; onClose: () => void; suggestions: any[]; estimateTitle?: string }) {
   const nav = useNavigate();
   const toast = useToast();
   const { me } = useMe();
@@ -120,20 +120,25 @@ function AddToEstimate({ open, onClose, suggestions }: { open: boolean; onClose:
     if (!open) return;
     const cat = items.data || [];
     setRows(suggestions.map((s) => {
+      const exact = cat.find((i) => i.name.trim().toLowerCase() === s.name.trim().toLowerCase());
       const base = s.name.toLowerCase().split(/[\s(]/)[0];
-      const match = cat.find((i) => i.type === s.type && i.name.toLowerCase().includes(base));
-      return { ...s, on: true, price: match ? String(match.price) : '', costPrice: match?.costPrice ?? null, unit: s.unit, catalogItemId: match?.id || null, matched: match?.name, category: match?.category || null };
+      const loose = s.price == null ? cat.find((i) => i.type === s.type && i.name.toLowerCase().includes(base)) : null;
+      const match = exact || loose;
+      const price = match ? String(match.price) : s.price != null ? String(s.price) : '';
+      return { ...s, on: true, price, costPrice: match?.costPrice ?? null, unit: s.unit, catalogItemId: match?.id || null, matched: match?.name,
+        category: s.category || match?.category || null, composition: s.composition || match?.description || null, note: match ? null : s.note || null, fromHint: !match && s.price != null };
     }));
   }, [open, items.data, suggestions]);
 
   const total = rows.filter((r) => r.on).reduce((a, r) => a + parseNum(r.price) * r.qty, 0);
   const submit = async () => {
-    const lines = rows.filter((r) => r.on).map((r) => ({ name: r.matched || r.name, qty: r.qty, unit: r.unit, price: parseNum(r.price), costPrice: r.costPrice, type: r.type, category: r.category, catalogItemId: r.catalogItemId }));
+    const lines = rows.filter((r) => r.on).map((r) => ({ name: r.matched || r.name, qty: r.qty, unit: r.unit, price: parseNum(r.price), costPrice: r.costPrice, type: r.type, category: r.category, catalogItemId: r.catalogItemId,
+      composition: r.composition || null, note: r.note || null, unconfirmed: Boolean(r.fromHint && r.type === 'material') }));
     if (!lines.length) return toast('Отметьте хотя бы одну позицию', true);
     setBusy(true);
     try {
       let id = target;
-      if (target === 'new') id = (await post('/estimates', { title: 'Новая смета' })).id;
+      if (target === 'new') id = (await post('/estimates', { title: estimateTitle || 'Новая смета' })).id;
       await post(`/estimates/${id}/lines`, { lines });
       toast('Добавлено в смету');
       nav(`/estimates/${id}`);
@@ -149,11 +154,18 @@ function AddToEstimate({ open, onClose, suggestions }: { open: boolean; onClose:
             {(estimates.data || []).map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
           </select>
         </Field>
+        {rows.length > 6 && (
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn sm" onClick={() => setRows((x) => x.map((y) => ({ ...y, on: true })))}>Все</button>
+            <button className="btn sm" onClick={() => setRows((x) => x.map((y) => ({ ...y, on: y.type !== 'material' })))}>Только работы</button>
+            <button className="btn sm" onClick={() => setRows((x) => x.map((y) => ({ ...y, on: y.type === 'material' })))}>Только материалы</button>
+          </div>
+        )}
         <div className="list">
           {rows.map((r, i) => (
             <div key={i} className="line">
               <label className="row"><input type="checkbox" checked={r.on} onChange={(e) => setRows((x) => x.map((y, j) => (j === i ? { ...y, on: e.target.checked } : y)))} />
-                <span className="grow"><b>{r.matched || r.name}</b><div className="xs muted">{n(r.qty, 3)} {r.unit} · {TYPE_LABEL[r.type]}{r.matched ? ' · цена из справочника' : ' · нет в справочнике'}</div></span></label>
+                <span className="grow"><b>{r.matched || r.name}</b><div className="xs muted">{n(r.qty, 3)} {r.unit} · {TYPE_LABEL[r.type]}{r.matched ? ' · цена из справочника' : r.fromHint ? ' · примерная цена' : ' · нет в справочнике'}</div></span></label>
               <div style={{ marginTop: 6 }}><NumInput value={r.price} onChange={(v) => setRows((x) => x.map((y, j) => (j === i ? { ...y, price: v } : y)))} unit={`₽/${r.unit}`} placeholder="Цена" /></div>
             </div>
           ))}

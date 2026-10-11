@@ -1,3 +1,4 @@
+import { evalExpr, isExpr } from '../../../shared/expr';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 
@@ -94,8 +95,12 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   );
 }
 
-export function NumInput({ value, onChange, unit, invalid, ...rest }: { value: any; onChange: (v: string) => void; unit?: string; invalid?: boolean } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'>) {
-  const el = <input className={`input num ${invalid ? 'invalid' : ''}`} inputMode="decimal" value={value ?? ''} onChange={(e) => onChange(e.target.value.replace(/[^\d.,\-]/g, ''))} {...rest} />;
+export function NumInput({ value, onChange, unit, invalid, onBlur, ...rest }: { value: any; onChange: (v: string) => void; unit?: string; invalid?: boolean } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'>) {
+  // можно вводить формулу: 6*4+2 — при выходе из поля подставится результат
+  const el = <input className={`input num ${invalid ? 'invalid' : ''}`} inputMode="decimal" value={value ?? ''}
+    onChange={(e) => onChange(e.target.value.replace(/[^\d.,\-+*/()×xх ]/gi, ''))}
+    onBlur={(e) => { if (isExpr(e.target.value)) { const v = evalExpr(e.target.value); if (v != null) onChange(String(v)); } onBlur?.(e); }}
+    {...rest} />;
   return unit ? <div className="input-unit">{el}<em>{unit}</em></div> : el;
 }
 

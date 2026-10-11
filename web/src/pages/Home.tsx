@@ -47,7 +47,8 @@ export default function Home() {
         <Link className="tile" to="/catalog">Справочник цен</Link>
         <Link className="tile" to="/assistant">ИИ-сметчик<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
         <Link className="tile" to="/settings">Настройки<small>подписка, логотип, друзья</small></Link>
-        <Link className="tile wide slim" to="/calculators">🧮 Калькуляторы · {CALCULATORS.length}</Link>
+        <Link className="tile slim" to="/calculators/fence-pro">🧱 Мастер забора</Link>
+        <Link className="tile slim" to="/calculators">🧮 Калькуляторы · {CALCULATORS.length}</Link>
       </div>
 
     </>

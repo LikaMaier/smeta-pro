@@ -49,7 +49,7 @@ export function estimatePage(d: any, m: PageMeta) {
     <div class="sums">
       ${sum('Работы', t.works)}${sum('Материалы', t.materials)}${sum('Техника, услуги и прочее', t.other)}
       ${sum('Накладные и непредвиденные расходы', t.overhead)}${sum('Доставка', t.delivery)}${sum('Дополнительные расходы', t.extraCosts)}
-      ${sum(`Скидка ${t.discountPct}%`, t.discount, true)}${sum(`Налог ${t.taxPct}%`, t.tax)}
+      ${sum(`Скидка ${t.discountPct}%`, t.discount, true)}${sum(`Налог ${t.taxPct}%`, t.tax)}${t.roundAdjust ? `<div class="sum"><span>Округление</span><span>${money(t.roundAdjust)}</span></div>` : ''}
       <div class="sum grand"><span>Итого</span><span>${money(t.total)}</span></div>
       ${d.paid ? `<div class="sum"><span>Получено</span><span>${money(d.paid)}</span></div><div class="sum grand2"><span>Всего к оплате</span><span>${money(d.toPay)}</span></div>` : ''}
     </div>

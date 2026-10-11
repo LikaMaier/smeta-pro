@@ -221,6 +221,7 @@ model Estimate {
   lossReservePct Decimal        @default(0) @db.Decimal(6, 2)
   delivery       Decimal        @default(0) @db.Decimal(14, 2)
   extraCosts     Decimal        @default(0) @db.Decimal(14, 2)
+  roundAdjust    Decimal        @default(0) @db.Decimal(14, 2) // округление итога (± к сумме после налога)
   notes          String?
   source         String         @default("manual") // manual | ai
   paymentTerms   String?

@@ -235,6 +235,8 @@ def modern_items(d, W, with_paid=False):
     add("Дополнительные расходы", t.get("extraCosts"))
     add(f"Скидка {qty(t.get('discountPct'))}%", t.get("discount"), neg=True)
     add(f"Налог {qty(t.get('taxPct'))}%", t.get("tax"))
+    if t.get("roundAdjust"):
+        tr.append([Paragraph("Округление", S["labelr"]), Paragraph(money(t.get("roundAdjust")), S["labelr"])])
     gi = len(tr)
     tr.append([Paragraph(t.get("totalLabel") or "Итого", S["totalr"]), Paragraph(money(t.get("total")), S["totalr"])])
     if with_paid and d.get("paid"):
@@ -341,6 +343,8 @@ def classic_items(d, W, with_paid=False):
     add("Дополнительные расходы:", t.get("extraCosts"))
     add(f"Скидка {qty(t.get('discountPct'))}%:", t.get("discount"), neg=True)
     add(f"Налог {qty(t.get('taxPct'))}%:", t.get("tax"))
+    if t.get("roundAdjust"):
+        tot.append(("Округление:", rub_r(t.get("roundAdjust")), False))
     tot.append((t.get("totalLabel", "Сметная стоимость") + ":", rub_r(t.get("total")), True))
     if with_paid and d.get("paid") is not None:
         tot.append(("Получено:", rub_r(d.get("paid") or 0), False))

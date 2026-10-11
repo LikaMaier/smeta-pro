@@ -12,7 +12,7 @@ import { confirmDialog, haptic, tg } from '../tg';
 type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; matPrice: string; coef: string; composition: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
 type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string; customerDetails: string; workStart: string; workEnd: string; warrantyMonths: string;
   sectionCoefs: Record<string, number>; paySchedule: { title: string; pct: string }[];
-  discountPct: string; markupPct: string; taxPct: string; lossReservePct: string; delivery: string; extraCosts: string };
+  discountPct: string; markupPct: string; taxPct: string; lossReservePct: string; delivery: string; extraCosts: string; roundAdjust: string };
 
 let seq = 0;
 const key = () => `l${Date.now()}_${seq++}`;
@@ -20,14 +20,14 @@ const toL = (l: any): L => ({ k: key(), id: l.id, name: l.name, qty: String(l.qt
 const toH = (e: any): H => ({ title: e.title, customer: e.customer || '', address: e.address || '', date: dateInput(e.date), status: e.status, projectId: e.projectId, notes: e.notes || '', paymentTerms: e.paymentTerms || '', validDays: String(e.validDays ?? 14),
   customerDetails: e.customerDetails || '', workStart: e.workStart ? dateInput(e.workStart) : '', workEnd: e.workEnd ? dateInput(e.workEnd) : '', warrantyMonths: String(e.warrantyMonths ?? 12),
   sectionCoefs: (e.sectionCoefs && typeof e.sectionCoefs === 'object' ? e.sectionCoefs : {}), paySchedule: Array.isArray(e.paySchedule) ? e.paySchedule.map((x: any) => ({ title: x.title, pct: String(x.pct) })) : [],
-  discountPct: String(e.discountPct || 0), markupPct: String(e.markupPct || 0), taxPct: String(e.taxPct || 0), lossReservePct: String(e.lossReservePct || 0), delivery: String(e.delivery || 0), extraCosts: String(e.extraCosts || 0) });
+  discountPct: String(e.discountPct || 0), markupPct: String(e.markupPct || 0), taxPct: String(e.taxPct || 0), lossReservePct: String(e.lossReservePct || 0), delivery: String(e.delivery || 0), extraCosts: String(e.extraCosts || 0), roundAdjust: String(e.roundAdjust || 0) });
 const payload = (h: H, lines: L[]) => ({
   title: h.title.trim() || 'Без названия', customer: h.customer || null, address: h.address || null, date: h.date || undefined, status: h.status, projectId: h.projectId || null, notes: h.notes || null,
   paymentTerms: h.paymentTerms || null, validDays: Math.max(1, Math.round(parseNum(h.validDays)) || 14),
   customerDetails: h.customerDetails || null, workStart: h.workStart || null, workEnd: h.workEnd || null, warrantyMonths: Math.max(0, Math.min(120, Math.round(parseNum(h.warrantyMonths)))),
   sectionCoefs: Object.keys(h.sectionCoefs).length ? h.sectionCoefs : null,
   paySchedule: h.paySchedule.filter((x) => x.title.trim() && parseNum(x.pct) > 0).length ? h.paySchedule.filter((x) => x.title.trim() && parseNum(x.pct) > 0).map((x) => ({ title: x.title.trim(), pct: parseNum(x.pct) })) : null,
-  discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts),
+  discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts), roundAdjust: parseNum(h.roundAdjust),
   lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), qty: parseNum(l.qty), unit: l.unit || 'шт', price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), coef: l.coef === '' ? 1 : (parseNum(l.coef) > 0 ? parseNum(l.coef) : 1), composition: l.composition.trim() || null, costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category || null, note: l.note || null, catalogItemId: l.catalogItemId || null, unconfirmed: Boolean(l.unconfirmed) })),
 });
 const draftKey = (id: string) => `smeta_draft_${id}`;
@@ -99,8 +99,15 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
 
   const totals = useMemo(() => calcEstimate(
     lines.map((l) => ({ qty: parseNum(l.qty), price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), coef: l.coef === '' ? 1 : parseNum(l.coef), costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category })),
-    { discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts), sectionCoefs: h.sectionCoefs },
+    { discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts), roundAdjust: parseNum(h.roundAdjust), sectionCoefs: h.sectionCoefs },
   ), [lines, h]);
+
+  /** Подобрать скидку так, чтобы итог стал ровно target (налог начисляется сверху) */
+  const roundTo = (target: number) => {
+    const before = totals.total - totals.roundAdjust;
+    setHead({ roundAdjust: String(Math.round((target - before) * 100) / 100) });
+    toast(`Итог: ${rub(target)} (округление ${rub(target - before)})`);
+  };
 
   const move = (k: string, dir: -1 | 1) => {
     setLines((ls) => { const i = ls.findIndex((l) => l.k === k); const j = i + dir; if (j < 0 || j >= ls.length) return ls; const c = [...ls]; [c[i], c[j]] = [c[j], c[i]]; return c; });
@@ -252,6 +259,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <button className="btn" onClick={() => addLines([{}])}><Icon.plus width={18} />Пустая строка</button>
         </div>
       )}
+      {!readOnly && (
+        <div className="grid2" style={{ marginTop: 8 }}>
+          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/calculators/fence-pro'); }}>🧱 Мастер забора</button>
+          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/calculators'); }}>🧮 Из калькулятора</button>
+        </div>
+      )}
 
       <h2 className="section-title">Итог</h2>
       <div className="panel">
@@ -267,6 +280,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             {totals.delivery > 0 && <tr><td>Доставка</td><td>{rub(totals.delivery)}</td></tr>}
             {totals.extraCosts > 0 && <tr><td>Доп. расходы</td><td>{rub(totals.extraCosts)}</td></tr>}
             {totals.tax > 0 && <tr><td>Налог {pct(parseNum(h.taxPct))}</td><td>{rub(totals.tax)}</td></tr>}
+            {totals.roundAdjust !== 0 && <tr><td>Округление</td><td>{rub(totals.roundAdjust)}</td></tr>}
             <tr className="total"><td>Итого</td><td>{rub(totals.total)}</td></tr>
           </tbody>
         </table>
@@ -411,6 +425,18 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           </div>
           <p className="xs muted">Порядок: подытог → резерв → наценка → скидка → доставка и доп. расходы → налог. Коэффициенты строк и разделов применяются к ценам.</p>
           <div className="panel stack">
+            <div className="title" style={{ fontWeight: 700 }}>Итог ровной суммой</div>
+            <div className="xs muted">Сейчас: {rub(totals.total)}{totals.roundAdjust ? ` (округление ${rub(totals.roundAdjust)})` : ''}. Цены позиций не меняются — в смете будет строка «Округление».</div>
+            <div className="row wrap">
+              {[1000, 5000, 10000].map((st) => {
+                const before = totals.total - totals.roundAdjust;
+                const target = Math.floor(before / st) * st;
+                return target > 0 && target < before ? <button key={st} className="btn sm" disabled={readOnly} onClick={() => roundTo(target)}>вниз до {rub(target)}</button> : null;
+              })}
+              {totals.roundAdjust !== 0 && <button className="btn sm ghost" disabled={readOnly} onClick={() => setHead({ roundAdjust: '0' })}>Без округления</button>}
+            </div>
+          </div>
+          <div className="panel stack">
             <div className="title" style={{ fontWeight: 700 }}>Поднять все цены</div>
             <div className="row" style={{ gap: 6 }}>
               <div style={{ width: 110 }}><NumInput value={raise.pct} onChange={(v) => setRaise((r) => ({ ...r, pct: v }))} unit="%" placeholder="10" /></div>
@@ -526,6 +552,13 @@ function HeadForm({ h, setHead, readOnly }: { h: H; setHead: (p: Partial<H>) => 
       </Field>
       <Field label="Смета действительна, дней"><NumInput value={h.validDays} onChange={(v) => setHead({ validDays: v })} unit="дн." readOnly={readOnly} /></Field>
       <Field label="Примечания для заказчика"><textarea className="textarea" value={h.notes} onChange={(e) => setHead({ notes: e.target.value })} readOnly={readOnly} /></Field>
+      {!readOnly && (
+        <div className="seg">
+          {['Цена указана за наличный расчёт.', 'Безналичный расчёт, без НДС.', 'Цены материалов действительны 14 дней.', 'Вывоз мусора включён.', 'Вывоз мусора оплачивается отдельно.', 'Гарантия на работы — 12 месяцев.', 'Электроэнергия и вода — за счёт заказчика.'].map((t) => (
+            <button key={t} className="chip" onClick={() => setHead({ notes: h.notes.includes(t) ? h.notes : `${h.notes ? `${h.notes.trim()}\n` : ''}${t}` })}>+ {t.replace(/\.$/, '')}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

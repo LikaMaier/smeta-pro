@@ -37,7 +37,7 @@ const headerSchema = z.object({
   status: z.enum(STATUSES).optional(),
   projectId: z.string().nullable().optional(),
   discountPct: pct.optional(), markupPct: pct.optional(), taxPct: pct.optional(), lossReservePct: pct.optional(),
-  delivery: nonneg.optional(), extraCosts: nonneg.optional(),
+  delivery: nonneg.optional(), extraCosts: nonneg.optional(), roundAdjust: z.coerce.number().min(-1e9).max(1e9).optional(),
   notes: z.string().max(5000).nullable().optional(),
   paymentTerms: z.string().max(2000).nullable().optional(),
   validDays: z.coerce.number().int().min(1).max(365).optional(),
@@ -60,7 +60,7 @@ export function jsonFields<T extends Record<string, any>>(o: T): T {
 export function estimateTotals(e: any) {
   return calcEstimate(
     (e.lines || []).map((l: any) => ({ qty: num(l.qty), price: num(l.price), matPrice: l.matPrice == null ? null : num(l.matPrice), coef: l.coef == null ? 1 : num(l.coef), costPrice: l.costPrice == null ? null : num(l.costPrice), type: l.type, category: l.category })),
-    { discountPct: num(e.discountPct), markupPct: num(e.markupPct), taxPct: num(e.taxPct), lossReservePct: num(e.lossReservePct), delivery: num(e.delivery), extraCosts: num(e.extraCosts), sectionCoefs: (e.sectionCoefs as any) || null },
+    { discountPct: num(e.discountPct), markupPct: num(e.markupPct), taxPct: num(e.taxPct), lossReservePct: num(e.lossReservePct), delivery: num(e.delivery), extraCosts: num(e.extraCosts), roundAdjust: num(e.roundAdjust), sectionCoefs: (e.sectionCoefs as any) || null },
   );
 }
 
@@ -91,18 +91,18 @@ async function cloneEstimate(userId: string, src: any, overrides: any) {
 }
 
 /** Цены для строк шаблона: свой справочник → примерные цены на работы → 0 (заполнить вручную) */
-async function priceTemplateLines(userId: string, lines: { name: string; qty: number; unit: string; type: string; category: string }[]) {
+async function priceTemplateLines(userId: string, lines: { name: string; qty: number; unit: string; type: string; category: string; price?: number; composition?: string; note?: string }[]) {
   const items = await prisma.catalogItem.findMany({ where: { userId, deletedAt: null, active: true } });
   const byName = new Map(items.map((i) => [i.name.toLowerCase(), i]));
   const starter = new Map(STARTER_PRICES.map((p) => [p.name.toLowerCase(), p]));
   return lines.map((l, i) => {
     const own = byName.get(l.name.toLowerCase());
     const st = starter.get(l.name.toLowerCase());
-    const note = own ? null : st ? 'Примерная цена — проверьте' : 'Укажите цену';
+    const note = own ? null : st ? 'Примерная цена — проверьте' : l.price ? (l.note || 'Примерная цена — проверьте') : 'Укажите цену';
     return {
       position: i, name: l.name, qty: l.qty, unit: own?.unit || l.unit, type: l.type, category: l.category,
-      price: own ? own.price : st ? st.price : 0, costPrice: own?.costPrice ?? null, catalogItemId: own?.id ?? null,
-      composition: own?.description || compositionFor(l.name)?.join('\n') || null,
+      price: own ? own.price : st ? st.price : l.price ?? 0, costPrice: own?.costPrice ?? null, catalogItemId: own?.id ?? null,
+      composition: own?.description || l.composition || compositionFor(l.name)?.join('\n') || null,
       note: note ? `${note}; количество типовое — уточните` : 'Количество типовое — уточните', unconfirmed: true,
     };
   });

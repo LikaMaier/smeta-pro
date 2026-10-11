@@ -1,3 +1,4 @@
+import { evalExpr, isExpr } from '../../shared/expr';
 const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
 const nf0 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -10,7 +11,9 @@ export const pct = (v: number | null | undefined) => (v == null ? '—' : `${nf.
 export const date = (s?: string | null) => (s ? new Date(s).toLocaleDateString('ru-RU') : '—');
 export const dateInput = (s?: string | null) => (s ? new Date(s).toISOString().slice(0, 10) : '');
 export const parseNum = (s: any): number => {
-  const v = Number(String(s ?? '').replace(/\s/g, '').replace(',', '.'));
+  const str = String(s ?? '');
+  if (isExpr(str)) return evalExpr(str) ?? 0; // «6*4+2» в поле количества
+  const v = Number(str.replace(/\s/g, '').replace(',', '.'));
   return Number.isFinite(v) ? v : 0;
 };
 

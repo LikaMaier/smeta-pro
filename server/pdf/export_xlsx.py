@@ -98,6 +98,8 @@ def estimate_sheet(wb, d):
         kv(ws, r, f"Скидка {t.get('discountPct', 0):g}%", -t["discount"], col=5); r += 1
     if t.get("tax"):
         kv(ws, r, f"НДС/налог {t.get('taxPct', 0):g}%", t["tax"], col=5); r += 1
+    if t.get("roundAdjust"):
+        kv(ws, r, "Округление", t["roundAdjust"], col=5); r += 1
     kv(ws, r, "ИТОГО", t["total"], col=5, bold=True, fill=TOTAL_FILL); r += 2
     if d.get("paymentTerms"):
         ws.cell(row=r, column=1, value="Условия оплаты:").font = Font(bold=True)

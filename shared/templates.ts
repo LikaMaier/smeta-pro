@@ -1,17 +1,29 @@
+import { fenceEstimate, FenceInput } from './fence';
 /**
  * Готовые шаблоны смет. Количество — типовое для примера, его нужно поправить под объект
  * (строки помечаются «требует уточнения»). Цена берётся из справочника пользователя по названию,
  * иначе — из примерных цен на работы; цены материалов не выдумываются (0 ₽, заполнить вручную).
  */
 type T = 'work' | 'material' | 'equipment' | 'service' | 'other';
-export interface TemplateLine { name: string; qty: number; unit: string; type: T; category: string }
+export interface TemplateLine { name: string; qty: number; unit: string; type: T; category: string; price?: number; composition?: string; note?: string }
 export interface EstimateTemplate { id: string; title: string; description: string; lines: TemplateLine[] }
 
 const w = (category: string, name: string, qty: number, unit: string): TemplateLine => ({ category, name, qty, unit, type: 'work' });
 const m = (category: string, name: string, qty: number, unit: string): TemplateLine => ({ category, name, qty, unit, type: 'material' });
 const e = (name: string, qty: number, unit: string): TemplateLine => ({ category: 'Аренда техники', name, qty, unit, type: 'equipment' });
 
+/** Шаблоны заборов собираются мастером забора — с материалами и ориентировочными ценами */
+const fenceTpl = (id: string, title: string, description: string, input: FenceInput): EstimateTemplate => ({
+  id, title, description,
+  lines: fenceEstimate(input).lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, type: l.type as T, category: l.category, price: l.price, composition: l.composition, note: l.note })),
+});
+
 export const TEMPLATES: EstimateTemplate[] = [
+  fenceTpl('fence-euro', 'Забор из евроштакетника (шахматка)', '50 м, бутование столбов, откатные ворота и калитка', { type: 'euro2', mount: 'buta', len: 50, h: 1.8, slideGates: 1, wickets: 1, caps: true }),
+  fenceTpl('fence-3d', 'Забор из 3D-сетки / Гиттер', '100 м, бетонирование столбов, калитка и распашные ворота', { type: 'gitter', mount: 'concrete', len: 100, h: 1.73, swingGates: 1, wickets: 1 }),
+  fenceTpl('fence-rabica', 'Забор из сетки-рабицы', '100 м, забивные столбы, калитка', { type: 'rabica', mount: 'drive', len: 100, h: 1.5, wickets: 1 }),
+  fenceTpl('fence-jalousie', 'Забор-жалюзи', '30 м, бетонирование, откатные ворота с автоматикой и калитка', { type: 'jalousie', mount: 'concrete', len: 30, h: 1.8, slideGates: 1, wickets: 1, automation: true, caps: true }),
+  fenceTpl('fence-brick', 'Забор: кирпичные столбы + профлист', '40 м на ленточном фундаменте, откатные ворота и калитка', { type: 'brick', mount: 'strip', len: 40, h: 2, slideGates: 1, wickets: 1 }),
   {
     id: 'gasholder', title: 'Газгольдер под ключ', description: 'Котлован, монтаж ёмкости, газопровод до дома, подключение котла',
     lines: [

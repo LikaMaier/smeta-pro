@@ -35,6 +35,7 @@ export interface EstimateParams {
   delivery?: number;
   extraCosts?: number;
   sectionCoefs?: Record<string, number> | null; // коэффициент на раздел (по названию раздела)
+  roundAdjust?: number; // округление итога: прибавляется к итогу после налога (может быть отрицательным)
 }
 
 export interface EstimateTotals {
@@ -54,6 +55,7 @@ export interface EstimateTotals {
   extraCosts: number;
   taxBase: number;
   tax: number;
+  roundAdjust: number;
   total: number;
   revenueExTax: number;
   directCost: number;
@@ -135,7 +137,8 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
   const extraKop = toKop(p.extraCosts || 0);
   const taxBaseKop = subtotalKop + reserveKop + markupKop - discountKop + deliveryKop + extraKop;
   const taxKop = pctOfKop(taxBaseKop, p.taxPct || 0);
-  const totalKop = taxBaseKop + taxKop;
+  const roundKop = toKop(p.roundAdjust || 0);
+  const totalKop = taxBaseKop + taxKop + roundKop;
   const revenueExTaxKop = totalKop - taxKop;
   const profitKop = revenueExTaxKop - directCostKop;
 
@@ -156,6 +159,7 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
     extraCosts: fromKop(extraKop),
     taxBase: fromKop(taxBaseKop),
     tax: fromKop(taxKop),
+    roundAdjust: fromKop(roundKop),
     total: fromKop(totalKop),
     revenueExTax: fromKop(revenueExTaxKop),
     directCost: fromKop(directCostKop),

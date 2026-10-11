@@ -79,3 +79,10 @@ test('резерв на потери считается и от материал
   const t = calcEstimate([{ qty: 1, price: 1000, matPrice: 2000, type: 'work' }], { lossReservePct: 5 });
   assert.equal(t.reserve, 100);
 });
+
+test('округление итога: прибавляется после налога', () => {
+  const t = calcEstimate([{ qty: 1, price: 100000, type: 'work' }], { taxPct: 6, roundAdjust: -1000 });
+  assert.equal(t.total, 105000);
+  assert.equal(t.tax, 6000);
+  assert.equal(t.roundAdjust, -1000);
+});
