@@ -35,7 +35,7 @@ model User {
   photos     Photo[]
   workLogs   WorkLog[]
   reminders  Reminder[]
-  contacts   Contact[]
+  addressBook Contact[]
   aiSessions AiSession[]
 }
 
