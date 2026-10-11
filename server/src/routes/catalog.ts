@@ -107,6 +107,42 @@ export async function catalogRoutes(app: FastifyInstance) {
     return plain(items);
   });
 
+  // Запомнить цены из мастера/калькулятора: обновить позиции с таким же названием или добавить новые
+  app.post('/api/items/bulk-upsert', async (req) => {
+    const { items } = z.object({ items: z.array(z.object({
+      name: z.string().trim().min(1).max(300), unit: z.string().trim().min(1).max(30),
+      type: z.enum(['work', 'material', 'equipment', 'service', 'other']), category: z.string().max(100).nullable().optional(),
+      price: z.coerce.number().min(0).max(1e11), composition: z.string().max(3000).nullable().optional(),
+    })).max(300) }).parse(req.body);
+    const list = await prisma.priceList.findFirst({ where: { userId: req.user.id, isDefault: true } }) || await prisma.priceList.findFirst({ where: { userId: req.user.id } });
+    if (!list) throw new HttpError(400, 'Нет прайс-листа');
+    const existing = await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId: list.id, deletedAt: null } });
+    const byName = new Map(existing.map((i) => [i.name.trim().toLowerCase(), i]));
+    let updated = 0, created = 0;
+    for (const it of items) {
+      const ex = byName.get(it.name.toLowerCase());
+      if (ex) {
+        if (Number(ex.price) === it.price) continue;
+        await prisma.catalogItem.update({
+          where: { id: ex.id },
+          data: { price: it.price, priceUpdatedAt: new Date(), ...(it.type === 'material' ? { costPrice: it.price } : {}),
+            ...(ex.notes?.startsWith('Примерная цена') ? { notes: null, params: {} } : {}) },
+        });
+        await prisma.priceHistory.create({ data: { itemId: ex.id, price: it.price } });
+        updated++;
+      } else {
+        const c = await prisma.catalogItem.create({
+          data: { userId: req.user.id, priceListId: list.id, name: it.name, unit: it.unit, type: it.type, category: it.category || 'Прочее',
+            price: it.price, costPrice: it.type === 'material' ? it.price : null, description: it.composition || null },
+        });
+        await prisma.priceHistory.create({ data: { itemId: c.id, price: it.price } });
+        byName.set(it.name.toLowerCase(), c);
+        created++;
+      }
+    }
+    return { updated, created };
+  });
+
   app.post('/api/items', async (req) => {
     const body = itemSchema.parse(req.body);
     await ownList(req.user.id, body.priceListId);

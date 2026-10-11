@@ -5,6 +5,7 @@ import { get, post } from '../api';
 import { useMe } from '../App';
 import { Field, Icon, NumInput, Sheet, State, useLoad, useToast } from '../components/ui';
 import { n, rub, parseNum, TYPE_LABEL } from '../format';
+import CalcResult from '../components/CalcResult';
 
 export default function Calculators() {
   return (
@@ -38,7 +39,6 @@ export function CalculatorPage() {
   });
   const [price, setPrice] = useState<string>(saved.price ?? '');
   const [touched, setTouched] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   useEffect(() => { try { localStorage.setItem(storeKey(id || ''), JSON.stringify({ values, price })); } catch { /* */ } }, [values, price, id]);
 
   const res = useMemo(() => {
@@ -89,92 +89,25 @@ export function CalculatorPage() {
       {out ? (
         <>
           <div className="box cresult" style={{ marginTop: 12 }}>
-            {primary && <div className="big num">{primary.label}: {n(primary.value, 3)} {primary.unit}</div>}
-            {out.rows.filter((r) => !r.primary).map((r, i) => <div key={i} className="num">{r.label}: {n(r.value, 3)} {r.unit}</div>)}
+            {primary && primary.unit !== '₽' && <div className="big num">{primary.label}: {n(primary.value, 3)} {primary.unit}</div>}
+            {out.rows.filter((r) => !r.primary && r.unit !== '₽').map((r, i) => <div key={i} className="num">{r.label}: {n(r.value, 3)} {r.unit}</div>)}
             {cost != null && <div className="cost num" style={{ marginTop: 6 }}>Стоимость: {rub(cost)}</div>}
           </div>
-          <div className="csection">Как посчитано</div>
-          <div className="formula num" style={{ marginTop: 8 }}>{out.formula.map((f, i) => <div key={i}>{f}</div>)}</div>
           {out.warnings.map((w, i) => <div key={i} className="banner" style={{ marginTop: 12, marginBottom: 0 }}>{w}</div>)}
-          {out.suggestions.length > 0 && <button className="btn primary block lg" style={{ marginTop: 16 }} onClick={() => setAddOpen(true)}><Icon.plus width={20} />Добавить в смету</button>}
-          <AddToEstimate open={addOpen} onClose={() => setAddOpen(false)} suggestions={out.suggestions} estimateTitle={calc.id === 'fence-pro' ? `Забор: ${(calc.fields[0].options || []).find((o) => o.value === values.type)?.label || ''}, ${values.len} м` : calc.group === 'Мастера' ? `${calc.short}: ${calc.title.split(':')[0]}` : calc.title} />
+          {out.suggestions.length > 0 && (
+            <CalcResult calcId={calc.id} suggestions={out.suggestions as any}
+              estimateTitle={calc.id === 'fence-pro' ? `Забор: ${(calc.fields[0].options || []).find((o) => o.value === values.type)?.label || ''}, ${values.len} м` : calc.group === 'Мастера' ? `${calc.short}: ${calc.title.split(':')[0]}` : calc.title} />
+          )}
+          {calc.group !== 'Мастера' && (
+            <details style={{ marginTop: 12 }}>
+              <summary className="small muted">Как посчитано</summary>
+              <div className="formula num" style={{ marginTop: 8 }}>{out.formula.map((f, i) => <div key={i}>{f}</div>)}</div>
+            </details>
+          )}
         </>
       ) : (
         <div className="state">Заполните параметры — результат появится сразу.</div>
       )}
     </>
-  );
-}
-
-function AddToEstimate({ open, onClose, suggestions, estimateTitle }: { open: boolean; onClose: () => void; suggestions: any[]; estimateTitle?: string }) {
-  const nav = useNavigate();
-  const toast = useToast();
-  const { me } = useMe();
-  const estimates = useLoad(() => (open ? get<any[]>('/estimates', { status: 'draft' }) : Promise.resolve([])), [open]);
-  const items = useLoad(() => (open ? get<any[]>('/items') : Promise.resolve([])), [open]);
-  const [rows, setRows] = useState<any[]>([]);
-  const [target, setTarget] = useState('new');
-  const [busy, setBusy] = useState(false);
-
-  // Цена по личному прайс-листу: ищем позицию с похожим названием и тем же типом
-  useEffect(() => {
-    if (!open) return;
-    const cat = items.data || [];
-    setRows(suggestions.map((s) => {
-      const exact = cat.find((i) => i.name.trim().toLowerCase() === s.name.trim().toLowerCase());
-      const base = s.name.toLowerCase().split(/[\s(]/)[0];
-      const loose = s.price == null ? cat.find((i) => i.type === s.type && i.name.toLowerCase().includes(base)) : null;
-      const match = exact || loose;
-      const price = match ? String(match.price) : s.price != null ? String(s.price) : '';
-      return { ...s, on: true, price, costPrice: match?.costPrice ?? null, unit: s.unit, catalogItemId: match?.id || null, matched: match?.name,
-        category: s.category || match?.category || null, composition: s.composition || match?.description || null, note: match ? null : s.note || null, fromHint: !match && s.price != null };
-    }));
-  }, [open, items.data, suggestions]);
-
-  const total = rows.filter((r) => r.on).reduce((a, r) => a + parseNum(r.price) * r.qty, 0);
-  const submit = async () => {
-    const lines = rows.filter((r) => r.on).map((r) => ({ name: r.matched || r.name, qty: r.qty, unit: r.unit, price: parseNum(r.price), costPrice: r.costPrice, type: r.type, category: r.category, catalogItemId: r.catalogItemId,
-      composition: r.composition || null, note: r.note || null, unconfirmed: Boolean(r.fromHint && r.type === 'material') }));
-    if (!lines.length) return toast('Отметьте хотя бы одну позицию', true);
-    setBusy(true);
-    try {
-      let id = target;
-      if (target === 'new') id = (await post('/estimates', { title: estimateTitle || 'Новая смета' })).id;
-      await post(`/estimates/${id}/lines`, { lines });
-      toast('Добавлено в смету');
-      nav(`/estimates/${id}`);
-    } catch (e: any) { toast(e.message, true); } finally { setBusy(false); }
-  };
-
-  return (
-    <Sheet open={open} onClose={onClose} title="Добавить в смету">
-      <div className="stack">
-        <Field label="Смета">
-          <select className="select" value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="new">Новая смета</option>
-            {(estimates.data || []).map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
-          </select>
-        </Field>
-        {rows.length > 6 && (
-          <div className="row" style={{ gap: 6 }}>
-            <button className="btn sm" onClick={() => setRows((x) => x.map((y) => ({ ...y, on: true })))}>Все</button>
-            <button className="btn sm" onClick={() => setRows((x) => x.map((y) => ({ ...y, on: y.type !== 'material' })))}>Только работы</button>
-            <button className="btn sm" onClick={() => setRows((x) => x.map((y) => ({ ...y, on: y.type === 'material' })))}>Только материалы</button>
-          </div>
-        )}
-        <div className="list">
-          {rows.map((r, i) => (
-            <div key={i} className="line">
-              <label className="row"><input type="checkbox" checked={r.on} onChange={(e) => setRows((x) => x.map((y, j) => (j === i ? { ...y, on: e.target.checked } : y)))} />
-                <span className="grow"><b>{r.matched || r.name}</b><div className="xs muted">{n(r.qty, 3)} {r.unit} · {TYPE_LABEL[r.type]}{r.matched ? ' · цена из справочника' : r.fromHint ? ' · примерная цена' : ' · нет в справочнике'}</div></span></label>
-              <div style={{ marginTop: 6 }}><NumInput value={r.price} onChange={(v) => setRows((x) => x.map((y, j) => (j === i ? { ...y, price: v } : y)))} unit={`₽/${r.unit}`} placeholder="Цена" /></div>
-            </div>
-          ))}
-        </div>
-        <div className="row between"><span className="muted">Стоимость</span><b className="num">{rub(Math.round(total * 100) / 100)}</b></div>
-        {rows.some((r) => r.on && !r.price) && <p className="xs muted">Позиции без цены добавятся с ценой 0 — заполните её в смете.</p>}
-        <button className="btn primary block lg" onClick={submit} disabled={busy}>{busy ? 'Добавляю…' : 'Добавить'}</button>
-      </div>
-    </Sheet>
   );
 }

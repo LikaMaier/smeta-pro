@@ -356,3 +356,24 @@ select.cinput option { color: #000; }
 .check-row .box-ch { flex: none; width: 22px; height: 22px; border-radius: 5px; border: 2px solid var(--tile-border, var(--line)); display: flex; align-items: center; justify-content: center; font-size: 14px; margin-top: 1px; }
 .check-row.on .box-ch { background: var(--accent); border-color: var(--accent); color: var(--accent-ink, #1a1206); }
 .check-row.on .grow { opacity: .55; text-decoration: line-through; }
+
+/* Редактируемый результат мастера / калькулятора */
+.calc-result { margin-top: 14px; }
+.cr-group { margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--r-l); overflow: hidden; background: var(--surface); }
+.cr-row { padding: 10px 12px; border-top: 1px solid var(--line); }
+.cr-row.off { opacity: .45; }
+.cr-top { display: flex; align-items: flex-start; gap: 8px; }
+.cr-top input[type=checkbox] { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--accent); }
+.cr-name { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0; color: var(--text); font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; }
+.cr-sum { white-space: nowrap; }
+.cr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0 0 28px; }
+.cr-grid .input { min-height: 40px; padding: 6px 10px; }
+.cr-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0 0 28px; }
+.src { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.src.own { background: rgba(98,192,143,.18); color: var(--ok); }
+.src.store { background: rgba(240,176,58,.18); color: var(--accent); }
+.src.edited { background: rgba(120,160,255,.2); color: #8fb0ff; }
+.src.none { background: rgba(255,114,98,.15); color: var(--bad); }
+.linklike { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 12px; cursor: pointer; }
+.cr-total { position: sticky; bottom: 0; background: var(--surface-2); border: 1px solid var(--tile-border, var(--line)); border-radius: var(--r-l); padding: 10px 12px; display: grid; gap: 4px; z-index: 2; }
+.cr-total .big { font-size: 19px; color: var(--accent); }
