@@ -48,6 +48,22 @@ model User {
   addressBook Contact[]
   aiSessions AiSession[]
   workActs   WorkAct[]
+  designs    Design[]
+}
+
+// Проект ИИ-проектировщика (навес и др.): параметры модели, из которых строятся чертежи, 3D и спецификация
+model Design {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String    @default("canopy")
+  title     String
+  params    Json
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, deletedAt])
 }
 
 // Акт выполненных работ (в т.ч. промежуточный): снимок выполненных объёмов на дату

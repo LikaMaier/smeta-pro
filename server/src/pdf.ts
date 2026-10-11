@@ -12,6 +12,7 @@ const DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../pdf')
 const SCRIPT = path.join(DIR, 'estimate_pdf.py');
 const XLSX_SCRIPT = path.join(DIR, 'export_xlsx.py');
 const KS_SCRIPT = path.join(DIR, 'ks_forms.py');
+const DESIGN_SCRIPT = path.join(DIR, 'design_pdf.py');
 
 /** Данные для PDF заказчику: без закупочных цен, себестоимости и прибыли */
 export function pdfData(e: any, user: any, number: number, free = false, paid: number | null = null) {
@@ -53,6 +54,7 @@ export function pdfData(e: any, user: any, number: number, free = false, paid: n
 
 export const renderPdf = (data: any) => runPy(SCRIPT, data, 'PDF');
 export const renderXlsx = (data: any) => runPy(XLSX_SCRIPT, data, 'Excel');
+export const renderDesign = (data: any) => runPy(DESIGN_SCRIPT, data, 'проекта');
 export const renderKs = (data: any) => runPy(KS_SCRIPT, data, data.form === 'ks2' ? 'КС-2' : 'КС-3');
 
 export const runImport = (file: Buffer, args: string[] = []) => runPy(path.join(DIR, 'import_xlsx.py'), file, 'импорт', args);

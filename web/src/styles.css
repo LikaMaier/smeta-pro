@@ -377,3 +377,23 @@ select.cinput option { color: #000; }
 .linklike { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 12px; cursor: pointer; }
 .cr-total { position: sticky; bottom: 0; background: var(--surface-2); border: 1px solid var(--tile-border, var(--line)); border-radius: var(--r-l); padding: 10px 12px; display: grid; gap: 4px; z-index: 2; }
 .cr-total .big { font-size: 19px; color: var(--accent); }
+
+/* ИИ-проектировщик */
+.dz-3d { margin: 10px 0 8px; border: 1px solid var(--line); border-radius: 4px; background: linear-gradient(#f4f1ea, #dcd7cc); overflow: hidden; cursor: grab; user-select: none; }
+.dz-3d:active { cursor: grabbing; }
+.dz-3d-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: rgba(0,0,0,.35); }
+.dz-3d-bar .muted { color: #e8e4dc; margin-right: auto; }
+.dz-3d-bar .chip { min-height: 28px; padding: 0 10px; color: #fff; border-color: rgba(255,255,255,.4); }
+.dz-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+.dz-sum > div { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; }
+.dz-sum b { font-size: 15px; } .dz-sum small { font-weight: 400; color: var(--muted); }
+.dz-warn { font-size: var(--fs-xs); color: var(--muted); border-left: 3px solid var(--amber); padding: 4px 8px; margin: 8px 0; }
+.dz-warn.bad { color: var(--bad); border-color: var(--bad); }
+.dz-ral { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); border-radius: 999px; background: none; font-size: 12px; cursor: pointer; }
+.dz-ral i { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); }
+.dz-ral.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.dz-sheet { background: #fff; color: #222; border-radius: 4px; padding: 8px; }
+.dz-sheet-t { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+.dz-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dz-table th, .dz-table td { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.dz-table th { color: var(--muted); font-weight: 500; }

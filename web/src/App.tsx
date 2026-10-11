@@ -17,6 +17,7 @@ import Finance from './pages/Finance';
 import Settings from './pages/Settings';
 import Acts from './pages/Acts';
 import Masters from './pages/Masters';
+import Designer from './pages/Designer';
 import Purchase from './pages/Purchase';
 import Assistant from './pages/Assistant';
 import More from './pages/More';
@@ -40,7 +41,7 @@ function titleOf(path: string): string {
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
     estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Меню', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Меню', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'ИИ-проектировщик',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[2] === 'acts') return 'Акты';
@@ -135,6 +136,7 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/catalog" element={<Catalog />} />
               <Route path="/calculators" element={<Calculators />} />
               <Route path="/masters" element={<Masters />} />
+              <Route path="/designer" element={<Designer />} />
               <Route path="/calculators/:id" element={<CalculatorPage />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/projects/:id" element={<ProjectPage />} />
