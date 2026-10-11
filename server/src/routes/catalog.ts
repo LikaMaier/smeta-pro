@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma, plain, notFound, HttpError, DEFAULT_CATEGORIES, num } from '../util';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { compositionFor } from '../../../shared/compositions';
+import { runImport, renderXlsx, fileName } from '../pdf';
+import { normName } from '../../../shared/names';
 
 const ITEM_TYPES = ['work', 'material', 'equipment', 'service', 'other'] as const;
 const money = z.coerce.number().min(0, 'не может быть отрицательной').max(1e11);
@@ -21,7 +23,45 @@ const itemSchema = z.object({
   active: z.boolean().optional(),
 });
 
-export async function catalogRoutes(app: FastifyInstance) {
+const upsertItem = z.object({
+  name: z.string().trim().min(1).max(300), unit: z.string().trim().min(1).max(30),
+  type: z.enum(['work', 'material', 'equipment', 'service', 'other']), category: z.string().max(100).nullable().optional(),
+  price: z.coerce.number().min(0).max(1e11), composition: z.string().max(3000).nullable().optional(),
+});
+
+/** Обновить цены позиций с тем же названием, при addNew — добавить отсутствующие. История цен сохраняется. */
+async function upsertItems(userId: string, listId: string | null, items: z.infer<typeof upsertItem>[], addNew: boolean) {
+  const list = listId ? { id: listId } : await prisma.priceList.findFirst({ where: { userId, isDefault: true } }) || await prisma.priceList.findFirst({ where: { userId } });
+  if (!list) throw new HttpError(400, 'Нет прайс-листа');
+  const existing = await prisma.catalogItem.findMany({ where: { userId, priceListId: list.id, deletedAt: null } });
+  const byName = new Map(existing.map((i) => [normName(i.name), i]));
+  let updated = 0, created = 0, same = 0;
+  const now = new Date();
+  for (const it of items) {
+    const ex = byName.get(normName(it.name));
+    if (ex) {
+      if (num(ex.price) === it.price) { same++; continue; }
+      await prisma.catalogItem.update({
+        where: { id: ex.id },
+        data: { price: it.price, priceUpdatedAt: now, ...(it.type === 'material' ? { costPrice: it.price } : {}),
+          ...(ex.notes?.startsWith('Примерная цена') ? { notes: null, params: {} } : {}) },
+      });
+      await prisma.priceHistory.create({ data: { itemId: ex.id, price: it.price } });
+      updated++;
+    } else if (addNew) {
+      const c = await prisma.catalogItem.create({
+        data: { userId, priceListId: list.id, name: it.name.trim(), unit: it.unit, type: it.type, category: it.category || 'Прочее',
+          price: it.price, costPrice: it.type === 'material' ? it.price : null, description: it.composition || null, priceUpdatedAt: now },
+      });
+      await prisma.priceHistory.create({ data: { itemId: c.id, price: it.price } });
+      byName.set(normName(it.name), c);
+      created++;
+    }
+  }
+  return { updated, created, same };
+}
+
+export async function catalogRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
   const ownList = async (userId: string, id: string) => {
     const l = await prisma.priceList.findFirst({ where: { id, userId } });
     if (!l) throw notFound('Прайс-лист');
@@ -109,38 +149,58 @@ export async function catalogRoutes(app: FastifyInstance) {
 
   // Запомнить цены из мастера/калькулятора: обновить позиции с таким же названием или добавить новые
   app.post('/api/items/bulk-upsert', async (req) => {
-    const { items } = z.object({ items: z.array(z.object({
-      name: z.string().trim().min(1).max(300), unit: z.string().trim().min(1).max(30),
-      type: z.enum(['work', 'material', 'equipment', 'service', 'other']), category: z.string().max(100).nullable().optional(),
-      price: z.coerce.number().min(0).max(1e11), composition: z.string().max(3000).nullable().optional(),
-    })).max(300) }).parse(req.body);
-    const list = await prisma.priceList.findFirst({ where: { userId: req.user.id, isDefault: true } }) || await prisma.priceList.findFirst({ where: { userId: req.user.id } });
-    if (!list) throw new HttpError(400, 'Нет прайс-листа');
-    const existing = await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId: list.id, deletedAt: null } });
-    const byName = new Map(existing.map((i) => [i.name.trim().toLowerCase(), i]));
-    let updated = 0, created = 0;
-    for (const it of items) {
-      const ex = byName.get(it.name.toLowerCase());
-      if (ex) {
-        if (Number(ex.price) === it.price) continue;
-        await prisma.catalogItem.update({
-          where: { id: ex.id },
-          data: { price: it.price, priceUpdatedAt: new Date(), ...(it.type === 'material' ? { costPrice: it.price } : {}),
-            ...(ex.notes?.startsWith('Примерная цена') ? { notes: null, params: {} } : {}) },
-        });
-        await prisma.priceHistory.create({ data: { itemId: ex.id, price: it.price } });
-        updated++;
-      } else {
-        const c = await prisma.catalogItem.create({
-          data: { userId: req.user.id, priceListId: list.id, name: it.name, unit: it.unit, type: it.type, category: it.category || 'Прочее',
-            price: it.price, costPrice: it.type === 'material' ? it.price : null, description: it.composition || null },
-        });
-        await prisma.priceHistory.create({ data: { itemId: c.id, price: it.price } });
-        byName.set(it.name.toLowerCase(), c);
-        created++;
-      }
+    const { items } = z.object({ items: z.array(upsertItem).max(300) }).parse(req.body);
+    return upsertItems(req.user.id, null, items, true);
+  });
+
+  // Выгрузить справочник в Excel (поменять цены и загрузить обратно)
+  app.post('/api/items/export/send', async (req) => {
+    const { priceListId } = z.object({ priceListId: z.string().optional() }).parse(req.body || {});
+    const list = priceListId ? await prisma.priceList.findFirst({ where: { id: priceListId, userId: req.user.id } }) : await prisma.priceList.findFirst({ where: { userId: req.user.id, isDefault: true } });
+    if (!list) throw notFound('Прайс-лист');
+    if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
+    const items = await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId: list.id, deletedAt: null }, orderBy: [{ category: 'asc' }, { name: 'asc' }] });
+    const TL: Record<string, string> = { work: 'Работа', material: 'Материал', equipment: 'Техника', service: 'Услуга', other: 'Прочее' };
+    const buf = await renderXlsx({ kind: 'catalog', list: list.name, items: items.map((i) => ({ name: i.name, unit: i.unit, price: num(i.price), category: i.category, typeLabel: TL[i.type] || i.type })) });
+    const { InputFile } = await import('grammy');
+    await opts.bot.api.sendDocument(Number(req.user.tgId), new InputFile(buf, fileName(`Справочник — ${list.name}`, 'xlsx')), {
+      caption: `Ваш справочник: ${items.length} позиций. Поменяйте цены в Excel и загрузите обратно: Справочник → «Прайс поставщика».`,
+    });
+    return { ok: true, count: items.length };
+  });
+
+  // Прайс поставщика из Excel: предпросмотр (что обновится / добавится) и применение
+  app.post('/api/items/import-pricelist', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
+    const b = z.object({
+      data: z.string().min(10), apply: z.boolean().default(false), priceKind: z.enum(['retail', 'opt']).default('retail'),
+      type: z.enum(['material', 'work', 'equipment', 'service']).default('material'), addNew: z.boolean().default(true),
+      priceListId: z.string().optional(), markupPct: z.coerce.number().min(-90).max(500).default(0),
+    }).parse(req.body);
+    const buf = Buffer.from(b.data.replace(/^data:[^,]*,/, ''), 'base64');
+    if (buf.length > 8 * 1024 * 1024) throw new HttpError(413, 'Файл больше 8 МБ');
+    if (!(buf[0] === 0x50 && buf[1] === 0x4b)) throw new HttpError(400, 'Нужен файл Excel .xlsx (старый .xls пересохраните как .xlsx)');
+    const parsed = JSON.parse((await runImport(buf, ['--pricelist', ...(b.priceKind === 'opt' ? ['--opt'] : [])])).toString('utf8'));
+    const k = 1 + b.markupPct / 100;
+    const rows = (parsed.lines as any[]).filter((l) => l.price > 0).map((l) => ({
+      name: String(l.name).slice(0, 300), unit: String(l.unit || 'шт').slice(0, 30), type: b.type, category: l.category || (b.type === 'material' ? 'Материалы' : 'Прочее'),
+      price: Math.round(l.price * k * 100) / 100,
+    }));
+    const listId = b.priceListId || (await prisma.priceList.findFirst({ where: { userId: req.user.id, isDefault: true } }))?.id;
+    if (!listId) throw new HttpError(400, 'Нет прайс-листа');
+    await ownList(req.user.id, listId);
+    if (!b.apply) {
+      const existing = await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId: listId, deletedAt: null }, select: { name: true, price: true } });
+      const by = new Map(existing.map((i) => [normName(i.name), num(i.price)]));
+      const preview = rows.map((r) => {
+        const old = by.get(normName(r.name));
+        return { ...r, old: old ?? null, status: old == null ? 'new' : old === r.price ? 'same' : 'update' };
+      });
+      return {
+        rows: preview.slice(0, 500), total: preview.length, withoutPrice: (parsed.lines as any[]).length - rows.length,
+        counts: { update: preview.filter((p) => p.status === 'update').length, new: preview.filter((p) => p.status === 'new').length, same: preview.filter((p) => p.status === 'same').length },
+      };
     }
-    return { updated, created };
+    return upsertItems(req.user.id, listId, rows, b.addNew);
   });
 
   app.post('/api/items', async (req) => {

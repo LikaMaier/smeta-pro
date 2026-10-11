@@ -54,7 +54,7 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
 
   app.get('/api/health', async () => ({ ok: true }));
   await app.register(authRoutes);
-  await app.register(catalogRoutes);
+  await app.register(catalogRoutes, { bot: opts.bot });
   await app.register(estimateRoutes, { bot: opts.bot });
   await app.register(projectRoutes, { bot: opts.bot });
   await app.register(noteRoutes);

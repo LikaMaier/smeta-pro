@@ -196,10 +196,32 @@ def project_book(wb, d):
         kv(ops, r, "Разница", f"=H{r-2}-H{r-1}", col=7, bold=True, fill=TOTAL_FILL)
 
 
+def catalog_book(wb, d):
+    ws = wb.active
+    ws.title = "Прайс"
+    ws["A1"] = f"Мой справочник цен — {d.get('list', '')}"
+    ws["A1"].font = Font(bold=True, size=13)
+    ws["A2"] = "Поменяйте цены в колонке «Цена» и загрузите файл обратно: Справочник → Прайс поставщика"
+    ws["A2"].font = Font(color="666666", italic=True)
+    head(ws, 4, ["Наименование", "Ед. изм.", "Цена", "Раздел", "Тип"], [60, 10, 14, 28, 12])
+    ws.freeze_panes = "A5"
+    r = 5
+    for it in d["items"]:
+        for i, v in enumerate([it["name"], it["unit"], it["price"], it.get("category"), it.get("typeLabel")], 1):
+            c = ws.cell(row=r, column=i, value=v)
+            c.border = BORDER
+            if i == 3:
+                c.number_format = MONEY
+        r += 1
+    ws.auto_filter.ref = f"A4:E{max(r - 1, 5)}"
+
+
 def main():
     d = json.load(sys.stdin)
     wb = Workbook()
-    if d.get("kind") == "project":
+    if d.get("kind") == "catalog":
+        catalog_book(wb, d)
+    elif d.get("kind") == "project":
         project_book(wb, d)
     else:
         estimate_sheet(wb, d)

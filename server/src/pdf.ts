@@ -55,11 +55,11 @@ export const renderPdf = (data: any) => runPy(SCRIPT, data, 'PDF');
 export const renderXlsx = (data: any) => runPy(XLSX_SCRIPT, data, 'Excel');
 export const renderKs = (data: any) => runPy(KS_SCRIPT, data, data.form === 'ks2' ? 'КС-2' : 'КС-3');
 
-export const runImport = (file: Buffer) => runPy(path.join(DIR, 'import_xlsx.py'), file, 'импорт');
+export const runImport = (file: Buffer, args: string[] = []) => runPy(path.join(DIR, 'import_xlsx.py'), file, 'импорт', args);
 
-function runPy(script: string, data: any, what: string): Promise<Buffer> {
+function runPy(script: string, data: any, what: string, args: string[] = []): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const p = spawn(process.env.PYTHON_BIN || 'python3', [script], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const p = spawn(process.env.PYTHON_BIN || 'python3', [script, ...args], { stdio: ['pipe', 'pipe', 'pipe'] });
     const out: Buffer[] = []; const err: Buffer[] = [];
     const timer = setTimeout(() => { p.kill('SIGKILL'); reject(new Error(`${what} создаётся слишком долго`)); }, 30000);
     p.stdout.on('data', (c) => out.push(c));

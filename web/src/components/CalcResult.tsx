@@ -4,6 +4,7 @@ import { get, post } from '../api';
 import { NumInput, useLoad, useToast } from './ui';
 import { n, rub, parseNum, TYPE_LABEL } from '../format';
 import { haptic } from '../tg';
+import { normName } from '../../../shared/names';
 
 /**
  * Редактируемый результат мастера / калькулятора.
@@ -48,11 +49,11 @@ export default function CalcResult({ calcId, suggestions, estimateTitle }: { cal
     });
   }, [keyed]);
 
-  const cat = useMemo(() => new Map((items.data || []).map((i: any) => [i.name.trim().toLowerCase(), i])), [items.data]);
+  const cat = useMemo(() => new Map((items.data || []).map((i: any) => [normName(i.name), i])), [items.data]);
 
   const rows = keyed.map((s) => {
     const o = ovr[s.key] || {};
-    const mine = cat.get(s.name.trim().toLowerCase());
+    const mine = cat.get(normName(s.name));
     const remembered = myPrices[s.name];
     const defPrice = mine ? String(mine.price) : remembered ?? (s.price != null ? String(s.price) : '');
     const src: 'own' | 'store' | 'none' = mine ? 'own' : remembered != null ? 'own' : s.price != null ? 'store' : 'none';

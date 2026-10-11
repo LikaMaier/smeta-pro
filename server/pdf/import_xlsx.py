@@ -31,32 +31,40 @@ def find_header(ws):
     for r in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 60), values_only=False):
         texts = {c.column: str(c.value).strip().lower() for c in r if c.value is not None and isinstance(c.value, str)}
         joined = " ".join(texts.values())
-        if re.search(r"наименован|работ[аы]?\b|позици", joined) and re.search(r"кол|цена|сумм|стоим", joined):
+        if re.search(r"наименован|работ[аы]?\b|позици|товар|номенклатур", joined) and re.search(r"кол|цена|сумм|стоим", joined):
             return r[0].row, texts
     return None, {}
 
 
-def map_cols(texts):
+def map_cols(texts, pricelist=False):
     m = {}
+    if pricelist:
+        prices = [c for c, t in sorted(texts.items()) if "цена" in t or "стоим" in t or "руб" in t]
+        want = "опт" if "--opt" in sys.argv else "розн"
+        pref = [c for c in prices if want in texts[c]]
+        if prices:
+            m["price"] = (pref or prices)[0]
     for col, t in sorted(texts.items()):
-        if "наименован" in t or ("работ" in t and "name" not in m and "цена" not in t and "стоим" not in t):
+        if col == m.get("price"):
+            continue
+        if "наименован" in t or "товар" in t or "номенклатур" in t or ("работ" in t and "name" not in m and "цена" not in t and "стоим" not in t):
             m.setdefault("name", col)
         elif re.search(r"\bед", t):
             m.setdefault("unit", col)
         elif "кол" in t:
             m.setdefault("qty", col)
-        elif "матер" in t:
+        elif "матер" in t and not pricelist:
             m.setdefault("mat", col)
-        elif "работ" in t and ("цена" in t or "стоим" in t or "р." in t or "руб" in t):
+        elif "работ" in t and ("цена" in t or "стоим" in t or "р." in t or "руб" in t) and not pricelist:
             m.setdefault("work", col)
-        elif "цена" in t or "за ед" in t:
+        elif ("цена" in t or "за ед" in t) and not pricelist:
             m.setdefault("price", col)
-        elif "сумм" in t or "стоим" in t or "всего" in t:
+        elif ("сумм" in t or "стоим" in t or "всего" in t) and not pricelist:
             m.setdefault("sum", col)
     return m
 
 
-def parse(data):
+def parse(data, pricelist=False):
     wb = load_workbook(io.BytesIO(data), data_only=True, read_only=False)
     best = None
     for ws in wb.worksheets:
@@ -67,7 +75,7 @@ def parse(data):
     if not best:
         raise SystemExit("Не нашли таблицу: нужна строка заголовков с колонками «Наименование», «Кол-во», «Цена» или «Сумма»")
     ws, hrow, texts = best
-    cols = map_cols(texts)
+    cols = map_cols(texts, pricelist)
     if "name" not in cols:
         raise SystemExit("Не нашли колонку «Наименование»")
     title = ""
@@ -118,7 +126,7 @@ def parse(data):
 
 if __name__ == "__main__":
     try:
-        print(json.dumps(parse(sys.stdin.buffer.read()), ensure_ascii=False))
+        print(json.dumps(parse(sys.stdin.buffer.read(), pricelist='--pricelist' in sys.argv), ensure_ascii=False))
     except SystemExit as e:
         sys.stderr.write(str(e))
         sys.exit(2)

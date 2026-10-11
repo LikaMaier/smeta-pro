@@ -27,6 +27,7 @@ export default function Catalog() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copyOpen, setCopyOpen] = useState(false);
   const [starterOpen, setStarterOpen] = useState(false);
+  const [priceOpen, setPriceOpen] = useState(false);
 
   const toggle = (id: string) => setSelected((s) => { const c = new Set(s); c.has(id) ? c.delete(id) : c.add(id); return c; });
   const currentList = lists.data?.find((l) => l.id === listId);
@@ -43,7 +44,12 @@ export default function Catalog() {
         <span className="small muted">{currentList?.itemsCount ?? ''} поз.</span><Icon.chevron className="chev" width={18} />
       </button>
 
-      {!ro && <button className="btn block" style={{ marginBottom: 12 }} onClick={() => setStarterOpen(true)}>Добавить примерные цены на работы ({STARTER_PRICES.length})</button>}
+      {!ro && (
+        <div className="grid2" style={{ marginBottom: 12 }}>
+          <button className="btn primary" onClick={() => setPriceOpen(true)}>📥 Прайс поставщика</button>
+          <button className="btn" onClick={() => setStarterOpen(true)}>Примерные цены</button>
+        </div>
+      )}
       <SearchBox value={q} onChange={setQ} placeholder="Поиск по названию" />
       <Chips value={type} onChange={setType} options={[{ value: '', label: 'Все' }, ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))]} />
       <select className="select" style={{ marginBottom: 12 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Категория">
@@ -84,6 +90,7 @@ export default function Catalog() {
         </div></div>
       )}
 
+      <PriceImportSheet open={priceOpen} priceListId={listId} onClose={() => setPriceOpen(false)} onDone={() => { setPriceOpen(false); items.reload(); lists.reload(); cats.reload(); }} />
       <StarterSheet open={starterOpen} onClose={() => setStarterOpen(false)} priceListId={listId} onDone={() => { setStarterOpen(false); items.reload(); lists.reload(); cats.reload(); }} />
 
       <ItemSheet item={edit} onClose={() => setEdit(null)} categories={cats.data || []} readOnly={ro}
@@ -269,3 +276,91 @@ function StarterSheet({ open, onClose, priceListId, onDone }: { open: boolean; o
 }
 
 const plural = (n: number, one: string, few: string, many: string) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
+
+/** Загрузка прайса поставщика (Excel): предпросмотр изменений, затем обновление цен и добавление новых позиций */
+function PriceImportSheet({ open, priceListId, onClose, onDone }: { open: boolean; priceListId: string; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const ref = React.useRef<HTMLInputElement>(null);
+  const [data, setData] = useState('');
+  const [fname, setFname] = useState('');
+  const [opts, setOpts] = useState({ priceKind: 'retail', type: 'material', addNew: true, markupPct: '0' });
+  const [preview, setPreview] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'update' | 'new'>('update');
+  useEffect(() => { if (!open) { setData(''); setPreview(null); setFname(''); } }, [open]);
+  const body = (apply: boolean, d = data) => ({ data: d, apply, priceKind: opts.priceKind, type: opts.type, addNew: opts.addNew, markupPct: parseNum(opts.markupPct), priceListId });
+  const run = async (d = data) => {
+    setBusy(true);
+    try { setPreview(await post('/items/import-pricelist', body(false, d))); } catch (e: any) { toast(e.message, true); setPreview(null); } finally { setBusy(false); }
+  };
+  useEffect(() => { if (data) run(); /* eslint-disable-next-line */ }, [opts.priceKind, opts.type, opts.markupPct]);
+  const pick = async (f?: File | null) => {
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) return toast('Файл больше 8 МБ', true);
+    const d = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(f); });
+    setData(d); setFname(f.name); run(d);
+    if (ref.current) ref.current.value = '';
+  };
+  const apply = async () => {
+    setBusy(true);
+    try {
+      const r = await post('/items/import-pricelist', body(true));
+      toast(`Готово: цен обновлено ${r.updated}${opts.addNew ? `, новых позиций ${r.created}` : ''}`);
+      onDone();
+    } catch (e: any) { toast(e.message, true); } finally { setBusy(false); }
+  };
+  if (!open) return null;
+  const rows = (preview?.rows || []).filter((r: any) => filter === 'all' || r.status === filter);
+  return (
+    <Sheet open onClose={onClose} title="Прайс поставщика из Excel">
+      <div className="stack">
+        <p className="small muted" style={{ margin: 0 }}>Загрузите прайс магазина или поставщика (.xlsx): найдём наименование, единицу и цену. Позиции с таким же названием в справочнике получат новую цену — она сразу подставится в мастера и сметы.</p>
+        <button className="btn block" disabled={busy} onClick={() => ref.current?.click()}>{busy && !preview ? 'Читаю файл…' : fname ? `📄 ${fname} — выбрать другой` : '📥 Выбрать файл Excel'}</button>
+        <input ref={ref} type="file" hidden accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => pick(e.target.files?.[0])} />
+        <div className="grid2">
+          <Field label="Какую цену брать">
+            <select className="select" value={opts.priceKind} onChange={(e) => setOpts({ ...opts, priceKind: e.target.value })}>
+              <option value="retail">розничную</option><option value="opt">оптовую</option>
+            </select>
+          </Field>
+          <Field label="Новые позиции — это">
+            <select className="select" value={opts.type} onChange={(e) => setOpts({ ...opts, type: e.target.value })}>
+              <option value="material">материалы</option><option value="work">работы</option><option value="equipment">техника</option><option value="service">услуги</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="Наценка к ценам прайса" hint="0 — как в прайсе. 10 — на 10% дороже для заказчика">
+          <NumInput value={opts.markupPct} onChange={(v) => setOpts({ ...opts, markupPct: v })} unit="%" />
+        </Field>
+        <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={opts.addNew} onChange={(e) => setOpts({ ...opts, addNew: e.target.checked })} />Добавлять позиции, которых нет в справочнике</label>
+        {preview && (
+          <>
+            <div className="panel small">
+              Найдено позиций: <b>{preview.total}</b>{preview.withoutPrice ? ` (без цены пропущено: ${preview.withoutPrice})` : ''}<br />
+              Обновится цена: <b>{preview.counts.update}</b> · новых: <b>{preview.counts.new}</b> · без изменений: {preview.counts.same}
+            </div>
+            <Chips value={filter} onChange={setFilter as any} options={[{ value: 'update', label: `Изменятся (${preview.counts.update})` }, { value: 'new', label: `Новые (${preview.counts.new})` }, { value: 'all', label: 'Все' }]} />
+            <div className="list" style={{ maxHeight: 320, overflow: 'auto' }}>
+              {rows.slice(0, 200).map((r: any, i: number) => (
+                <div key={i} className="list-item" style={{ cursor: 'default' }}>
+                  <div className="grow"><div className="small ellipsis">{r.name}</div><div className="xs muted">{r.category} · {r.unit}</div></div>
+                  <div className="xs num" style={{ textAlign: 'right' }}>
+                    {r.status === 'update' && <><s className="muted">{rub(r.old)}</s><br /><b className={r.price > r.old ? 'neg' : 'pos'}>{rub(r.price)}</b></>}
+                    {r.status === 'new' && <b>{rub(r.price)}<br /><span className="muted">новая</span></b>}
+                    {r.status === 'same' && <span className="muted">{rub(r.price)}</span>}
+                  </div>
+                </div>
+              ))}
+              {!rows.length && <p className="small muted" style={{ padding: 12 }}>Нет позиций в этом списке.</p>}
+            </div>
+            <button className="btn primary block lg" disabled={busy || !(preview.counts.update || (opts.addNew && preview.counts.new))} onClick={apply}>
+              {busy ? 'Сохраняю…' : `Применить: обновить ${preview.counts.update}${opts.addNew ? `, добавить ${preview.counts.new}` : ''}`}
+            </button>
+          </>
+        )}
+        <button className="btn ghost block" disabled={busy} onClick={async () => { try { await post('/items/export/send', { priceListId }); toast('Справочник отправлен вам в чат бота — поменяйте цены и загрузите сюда'); } catch (e: any) { toast(e.message, true); } }}>📤 Скачать мой справочник в Excel</button>
+        <p className="xs muted" style={{ margin: 0 }}>Сопоставление — по названию (регистр, «х/×», кавычки и лишние пробелы не важны). Чтобы цена из прайса попадала в мастера, назовите позицию в справочнике так же, как в прайсе (или наоборот). Старые цены сохраняются в истории позиции.</p>
+      </div>
+    </Sheet>
+  );
+}
