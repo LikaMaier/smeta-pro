@@ -6,7 +6,6 @@ const ITEMS = [
   { to: '/calculators', icon: Icon.calc, title: 'Калькуляторы', text: 'Бетон, кирпич, гипсокартон, отделка, древесина' },
   { to: '/finance', icon: Icon.money, title: 'Финансы', text: 'Прибыль и долги по всем объектам' },
   { to: '/assistant', icon: Icon.mic, title: 'ИИ-помощник', text: 'Сметы по голосу и тексту' },
-  { to: '/notes', icon: Icon.note, title: 'Заметки', text: 'По объектам и общие' },
   { to: '/settings', icon: Icon.gear, title: 'Настройки и подписка', text: 'Тариф, ИИ, реквизиты' },
 ];
 

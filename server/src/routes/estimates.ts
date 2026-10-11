@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, plain, notFound, audit, num, HttpError, accessOf } from '../util';
 import { calcEstimate } from '../../../shared/estimate';
-import { pdfData, renderPdf, pdfLink, checkPdfSig, pdfFileName } from '../pdf';
+import { pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind } from '../pdf';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { getTemplate } from '../../../shared/templates';
 
@@ -94,32 +94,66 @@ async function estimateNumber(userId: string, e: any) {
 export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
   app.get('/api/templates', async () => (await import('../../../shared/templates')).TEMPLATES.map((t) => ({ id: t.id, title: t.title, description: t.description, lines: t.lines.length })));
 
-  // ---- PDF ----
-  app.post('/api/estimates/:id/pdf/send', async (req) => {
-    const e = await loadEstimate(req.user.id, (req.params as any).id);
-    if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить PDF в чат нельзя', 'bot_not_configured');
-    const pdf = await renderPdf(pdfData(e, req.user, await estimateNumber(req.user.id, e), !accessOf(req.user).active));
-    const { InputFile } = await import('grammy');
-    await opts.bot.api.sendDocument(Number(req.user.tgId), new InputFile(pdf, pdfFileName(e.title)), {
-      caption: `Смета «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Перешлите заказчику.`,
-    });
-    await audit(req.user.id, 'estimate', e.id, 'pdf_sent');
-    return { ok: true };
-  });
+  // ---- Файлы: PDF сметы, акт выполненных работ, Excel (для заказчика и для себя) ----
+  const KINDS = ['pdf', 'act', 'xlsx', 'xlsxown'] as const;
+  type EKind = typeof KINDS[number];
+  const PAID: EKind[] = ['act', 'xlsx', 'xlsxown']; // бесплатно — только PDF первой сметы
+  const needPaid = (user: any, kind: EKind) => {
+    if (PAID.includes(kind) && !accessOf(user).active)
+      throw new HttpError(402, 'Акт и экспорт в Excel доступны по подписке.', 'subscription_required');
+  };
+  async function buildFile(e: any, user: any, kind: EKind, actDate?: string) {
+    const number = await estimateNumber(user.id, e);
+    if (kind === 'xlsx' || kind === 'xlsxown') {
+      return { buf: await renderXlsx(xlsxEstimateData(e, user, number, kind === 'xlsxown')), name: fileName(kind === 'xlsxown' ? `${e.title} (для себя)` : e.title, 'xlsx'),
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+    }
+    const data: any = pdfData(e, user, number, !accessOf(user).active);
+    if (kind === 'act') Object.assign(data, { docType: 'act', actDate: actDate || new Date().toISOString().slice(0, 10) });
+    return { buf: await renderPdf(data), name: fileName(kind === 'act' ? `Акт — ${e.title}` : e.title, 'pdf'), type: 'application/pdf' };
+  }
+  const CAPTION: Record<EKind, (e: any) => string> = {
+    pdf: (e) => `Смета «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Перешлите заказчику.`,
+    act: (e) => `Акт выполненных работ по смете «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Распечатайте в 2 экземплярах и подпишите с заказчиком.`,
+    xlsx: (e) => `Смета «${e.title}» в Excel — для заказчика (без себестоимости).`,
+    xlsxown: (e) => `Смета «${e.title}» в Excel — для себя: себестоимость и прибыль. Заказчику не пересылайте.`,
+  };
+  const kindParam = z.object({ kind: z.enum(KINDS) });
 
-  app.get('/api/estimates/:id/pdf/link', async (req) => {
-    const e = await loadEstimate(req.user.id, (req.params as any).id);
-    return { url: pdfLink(e.id) };
-  });
+  // старые адреса PDF оставлены для совместимости
+  app.post('/api/estimates/:id/pdf/send', async (req) => sendFile(req, 'pdf'));
+  app.get('/api/estimates/:id/pdf/link', async (req) => linkFile(req, 'pdf'));
+  app.post('/api/estimates/:id/file/:kind/send', async (req) => sendFile(req, kindParam.parse(req.params).kind));
+  app.get('/api/estimates/:id/file/:kind/link', async (req) => linkFile(req, kindParam.parse(req.params).kind));
+
+  async function sendFile(req: any, kind: EKind) {
+    needPaid(req.user, kind);
+    const e = await loadEstimate(req.user.id, req.params.id);
+    if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
+    const body = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(req.body || {});
+    const f = await buildFile(e, req.user, kind, body.date);
+    const { InputFile } = await import('grammy');
+    await opts.bot.api.sendDocument(Number(req.user.tgId), new InputFile(f.buf, f.name), { caption: CAPTION[kind](e) });
+    await audit(req.user.id, 'estimate', e.id, `${kind}_sent`);
+    return { ok: true };
+  }
+  async function linkFile(req: any, kind: EKind) {
+    needPaid(req.user, kind);
+    const e = await loadEstimate(req.user.id, req.params.id);
+    return { url: fileLink(kind as FileKind, e.id) };
+  }
 
   app.get('/files/estimates/:file', async (req, reply) => {
-    const id = String((req.params as any).file).replace(/\.pdf$/, '');
+    const id = String((req.params as any).file).replace(/\.(pdf|xlsx)$/, '');
     const { exp, sig } = req.query as any;
-    if (!checkPdfSig(id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте PDF из приложения заново' });
+    const kind = (KINDS as readonly string[]).includes((req.query as any).kind) ? (req.query as any).kind as EKind : 'pdf';
+    if (!checkSig(kind, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте файл из приложения заново' });
     const e = await prisma.estimate.findFirst({ where: { id, deletedAt: null }, include: { lines: { orderBy: { position: 'asc' } }, user: true } });
     if (!e) return reply.status(404).send({ error: 'Смета не найдена' });
-    const pdf = await renderPdf(pdfData(e, e.user, await estimateNumber(e.userId, e), !accessOf(e.user).active));
-    return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(pdfFileName(e.title))}`).send(pdf);
+    if (PAID.includes(kind) && !accessOf(e.user).active) return reply.status(402).send({ error: 'Доступно по подписке' });
+    const f = await buildFile(e, e.user, kind);
+    return reply.header('Content-Type', f.type)
+      .header('Content-Disposition', `${f.type === 'application/pdf' ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`).send(f.buf);
   });
 
   app.get('/api/estimates', async (req) => {

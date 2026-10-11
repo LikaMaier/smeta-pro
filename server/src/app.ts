@@ -53,7 +53,7 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
   await app.register(authRoutes);
   await app.register(catalogRoutes);
   await app.register(estimateRoutes, { bot: opts.bot });
-  await app.register(projectRoutes);
+  await app.register(projectRoutes, { bot: opts.bot });
   await app.register(noteRoutes);
   await app.register(billingRoutes, { bot: opts.bot });
   await app.register(aiRoutes);

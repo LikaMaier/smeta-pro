@@ -37,7 +37,7 @@ export async function meView(user: any) {
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
     companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen ? user.theme : 'steel',
     aiAvailable: Boolean(env.AI_PROVIDER),
-    access: { ...accessOf(user), freeEstimateLeft: free.estimateCount === 0, freeEstimateId: free.firstEstimateId },
+    access: { ...accessOf(user), freeEstimateLeft: free.estimateCount === 0, freeEstimateId: free.firstEstimateId, estimateCount: free.estimateCount },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
   });
 }

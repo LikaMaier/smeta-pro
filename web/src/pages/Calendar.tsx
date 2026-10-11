@@ -8,6 +8,8 @@ import { rub, rub0, INCOME_TYPE, groupLabel } from '../format';
 import { preparePhoto } from '../photo';
 import { confirmDialog, haptic } from '../tg';
 import { OpSheet } from './ProjectPage';
+import Finance from './Finance';
+import { Chips } from '../components/ui';
 
 const todayKey = () => {
   const d = new Date();
@@ -33,7 +35,17 @@ export default function Calendar() {
   const data = useLoad(() => get<any>('/calendar', { month, projectId }), [month, projectId]);
   const go = (m: string) => setSp({ m, ...(projectId ? { p: projectId } : {}) }, { replace: true });
   const today = todayKey();
+  const [view, setView] = useState<'cal' | 'money'>(sp.get('v') === 'money' ? 'money' : 'cal');
 
+  return (
+    <>
+      <Chips value={view} onChange={setView} options={[{ value: 'cal', label: 'Календарь' }, { value: 'money', label: 'Деньги по объектам' }]} />
+      {view === 'money' ? <Finance /> : <CalendarMonth month={month} go={go} projectId={projectId} setProjectId={setProjectId} projects={projects} data={data} today={today} nav={nav} />}
+    </>
+  );
+}
+
+function CalendarMonth({ month, go, projectId, setProjectId, projects, data, today, nav }: any) {
   return (
     <>
       <div className="cal-head">

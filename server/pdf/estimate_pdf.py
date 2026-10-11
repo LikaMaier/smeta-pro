@@ -148,18 +148,23 @@ def build(d):
                               ("BOTTOMPADDING", (0, 0), (-1, -1), 8), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
     els += [head, Spacer(1, 8)]
 
-    d_date = d.get("date") or date.today().isoformat()
+    is_act = d.get("docType") == "act"
+    d_date = (date.today().isoformat() if is_act and not d.get("actDate") else d.get("actDate")) if is_act else (d.get("date") or date.today().isoformat())
     try:
         dd = datetime.fromisoformat(d_date[:10]).date()
     except ValueError:
         dd = date.today()
     valid = d.get("validDays") or 14
     number = d.get("number") or ""
-    els.append(Paragraph(esc(d.get("title") or "Смета"), S["title"]))
-    els.append(Paragraph(f"Смета{(' № ' + esc(number)) if number else ''} от {dd.strftime('%d.%m.%Y')} · действительна до {(dd + timedelta(days=int(valid))).strftime('%d.%m.%Y')}", S["sub"]))
+    if is_act:
+        els.append(Paragraph(f"Акт{(' № ' + esc(number)) if number else ''} выполненных работ", S["title"]))
+        els.append(Paragraph(f"от {dd.strftime('%d.%m.%Y')} · по смете «{esc(d.get('title') or '')}»", S["sub"]))
+    else:
+        els.append(Paragraph(esc(d.get("title") or "Смета"), S["title"]))
+        els.append(Paragraph(f"Смета{(' № ' + esc(number)) if number else ''} от {dd.strftime('%d.%m.%Y')} · действительна до {(dd + timedelta(days=int(valid))).strftime('%d.%m.%Y')}", S["sub"]))
     els.append(Spacer(1, 8))
 
-    info = [(k, v) for k, v in [("Заказчик", d.get("customer")), ("Адрес объекта", d.get("address"))] if v]
+    info = [(k, v) for k, v in ([("Исполнитель", d.get("company"))] if is_act else []) + [("Заказчик", d.get("customer")), ("Адрес объекта", d.get("address"))] if v]
     if info:
         t = Table([[Paragraph(k, S["sub"]), Paragraph(esc(v), S["label"])] for k, v in info], colWidths=[32 * mm, W - 32 * mm])
         t.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
@@ -222,12 +227,19 @@ def build(d):
                             ("RIGHTPADDING", (0, 0), (-1, -1), 3), ("TOPPADDING", (0, 0), (-1, -2), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -2), 1.5)]))
     els.append(KeepTogether([tt, Spacer(1, 3), Paragraph(f"Сумма прописью: {rub_words(t.get('total'))}", ParagraphStyle('wr', parent=S['words'], alignment=TA_RIGHT))]))
 
-    if d.get("paymentTerms"):
+    if is_act:
+        els += [Spacer(1, 10), Paragraph(
+            f"Вышеперечисленные работы выполнены полностью и в срок на общую сумму {money(t.get('total'))}. "
+            "Заказчик претензий по объёму, качеству и срокам выполнения работ не имеет.", S["body"])]
+    if d.get("paymentTerms") and not is_act:
         els += [Paragraph("Условия оплаты", S["h2"]), Paragraph(esc(d.get("paymentTerms")), S["body"])]
-    if d.get("notes"):
+    if d.get("notes") and not is_act:
         els += [Paragraph("Примечания", S["h2"]), Paragraph(esc(d.get("notes")), S["body"])]
 
-    sign = Table([[Paragraph("Исполнитель ____________________", S["label"]), Paragraph("Заказчик ____________________", S["labelr"])]], colWidths=[W / 2, W / 2])
+    sign_rows = [[Paragraph("Исполнитель ____________________", S["label"]), Paragraph("Заказчик ____________________", S["labelr"])]]
+    if is_act:
+        sign_rows = [[Paragraph("Работы сдал:", S["sub"]), Paragraph("Работы принял:", ParagraphStyle('sr', parent=S['sub'], alignment=TA_RIGHT))]] + sign_rows
+    sign = Table(sign_rows, colWidths=[W / 2, W / 2])
     sign.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
     els += [Spacer(1, 22), KeepTogether([sign])]
 

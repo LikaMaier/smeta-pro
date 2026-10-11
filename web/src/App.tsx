@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { post, get, setToken, onApiError } from './api';
 import { tg, inTelegram, initTelegram } from './tg';
 import { Boundary, Icon, Sheet, State, ToastProvider } from './components/ui';
@@ -14,7 +14,6 @@ import Calculators, { CalculatorPage } from './pages/Calculators';
 import Projects from './pages/Projects';
 import ProjectPage from './pages/ProjectPage';
 import Finance from './pages/Finance';
-import Notes from './pages/Notes';
 import Settings from './pages/Settings';
 import Assistant from './pages/Assistant';
 import More from './pages/More';
@@ -25,7 +24,7 @@ import { applyTheme } from './theme';
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
   aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean; theme?: string;
-  access: { active: boolean; mode: 'trial' | 'subscription' | 'expired' | 'free' | 'admin'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeEstimateId: string | null };
+  access: { active: boolean; mode: 'trial' | 'subscription' | 'expired' | 'free' | 'admin'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeEstimateId: string | null; estimateCount?: number };
 }
 const MeCtx = createContext<{ me: Me; setMe: (m: Me) => void; refreshMe: () => Promise<void> }>(null as any);
 export const useMe = () => useContext(MeCtx);
@@ -38,7 +37,7 @@ function titleOf(path: string): string {
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
     estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Меню', calendar: 'Календарь', reminders: 'Напоминания', contacts: 'Записная книжка',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Меню', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[1]) return 'Смета';
@@ -96,7 +95,7 @@ function Paywall() {
   return (
     <Sheet open={open} onClose={() => setOpen(false)} title="Нужна подписка">
       <div className="stack">
-        <p style={{ margin: 0 }}>Первая смета — бесплатно. Чтобы создавать новые сметы, вести объекты, деньги, календарь с фото, напоминания и записную книжку, оформите подписку.</p>
+        <p style={{ margin: 0 }}>Первая смета — бесплатно. Чтобы создавать новые сметы, вести объекты, деньги, календарь с фото, делать акты выполненных работ и выгружать в Excel, оформите подписку.</p>
         <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
         <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
       </div>
@@ -132,7 +131,7 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/projects" element={<Projects />} />
               <Route path="/projects/:id" element={<ProjectPage />} />
               <Route path="/finance" element={<Finance />} />
-              <Route path="/notes" element={<Notes />} />
+              <Route path="/notes" element={<Navigate to="/calendar" replace />} />
               <Route path="/assistant" element={<Assistant />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/more" element={<More />} />

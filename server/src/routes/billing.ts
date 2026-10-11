@@ -2,19 +2,21 @@ import type { FastifyInstance } from 'fastify';
 import { prisma, plain, HttpError } from '../util';
 
 /**
- * Тарифы хранятся в БД (таблица Plan) и меняются без деплоя.
- * Стартовые значения цен — ЗАГЛУШКИ, их нужно уточнить (см. README).
+ * Тарифы. Оплата цифровых услуг внутри Telegram — только в Telegram Stars.
+ * 1 звезда стоит пользователю ≈ 2–3 ₽ (зависит от способа покупки), поэтому 490 ₽ ≈ 199 ⭐.
+ * Год = 12 месяцев со скидкой 30%: 199 × 12 × 0,7 ≈ 1670 ⭐.
+ * Цены синхронизируются с базой при каждом запуске; старые тарифы отключаются (оплаты по ним сохраняются).
  */
 export const DEFAULT_PLANS = [
-  { code: 'master_month', title: 'Мастер — 1 месяц', months: 1, starsPrice: 1, aiLimit: 100, sort: 1 },
-  { code: 'master_year', title: 'Мастер — 12 месяцев', months: 12, starsPrice: 10, aiLimit: 100, sort: 2 },
-  { code: 'pro_month', title: 'PRO — 1 месяц', months: 1, starsPrice: 2, aiLimit: 500, sort: 3 },
-  { code: 'pro_year', title: 'PRO — 12 месяцев', months: 12, starsPrice: 20, aiLimit: 500, sort: 4 },
+  { code: 'month', title: 'Подписка на 1 месяц', months: 1, starsPrice: 199, rubPrice: 490, aiLimit: 300, sort: 1, active: true },
+  { code: 'year', title: 'Подписка на 12 месяцев (−30%)', months: 12, starsPrice: 1670, rubPrice: 4116, aiLimit: 300, sort: 2, active: true },
 ];
 
 export async function seedPlans() {
-  const count = await prisma.plan.count();
-  if (count === 0) await prisma.plan.createMany({ data: DEFAULT_PLANS });
+  for (const p of DEFAULT_PLANS) {
+    await prisma.plan.upsert({ where: { code: p.code }, create: p, update: p });
+  }
+  await prisma.plan.updateMany({ where: { code: { notIn: DEFAULT_PLANS.map((p) => p.code) } }, data: { active: false } });
 }
 
 /** Продление подписки после ПОДТВЕРЖДЁННОЙ оплаты (вызывается только из обработчика successful_payment бота) */
@@ -29,7 +31,7 @@ export async function applyPayment(userId: string, planCode: string, stars: numb
   until.setMonth(until.getMonth() + plan.months);
   await prisma.$transaction([
     prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId } }),
-    prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until } }),
+    prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until, subNotice3At: null, subNoticeEndAt: null } }),
   ]);
 }
 

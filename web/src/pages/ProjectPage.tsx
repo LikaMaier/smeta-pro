@@ -91,6 +91,10 @@ function Project({ p, setP, reload }: { p: any; setP: (x: any) => void; reload: 
             <button className="btn primary" onClick={() => setOp({ kind: 'income' })}><Icon.plus width={18} />Поступление</button>
             <button className="btn primary" onClick={() => setOp({ kind: 'expense' })}><Icon.plus width={18} />Расход</button>
           </div>}
+          <button className="btn block" style={{ marginTop: 12 }} onClick={async () => {
+            try { await post(`/projects/${p.id}/xlsx/send`); haptic('success'); toast('Excel по объекту отправлен вам в чат бота'); }
+            catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); }
+          }}>📊 Выгрузить в Excel</button>
         </>
       )}
 

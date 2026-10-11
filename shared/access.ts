@@ -7,7 +7,7 @@ export interface FreeCtx { estimateCount: number; firstEstimateId: string | null
 
 const ALWAYS = [/^\/api\/auth\//, /^\/api\/me$/, /^\/api\/pay\//];
 const CATALOG = [/^\/api\/items(\/|$)/, /^\/api\/pricelists(\/|$)/];
-const FIRST_ESTIMATE_SUB = ['', '/lines', '/pdf/send', '/refresh-prices'];
+const FIRST_ESTIMATE_SUB = ['', '/lines', '/pdf/send', '/file/pdf/send', '/refresh-prices'];
 
 export function freeWriteAllowed(method: string, url: string, ctx: FreeCtx): boolean {
   if (ALWAYS.some((r) => r.test(url))) return true;

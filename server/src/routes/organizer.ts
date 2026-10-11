@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, plain, notFound } from '../util';
+import { env } from '../env';
 import { nextRun } from '../../../shared/reminders';
 
 const REPEATS = ['none', 'daily', 'weekly', 'monthly'] as const;
@@ -122,6 +123,7 @@ export function startReminderLoop(bot: any, log: { error: (o: any, m?: string) =
           });
         } catch (e) { log.error({ err: e }, 'Не удалось отправить напоминание'); }
       }
+      await subscriptionNotices(bot, log, appUrl);
     } catch (e) { log.error({ err: e }, 'Ошибка планировщика напоминаний'); } finally { running = false; }
   };
   setInterval(tick, 30000);
@@ -130,3 +132,43 @@ export function startReminderLoop(bot: any, log: { error: (o: any, m?: string) =
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** Сколько данных у пользователя — то, что жалко потерять */
+async function userStats(userId: string) {
+  const [projects, estimates, photos] = await Promise.all([
+    prisma.project.count({ where: { userId, deletedAt: null } }),
+    prisma.estimate.count({ where: { userId, deletedAt: null, isTemplate: false } }),
+    prisma.photo.count({ where: { userId, deletedAt: null } }),
+  ]);
+  const parts = [estimates && `смет: ${estimates}`, projects && `объектов: ${projects}`, photos && `фото: ${photos}`].filter(Boolean);
+  return parts.length ? `У вас ${parts.join(', ')}.` : '';
+}
+
+/** Уведомления о подписке: за 3 дня до окончания и в день окончания (по одному разу) */
+async function subscriptionNotices(bot: any, log: { error: (o: any, m?: string) => void }, appUrl: string) {
+  const now = new Date();
+  const kb = appUrl ? { inline_keyboard: [[{ text: 'Продлить подписку', web_app: { url: `${appUrl}/settings` } }]] } : undefined;
+  const soon = await prisma.user.findMany({
+    where: { subscriptionUntil: { gt: now, lte: new Date(now.getTime() + 3 * 864e5) }, subNotice3At: null }, take: 50,
+  });
+  const ended = await prisma.user.findMany({
+    where: { subscriptionUntil: { lte: now, gt: new Date(now.getTime() - 7 * 864e5) }, subNoticeEndAt: null }, take: 50,
+  });
+  for (const u of soon) {
+    if (env.ADMIN_TG_IDS.includes(String(u.tgId))) continue;
+    const claimed = await prisma.user.updateMany({ where: { id: u.id, subNotice3At: null }, data: { subNotice3At: now } });
+    if (!claimed.count) continue;
+    const date = u.subscriptionUntil!.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: 'Europe/Moscow' });
+    const stats = await userStats(u.id);
+    await bot.api.sendMessage(Number(u.tgId), `⏳ <b>Подписка СМЕТА PRO заканчивается ${date}.</b>\n${stats} Продлите, чтобы продолжать вести сметы, объекты и календарь без перерыва.`, { parse_mode: 'HTML', reply_markup: kb })
+      .catch((e: any) => log.error({ err: e }, 'Не удалось отправить уведомление о подписке'));
+  }
+  for (const u of ended) {
+    if (env.ADMIN_TG_IDS.includes(String(u.tgId))) continue;
+    const claimed = await prisma.user.updateMany({ where: { id: u.id, subNoticeEndAt: null }, data: { subNoticeEndAt: now } });
+    if (!claimed.count) continue;
+    const stats = await userStats(u.id);
+    await bot.api.sendMessage(Number(u.tgId), `🔒 <b>Подписка СМЕТА PRO закончилась.</b>\n${stats} Все данные сохранены и доступны для просмотра. Продлите подписку, чтобы снова их изменять.`, { parse_mode: 'HTML', reply_markup: kb })
+      .catch((e: any) => log.error({ err: e }, 'Не удалось отправить уведомление о подписке'));
+  }
+}

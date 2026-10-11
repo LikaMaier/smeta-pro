@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { useMe } from '../App';
@@ -6,12 +6,14 @@ import { useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import { CALCULATORS } from '../../../shared/calculators';
 import Hero from '../components/Hero';
+import Onboarding from '../components/Onboarding';
 
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const MONTH_NAME = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString('ru-RU', { month: 'long' });
 
 export default function Home() {
-  const { me } = useMe();
+  const { me, refreshMe } = useMe();
+  useEffect(() => { refreshMe().catch(() => {}); }, []); // eslint-disable-line
   const nav = useNavigate();
   const cal = useLoad(() => get<any>('/calendar', { month: monthNow() }), []);
   const fin = useLoad(() => get<any>('/finance/summary'), []);
@@ -33,6 +35,8 @@ export default function Home() {
         />
       </Link>
 
+      {(me.access.estimateCount ?? 0) === 0 && <Onboarding onTemplate={() => nav('/estimates?new=1')} />}
+
       <div className="tiles">
         <button className="tile wide" onClick={() => (me.access.active || me.access.freeEstimateLeft ? createEstimate() : nav('/settings'))} disabled={busy}>
           + Новая смета{!me.access.active && me.access.freeEstimateLeft ? <small>первая — бесплатно</small> : null}
@@ -40,12 +44,10 @@ export default function Home() {
         <Link className="tile" to="/calculators">Расчёты<small>калькуляторов: {CALCULATORS.length}</small></Link>
         <Link className="tile" to="/estimates">Сметы</Link>
         <Link className="tile" to="/projects">Объекты{active ? <small>в работе: {active}</small> : null}</Link>
-        <Link className="tile" to="/calendar">Календарь<small>фото и заработок</small></Link>
-        <Link className="tile" to="/finance">Финансы</Link>
+        <Link className="tile" to="/calendar">Календарь и деньги<small>фото, доходы, прибыль</small></Link>
         <Link className="tile" to="/catalog">Справочник цен</Link>
         <Link className="tile" to="/reminders">Напоминания</Link>
         <Link className="tile" to="/contacts">Записная книжка<small>телефоны по датам</small></Link>
-        <Link className="tile" to="/notes">Заметки</Link>
         <Link className="tile" to="/assistant">ИИ-сметчик<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
         <Link className="tile wide" to="/settings">Настройки и подписка</Link>
       </div>

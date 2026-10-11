@@ -59,13 +59,13 @@ export default function Settings() {
         <div className="list">
           {list.map((p) => (
             <div key={p.code} className="list-item" style={{ cursor: 'default' }}>
-              <div className="grow"><div className="title">{p.title}</div><div className="xs muted">{p.starsPrice} ⭐ Telegram Stars</div></div>
+              <div className="grow"><div className="title">{p.title}</div><div className="xs muted">{p.starsPrice} ⭐{p.rubPrice ? ` · ≈ ${p.rubPrice.toLocaleString('ru-RU')} ₽` : ''}{p.months === 12 ? ` · ${Math.round(p.rubPrice / 12)} ₽ в месяц` : ''}</div></div>
               <button className="btn primary sm" disabled={!!paying} onClick={() => pay(p.code)}>{paying === p.code ? 'Открываю…' : me.access.mode === 'subscription' ? 'Продлить' : 'Оформить'}</button>
             </div>
           ))}
         </div>
       )}</Load>
-      <p className="xs muted">Оплата в Telegram Stars. Доступ продлевается только после подтверждения платежа Telegram.</p>
+      <p className="xs muted">Оплата в Telegram Stars — так Telegram принимает оплату цифровых услуг. Сумма в рублях примерная: зависит от того, где покупать звёзды. Доступ продлевается сразу после подтверждения платежа.</p>
 
       <h2 className="section-title">ИИ-сметчик (OpenAI)</h2>
       <div className="panel">

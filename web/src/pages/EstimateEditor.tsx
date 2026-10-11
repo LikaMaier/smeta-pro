@@ -106,20 +106,28 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   };
 
   const [pdfBusy, setPdfBusy] = useState(false);
-  const sendPdf = async () => {
-    setPdfBusy(true);
-    try { if (dirty) await save(); await post(`/estimates/${initial.id}/pdf/send`); haptic('success'); toast('PDF отправлен вам в чат бота — перешлите заказчику'); }
-    catch (e: any) { toast(e.message, true); } finally { setPdfBusy(false); }
+  const FILE_OK: Record<string, string> = {
+    pdf: 'PDF отправлен вам в чат бота — перешлите заказчику',
+    act: 'Акт отправлен вам в чат бота — распечатайте и подпишите с заказчиком',
+    xlsx: 'Excel отправлен вам в чат бота',
+    xlsxown: 'Excel «для себя» отправлен вам в чат бота — заказчику его не пересылайте',
   };
-  const openPdf = async () => {
+  const sendFile = async (kind: 'pdf' | 'act' | 'xlsx' | 'xlsxown') => {
+    setPdfBusy(true);
+    try { if (dirty) await save(); await post(`/estimates/${initial.id}/file/${kind}/send`); haptic('success'); toast(FILE_OK[kind]); }
+    catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setPdfBusy(false); }
+  };
+  const sendPdf = () => sendFile('pdf');
+  const openFile = async (kind: 'pdf' | 'act') => {
     setPdfBusy(true);
     try {
       if (dirty) await save();
-      const { url } = await get(`/estimates/${initial.id}/pdf/link`);
+      const { url } = await get(`/estimates/${initial.id}/file/${kind}/link`);
       const full = new URL(url, location.origin).toString();
       if (tg?.openLink) tg.openLink(full); else window.open(full, '_blank');
-    } catch (e: any) { toast(e.message, true); } finally { setPdfBusy(false); }
+    } catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setPdfBusy(false); }
   };
+  const openPdf = () => openFile('pdf');
 
   const action = async (fn: () => Promise<any>, ok?: string) => {
     try { if (dirty) await save(); await fn(); if (ok) toast(ok); } catch (e: any) { toast(e.message, true); }
@@ -222,7 +230,11 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <button className="btn primary" disabled={pdfBusy} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 PDF в Telegram'}</button>
         <button className="btn" disabled={pdfBusy} onClick={() => openPdf()}>Открыть PDF</button>
       </div>
-      <p className="xs muted">В PDF только то, что видит заказчик: без закупочных цен и вашей прибыли. Реквизиты — в Настройках.</p>
+      <div className="grid2" style={{ marginTop: 8 }}>
+        <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт работ</button>
+        <button className="btn" disabled={pdfBusy} onClick={() => sendFile('xlsx')}>📊 Excel</button>
+      </div>
+      <p className="xs muted">В PDF, акте и Excel только то, что видит заказчик: без закупочных цен и вашей прибыли. Реквизиты — в Настройках.{!me.access.active && ' Акт и Excel — по подписке.'}</p>
 
       <h2 className="section-title">Для себя</h2>
       <div className="panel">
@@ -233,6 +245,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <tr><td>Маржа</td><td>{pct(totals.marginPct)}</td></tr>
         </tbody></table>
         {totals.linesWithoutCost > 0 && <p className="xs muted" style={{ marginBottom: 0 }}>У {totals.linesWithoutCost} поз. не указана закупочная цена — они не входят в себестоимость, прибыль может быть завышена.</p>}
+        <button className="btn block" style={{ marginTop: 12 }} disabled={pdfBusy} onClick={() => sendFile('xlsxown')}>📊 Excel для себя (с прибылью)</button>
       </div>
 
       <div className="totalbar"><div className="in">

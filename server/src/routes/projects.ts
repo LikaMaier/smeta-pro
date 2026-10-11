@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { prisma, plain, notFound, audit, num, HttpError } from '../util';
+import { prisma, plain, notFound, audit, num, HttpError, accessOf } from '../util';
+import { renderXlsx, fileLink, checkSig, fileName } from '../pdf';
 import { calcProjectFinance } from '../../../shared/finance';
 import { estimateTotals } from './estimates';
 
@@ -99,7 +100,56 @@ const view = (p: any) => {
   };
 };
 
-export async function projectRoutes(app: FastifyInstance) {
+const P_STATUS: Record<string, string> = { draft: 'Черновик', estimated: 'Смета подготовлена', negotiation: 'Согласование', in_progress: 'В работе', paused: 'Приостановлен', done: 'Завершён', archived: 'Архив' };
+const EXP_LABEL: Record<string, string> = { materials: 'Материалы', equipment: 'Техника', labor: 'Рабочие и подрядчики', other: 'Прочие расходы' };
+const INC_LABEL: Record<string, string> = { advance: 'Аванс', interim: 'Промежуточный платёж', final: 'Окончательный платёж', extra_work: 'Доп. работы', contract_change: 'Изменение договора' };
+
+/** Excel по объекту: сводка и все операции */
+async function projectXlsx(p: any) {
+  const ops = [...(p.financeOps || [])].sort((a: any, b: any) => +new Date(a.date) - +new Date(b.date));
+  return renderXlsx({
+    kind: 'project', name: p.name, customer: p.customer, address: p.address, status: P_STATUS[p.status] || p.status,
+    finance: projectFinance(p),
+    ops: ops.map((o: any) => ({
+      date: new Date(o.date).toISOString().slice(0, 10), kind: o.kind,
+      category: o.kind === 'income' ? INC_LABEL[o.incomeType] || o.incomeType : EXP_LABEL[o.category] || o.category,
+      title: o.title, counterparty: o.counterparty, qty: o.qty == null ? null : num(o.qty), unit: o.unit,
+      amount: num(o.amount), paidAmount: num(o.paidAmount), note: o.note,
+    })),
+  });
+}
+
+export async function projectRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
+  const paid = (user: any) => {
+    if (!accessOf(user).active) throw new HttpError(402, 'Экспорт в Excel доступен по подписке.', 'subscription_required');
+  };
+  app.post('/api/projects/:id/xlsx/send', async (req) => {
+    paid(req.user);
+    const p = await loadProject(req.user.id, (req.params as any).id);
+    if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
+    const { InputFile } = await import('grammy');
+    await opts.bot.api.sendDocument(Number(req.user.tgId), new InputFile(await projectXlsx(p), fileName(p.name, 'xlsx', 'Объект')), {
+      caption: `Объект «${p.name}» в Excel: сводка и все доходы/расходы.`,
+    });
+    return { ok: true };
+  });
+  app.get('/api/projects/:id/xlsx/link', async (req) => {
+    paid(req.user);
+    const p = await loadProject(req.user.id, (req.params as any).id);
+    return { url: fileLink('pxlsx', p.id) };
+  });
+  app.get('/files/projects/:file', async (req, reply) => {
+    const id = String((req.params as any).file).replace(/\.xlsx$/, '');
+    const { exp, sig } = req.query as any;
+    if (!checkSig('pxlsx', id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте файл из приложения заново' });
+    const owner = await prisma.project.findFirst({ where: { id, deletedAt: null }, include: { user: true } });
+    if (!owner) return reply.status(404).send({ error: 'Объект не найден' });
+    if (!accessOf(owner.user).active) return reply.status(402).send({ error: 'Доступно по подписке' });
+    const p = await loadProject(owner.userId, id);
+    return reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName(p.name, 'xlsx', 'Объект'))}`).send(await projectXlsx(p));
+  });
+
   app.get('/api/projects', async (req) => {
     const q = z.object({ status: z.string().optional(), q: z.string().optional() }).parse(req.query);
     const list = await prisma.project.findMany({

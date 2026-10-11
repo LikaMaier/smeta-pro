@@ -23,6 +23,8 @@ model User {
   themeChosen       Boolean   @default(false)
   trialEndsAt       DateTime
   subscriptionUntil DateTime?
+  subNotice3At      DateTime? // когда отправлено «подписка заканчивается через 3 дня»
+  subNoticeEndAt    DateTime? // когда отправлено «подписка закончилась»
   createdAt         DateTime  @default(now())
 
   priceLists PriceList[]
@@ -299,6 +301,7 @@ model Plan {
   title      String
   months     Int
   starsPrice Int
+  rubPrice   Int     @default(0) // ориентировочная цена в рублях для показа
   aiLimit    Int     @default(0)
   active     Boolean @default(true)
   sort       Int     @default(0)

@@ -14,7 +14,7 @@ export default function Estimates() {
   const [to, setTo] = useState('');
   const dq = useDebounced(q);
   const list = useLoad(() => get<any[]>('/estimates', { q: dq, status, template: tab === 'templates' ? '1' : '', from, to: to ? `${to}T23:59:59` : '' }), [dq, status, tab, from, to]);
-  const [newOpen, setNewOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(() => new URLSearchParams(location.search).get('new') === '1');
   const templates = useLoad(() => (newOpen ? get<any[]>('/estimates', { template: '1' }) : Promise.resolve([])), [newOpen]);
 
   const create = async (fromId?: string, templateId?: string) => {

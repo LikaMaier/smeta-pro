@@ -31,3 +31,10 @@ test('справочник цен и настройки — бесплатно; 
   assert.equal(freeWriteAllowed('POST', '/api/reminders', used), false);
   assert.equal(freeWriteAllowed('POST', '/api/ai/message', used), false);
 });
+
+test('PDF первой сметы — бесплатно; акт и Excel — по подписке', () => {
+  assert.equal(freeWriteAllowed('POST', '/api/estimates/e1/file/pdf/send', used), true);
+  assert.equal(freeWriteAllowed('POST', '/api/estimates/e1/file/act/send', used), false);
+  assert.equal(freeWriteAllowed('POST', '/api/estimates/e1/file/xlsx/send', used), false);
+  assert.equal(freeWriteAllowed('POST', '/api/projects/p1/xlsx/send', used), false);
+});
