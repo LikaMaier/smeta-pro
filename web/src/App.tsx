@@ -53,8 +53,8 @@ const CalcIcon = (p: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" {...p}>
     <rect x="3" y="2.5" width="18" height="19" rx="2.5" fill="#D9D9D9" />
     <rect x="5" y="4.5" width="14" height="4" rx="1" fill="#3B4A3B" />
-    <text x="17.6" y="7.8" fontSize="3.4" fill="#FFE01B" textAnchor="end" fontWeight="700">90</text>
-    {[0, 1, 2].map((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={5 + c * 4.9} y={10.5 + r * 3.6} width="3.8" height="2.6" rx=".6" fill={c === 2 && r === 2 ? '#FFE01B' : '#8A8A8A'} />))}
+    <text x="17.6" y="7.8" fontSize="3.4" fill="#F2D43C" textAnchor="end" fontWeight="700">90</text>
+    {[0, 1, 2].map((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={5 + c * 4.9} y={10.5 + r * 3.6} width="3.8" height="2.6" rx=".6" fill={c === 2 && r === 2 ? '#F2D43C' : '#8A8A8A'} />))}
   </svg>
 );
 

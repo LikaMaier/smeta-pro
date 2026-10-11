@@ -69,3 +69,20 @@ test('углы: 3-4-5 и отклонение диагонали', () => {
   assert.equal(out.rows[0].value, 5);
   assert.equal(out.rows[1].value, 10);
 });
+
+test('кровля 10×8, 30°, свес 0,5: площадь = 2 × 11 × 4,5/cos30', () => {
+  const v = primary('roof-gable', { L: 10, W: 8, ang: 30, o: 0.5, sw: 1.1, screws: 8, reserve: 0 });
+  assert.equal(v, Math.round(2 * 11 * (4.5 / Math.cos(Math.PI / 6)) * 100) / 100);
+});
+
+test('септик: 4 чел × 200 л × 3 сут = 2,4 м³, КС-15, 2 камеры → по 2 кольца', () => {
+  const out = runCalc(getCalculator('septic')!, { people: 4, norm: 200, days: 3, d: '1.5', ch: '2' }).output!;
+  assert.equal(out.rows[2].value, 2.4);
+  assert.equal(out.rows[0].value, 4);
+});
+
+test('забор 50 м, ворота 5 м, шаг 2,5: 19 столбов, 40 листов', () => {
+  const out = runCalc(getCalculator('fence')!, { len: 50, gates: 5, h: 2, step: 2.5, rows: 2, sw: 1.15, depth: 1.2 }).output!;
+  assert.equal(out.rows[1].value, 19);
+  assert.equal(out.rows[0].value, 40);
+});

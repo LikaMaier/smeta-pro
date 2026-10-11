@@ -7,8 +7,8 @@ export function initTelegram() {
   try {
     tg.ready();
     tg.expand();
-    tg.setHeaderColor?.('#1C1C1C');
-    tg.setBackgroundColor?.('#1C1C1C');
+    tg.setHeaderColor?.('#3A1806');
+    tg.setBackgroundColor?.('#3A1806');
     tg.disableVerticalSwipes?.();
   } catch { /* старые клиенты */ }
 }

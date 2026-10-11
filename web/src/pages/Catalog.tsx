@@ -4,6 +4,7 @@ import { useMe } from '../App';
 import { Chips, Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, date, parseNum, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog } from '../tg';
+import { STARTER_PRICES, STARTER_CATEGORIES } from '../../../shared/starterPrices';
 
 const empty = { name: '', type: 'work', category: '', unit: 'м²', price: '', costPrice: '', description: '', notes: '', active: true };
 
@@ -25,6 +26,7 @@ export default function Catalog() {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copyOpen, setCopyOpen] = useState(false);
+  const [starterOpen, setStarterOpen] = useState(false);
 
   const toggle = (id: string) => setSelected((s) => { const c = new Set(s); c.has(id) ? c.delete(id) : c.add(id); return c; });
   const currentList = lists.data?.find((l) => l.id === listId);
@@ -41,6 +43,7 @@ export default function Catalog() {
         <span className="small muted">{currentList?.itemsCount ?? ''} поз.</span><Icon.chevron className="chev" width={18} />
       </button>
 
+      {!ro && <button className="btn block" style={{ marginBottom: 12 }} onClick={() => setStarterOpen(true)}>Добавить примерные цены на работы ({STARTER_PRICES.length})</button>}
       <SearchBox value={q} onChange={setQ} placeholder="Поиск по названию" />
       <Chips value={type} onChange={setType} options={[{ value: '', label: 'Все' }, ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))]} />
       <select className="select" style={{ marginBottom: 12 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Категория">
@@ -56,7 +59,7 @@ export default function Catalog() {
       <Load state={items} empty={(d) => (d.length ? null : (
         <State title={q || type || category ? 'Ничего не найдено' : 'Справочник пуст'}
           text={q || type || category ? 'Измените поиск или фильтр.' : 'Добавьте работы и материалы с вашими ценами — они будут подставляться в новые сметы.'}
-          action={!ro && !q ? <button className="btn primary" onClick={() => setEdit({ ...empty, priceListId: listId })}>Добавить позицию</button> : undefined} />
+          action={!ro && !q ? <div className="stack"><button className="btn primary" onClick={() => setStarterOpen(true)}>Заполнить примерными ценами</button><button className="btn" onClick={() => setEdit({ ...empty, priceListId: listId })}>Добавить свою позицию</button></div> : undefined} />
       ))}>
         {(list) => (
           <div className="list">
@@ -65,7 +68,7 @@ export default function Catalog() {
                 {selecting && <input type="checkbox" readOnly checked={selected.has(it.id)} aria-label="Выбрать" />}
                 <div className="grow">
                   <div className="title ellipsis">{it.name}</div>
-                  <div className="xs muted">{it.category} · {TYPE_LABEL[it.type]}{!it.active ? ' · неактивна' : ''}</div>
+                  <div className="xs muted">{it.category} · {TYPE_LABEL[it.type]}{!it.active ? ' · неактивна' : ''} {it.params?.starter && <span className="badge accent">примерная</span>}</div>
                 </div>
                 <div className="right"><div className="num" style={{ fontWeight: 700 }}>{rub(it.price)}</div><div className="xs muted">за {it.unit}</div></div>
               </button>
@@ -80,6 +83,8 @@ export default function Catalog() {
           <button className="btn primary" onClick={() => setCopyOpen(true)}>Копировать или перенести</button>
         </div></div>
       )}
+
+      <StarterSheet open={starterOpen} onClose={() => setStarterOpen(false)} priceListId={listId} onDone={() => { setStarterOpen(false); items.reload(); lists.reload(); cats.reload(); }} />
 
       <ItemSheet item={edit} onClose={() => setEdit(null)} categories={cats.data || []} readOnly={ro}
         onSaved={() => { setEdit(null); items.reload(); lists.reload(); cats.reload(); }} />
@@ -221,3 +226,46 @@ function PriceLists({ lists, current, onPick, onChanged, readOnly }: { lists: an
     </div>
   );
 }
+
+function StarterSheet({ open, onClose, priceListId, onDone }: { open: boolean; onClose: () => void; priceListId: string; onDone: () => void }) {
+  const toast = useToast();
+  const [sel, setSel] = useState<Set<string>>(new Set(STARTER_CATEGORIES));
+  const [busy, setBusy] = useState(false);
+  const [peek, setPeek] = useState<string | null>(null);
+  const toggle = (c: string) => setSel((s) => { const x = new Set(s); x.has(c) ? x.delete(c) : x.add(c); return x; });
+  const count = STARTER_PRICES.filter((p) => sel.has(p.category)).length;
+  const add = async () => {
+    if (!sel.size) return toast('Выберите хотя бы один раздел', true);
+    setBusy(true);
+    try { const r = await post('/items/import-starter', { priceListId, categories: [...sel] }); toast(r.added ? `Добавлено работ: ${r.added}` : 'Эти работы уже есть в прайсе'); onDone(); }
+    catch (e: any) { toast(e.message, true); } finally { setBusy(false); }
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Примерные цены на работы">
+      <div className="banner">Ориентировочные цены по России на 2026 год, без материалов. В вашем регионе они могут отличаться в разы. После добавления поправьте их под себя: пометка «примерная» снимется.</div>
+      <div className="list">
+        {STARTER_CATEGORIES.map((c) => {
+          const rows = STARTER_PRICES.filter((p) => p.category === c);
+          return (
+            <div key={c}>
+              <div className="list-item" style={{ cursor: 'default' }}>
+                <input type="checkbox" checked={sel.has(c)} onChange={() => toggle(c)} aria-label={c} />
+                <button className="grow" style={{ background: 'none', border: 0, textAlign: 'left', padding: 0, cursor: 'pointer' }} onClick={() => setPeek(peek === c ? null : c)}>
+                  <div className="title">{c}</div><div className="xs muted">{rows.length} {plural(rows.length, 'работа', 'работы', 'работ')} · {peek === c ? 'скрыть' : 'показать цены'}</div>
+                </button>
+              </div>
+              {peek === c && (
+                <table className="breakdown" style={{ padding: '0 16px 8px', display: 'table', width: 'calc(100% - 32px)', margin: '0 16px 8px' }}><tbody>
+                  {rows.map((r) => <tr key={r.name}><td>{r.name}</td><td>{rub(r.price)}/{r.unit}</td></tr>)}
+                </tbody></table>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <button className="btn primary block lg" style={{ marginTop: 12 }} onClick={add} disabled={busy}>{busy ? 'Добавляю…' : `Добавить в прайс: ${count}`}</button>
+    </Sheet>
+  );
+}
+
+const plural = (n: number, one: string, few: string, many: string) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);

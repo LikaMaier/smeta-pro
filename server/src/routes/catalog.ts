@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, plain, notFound, HttpError, DEFAULT_CATEGORIES, num } from '../util';
+import { STARTER_PRICES } from '../../../shared/starterPrices';
 
 const ITEM_TYPES = ['work', 'material', 'equipment', 'service', 'other'] as const;
 const money = z.coerce.number().min(0, 'не может быть отрицательной').max(1e11);
@@ -121,7 +122,11 @@ export async function catalogRoutes(app: FastifyInstance) {
     const priceChanged = (body.price != null && body.price !== num(prev.price)) ||
       (body.costPrice !== undefined && (body.costPrice ?? null) !== (prev.costPrice == null ? null : num(prev.costPrice)));
     const item = await prisma.catalogItem.update({
-      where: { id }, data: { ...body, ...(priceChanged ? { priceUpdatedAt: new Date() } : {}) },
+      where: { id }, data: {
+        ...body,
+        // своя цена вместо примерной — снимаем пометку «примерная»
+        ...(priceChanged ? { priceUpdatedAt: new Date(), ...((prev.params as any)?.starter ? { params: { ...(prev.params as any), starter: false } } : {}) } : {}),
+      },
     });
     // Изменение цены НЕ затрагивает сохранённые сметы: в строках сметы хранится копия цены.
     if (priceChanged) await prisma.priceHistory.create({ data: { itemId: id, price: item.price, costPrice: item.costPrice } });
@@ -139,6 +144,25 @@ export async function catalogRoutes(app: FastifyInstance) {
     const { id } = req.params as any;
     await ownItem(req.user.id, id);
     return plain(await prisma.priceHistory.findMany({ where: { itemId: id }, orderBy: { changedAt: 'desc' }, take: 100 }));
+  });
+
+  // Добавить стартовый набор работ с ориентировочными ценами (только выбранные разделы, без дублей)
+  app.post('/api/items/import-starter', async (req) => {
+    const { priceListId, categories } = z.object({ priceListId: z.string(), categories: z.array(z.string()).min(1) }).parse(req.body);
+    await ownList(req.user.id, priceListId);
+    const existing = new Set((await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId, deletedAt: null }, select: { name: true } })).map((i) => i.name.toLowerCase()));
+    const rows = STARTER_PRICES.filter((p) => categories.includes(p.category) && !existing.has(p.name.toLowerCase()));
+    for (const r of rows) {
+      const item = await prisma.catalogItem.create({
+        data: {
+          userId: req.user.id, priceListId, name: r.name, category: r.category, unit: r.unit, price: r.price,
+          type: r.category === 'Аренда техники' ? 'equipment' : r.name.startsWith('Вывоз') ? 'service' : 'work',
+          notes: 'Примерная цена — проверьте и поправьте под свой регион', params: { starter: true },
+        },
+      });
+      await prisma.priceHistory.create({ data: { itemId: item.id, price: item.price } });
+    }
+    return { ok: true, added: rows.length };
   });
 
   // Копирование / перенос позиций между прайс-листами
