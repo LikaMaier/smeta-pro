@@ -24,3 +24,7 @@ table.kv td:first-child{color:var(--muted);padding-right:12px;width:45%}
 .dz-sheet-t{font-weight:700;font-size:13px;margin-bottom:4px}
 .foot{text-align:center;font-size:13px;color:var(--muted);padding:8px 0 24px}.foot a{color:var(--accent-text)}
 @media (max-width:420px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.vars{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0 10px}
+.var{border:1.5px solid var(--line);border-radius:12px;background:transparent;color:var(--ink);padding:8px 4px;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.var span{font-size:14px}.var b{font-size:14px;color:var(--accent-text)}
+.var.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}

@@ -29,7 +29,9 @@ export interface CanopyParams {
   attach: boolean;      // пристенный: высокая сторона крепится к стене дома (только односкатная)
   postStep: number;     // шаг столбов, м
   overhang: number;     // свесы кровли, м
-  cover: 'prof' | 'tile' | 'soft' | 'poly' | 'sandwich' | 'none';
+  cover: 'prof' | 'tile' | 'soft' | 'poly' | 'sandwich' | 'slats' | 'none'; // slats — ламели (пергола)
+  layout: 'perimeter' | 'center'; // столбы по периметру или в один ряд по центру (консольный Т-навес)
+  midRows: number;      // промежуточные ряды столбов поперёк пролёта (многопролётный навес)
   walls: Record<Side, Wall>;
   profH: number;        // высота профлиста при «профлист» / «профлист + сетка»
   gate: 'none' | 'swing' | 'sectional'; // ворота в передней стене
@@ -51,7 +53,7 @@ export interface CanopyParams {
 }
 
 export const CANOPY_DEFAULT: CanopyParams = {
-  kind: 'tko', L: 10.2, W: 9.2, roof: 'single', frame: 'steel', gutter: false, snowGuard: false, lights: 0, hHigh: 6, hLow: 5, highSide: 'left', attach: false, postStep: 3, overhang: 0.3, cover: 'prof',
+  kind: 'tko', L: 10.2, W: 9.2, roof: 'single', layout: 'perimeter', midRows: 0, frame: 'steel', gutter: false, snowGuard: false, lights: 0, hHigh: 6, hLow: 5, highSide: 'left', attach: false, postStep: 3, overhang: 0.3, cover: 'prof',
   walls: { front: 'open', back: 'prof_mesh', left: 'prof_mesh', right: 'prof_mesh' }, profH: 2,
   gate: 'none', gateW: 3, gateH: 2.5, door: false, insulate: false,
   base: 'slab', stripW: 0.4, stripD: 0.7, eps: 0.1, city: '', slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite', snow: 3, color: 'RAL 7024', waste: 5,
@@ -92,6 +94,10 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   if (p.attach) p.walls = { ...p.walls, [p.highSide]: 'open' };
   if (p.roof === 'arch' && p.frame === 'wood') { p.frame = 'steel'; warnings.push('Арочный каркас делается из гнутой профтрубы — каркас переключён на металл'); }
   const consoles = p.kind === 'visor';
+  if (p.roof === 'hip' || consoles || p.attach) { p.layout = 'perimeter'; }
+  const center = p.layout === 'center';
+  if (center) { p.walls = { front: 'open', back: 'open', left: 'open', right: 'open' }; p.gate = 'none'; p.door = false; p.midRows = 0; }
+  const midRows = p.roof === 'hip' ? 0 : clamp(Math.round(p.midRows || 0), 0, 6);
   // большой снег (V район и выше) — стропила и балки на размер мощнее
   const snowK = p.snow >= 6 ? 1.4 : p.snow >= 5 ? 1.2 : 1;
   const light = p.kind === 'greenhouse' && p.frame === 'steel'; // теплица: лёгкий оцинкованный каркас
@@ -157,6 +163,15 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   for (const s of SIDES) if (p.roof === 'gable' && kinkSide(s)) addPost(...sideDefs[s].pt(sideDefs[s].len / 2));
   // пристенный: со стороны дома столбов нет — несущая балка на анкерах
   if (p.attach) for (const [k, [x, y]] of postMap) if (sideOf(x, y).some((q) => q.side === p.highSide)) postMap.delete(k);
+  // промежуточные ряды столбов (многопролётный навес)
+  const midU = Array.from({ length: midRows }, (_, i) => (span * (i + 1)) / (midRows + 1));
+  for (const u of midU) for (const v of steps(lenV, p.postStep)) addPost(...(toW(u, v, 0).slice(0, 2) as [number, number]));
+  // консольный Т-навес: один ряд столбов по центру
+  if (center) {
+    postMap.clear();
+    for (const v of steps(lenV, p.postStep)) addPost(...(toW(span / 2, v, 0).slice(0, 2) as [number, number]));
+    if (span / 2 > 3.5) warnings.push(`Консольный навес: вылет ${r2(span / 2, 1)} м в каждую сторону — больше 3,5 м нужен расчёт, лучше два ряда столбов`);
+  }
   // козырёк: столбов нет совсем — консоли (подкосы) от стены
   if (consoles) { postMap.clear(); if (span > 2) warnings.push('Козырёк на консолях — вылет больше 2 м нужно проверить, лучше поставить столбы (тип «Пристенный навес»)'); }
 
@@ -202,7 +217,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   }
 
   // сечение столбов — по самому высокому столбу (у четырёхскатной и двускатной без средних стоек это карниз)
-  const postProf = postProfile(Math.max(hLow, ...[...postMap.values()].map(([x, y]) => topAt(x, y))));
+  const postProf = postProfile(Math.max(hLow, ...[...postMap.values()].map(([x, y]) => topAt(x, y))) + (center ? 1.6 : 0)); // консольный — столбы мощнее
   const postSet = new Map<string, V3>();
   for (const [k, [x, y]] of postMap) { postSet.set(k, [x, y, 0]); add('post', postProf, [x, y, 0], [x, y, topAt(x, y)]); }
   if (hHigh > 6.2) warnings.push('Высота больше 6 м — сечение столбов и связи нужно проверить расчётом');
@@ -226,9 +241,13 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     }
   }
 
+  // балки по внутренним рядам столбов (поперёк — вдоль v)
+  for (const u of center ? [span / 2] : midU) add('beam', beamProfile(p.postStep * snowK), toW(u, 0, hAt(u)), toW(u, lenV, hAt(u)));
+
   // ---------- стропильная система ----------
   const rStepMax = rafterMax(p.snow, wood || light);
-  const purStep = light ? 1.0 : p.cover === 'poly' ? 0.7 : p.cover === 'tile' ? 0.35 : p.cover === 'soft' ? 0.6 : p.cover === 'sandwich' ? 1.5 : p.snow <= 3 ? 1.0 : 0.6;
+  const slats = p.cover === 'slats';
+  const purStep = slats ? 0.3 : light ? 1.0 : p.cover === 'poly' ? 0.7 : p.cover === 'tile' ? 0.35 : p.cover === 'soft' ? 0.6 : p.cover === 'sandwich' ? 1.5 : p.snow <= 3 ? 1.0 : 0.6;
   let bentLen = 0; // гнутые элементы арки
   let truss = false, rafterProf = '', chordProf = '', webProf = '', purProf = '', rafterCount = 0, rafterSpacing = 0, purlinRows = 0, slopeLen = 0;
   const roofPolys: V3[][] = [];
@@ -236,8 +255,12 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
 
   if (!hip) {
     const vPos = steps(lenV, p.postStep);
-    const halfSpan0 = p.roof === 'gable' ? span / 2 : span;
-    truss = arch ? span > 7 : Math.hypot(halfSpan0, hHigh - hLow) > 6.5;
+    // опоры поперёк пролёта: края, конёк, промежуточные ряды; самый длинный участок решает — стропила или фермы
+    const supU = [...new Set([0, span, ...(p.roof === 'gable' ? [span / 2] : []), ...midU].map((u) => r2(u, 4)))].sort((a, b) => a - b);
+    const segU: [number, number][] = supU.slice(1).map((u, i) => [supU[i], u]);
+    const maxSeg = center ? span / 2 : Math.max(...segU.map(([a, b]) => b - a));
+    const halfSpan0 = maxSeg;
+    truss = arch ? maxSeg > 7 : Math.hypot(halfSpan0, (hHigh - hLow) * (maxSeg / (p.roof === 'gable' ? span / 2 : span))) > 6.5 && !center;
     // фермы ставим по линиям столбов, обычные стропила — с шагом по снеговой нагрузке
     const perBay = truss ? 1 : Math.max(1, Math.ceil((lenV / (vPos.length - 1)) / rStepMax - 1e-9));
     const rafV: number[] = [];
@@ -252,10 +275,10 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     rafterProf = rafterProfile(slopeLen * snowK);
     if (truss) {
       chordProf = slopeLen <= 9 ? '60×40×3' : '80×60×3'; webProf = '40×40×2'; rafterProf = chordProf;
-      const ht = Math.min(1.0, Math.max(0.4, span / 12));
+      const ht = Math.min(1.0, Math.max(0.4, maxSeg / 12));
       if (slopeLen > 12) warnings.push('Пролёт больше 12 м — ферма требует расчёта конструктора');
       for (const v of rafV) {
-        const segs: [number, number][] = p.roof === 'gable' ? [[0, span / 2], [span / 2, span]] : [[0, span]];
+        const segs: [number, number][] = segU;
         for (const [u0, u1] of segs) {
           const n = Math.max(2, Math.ceil((u1 - u0) / (ht * 1.4)));
           if (arch) {
@@ -280,6 +303,12 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     } else {
       // у стены дома свеса нет
       const o0 = p.attach && highAtStart ? 0 : ov, o1 = p.attach && !highAtStart ? 0 : ov;
+      // консольный Т-навес: подкосы от столба к стропилам в обе стороны
+      if (center) for (const v of steps(lenV, p.postStep)) {
+        const zc = hAt(span / 2), reach = Math.min(span * 0.3, 1.8), drop = Math.min(1.2, Math.max(0.5, span * 0.18));
+        add('brace', beamProfile(p.postStep) === '100×50×3' ? '80×40×3' : '100×50×3', toW(span / 2, v, zc - drop), toW(span / 2 - reach, v, hAt(span / 2 - reach) - 0.02));
+        add('brace', beamProfile(p.postStep) === '100×50×3' ? '80×40×3' : '100×50×3', toW(span / 2, v, zc - drop), toW(span / 2 + reach, v, hAt(span / 2 + reach) - 0.02));
+      }
       for (const v of rafV) {
         if (arch) { const us = arcUs(-ov, span + ov); for (let i = 0; i < AN; i++) add('rafter', rafterProf, toW(us[i], v, hAt(us[i])), toW(us[i + 1], v, hAt(us[i + 1]))); bentLen += polyLen(us); }
         else if (p.roof === 'gable') { add('rafter', rafterProf, toW(-ov, v, hAt(-ov)), toW(span / 2, v, hAt(span / 2))); add('rafter', rafterProf, toW(span / 2, v, hAt(span / 2)), toW(span + ov, v, hAt(span + ov))); }
@@ -287,7 +316,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
       }
     }
     // прогоны
-    purProf = purlinProfile(rafterSpacing);
+    purProf = slats ? '60×20×2' : purlinProfile(rafterSpacing);
     const roofTop = (u: number) => hAt(u) + 0.03;
     const purU: number[] = [];
     if (p.roof === 'gable') { steps(span / 2, purStep).forEach((u) => purU.push(u)); steps(span / 2, purStep).forEach((u) => purU.push(span / 2 + u)); }
@@ -335,7 +364,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
       add('rafter', rafterProf, ab2w(hl + ov, b, z(hl + ov, b)), ab2w(hl - e, b, z(hl - e, b))); rafterCount++;
     }
     rafterSpacing = rStepMax;
-    purProf = purlinProfile(rafterSpacing);
+    purProf = slats ? '60×20×2' : purlinProfile(rafterSpacing);
     // прогоны — замкнутыми кольцами по скатам
     for (let t = -ov + 0.05; t < hs / 2 - 0.1; t += purStep) {
       const zz = hLow + kHip * t + 0.03;
@@ -351,7 +380,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     ridgeLen = Math.max(0, hl - hs) + 4 * dist(E1, R1);
     eaveLen = 2 * (hl + hs + 4 * ov);
   }
-  if (p.cover !== 'none') roofPolys.forEach((pts) => panels.push({ kind: 'roof', pts }));
+  if (p.cover !== 'none' && !slats) roofPolys.forEach((pts) => panels.push({ kind: 'roof', pts }));
   const roofArea = roofPolys.reduce((a, q) => a + area3(q), 0);
 
   // ---------- стены: обшивка, перила, проёмы ----------
@@ -461,7 +490,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
       m.profile = ({
         post: postH <= 3.2 ? '150×150' : '200×200', beam: P(m.profile).a >= 120 ? '200×100' : '150×100',
         rafter: len <= 3.2 ? '50×150' : len <= 4.5 ? '50×200' : '100×200', hip: '100×200', chord: '50×200', web: '50×100',
-        purlin: rafterSpacing > 1.0 ? '50×100' : '25×100', rail: '50×100', frame: '100×100', handrail: '50×100', baluster: '50×50', brace: '100×100',
+        purlin: slats ? '50×150' : rafterSpacing > 1.0 ? '50×100' : '25×100', rail: '50×100', frame: '100×100', handrail: '50×100', baluster: '50×50', brace: '100×100',
       } as Record<MemberKind, string>)[m.kind];
       if (m.kind === 'rafter' && len > 6) warnings.push('Деревянное стропило длиннее 6 м — нужен стык или клеёный брус');
     }
@@ -475,7 +504,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     const g = byProf.get(m.profile) || { pieces: [], kinds: new Set() };
     g.pieces.push(dist(m.a, m.b)); g.kinds.add(m.kind); byProf.set(m.profile, g);
   }
-  const KIND: Record<string, string> = { post: 'столбы', beam: 'обвязка', rafter: 'стропила', chord: 'пояса ферм', web: 'решётка ферм', purlin: wood ? 'обрешётка' : 'прогоны', rail: 'ригели обшивки', frame: 'рамы проёмов', hip: 'конёк и рёбра', handrail: 'перила', baluster: 'балясины', brace: 'консоли' };
+  const KIND: Record<string, string> = { post: 'столбы', beam: 'обвязка', rafter: 'стропила', chord: 'пояса ферм', web: 'решётка ферм', purlin: slats ? 'ламели' : wood ? 'обрешётка' : 'прогоны', rail: 'ригели обшивки', frame: 'рамы проёмов', hip: 'конёк и рёбра', handrail: 'перила', baluster: 'балясины', brace: 'консоли' };
   const steel = [...byProf.entries()].map(([profile, g]) => {
     const pr = P(profile);
     const len = g.pieces.reduce((a, b) => a + b, 0);
@@ -760,9 +789,10 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     b.sum('Плитка', slabArea, 'м²');
   }
   const hardRoof = p.cover === 'prof' || p.cover === 'tile' || p.cover === 'soft' || p.cover === 'sandwich';
-  if ((p.gutter && p.cover !== 'none') || (p.snowGuard && hardRoof)) {
+  const gutterOk = p.gutter && p.cover !== 'none' && !slats;
+  if (gutterOk || (p.snowGuard && hardRoof)) {
     b.sec('Водосток и снегозадержание');
-    if (p.gutter && p.cover !== 'none') {
+    if (gutterOk) {
       const pipes = (eaveLen > lenV + 2 * ov + 0.1 ? 2 : 1) * Math.max(2, Math.ceil(lenV / 10) + 1);
       b.mat('Водосточная система: желоб, крюки, воронки, колена', eaveLen * k, 'пог. м', 950);
       b.mat('Труба водосточная', pipes * hLow * k, 'пог. м', 650);
@@ -791,7 +821,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   b.summary.unshift(
     { label: 'Размер в плане', value: r2(L * W, 1), unit: `м² (${L}×${W})` },
     { label: wood ? 'Пиломатериал' : 'Металл', value: wood ? r2(woodVol, 2) : r2(steelKg, 0), unit: wood ? 'м³' : 'кг' },
-    { label: 'Кровля', value: r2(roofArea, 1), unit: 'м²' },
+    { label: slats ? 'Площадь перголы' : 'Кровля', value: r2(roofArea, 1), unit: 'м²' },
     { label: 'Профлист на стенах', value: r2(profArea, 1), unit: 'м²' },
     { label: 'Поликарбонат на стенах', value: r2(polyWall, 1), unit: 'м²' },
     { label: 'Сэндвич-панели на стенах', value: r2(sandWall, 1), unit: 'м²' },
@@ -800,13 +830,15 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     { label: 'Перила', value: r2(railLen, 1), unit: 'пог. м' },
     { label: 'Столбов', value: nPosts, unit: 'шт' },
   );
+  if (slats) warnings.push('Пергола: ламели не защищают от дождя — при необходимости добавьте поликарбонат поверх');
+  if (midRows) warnings.push(`Многопролётный навес: ${midRows + 1} пролёта по ${r2(span / (midRows + 1), 2)} м, учитывайте промежуточные столбы в схеме проезда и парковки`);
   if (truss) warnings.push(`Пролёт ${r2(slopeLen, 1)} м — стропила заменены фермами (пояса ${chordProf}, решётка ${webProf})`);
   warnings.push('Эскиз и расчёт материалов, а не расчёт прочности. Сечения подобраны по типовым таблицам — для ответственных объектов проверьте у конструктора.');
 
   const profOf = (...ks: MemberKind[]) => members.find((m) => ks.includes(m.kind))?.profile;
   return {
     params: p, members, panels, steel, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings], openings, topAt,
-    info: { wood, woodVol: r2(woodVol, 2), arch, span: hip ? hs : span, lenV: hip ? hl : lenV, alongX, truss, rafterProf: profOf('chord', 'rafter') || rafterProf, purProf: profOf('purlin') || purProf, beamProf: profOf('beam') || beamProf, postProf: profOf('post') || postProf, rafters: rafterCount, rafterSpacing: r2(rafterSpacing), purlins: purlinRows, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: nPosts, hHigh, hLow, steelKg: r2(steelKg, 0) },
+    info: { wood, woodVol: r2(woodVol, 2), arch, center, midRows, slats, span: hip ? hs : span, lenV: hip ? hl : lenV, alongX, truss, rafterProf: profOf('chord', 'rafter') || rafterProf, purProf: profOf('purlin') || purProf, beamProf: profOf('beam') || beamProf, postProf: profOf('post') || postProf, rafters: rafterCount, rafterSpacing: r2(rafterSpacing), purlins: purlinRows, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: nPosts, hHigh, hLow, steelKg: r2(steelKg, 0) },
   };
 }
 export type CanopyResult = ReturnType<typeof buildCanopy>;

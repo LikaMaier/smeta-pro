@@ -160,3 +160,35 @@ test('фундаменты: УШП, лента, винтовые сваи — с
   const s3 = buildCanopy({ ...base, walls: undefined, snow: 3 }), s5 = buildCanopy({ ...base, walls: undefined, snow: 5 });
   assert.ok(s5.info.steelKg > s3.info.steelKg);
 });
+
+import { makeVariants } from '../shared/design/variants';
+
+test('консольный Т-навес: столбы только по центру, подкосы в обе стороны, стены открыты', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'park-t')!.p);
+  const posts = r.members.filter((m) => m.kind === 'post');
+  assert.ok(posts.length >= 3 && posts.every((m) => Math.abs(m.a[0] - 3.5) < 1e-6));
+  assert.equal(r.members.filter((m) => m.kind === 'brace').length, posts.length * 2);
+});
+
+test('многопролётный: промежуточный ряд столбов делит пролёт, без ферм', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'park-10')!.p);
+  assert.ok(r.members.some((m) => m.kind === 'post' && Math.abs(m.a[1] - 5.5) < 1e-6));
+  assert.equal(r.info.truss, false);
+  const one = buildCanopy({ ...PRESETS.find((p) => p.id === 'park-10')!.p, midRows: 0 });
+  assert.ok(one.info.posts < r.info.posts);
+});
+
+test('пергола: ламели вместо кровли, без кровельных материалов и водостока', () => {
+  const r = buildCanopy({ ...PRESETS.find((p) => p.id === 'pergola-m')!.p, gutter: true });
+  assert.equal(r.panels.filter((p) => p.kind === 'roof').length, 0);
+  assert.ok(!r.lines.some((l) => /Профнастил кровельный|Монтаж водосточной/.test(l.name)));
+  assert.ok(r.steel.some((s) => s.use.includes('ламели')));
+});
+
+test('три варианта: эконом дешевле стандарта, премиум дороже', () => {
+  for (const id of ['car2', 'gazebo', 'garage', 'terrace-m']) {
+    const vs = makeVariants(buildCanopy(PRESETS.find((p) => p.id === id)!.p).params);
+    const t = vs.map((v) => buildCanopy(v.params).lines.reduce((a, l) => a + l.qty * l.price, 0));
+    assert.ok(t[0] <= t[1] && t[1] < t[2], `${id}: ${t.map(Math.round)}`);
+  }
+});

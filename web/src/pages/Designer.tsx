@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { get, post, put, del } from '../api';
-import { Chips, Field, NumInput, Sheet, useDebounced, useToast } from '../components/ui';
+import { Chips, Field, NumInput, Sheet, useDebounced, useLoad, useToast } from '../components/ui';
+import { normName } from '../../../shared/names';
+import { makeVariants } from '../../../shared/design/variants';
 import CalcResult from '../components/CalcResult';
 import { Viewer, Drawings } from '../components/Design3D';
 import { n, rub0, parseNum } from '../format';
 import { haptic, confirmDialog, tg } from '../tg';
 import { useMe } from '../App';
 import { buildCanopy, CANOPY_DEFAULT, OBJ_LABEL, type CanopyParams, type ObjKind, type Side, type Wall } from '../../../shared/design/canopy';
-import { RAL } from '../../../shared/design/render';
+import { RAL, render3d, view3dToSvg } from '../../../shared/design/render';
 import { CITIES, snowByCity, snowLabel } from '../../../shared/design/snow';
 import { WALL_LABEL } from '../../../shared/design/report';
 import { PRESETS } from '../../../shared/design/presets';
@@ -17,9 +19,9 @@ import { PRESETS } from '../../../shared/design/presets';
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
 // пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
-const BLANK: Partial<CanopyParams> = { stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const BLANK: Partial<CanopyParams> = { layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
 const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
-const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps'] as const;
+const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows'] as const;
 type NumKey = (typeof NUMS)[number];
 const MM = new Set<NumKey>(['slabT', 'sand', 'gravel', 'stripW', 'stripD', 'eps']); // в форме — в миллиметрах
 const toStr = (p: CanopyParams) => Object.fromEntries(NUMS.map((k) => [k, String(MM.has(k) ? Math.round(p[k] * 1000) : p[k])])) as Record<NumKey, string>;
@@ -28,7 +30,7 @@ const SIDE_SHORT: Record<Side, string> = { front: 'спереди', back: 'сз�
 const DRAFT = 'smeta_designer_draft';
 const KIND_ICON: Record<ObjKind, string> = { canopy: '⛱', tko: '🗑', lean: '🏠', visor: '🚪', gazebo: '🛖', garage: '🚗', greenhouse: '🌱', woodshed: '🪵' };
 
-type Tab = 'params' | 'draw' | 'steel' | 'est';
+type Tab = 'params' | 'draw' | 'steel' | 'var' | 'est';
 
 export default function Designer() {
   const toast = useToast();
@@ -43,6 +45,7 @@ export default function Designer() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [busy, setBusy] = useState<'' | 'ai' | 'pdf' | 'save' | 'share'>('');
   const [listOpen, setListOpen] = useState(false);
+  const [showVariants, setShowVariants] = useState<boolean>(!!saved0?.sv);
   const [list, setList] = useState<any[] | null>(null);
 
   const params: CanopyParams = useMemo(() => {
@@ -62,15 +65,18 @@ export default function Designer() {
     if (params.L < 1 || params.L > 60 || params.W < 1 || params.W > 60) e.push('Размеры в плане — от 1 до 60 м');
     if (params.hHigh < 1.2 || params.hHigh > 12 || params.hLow < 1.2 || params.hLow > 12) e.push('Высоты — от 1,2 до 12 м');
     if (params.lights < 0 || params.lights > 50) e.push('Светильников — от 0 до 50');
+    if (params.midRows < 0 || params.midRows > 6) e.push('Промежуточных рядов столбов — от 0 до 6');
     if (params.snow < 1 || params.snow > 8) e.push('Снеговой район — от 1 до 8');
     if (params.base === 'strip' && (params.stripW < 0.2 || params.stripW > 1 || params.stripD < 0.3 || params.stripD > 2)) e.push('Лента: ширина 200–1000 мм, высота 300–2000 мм');
     if (params.postStep < 1.5 || params.postStep > 6) e.push('Шаг столбов — от 1,5 до 6 м');
     return e;
   }, [params]);
 
-  useEffect(() => { try { localStorage.setItem(DRAFT, JSON.stringify({ p: params, title, id: designId })); } catch { /* */ } }, [params, title, designId]);
+  useEffect(() => { try { localStorage.setItem(DRAFT, JSON.stringify({ p: params, title, id: designId, sv: showVariants })); } catch { /* */ } }, [params, title, designId, showVariants]);
 
-  const apply = (p: Partial<CanopyParams>, t?: string, id: string | null = null) => {
+  const apply = (p0: Partial<CanopyParams> & { _variants?: any }, t?: string, id: string | null = null) => {
+    const { _variants, ...p } = p0 as any;
+    if (id) setShowVariants(!!_variants);
     const f = full(p); setBase(f); setNums(toStr(f)); if (t) setTitle(t); setDesignId(id); setQuestions([]);
   };
   const setB = (patch: Partial<CanopyParams>) => setBase((b) => ({ ...b, ...patch }));
@@ -88,14 +94,23 @@ export default function Designer() {
       toast('Параметры заполнены — проверьте и поправьте при необходимости');
     } catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
   };
+  // три варианта (эконом / стандарт / премиум) с ценами из справочника прораба
+  const items = useLoad(() => get<any[]>('/items').catch(() => []), []);
+  const priceMap = useMemo(() => new Map<string, number>((items.data || []).map((i: any) => [normName(i.name), Number(i.price)])), [items.data]);
+  const variants = useMemo(() => (tab === 'var' || showVariants ? makeVariants(dp).map((v) => {
+    const r = buildCanopy(v.params);
+    return { ...v, res: r, total: Math.round(r.lines.reduce((a, l: any) => a + l.qty * (priceMap.get(normName(l.name)) ?? l.price ?? 0), 0)) };
+  }) : []), [dp, tab, showVariants, priceMap]);
+  const withVariants = () => (showVariants && variants.length ? { ...params, _variants: variants.map(({ id, label, changes, total, params: vp }) => ({ id, label, changes, total, params: vp })) } : params);
   // сохранить (или обновить) проект и вернуть его id
   const persist = async (): Promise<string> => {
+    const body = { title, params: withVariants() };
     try {
-      const d = designId ? await put(`/designs/${designId}`, { title, params }) : await post('/designs', { title, params, kind: 'canopy' });
+      const d = designId ? await put(`/designs/${designId}`, body) : await post('/designs', { ...body, kind: 'canopy' });
       setDesignId(d.id); return d.id;
     } catch (e: any) {
       if (e.status !== 404) throw e;
-      const d = await post('/designs', { title, params, kind: 'canopy' }); setDesignId(d.id); return d.id;
+      const d = await post('/designs', { ...body, kind: 'canopy' }); setDesignId(d.id); return d.id;
     }
   };
   const save = async () => {
@@ -161,7 +176,7 @@ export default function Designer() {
       </div>
       {errors.map((e) => <div key={e} className="dz-warn bad">{e}</div>)}
 
-      <Chips<Tab> value={tab} onChange={setTab} options={[{ value: 'params', label: 'Параметры' }, { value: 'draw', label: 'Чертежи' }, { value: 'steel', label: res.info.wood ? 'Пиломатериал' : 'Металл' }, { value: 'est', label: 'Смета' }]} />
+      <Chips<Tab> value={tab} onChange={setTab} options={[{ value: 'params', label: 'Параметры' }, { value: 'draw', label: 'Чертежи' }, { value: 'steel', label: res.info.wood ? 'Пиломатериал' : 'Металл' }, { value: 'var', label: 'Варианты' }, { value: 'est', label: 'Смета' }]} />
 
       {tab === 'params' && (
         <div className="stack">
@@ -183,9 +198,15 @@ export default function Designer() {
             <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.attach} onChange={(e) => setB({ attach: e.target.checked })} />Крепится к стене дома высокой стороной ({SIDE_SHORT[base.highSide]}) — без столбов у стены</label>
           )}
           {base.kind === 'visor' && <p className="xs muted" style={{ margin: 0 }}>Козырёк крепится к стене на консолях (подкосах), без столбов</p>}
+          {!['visor', 'lean'].includes(base.kind) && base.roof !== 'hip' && !base.attach && (
+            <Field label="Расстановка столбов">
+              <Chips value={base.layout} onChange={(v) => setB({ layout: v })} options={[{ value: 'perimeter', label: 'По периметру' }, { value: 'center', label: 'Один ряд по центру (консольный)' }]} />
+            </Field>
+          )}
+          {base.layout === 'perimeter' && base.roof !== 'hip' && !['visor'].includes(base.kind) && num('midRows', 'Промежуточных рядов столбов', 'шт', '0 — один пролёт; 1 и больше — многопролётный навес (стоянки, склады)')}
           <div className="grid2">{base.kind !== 'visor' && num('postStep', 'Шаг столбов, до', 'м')}{num('overhang', 'Свес кровли', 'м')}</div>
           {base.roof !== 'arch' && <Field label="Каркас"><Chips value={base.frame} onChange={(v) => setB({ frame: v })} options={[{ value: 'steel', label: 'Металл (профтруба)' }, { value: 'wood', label: 'Дерево (брус)' }]} /></Field>}
-          <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'tile', label: 'Металлочерепица' }, { value: 'soft', label: 'Гибкая черепица' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'sandwich', label: 'Сэндвич' }, { value: 'none', label: 'Без кровли' }]} /></Field>
+          <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'tile', label: 'Металлочерепица' }, { value: 'soft', label: 'Гибкая черепица' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'sandwich', label: 'Сэндвич' }, { value: 'slats', label: 'Ламели (пергола)' }, { value: 'none', label: 'Без кровли' }]} /></Field>
           <Field label="Цвет (RAL)">
             <div className="row wrap" style={{ gap: 6 }}>
               {Object.entries(RAL).map(([code, hex]) => (
@@ -251,6 +272,21 @@ export default function Designer() {
             <tfoot><tr><td colSpan={5}>Итого {res.info.wood ? 'пиломатериала' : 'металла'} (с отходом)</td><td className="num"><b>{res.info.wood ? `${n(res.steel.reduce((a, s) => a + s.vol, 0), 2)} м³` : `${n(res.steel.reduce((a, s) => a + s.kg, 0), 0)} кг`}</b></td></tr></tfoot>
           </table>
           <p className="xs muted">{res.info.wood ? 'Брус и доска — по 6 м, хвоя естественной влажности.' : 'Раскрой — по хлыстам 6 и 12 м с пропилом 3 мм.'} Сечения — по типовым таблицам для снегового района {params.snow}.</p>
+        </div>
+      )}
+
+      {tab === 'var' && (
+        <div className="stack">
+          <p className="small muted" style={{ margin: 0 }}>Три комплектации одного объекта — заказчику проще выбрать между вашими вариантами, чем между вами и конкурентом. Цены — из вашего справочника, где он есть, иначе ориентировочные.</p>
+          {variants.map((v) => (
+            <div key={v.id} className={`panel dz-var ${v.id === 'std' ? 'on' : ''}`} style={{ padding: 10 }}>
+              <div className="row between"><b>{v.label}</b><b className="num">{rub0(v.total)}</b></div>
+              <div className="dz-var-3d" dangerouslySetInnerHTML={{ __html: view3dToSvg(render3d(v.res, -35, 24, 480, 300)) }} />
+              <ul className="xs" style={{ margin: '6px 0', paddingLeft: 18 }}>{v.changes.map((c) => <li key={c}>{c}</li>)}</ul>
+              {v.id !== 'std' && <button className="btn sm block" onClick={() => { apply(v.params, title, designId); setTab('params'); toast(`Взят вариант «${v.label}» — можно поправить`); }}>Взять за основу</button>}
+            </div>
+          ))}
+          <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={showVariants} onChange={(e) => setShowVariants(e.target.checked)} />Показывать 3 варианта с ценами заказчику по 3D-ссылке</label>
         </div>
       )}
 
