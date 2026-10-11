@@ -208,7 +208,7 @@ model Estimate {
   workStart      DateTime?
   workEnd        DateTime?
   warrantyMonths Int            @default(12)
-  shareToken     String?        @unique // ссылка для заказчика
+  shareToken     String? // ссылка для заказчика (случайные 18 байт; поиск по индексу)
   sharedAt       DateTime?
   viewedAt       DateTime?
   approvedAt     DateTime?
@@ -218,6 +218,7 @@ model Estimate {
   updatedAt      DateTime       @updatedAt
   lines          EstimateLine[]
 
+  @@index([shareToken])
   @@index([userId, deletedAt])
 }
 
