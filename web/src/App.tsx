@@ -27,8 +27,8 @@ import { applyTheme } from './theme';
 
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
-  aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean; theme?: string;
-  access: { active: boolean; mode: 'trial' | 'subscription' | 'expired' | 'free' | 'admin'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeEstimateId: string | null; estimateCount?: number };
+  aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean; theme?: string; designPrices?: Record<string, number> | null; pay?: { yookassa: boolean; receipt: boolean };
+  access: { active: boolean; mode: 'trial' | 'subscription' | 'expired' | 'free' | 'admin'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeEstimateIds?: string[]; estimateCount?: number };
 }
 const MeCtx = createContext<{ me: Me; setMe: (m: Me) => void; refreshMe: () => Promise<void> }>(null as any);
 export const useMe = () => useContext(MeCtx);
@@ -101,7 +101,7 @@ function Paywall() {
   return (
     <Sheet open={open} onClose={() => setOpen(false)} title="Нужна подписка">
       <div className="stack">
-        <p style={{ margin: 0 }}>Первая смета — бесплатно. Чтобы создавать новые сметы, вести объекты, деньги, календарь с фото, делать договоры и акты, выгружать в Excel, оформите подписку.</p>
+        <p style={{ margin: 0 }}>Первые 3 сметы — бесплатно. Чтобы создавать больше смет, вести объекты, деньги, календарь с фото, делать договоры и акты, выгружать в Excel, оформите подписку.</p>
         <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
         <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
       </div>

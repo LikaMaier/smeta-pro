@@ -1,3 +1,4 @@
+import { FREE_ESTIMATES } from '../../shared/access';
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { FastifyReply } from 'fastify';
 import { ZodError } from 'zod';
@@ -65,11 +66,11 @@ export function accessOf(u: { trialEndsAt: Date; subscriptionUntil: Date | null;
   };
 }
 
-/** Данные для бесплатного режима: сколько смет создано и какая была первой */
+/** Данные для бесплатного режима: сколько смет создано и какие из них бесплатные (первые FREE_ESTIMATES) */
 export async function freeCtx(userId: string) {
   const [estimateCount, first] = await Promise.all([
     prisma.estimate.count({ where: { userId, isTemplate: false } }), // удалённые тоже считаются
-    prisma.estimate.findFirst({ where: { userId, isTemplate: false }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
+    prisma.estimate.findMany({ where: { userId, isTemplate: false }, orderBy: { createdAt: 'asc' }, select: { id: true }, take: FREE_ESTIMATES }),
   ]);
-  return { estimateCount, firstEstimateId: first?.id || null };
+  return { estimateCount, freeEstimateIds: first.map((e) => e.id) };
 }

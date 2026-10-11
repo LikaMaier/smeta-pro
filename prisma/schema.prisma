@@ -18,6 +18,7 @@ model User {
   username          String?
   companyName       String?
   contacts          String?
+  designPrices      Json?
   aiEnabled         Boolean   @default(false)
   theme             String    @default("steel")
   themeChosen       Boolean   @default(false)
@@ -380,6 +381,8 @@ model Payment {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   planCode        String
   stars           Int
+  provider        String   @default("stars") // stars | yookassa
+  amountRub       Int?
   telegramChargeId String  @unique
   status          String   @default("paid") // paid | refunded
   createdAt       DateTime @default(now())

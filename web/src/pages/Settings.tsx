@@ -16,6 +16,24 @@ export default function Settings() {
   const [paying, setPaying] = useState('');
   useEffect(() => { setCompany(me.companyName || ''); setContacts(me.contacts || ''); }, [me.companyName, me.contacts]);
 
+  const [email, setEmail] = useState(() => { try { return localStorage.getItem('smeta_pay_email') || ''; } catch { return ''; } });
+  const [ykId, setYkId] = useState<string | null>(null);
+  const payYk = async (code: string) => {
+    if (me.pay?.receipt && !/^\S+@\S+\.\S+$/.test(email)) return toast('Укажите email — на него придёт чек', true);
+    setPaying(code);
+    try {
+      try { localStorage.setItem('smeta_pay_email', email); } catch { /* */ }
+      const { url, id } = await post(`/pay/${code}/yookassa`, me.pay?.receipt ? { email } : {});
+      setYkId(id);
+      if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank');
+      toast('Оплатите на странице ЮKassa и вернитесь — доступ продлится сам');
+    } catch (e: any) { toast(e.message, true); } finally { setPaying(''); }
+  };
+  const checkYk = async () => {
+    if (!ykId) return;
+    try { const r = await post(`/pay/yookassa/${ykId}/check`); await refreshMe(); toast(r.status === 'succeeded' ? 'Оплата получена, подписка продлена' : 'Оплата ещё не поступила — попробуйте через минуту', r.status !== 'succeeded'); }
+    catch (e: any) { toast(e.message, true); }
+  };
   const pay = async (code: string) => {
     setPaying(code);
     try {
@@ -38,7 +56,7 @@ export default function Settings() {
         <div className="row between">
           <div>
             <div className="title" style={{ fontWeight: 700 }}>{({ subscription: 'Подписка активна', trial: 'Пробный период', admin: 'Полный доступ (владелец)', expired: 'Подписка закончилась', free: 'Бесплатный доступ' } as any)[me.access.mode]}</div>
-            <div className="small muted">{me.access.mode === 'subscription' || me.access.mode === 'trial' ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Без ограничений' : me.access.freeEstimateLeft ? 'Первая смета — бесплатно. Дальше — по подписке.' : 'Бесплатная смета использована. Данные сохранены и доступны для просмотра.'}</div>
+            <div className="small muted">{me.access.mode === 'subscription' || me.access.mode === 'trial' ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Без ограничений' : me.access.freeEstimateLeft ? `Бесплатно: 3 сметы, осталось ${me.access.freeLeft ?? 3}. Дальше — по подписке.` : 'Бесплатные сметы использованы. Данные сохранены и доступны для просмотра.'}</div>
           </div>
           <span className={`badge ${me.access.active ? 'ok' : 'bad'}`}>{me.access.active ? 'Доступ есть' : 'Нет доступа'}</span>
         </div>
@@ -50,14 +68,19 @@ export default function Settings() {
       <Load state={plans}>{(list) => (
         <div className="list">
           {list.map((p) => (
-            <div key={p.code} className="list-item" style={{ cursor: 'default' }}>
-              <div className="grow"><div className="title">{p.title}</div><div className="xs muted">{p.starsPrice} ⭐{p.rubPrice ? ` · ≈ ${p.rubPrice.toLocaleString('ru-RU')} ₽` : ''}{p.months === 12 ? ` · ${Math.round(p.rubPrice / 12)} ₽ в месяц` : ''}</div></div>
-              <button className="btn primary sm" disabled={!!paying} onClick={() => pay(p.code)}>{paying === p.code ? 'Открываю…' : me.access.mode === 'subscription' ? 'Продлить' : 'Оформить'}</button>
+            <div key={p.code} className="list-item" style={{ cursor: 'default', display: 'block' }}>
+              <div><div className="title">{p.title}</div><div className="xs muted">{p.starsPrice} ⭐{p.rubPrice ? ` · ≈ ${p.rubPrice.toLocaleString('ru-RU')} ₽` : ''}{p.months === 12 ? ` · ${Math.round(p.rubPrice / 12)} ₽ в месяц` : ''}</div></div>
+              <div className={me.pay?.yookassa ? 'grid2' : ''} style={{ marginTop: 8 }}>
+                {me.pay?.yookassa && <button className="btn primary sm block" disabled={!!paying} onClick={() => payYk(p.code)}>{paying === p.code ? 'Открываю…' : `Картой / СБП · ${(p.rubPrice || 0).toLocaleString('ru-RU')} ₽`}</button>}
+                <button className={`btn sm block ${me.pay?.yookassa ? '' : 'primary'}`} disabled={!!paying} onClick={() => pay(p.code)}>{me.pay?.yookassa ? `Звёздами · ${p.starsPrice} ⭐` : paying === p.code ? 'Открываю…' : me.access.mode === 'subscription' ? 'Продлить' : 'Оформить'}</button>
+              </div>
             </div>
           ))}
         </div>
       )}</Load>
-      <p className="xs muted">Оплата в Telegram Stars — так Telegram принимает оплату цифровых услуг. Сумма в рублях примерная: зависит от того, где покупать звёзды. Доступ продлевается сразу после подтверждения платежа.</p>
+      {me.pay?.yookassa && me.pay.receipt && <Field label="Email для чека"><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@mail.ru" /></Field>}
+      {ykId && <button className="btn block" onClick={checkYk}>Я оплатил(а) — проверить оплату</button>}
+      <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa, чек придёт на email. Или в Telegram Stars.' : 'Оплата в Telegram Stars. Сумма в рублях примерная: зависит от того, где покупать звёзды.'} Доступ продлевается сразу после подтверждения платежа.</p>
 
       <h2 className="section-title">ИИ-сметчик (OpenAI)</h2>
       <div className="panel">
@@ -137,7 +160,7 @@ function Referral() {
   const toast = useToast();
   const r = useLoad(() => get<any>('/referrals'), []);
   const d = r.data;
-  const text = 'Делаю сметы и считаю прибыль по объектам в СМЕТА PRO прямо в Telegram. Первая смета — бесплатно:';
+  const text = 'Делаю сметы и считаю прибыль по объектам в СМЕТА PRO прямо в Telegram. Первые 3 сметы — бесплатно:';
   const share = () => {
     if (!d?.link) return toast('Ссылка появится после запуска бота', true);
     const u = `https://t.me/share/url?url=${encodeURIComponent(d.link)}&text=${encodeURIComponent(text)}`;

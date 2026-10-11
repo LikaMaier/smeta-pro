@@ -5,7 +5,7 @@ import { CALCULATORS, CALC_GROUPS } from '../../../shared/calculators';
 import { SearchBox } from '../components/ui';
 
 /**
- * Единый раздел «Расчёты»: 3D-проектировщик → мастера под ключ (смета с работами) → быстрые калькуляторы (сколько материала).
+ * Единый раздел «Расчёты»: мастера под ключ (смета с работами) → быстрые калькуляторы (сколько материала).
  * Калькуляторы, которые повторяют мастера, спрятаны из списка (ссылки на них продолжают работать).
  */
 const LIST = [
@@ -26,12 +26,6 @@ export default function Masters() {
   return (
     <>
       <SearchBox value={q} onChange={setQ} placeholder="Найти: плитка, бетон, забор, септик…" />
-      {!s && (
-        <Link to="/designer" className="panel row" style={{ padding: 12, margin: '10px 0', color: 'inherit' }}>
-          <span style={{ fontSize: 30, width: 40, textAlign: 'center' }} aria-hidden="true">📐</span>
-          <div className="grow"><b>Проектировщик 3D</b><div className="xs muted">Навесы, ТКО, беседки, гаражи, теплицы: 3D, чертежи, металл и смета</div></div>
-        </Link>
-      )}
       {masters.length > 0 && <div className="tile-group">Мастера под ключ — смета с работами и материалами</div>}
       <div className="list">
         {masters.map((m) => (

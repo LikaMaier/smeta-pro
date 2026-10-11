@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { get, post, put, del } from '../api';
+import { get, post, put, del, patch } from '../api';
+import { DESIGN_PRICES, DESIGN_PRICE_LABELS } from '../../../shared/design/prices';
 import { Chips, Field, NumInput, Sheet, useDebounced, useLoad, useToast } from '../components/ui';
 import { normName } from '../../../shared/names';
 import { makeVariants } from '../../../shared/design/variants';
@@ -19,9 +20,9 @@ import { PRESETS } from '../../../shared/design/presets';
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
 // пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
-const BLANK: Partial<CanopyParams> = { entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const BLANK: Partial<CanopyParams> = { block: 0, blockAt: 'left', blockWall: 'prof_full', ties: 'auto', curb: false, bumpers: false, entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
 const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
-const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows', 'containers'] as const;
+const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows', 'containers', 'block'] as const;
 type NumKey = (typeof NUMS)[number];
 const MM = new Set<NumKey>(['slabT', 'sand', 'gravel', 'stripW', 'stripD', 'eps']); // в форме — в миллиметрах
 const toStr = (p: CanopyParams) => Object.fromEntries(NUMS.map((k) => [k, String(MM.has(k) ? Math.round(p[k] * 1000) : p[k])])) as Record<NumKey, string>;
@@ -34,7 +35,7 @@ type Tab = 'params' | 'draw' | 'steel' | 'var' | 'est';
 
 export default function Designer() {
   const toast = useToast();
-  const { me } = useMe();
+  const { me, refreshMe } = useMe();
   const saved0 = useMemo(() => { try { return JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch { return null; } }, []);
   const [base, setBase] = useState<CanopyParams>(() => full(saved0?.p || CANOPY_DEFAULT));
   const [nums, setNums] = useState<Record<NumKey, string>>(() => toStr(full(saved0?.p || CANOPY_DEFAULT)));
@@ -45,6 +46,15 @@ export default function Designer() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [busy, setBusy] = useState<'' | 'ai' | 'pdf' | 'save' | 'share'>('');
   const [listOpen, setListOpen] = useState(false);
+  const [slopeIn, setSlopeIn] = useState('');
+  const [pricesOpen, setPricesOpen] = useState(false);
+  const [priceDraft, setPriceDraft] = useState<Record<string, string>>({});
+  const savePrices = async (reset = false) => {
+    const out: Record<string, number> = {};
+    if (!reset) for (const [k, v] of Object.entries(priceDraft)) { const x = parseNum(v); if (x > 0) out[k] = x; }
+    try { await patch('/me', { designPrices: Object.keys(out).length ? out : null }); await refreshMe(); setPricesOpen(false); haptic('success'); toast(reset ? 'Вернули цены по умолчанию' : 'Цены сохранены — все проекты пересчитаны'); }
+    catch (e: any) { toast(e.message, true); }
+  };
   const [showVariants, setShowVariants] = useState<boolean>(!!saved0?.sv);
   const [list, setList] = useState<any[] | null>(null);
 
@@ -54,7 +64,8 @@ export default function Designer() {
     return p;
   }, [base, nums]);
   const dp = useDebounced(params, 250);
-  const res = useMemo(() => buildCanopy(dp), [dp]);
+  const ownPrices = (me as any).designPrices || null;
+  const res = useMemo(() => buildCanopy(dp, ownPrices), [dp, ownPrices]);
   const cityHint = (() => {
     const c = snowByCity(base.city);
     if (c) return `${c.name}: снеговой район ${snowLabel(c.region)} — подставлен. Ориентировочно по СП 20.13330, границы районов проверяйте по карте.`;
@@ -98,9 +109,9 @@ export default function Designer() {
   const items = useLoad(() => get<any[]>('/items').catch(() => []), []);
   const priceMap = useMemo(() => new Map<string, number>((items.data || []).map((i: any) => [normName(i.name), Number(i.price)])), [items.data]);
   const variants = useMemo(() => (tab === 'var' || showVariants ? makeVariants(dp).map((v) => {
-    const r = buildCanopy(v.params);
+    const r = buildCanopy(v.params, ownPrices);
     return { ...v, res: r, total: Math.round(r.lines.reduce((a, l: any) => a + l.qty * (priceMap.get(normName(l.name)) ?? l.price ?? 0), 0)) };
-  }) : []), [dp, tab, showVariants, priceMap]);
+  }) : []), [dp, tab, showVariants, priceMap, ownPrices]);
   const withVariants = () => (showVariants && variants.length ? { ...params, _variants: variants.map(({ id, label, changes, total, params: vp }) => ({ id, label, changes, total, params: vp })) } : params);
   // сохранить (или обновить) проект и вернуть его id
   const persist = async (): Promise<string> => {
@@ -187,6 +198,18 @@ export default function Designer() {
             {num('hHigh', base.roof === 'single' ? 'Высокая сторона' : 'Высота в коньке', 'м')}
             {num('hLow', base.roof === 'single' ? 'Низкая сторона' : 'Высота карниза', 'м')}
           </div>
+          {base.roof !== 'arch' && (() => {
+            const run = base.roof === 'hip' ? Math.min(params.L, params.W) / 2 : base.roof === 'gable' ? res.info.span / 2 : res.info.span;
+            const deg = (Math.atan(Math.max(0, params.hHigh - params.hLow) / Math.max(0.1, run)) * 180) / Math.PI;
+            const setDeg = (v: string) => { const d = parseNum(v); if (!(d >= 0 && d < 60)) return; const h = params.hLow + Math.tan((d * Math.PI) / 180) * run; setNums((x) => ({ ...x, hHigh: String(Math.round(h * 100) / 100) })); };
+            return (
+              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                <span className="small muted grow">Уклон: <b>{n(deg, 1)}°</b> ({n(Math.tan((deg * Math.PI) / 180) * 100, 0)}%)</span>
+                <span className="small muted">задать, °</span>
+                <div style={{ width: 96 }}><NumInput value={slopeIn} placeholder={n(deg, 1)} onChange={setSlopeIn} onBlur={() => { if (slopeIn) { setDeg(slopeIn); setSlopeIn(''); } }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} aria-label="Уклон, градусы" /></div>
+              </div>
+            );
+          })()}
           <Field label={base.roof === 'single' ? 'Где высокая сторона' : 'Скаты на стороны'}>
             {base.roof === 'hip' ? <p className="xs muted" style={{ margin: 0 }}>Конёк — вдоль длинной стороны; при квадрате кровля шатровая</p>
               : base.roof === 'arch' ? <Chips value={base.highSide === 'left' || base.highSide === 'right' ? 'left' : 'front'} onChange={(v) => setB({ highSide: v as Side })} options={[{ value: 'left', label: 'арки поперёк фасада' }, { value: 'front', label: 'арки вдоль фасада' }]} />
@@ -212,7 +235,7 @@ export default function Designer() {
             <>
               <div className="grid2">
                 {num('containers', 'Контейнеров в макете', 'шт')}
-                <Field label="Объём контейнера"><Chips value={base.contType} onChange={(v) => setB({ contType: v })} options={[{ value: '1.1', label: '1,1 м³' }, { value: '0.75', label: '0,75 м³' }]} /></Field>
+                <Field label="Объём контейнера"><Chips value={base.contType} onChange={(v) => setB({ contType: v })} options={[{ value: '1.1', label: '1,1 м³' }, { value: '0.75', label: '0,75 м³' }, { value: '8', label: 'бункер 8 м³' }]} /></Field>
               </div>
               <p className="xs muted" style={{ margin: 0 }}>Контейнеры ставятся вдоль стены напротив въезда; программа проверит, что они помещаются и остаётся проход.</p>
             </>
@@ -240,6 +263,20 @@ export default function Designer() {
           ))}
           {Object.values(base.walls).some((w) => w === 'prof' || w === 'prof_mesh') && num('profH', 'Высота профлиста', 'м')}
 
+          <div className="csection">Совмещённый объект</div>
+          <p className="xs muted" style={{ margin: 0 }}>Часть по длине — закрытый блок (хозблок, гараж, кухня, подсобка, отсек КГМ), остальное — открытый навес под одной крышей. Ворота и дверь ставятся в блок.</p>
+          <div className="grid2">
+            {num('block', 'Длина закрытого блока', 'м', '0 — без блока')}
+            <Field label="Блок с какой стороны"><Chips value={base.blockAt} onChange={(v) => setB({ blockAt: v })} options={[{ value: 'left', label: 'слева' }, { value: 'right', label: 'справа' }]} /></Field>
+          </div>
+          {parseNum(nums.block) > 0 && (
+            <Field label="Стены блока">
+              <select className="select" value={base.blockWall} onChange={(e) => setB({ blockWall: e.target.value as Wall })}>
+                {(Object.keys(WALL_LABEL) as Wall[]).filter((w) => w !== 'open').map((w) => <option key={w} value={w}>{WALL_LABEL[w]}</option>)}
+              </select>
+            </Field>
+          )}
+
           <div className="csection">Ворота и дверь</div>
           <Field label="Ворота в передней стене"><Chips value={base.gate} onChange={(v) => setB({ gate: v })} options={[{ value: 'none', label: 'Нет' }, { value: 'swing', label: 'Распашные' }, { value: 'sectional', label: 'Секционные' }]} /></Field>
           {base.gate !== 'none' && <div className="grid2">{num('gateW', 'Ширина ворот', 'м')}{num('gateH', 'Высота ворот', 'м')}</div>}
@@ -261,6 +298,9 @@ export default function Designer() {
             </>
           )}
           <div className="csection">Дополнительно</div>
+          <Field label="Связи жёсткости" hint="Крестовые связи в крайних пролётах стен и по кровле. «Авто» — при высоте от 3,2 м или длине от 12 м"><Chips value={base.ties} onChange={(v) => setB({ ties: v })} options={[{ value: 'auto', label: 'авто' }, { value: 'yes', label: 'да' }, { value: 'no', label: 'нет' }]} /></Field>
+          <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.curb} onChange={(e) => setB({ curb: e.target.checked })} />Бордюр по периметру (кроме въезда)</label>
+          <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.bumpers} onChange={(e) => setB({ bumpers: e.target.checked })} />Колесоотбойники у столбов{base.kind === 'tko' ? ' и отбойник для контейнеров вдоль стен' : ''}</label>
           <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.gutter} onChange={(e) => setB({ gutter: e.target.checked })} />Водосток (желоба и трубы)</label>
           {['prof', 'tile', 'soft', 'sandwich'].includes(base.cover) && <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.snowGuard} onChange={(e) => setB({ snowGuard: e.target.checked })} />Снегозадержатели</label>}
           {num('lights', 'Освещение: светильников', 'шт', '0 — без освещения; кабель, автомат и монтаж посчитаются')}
@@ -318,6 +358,7 @@ export default function Designer() {
           <button className="btn" disabled={busy === 'save'} onClick={save}>{designId ? 'Сохранить' : 'Сохранить проект'}</button>
           <button className="btn" onClick={openList}>Мои проекты</button>
         </div>
+        <button className="btn block" onClick={() => { setPriceDraft(Object.fromEntries(Object.entries((me as any).designPrices || {}).map(([k, v]) => [k, String(v)]))); setPricesOpen(true); }}>💰 Мои цены на материалы{(me as any).designPrices ? ' · заданы' : ''}</button>
         {tab !== 'est' && <button className="btn block" onClick={() => setTab('est')}>Смета по проекту · ≈ {rub0(res.lines.reduce((a, l: any) => a + l.qty * (l.price || 0), 0))}</button>}
       </div>
 
@@ -330,6 +371,25 @@ export default function Designer() {
           <button className="btn block" onClick={copy}>Скопировать для WhatsApp / SMS</button>
           {share?.url && <a className="btn block" href={share.url} target="_blank" rel="noreferrer">Открыть как заказчик</a>}
           <button className="btn block" onClick={async () => { if (!designId) return; setShare(null); await del(`/designs/${designId}/share`); toast('Ссылка отключена'); }}>Отключить ссылку</button>
+        </div>
+      </Sheet>
+
+      <Sheet open={pricesOpen} onClose={() => setPricesOpen(false)} title="Мои цены на материалы">
+        <p className="small muted" style={{ marginTop: 0 }}>Укажите свои цены — все проекты, варианты и PDF посчитаются по ним. Пустое поле — цена по умолчанию (серым).</p>
+        {[...new Set(DESIGN_PRICE_LABELS.map((x) => x.group))].map((g) => (
+          <div key={g}>
+            <div className="tile-group" style={{ margin: '10px 0 4px' }}>{g}</div>
+            {DESIGN_PRICE_LABELS.filter((x) => x.group === g).map((x) => (
+              <div key={x.key} className="row" style={{ gap: 8, marginBottom: 6 }}>
+                <span className="small grow">{x.label}</span>
+                <div style={{ width: 150 }}><NumInput value={priceDraft[x.key] ?? ''} placeholder={String(DESIGN_PRICES[x.key])} onChange={(v) => setPriceDraft((d) => ({ ...d, [x.key]: v }))} unit={x.unit} aria-label={x.label} /></div>
+              </div>
+            ))}
+          </div>
+        ))}
+        <div className="stack" style={{ marginTop: 10 }}>
+          <button className="btn primary block" onClick={() => savePrices()}>Сохранить цены</button>
+          <button className="btn block" onClick={() => savePrices(true)}>Сбросить на цены по умолчанию</button>
         </div>
       </Sheet>
 

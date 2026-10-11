@@ -1,5 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import crypto from 'node:crypto';
 import { prisma, plain, HttpError } from '../util';
+import { env } from '../env';
 
 /**
  * Тарифы. Оплата цифровых услуг внутри Telegram — только в Telegram Stars.
@@ -20,7 +23,7 @@ export async function seedPlans() {
 }
 
 /** Продление подписки после ПОДТВЕРЖДЁННОЙ оплаты (вызывается только из обработчика successful_payment бота) */
-export async function applyPayment(userId: string, planCode: string, stars: number, chargeId: string): Promise<{ referrer?: { tgId: bigint; until: Date } } | void> {
+export async function applyPayment(userId: string, planCode: string, stars: number, chargeId: string, extra: { provider?: string; amountRub?: number } = {}): Promise<{ referrer?: { tgId: bigint; until: Date } } | void> {
   const exists = await prisma.payment.findUnique({ where: { telegramChargeId: chargeId } });
   if (exists) return; // идемпотентность: повторное уведомление не продлевает дважды
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
@@ -30,7 +33,7 @@ export async function applyPayment(userId: string, planCode: string, stars: numb
   const until = new Date(base);
   until.setMonth(until.getMonth() + plan.months);
   await prisma.$transaction([
-    prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId } }),
+    prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId, provider: extra.provider || 'stars', amountRub: extra.amountRub ?? null } }),
     prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until, subNotice3At: null, subNoticeEndAt: null } }),
   ]);
   return { referrer: (await rewardReferrer(user)) ?? undefined };
@@ -67,4 +70,67 @@ export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
     );
     return { url };
   });
+
+  // ---- ЮKassa: карта, СБП, SberPay. Подписка продлевается только после подтверждённой оплаты ----
+  const ykAuth = () => 'Basic ' + Buffer.from(`${env.YOOKASSA_SHOP_ID}:${env.YOOKASSA_SECRET_KEY}`).toString('base64');
+  const ykEnabled = () => Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY);
+
+  app.post('/api/pay/:code/yookassa', async (req) => {
+    if (!ykEnabled()) throw new HttpError(503, 'Оплата картой ещё не подключена', 'payments_unavailable');
+    const { code } = req.params as any;
+    const { email } = z.object({ email: z.string().email().max(120).optional() }).parse(req.body || {});
+    const plan = await prisma.plan.findFirst({ where: { code, active: true } });
+    if (!plan || !plan.rubPrice) throw new HttpError(404, 'Тариф не найден');
+    if (env.YOOKASSA_RECEIPT && !email) throw new HttpError(400, 'Укажите email — на него придёт чек', 'email_required');
+    const value = `${plan.rubPrice}.00`;
+    const body: any = {
+      amount: { value, currency: 'RUB' }, capture: true,
+      confirmation: { type: 'redirect', return_url: `${env.PUBLIC_URL || ''}/paid` },
+      description: `${plan.title} — СМЕТА PRO`.slice(0, 128),
+      metadata: { userId: req.user.id, plan: plan.code },
+    };
+    if (env.YOOKASSA_RECEIPT) body.receipt = { customer: { email }, items: [{ description: plan.title.slice(0, 128), quantity: '1.00', amount: { value, currency: 'RUB' }, vat_code: env.YOOKASSA_VAT_CODE, payment_mode: 'full_payment', payment_subject: 'service' }] };
+    const r = await fetch('https://api.yookassa.ru/v3/payments', {
+      method: 'POST', headers: { Authorization: ykAuth(), 'Idempotence-Key': crypto.randomUUID(), 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const j: any = await r.json().catch(() => ({}));
+    if (!r.ok || !j.confirmation?.confirmation_url) { req.log.error({ yk: j }, 'yookassa create failed'); throw new HttpError(502, 'ЮKassa не приняла платёж: ' + (j.description || r.status)); }
+    return { url: j.confirmation.confirmation_url, id: j.id };
+  });
+
+  /** Проверить платёж в ЮKassa и, если оплачен, продлить подписку (идемпотентно) */
+  async function settleYk(id: string) {
+    if (!/^[\w-]{10,64}$/.test(id)) return null;
+    const r = await fetch(`https://api.yookassa.ru/v3/payments/${id}`, { headers: { Authorization: ykAuth() } });
+    if (!r.ok) return null;
+    const p: any = await r.json();
+    if (p.status !== 'succeeded' || !p.paid || !p.metadata?.userId || !p.metadata?.plan) return { status: p.status };
+    const user = await prisma.user.findUnique({ where: { id: p.metadata.userId } });
+    if (!user) return { status: 'unknown_user' };
+    const res = await applyPayment(user.id, p.metadata.plan, 0, `yk:${p.id}`, { provider: 'yookassa', amountRub: Math.round(Number(p.amount?.value || 0)) });
+    if (res !== undefined && opts.bot) {
+      const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      await opts.bot.api.sendMessage(Number(user.tgId), `Оплата прошла. Подписка активна до ${new Date(fresh.subscriptionUntil!).toLocaleDateString('ru-RU')}.`).catch(() => {});
+      if (res && res.referrer) await opts.bot.api.sendMessage(Number(res.referrer.tgId), `🎁 Ваш друг оформил подписку СМЕТА PRO — дарим вам месяц бесплатно!\nПодписка продлена до ${res.referrer.until.toLocaleDateString('ru-RU')}.`).catch(() => {});
+    }
+    return { status: 'succeeded' };
+  }
+
+  // Уведомление от ЮKassa. Телу не доверяем: статус перепроверяем запросом к API ЮKassa с нашим ключом.
+  app.post('/pay/yookassa/webhook', async (req, reply) => {
+    if (!ykEnabled()) return reply.status(200).send({ ok: true });
+    const id = (req.body as any)?.object?.id;
+    if (typeof id === 'string') await settleYk(id).catch((e) => req.log.error(e, 'yookassa settle failed'));
+    return reply.status(200).send({ ok: true });
+  });
+
+  // Проверка из приложения (если уведомление задержалось)
+  app.post('/api/pay/yookassa/:id/check', async (req) => {
+    if (!ykEnabled()) throw new HttpError(503, 'Оплата картой не подключена');
+    const r = await settleYk((req.params as any).id);
+    return r || { status: 'unknown' };
+  });
+
+  // Страница возврата после оплаты (открывается в браузере)
+  app.get('/paid', async (_req, reply) => reply.header('Content-Type', 'text/html; charset=utf-8').send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Оплата</title><body style="font:17px system-ui;padding:28px;background:#f4f1ea;color:#22180f"><h1>Спасибо!</h1><p>Если оплата прошла, подписка продлится в течение минуты — бот пришлёт сообщение. Вернитесь в Telegram.</p></body>`));
 }

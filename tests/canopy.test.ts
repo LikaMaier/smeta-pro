@@ -196,3 +196,41 @@ test('три варианта: эконом дешевле стандарта, �
     assert.ok(t[0] <= t[1] && t[1] < t[2], `${id}: ${t.map(Math.round)}`);
   }
 });
+
+test('совмещённый объект: блок с перегородкой, ворота в блоке, въезд без столбов только в открытой части', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'combo-garage')!.p);
+  const gate = r.openings.find((o) => o.kind === 'gate')!;
+  assert.ok(gate.a0 >= 0 && gate.a1 <= 4.5);
+  assert.ok(r.members.some((m) => m.kind === 'post' && Math.abs(m.a[0] - 4.5) < 1e-6 && m.a[1] > 0 && m.a[1] < 6)); // столбы перегородки
+  const shed = buildCanopy(PRESETS.find((p) => p.id === 'combo-car-shed')!.p);
+  assert.ok(shed.members.some((m) => m.kind === 'post' && m.a[1] === 0 && Math.abs(m.a[0] - 3) < 1e-6), 'столб на границе блока остаётся');
+  assert.ok(shed.panels.some((p) => p.kind === 'prof' && p.pts.every((q) => Math.abs(q[0] - 3) < 1e-6)), 'перегородка обшита');
+});
+
+test('связи жёсткости, бордюр, колесоотбойники; ТКО СНТ — бункеры и отсек КГМ', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'snt-kgm')!.p);
+  assert.ok(r.members.filter((m) => m.kind === 'tie').length >= 4);
+  assert.ok(r.lines.some((l) => l.name.startsWith('Бордюр дорожный')));
+  assert.ok(r.lines.some((l) => l.name.startsWith('Колесоотбойник')));
+  assert.ok(r.lines.some((l) => l.name.startsWith('Отбойник для контейнеров')));
+  // контейнеры не заходят в отсек КГМ (правые 4 м)
+  for (const c of r.panels.filter((p) => p.kind === 'container')) assert.ok(c.pts.every((q) => q[0] <= 11 + 1e-6));
+  const b = buildCanopy(PRESETS.find((p) => p.id === 'snt-bunker')!.p);
+  assert.equal(b.panels.filter((p) => p.kind === 'container').length, 2);
+  const big = buildCanopy(PRESETS.find((p) => p.id === 'snt-big')!.p);
+  assert.ok(big.girder && big.girder.len === 9);
+});
+
+test('свои цены: металл и С-8 по цене прораба', () => {
+  const p = PRESETS.find((x) => x.id === 'car2')!.p;
+  const a = buildCanopy(p), b = buildCanopy(p, { steelKg: 190, profC8: 960 });
+  const tube = (r: any) => r.lines.filter((l: any) => l.name.startsWith('Труба профильная')).reduce((s: number, l: any) => s + l.qty * l.price, 0);
+  assert.ok(Math.abs(tube(b) / tube(a) - 2) < 0.02);
+  assert.ok(b.lines.some((l) => l.name.startsWith('Профнастил С-8') && l.unit === 'лист'));
+});
+
+test('узлы на чертежах: опора, столб — обвязка, стропило, связь', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'snt-8')!.p);
+  const t = drawings(r).map((s) => s.title);
+  assert.ok(t.some((x) => x.startsWith('Узел 1')) && t.some((x) => x.startsWith('Узел 2')) && t.some((x) => x.startsWith('Узел 3')) && t.some((x) => x.startsWith('Узел 4')));
+});

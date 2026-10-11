@@ -49,6 +49,11 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
 
   // плита и земля
   for (const p of res.panels) {
+    if (p.kind === 'curb') {
+      const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], -0.05] as V3);
+      faces.push({ pts: top, fill: '#B9B6AF', stroke: '#8d8a83', opacity: 1, d: 0, sw: 0.5, ground: true });
+      for (let i = 0; i < 4; i++) faces.push({ pts: [top[i], top[(i + 1) % 4], bot[(i + 1) % 4], bot[i]], fill: '#9F9C95', stroke: '#85827b', opacity: 1, d: 0, sw: 0.4 });
+    }
     if (p.kind === 'strip') {
       // лента фундамента: над землёй 0,2 м
       const top = p.pts.map((q) => [q[0], q[1], 0.0] as V3), bot = p.pts.map((q) => [q[0], q[1], -0.2] as V3);
@@ -102,7 +107,8 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
       [[A[0], A[1], B[1], B[0]], mul(e2, -1)], [[A[1], A[2], B[2], B[1]], e1], [[A[2], A[3], B[3], B[2]], e2], [[A[3], A[0], B[0], B[3]], mul(e1, -1)],
       ...(m.c0 ? [[[A[0], A[3], A[2], A[1]], mul(d, -1)] as [V3[], V3]] : []), ...(m.c1 ? [[[B[0], B[1], B[2], B[3]], d] as [V3[], V3]] : []),
     ];
-    const base = m.kind === 'rail' || m.kind === 'web' || m.kind === 'purlin' || m.kind === 'baluster' ? shade(frame, 1.1) : frame;
+    const base = m.kind === 'bollard' || m.kind === 'bumper' ? (m.kind === 'bollard' && Math.floor(((m.a[2] + m.b[2]) / 2) / 0.2) % 2 ? '#2b2b2b' : '#E3B505')
+      : m.kind === 'tie' ? shade(frame, 0.85) : m.kind === 'rail' || m.kind === 'web' || m.kind === 'purlin' || m.kind === 'baluster' ? shade(frame, 1.1) : frame;
     for (const [q, n] of quads) {
       if (camN(n) > 0.02) continue; // невидимая грань
       const k = 0.55 + 0.5 * Math.max(0, dot(n, light));
@@ -112,7 +118,7 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
   // панели: кровля, профлист, сетка
   const col = colorOf(res.params.color);
   for (const p of res.panels) {
-    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip') continue;
+    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip' || p.kind === 'curb') continue;
     if (p.kind === 'container') {
       // евроконтейнер: корпус и крышка
       const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], 0.12] as V3);
@@ -207,6 +213,9 @@ export function drawings(res: CanopyResult): Sheet[] {
   // ---------- план ----------
   {
     const pr: Prim[] = [];
+    for (const q of res.panels.filter((x) => x.kind === 'curb')) pr.push({ t: 'poly', pts: q.pts.map((v) => [v[0], v[1]] as [number, number]), fill: '#B9B6AF', c: '#666', w: 0.5 });
+    for (const m of res.members.filter((x) => x.kind === 'bollard')) pr.push({ t: 'poly', pts: [[m.a[0] - 0.07, m.a[1] - 0.07], [m.a[0] + 0.07, m.a[1] - 0.07], [m.a[0] + 0.07, m.a[1] + 0.07], [m.a[0] - 0.07, m.a[1] + 0.07]], fill: '#E3B505', c: '#333', w: 0.5 });
+    for (const m of res.members.filter((x) => x.kind === 'bumper' && Math.abs(x.a[2] - x.b[2]) < 0.01)) pr.push({ t: 'line', x1: m.a[0], y1: m.a[1], x2: m.b[0], y2: m.b[1], w: 2, c: '#C99A00' });
     for (const q of res.panels.filter((x) => x.kind === 'strip')) pr.push({ t: 'poly', pts: q.pts.map((v) => [v[0], v[1]] as [number, number]), fill: '#E2DFD8', c: '#777', w: 0.6, hatch: 'concrete' });
     if (res.params.base === 'paving') { const o = res.params.slabOver; pr.push({ t: 'poly', pts: [[-o, -o], [L + o, -o], [L + o, W + o], [-o, W + o]], fill: '#E4E0D8', c: '#888', w: 0.8, hatch: 'gravel' }); }
     if (res.params.base === 'slab' || res.params.base === 'ushp') { const o = res.params.slabOver; pr.push({ t: 'poly', pts: [[-o, -o], [L + o, -o], [L + o, W + o], [-o, W + o]], fill: '#ECEAE4', c: '#888', w: 0.8, hatch: 'concrete' }); }
@@ -378,6 +387,7 @@ export function drawings(res: CanopyResult): Sheet[] {
     z -= 0.6;
     sheets.push({ title: ushp ? 'Разрез УШП (толщины условно ×4)' : 'Разрез основания (толщины условно ×4)', x0: -1.1, y0: z - 0.2, x1: w + 6.2, y1: 0.4, prims: pr });
   }
+  sheets.push(...nodeSheets(res));
   return sheets;
 }
 
@@ -434,4 +444,131 @@ export function sheetToSvg(sh: Sheet, pxWidth = 800, dark = false) {
   }
   out.push('</svg>');
   return out.join('');
+}
+
+// ---------------------------------------------------------------- Узлы
+/** Типовые узлы в масштабе (×5): опора столба, столб — обвязка, стропило — обвязка, связь. Подписи — реальные сечения. */
+function nodeSheets(res: CanopyResult): Sheet[] {
+  const K = 5;
+  const P = res.params, I = res.info;
+  const wood = !!I.wood;
+  const mm = (v: number) => (v / 1000) * K;
+  const sz = (prof: string) => { const [a, b] = String(prof || '100×100').split('×').map(Number); return [a || 100, b || a || 100]; };
+  const out: Sheet[] = [];
+  const steelC = '#C9CED6', woodC = '#D9B48A', concC = '#D3D0C9';
+  const rect = (pr: Prim[], x: number, y: number, w: number, h: number, fill: string, hatch?: any, c = '#222', wd = 0.9) => pr.push({ t: 'poly', pts: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], fill, c, w: wd, hatch });
+  const label = (pr: Prim[], x: number, y: number, tx: number, ty: number, text: string) => {
+    pr.push({ t: 'line', x1: x, y1: y, x2: tx - 0.1, y2: ty, w: 0.6, c: '#555' });
+    pr.push({ t: 'text', x: tx, y: ty - 0.07, s: text, size: 0.2, anchor: 'start' });
+  };
+
+  // ---- Узел 1. Опора столба
+  {
+    const pr: Prim[] = [];
+    const [pa] = sz(I.postProf);
+    const pw = mm(pa);
+    const base = P.base;
+    const x0 = -pw / 2;
+    // основание
+    const concrete = ['slab', 'ushp', 'strip', 'none', 'paving', 'piles'].includes(base);
+    if (base === 'piles' || base === 'paving') {
+      rect(pr, -mm(150), -mm(1500) , mm(300), mm(1500), concC, 'concrete', '#555', 0.8);
+      pr.push({ t: 'poly', pts: [[-2.2, 0], [2.2, 0], [2.2, -mm(1600)], [-2.2, -mm(1600)]], c: '#A88F6C', w: 0.3, hatch: 'soil' });
+      rect(pr, -mm(150), -mm(1500), mm(300), mm(1500), concC, 'concrete', '#555', 0.8);
+      rect(pr, x0, -mm(1200), pw, mm(1200) + 2.6, wood ? woodC : steelC);
+      label(pr, 0, -mm(700), 1.6, -1.5, `Бетонирование: свая Ø300, глубина 1500 мм, бетон М300`);
+      label(pr, pw / 2, 1.6, 1.6, 1.6, `Столб ${I.postProf}${wood ? ' (брус)' : ''}, заглубление 1200 мм`);
+      pr.push({ t: 'line', x1: -2.2, y1: 0, x2: 2.2, y2: 0, w: 1.4, c: '#333' });
+      out.push({ title: 'Узел 1. Опора столба (бетонирование)', x0: -2.6, y0: -mm(1600) - 0.4, x1: 7.4, y1: 3, prims: pr });
+    } else if (base === 'screw' || base === 'deck') {
+      pr.push({ t: 'poly', pts: [[-2, 0], [2, 0], [2, -2.2], [-2, -2.2]], c: '#A88F6C', w: 0.3, hatch: 'soil' });
+      rect(pr, -mm(54), -2.2, mm(108), 2.2 + mm(100), '#AEB4BC');
+      rect(pr, -mm(100), mm(100), mm(200), mm(8), steelC);
+      rect(pr, x0, mm(108), pw, 2.4, wood ? woodC : steelC);
+      label(pr, 0, -1.1, 1.4, -1.1, 'Свая винтовая Ø108×4, L 2500 мм');
+      label(pr, mm(100), mm(104), 1.4, 0.3, 'Оголовок 200×200×8, сварка / болты М12');
+      label(pr, pw / 2, 1.5, 1.4, 1.5, `Столб ${I.postProf}`);
+      pr.push({ t: 'line', x1: -2, y1: 0, x2: 2, y2: 0, w: 1.4, c: '#333' });
+      out.push({ title: 'Узел 1. Опора столба на винтовой свае', x0: -2.3, y0: -2.5, x1: 7.2, y1: 2.9, prims: pr });
+    } else if (concrete) {
+      const plate = mm(Math.max(300, pa + 160)), pt = mm(10);
+      rect(pr, -2.2, -1.4, 4.4, 1.4, concC, 'concrete', '#777', 0.6);
+      rect(pr, -plate / 2, 0, plate, pt, '#9AA3AD');
+      if (wood) {
+        rect(pr, -pw / 2 - mm(4), pt, mm(4), mm(150), '#9AA3AD');
+        rect(pr, pw / 2, pt, mm(4), mm(150), '#9AA3AD');
+        rect(pr, x0, pt + mm(60), pw, 2.2, woodC);
+        pr.push({ t: 'line', x1: -pw / 2 - 0.2, y1: pt + mm(110), x2: pw / 2 + 0.2, y2: pt + mm(110), w: 1.4, c: '#333' });
+        label(pr, pw / 2, pt + mm(110), 1.6, 0.9, 'Опора П-образная, болт М12 насквозь');
+        label(pr, pw / 2, 1.8, 1.6, 1.8, `Столб — брус ${I.postProf}, зазор 60 мм от бетона`);
+      } else {
+        rect(pr, x0, pt, pw, 2.4, steelC);
+        for (const sg of [-1, 1]) pr.push({ t: 'poly', pts: [[sg * pw / 2, pt], [sg * (pw / 2 + mm(80)), pt], [sg * pw / 2, pt + mm(150)]], fill: '#9AA3AD', c: '#222', w: 0.8 });
+        label(pr, pw / 2, 1.9, 1.6, 1.9, `Столб ${I.postProf}, сварка по контуру`);
+        label(pr, pw / 2 + mm(40), pt + mm(60), 1.6, 1.1, 'Рёбра жёсткости 80×150×6 — 4 шт');
+      }
+      for (const sg of [-1, 1]) pr.push({ t: 'line', x1: sg * (plate / 2 - mm(40)), y1: pt + mm(30), x2: sg * (plate / 2 - mm(40)), y2: -mm(250), w: 1.6, c: '#333', dash: true });
+      label(pr, plate / 2, pt / 2, 1.6, 0.35, `Пластина ${Math.round(Math.max(300, pa + 160))}×${Math.round(Math.max(300, pa + 160))}×10`);
+      label(pr, plate / 2 - mm(40), -mm(150), 1.6, -0.45, 'Анкер М16×250 — 4 шт (химический или закладной)');
+      label(pr, 0, -1.0, 1.6, -1.1, base === 'strip' ? 'Лента фундамента, бетон М300' : base === 'none' ? 'Существующее основание' : 'Плита, бетон М300');
+      pr.push({ t: 'dim', x1: -plate / 2, y1: 0, x2: plate / 2, y2: 0, off: -1.65, s: `${Math.round(Math.max(300, pa + 160))} мм` });
+      out.push({ title: 'Узел 1. Опора столба', x0: -2.5, y0: -2.1, x1: 8.2, y1: 2.9, prims: pr });
+    }
+  }
+
+  // ---- Узел 2. Столб — обвязка
+  if (I.posts > 0) {
+    const pr: Prim[] = [];
+    const [pa] = sz(I.postProf), [bh, bw] = sz(I.beamProf);
+    const pw = mm(pa), H = mm(bh), Bw = mm(bw);
+    rect(pr, -pw / 2, -2.2, pw, 2.2, wood ? woodC : steelC);
+    if (!wood) rect(pr, -pw / 2 - mm(20), 0, pw + mm(40), mm(8), '#9AA3AD');
+    const z = wood ? 0 : mm(8);
+    rect(pr, -2.4, z, 4.8, H, wood ? woodC : steelC, undefined, '#222', 1);
+    pr.push({ t: 'line', x1: -2.4, y1: z + mm(wood ? 0 : 3), x2: 2.4, y2: z + mm(wood ? 0 : 3), w: 0.4, c: '#666' });
+    if (wood) { rect(pr, pw / 2, -mm(90), mm(5), mm(90) + H * 0.6, '#9AA3AD'); rect(pr, -pw / 2 - mm(5), -mm(90), mm(5), mm(90) + H * 0.6, '#9AA3AD'); }
+    label(pr, 1.6, z + H / 2, 3.0, z + H / 2, `Обвязка ${I.beamProf}${wood ? ' (брус)' : ''}`);
+    label(pr, pw / 2, -1.2, 3.0, -1.2, `Столб ${I.postProf}`);
+    label(pr, pw / 2 + mm(20), z / 2, 3.0, -0.4, wood ? 'Уголки крепёжные 90×90×65 — 2 шт, саморезы 5×50' : 'Оголовок: пластина 6 мм, сварка по контуру');
+    pr.push({ t: 'dim', x1: -2.4, y1: z, x2: -2.4, y2: z + H, off: -0.35, s: `${bh} мм` });
+    out.push({ title: 'Узел 2. Столб — обвязка', x0: -3.2, y0: -2.5, x1: 9.5, y1: z + H + 0.5, prims: pr });
+  }
+
+  // ---- Узел 3. Стропило (ферма) — обвязка и кровля
+  if (P.roof !== 'hip' || true) {
+    const pr: Prim[] = [];
+    const [bh, bw] = sz(I.beamProf), [rh] = sz(I.rafterProf), [ph] = sz(I.purProf);
+    const H = mm(bh), Bw = mm(bw), R = mm(rh), Pp = mm(ph);
+    const ang = Math.max(3, Math.min(30, (Math.atan((I.hHigh - I.hLow) / Math.max(1, P.roof === 'single' ? I.span : I.span / 2)) * 180) / Math.PI)) * Math.PI / 180;
+    rect(pr, -Bw / 2, -H, Bw, H, wood ? woodC : steelC);
+    const L0 = -2.6, L1 = 2.6, ca = Math.cos(ang), sa = Math.sin(ang);
+    const rp = (t: number, h: number): [number, number] => [t * ca - h * sa, t * sa + h * ca];
+    pr.push({ t: 'poly', pts: [rp(L0, 0), rp(L1, 0), rp(L1, R), rp(L0, R)], fill: wood ? woodC : steelC, c: '#222', w: 0.9 });
+    for (const t of [-1.8, 0.2, 2.2]) { const [x, y] = rp(t, R); pr.push({ t: 'poly', pts: [rp(t - Pp / 2, R), rp(t + Pp / 2, R), rp(t + Pp / 2, R + Pp), rp(t - Pp / 2, R + Pp)], fill: wood ? woodC : '#B9C0C8', c: '#222', w: 0.7 }); void x; void y; }
+    const roofLabel = P.cover === 'prof' ? `Профнастил ${({ C8: 'С-8', C20: 'С-20', HC35: 'НС-35' } as any)[P.profGrade] || 'С-8'}, саморезы 4,8×35 через волну` : P.cover === 'poly' ? 'Поликарбонат, термошайбы' : P.cover === 'tile' ? 'Металлочерепица' : P.cover === 'soft' ? 'Гибкая черепица по OSB' : P.cover === 'sandwich' ? 'Сэндвич-панель' : 'Покрытие';
+    if (P.cover !== 'none' && P.cover !== 'slats') pr.push({ t: 'poly', pts: [rp(L0, R + Pp), rp(L1, R + Pp), rp(L1, R + Pp + 0.06), rp(L0, R + Pp + 0.06)], fill: '#5A6470', c: '#222', w: 0.5 });
+    if (!wood) pr.push({ t: 'poly', pts: [[Bw / 2, 0], [Bw / 2 + mm(60), 0], [Bw / 2, mm(60)]], fill: '#9AA3AD', c: '#222', w: 0.7 });
+    label(pr, ...rp(1.2, R / 2), 3.2, 0.9, `${I.truss ? 'Пояс фермы' : P.roof === 'arch' ? 'Арка' : 'Стропило'} ${I.rafterProf}`);
+    label(pr, ...rp(2.2, R + Pp / 2), 3.2, 1.5, `${wood ? 'Обрешётка' : 'Прогон'} ${I.purProf}`);
+    if (P.cover !== 'none' && P.cover !== 'slats') label(pr, ...rp(1.6, R + Pp + 0.04), 3.2, 2.1, roofLabel);
+    label(pr, Bw / 2, -H / 2, 3.2, -0.5, `Обвязка ${I.beamProf}${wood ? ', врубка + скоба / уголок' : ', сварка + косынка 6 мм'}`);
+    out.push({ title: `Узел 3. ${I.truss ? 'Ферма' : 'Стропило'} — обвязка, кровля`, x0: -3.0, y0: -H - 0.6, x1: 10.5, y1: 2.6, prims: pr });
+  }
+
+  // ---- Узел 4. Связь жёсткости
+  if (res.members.some((m) => m.kind === 'tie')) {
+    const pr: Prim[] = [];
+    const [pa] = sz(I.postProf);
+    const pw = mm(pa);
+    rect(pr, -pw / 2, -2, pw, 4, wood ? woodC : steelC);
+    rect(pr, pw / 2, -0.75, mm(200), mm(300), '#9AA3AD');
+    { const ang = (40 * Math.PI) / 180, w = mm(40), x0 = pw / 2 + mm(60), y0 = -0.35, l = 2.6;
+      const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy * w / 2, ny = dx * w / 2;
+      pr.push({ t: 'poly', pts: [[x0 + nx, y0 + ny], [x0 + dx * l + nx, y0 + dy * l + ny], [x0 + dx * l - nx, y0 + dy * l - ny], [x0 - nx, y0 - ny]], fill: wood ? woodC : '#B9C0C8', c: '#222', w: 0.8 }); }
+    label(pr, pw / 2 + mm(150), -0.6, 2.8, -0.9, 'Косынка 200×300×8, сварка');
+    label(pr, pw / 2 + 1.4, 0.75, 2.8, 0.75, `Связь ${wood ? 'брус 50×100' : 'труба 40×40×3'}, крестом в крайних пролётах`);
+    label(pr, pw / 2, -1.6, 2.8, -1.6, `Столб ${I.postProf}`);
+    out.push({ title: 'Узел 4. Крепление связи жёсткости', x0: -1.5, y0: -2.3, x1: 10, y1: 2.3, prims: pr });
+  }
+  return out;
 }

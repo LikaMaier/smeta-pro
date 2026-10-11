@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+import { FREE_ESTIMATES } from '../../../shared/access';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { env } from '../env';
@@ -49,10 +51,11 @@ export async function meView(user: any) {
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
     companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen ? user.theme : 'steel',
     aiAvailable: Boolean(env.AI_PROVIDER),
-    access: { ...accessOf(user), freeEstimateLeft: free.estimateCount === 0, freeEstimateId: free.firstEstimateId, estimateCount: free.estimateCount },
+    access: { ...accessOf(user), freeEstimateLeft: free.estimateCount < FREE_ESTIMATES, freeLeft: Math.max(0, FREE_ESTIMATES - free.estimateCount), freeEstimateIds: free.freeEstimateIds, estimateCount: free.estimateCount },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
     logoUrl: brandUrl(user.logoFile), signUrl: brandUrl(user.signFile),
-    weeklyDigest: user.weeklyDigest ?? true, docStyle: user.docStyle || 'classic',
+    weeklyDigest: user.weeklyDigest ?? true, docStyle: user.docStyle || 'classic', designPrices: user.designPrices || null,
+    pay: { yookassa: Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY), receipt: env.YOOKASSA_RECEIPT },
     refLink: botLink(`ref_${user.id}`),
   });
 }
@@ -94,8 +97,10 @@ export async function authRoutes(app: FastifyInstance) {
       theme: z.enum(['steel', 'gold', 'carbon', 'blueprint', 'malachite']).optional(),
       companyName: z.string().max(200).nullable().optional(),
       contacts: z.string().max(500).nullable().optional(),
+      designPrices: z.record(z.string().max(40), z.number().positive().max(1e8)).nullable().optional(),
     }).parse(req.body);
-    const user = await prisma.user.update({ where: { id: req.user.id }, data: { ...body, ...(body.theme ? { themeChosen: true } : {}) } });
+    const { designPrices, ...rest } = body;
+    const user = await prisma.user.update({ where: { id: req.user.id }, data: { ...rest, ...(body.theme ? { themeChosen: true } : {}), ...(designPrices !== undefined ? { designPrices: designPrices === null ? Prisma.DbNull : designPrices } : {}) } });
     return meView(user);
   });
 }

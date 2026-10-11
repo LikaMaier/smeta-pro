@@ -2,12 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freeWriteAllowed } from '../shared/access';
 
-const fresh = { estimateCount: 0, firstEstimateId: null };
-const used = { estimateCount: 1, firstEstimateId: 'e1' };
+const fresh = { estimateCount: 0, freeEstimateIds: [] as string[] };
+const two = { estimateCount: 2, freeEstimateIds: ['e0', 'e1'] };
+const used = { estimateCount: 3, freeEstimateIds: ['e0', 'e1', 'e3'] };
 
-test('первая смета бесплатно, вторая — нет', () => {
+test('три сметы бесплатно, четвёртая — нет', () => {
   assert.equal(freeWriteAllowed('POST', '/api/estimates', fresh), true);
+  assert.equal(freeWriteAllowed('POST', '/api/estimates', two), true);
   assert.equal(freeWriteAllowed('POST', '/api/estimates', used), false);
+  assert.equal(freeWriteAllowed('PUT', '/api/estimates/e3', used), true);
 });
 
 test('первую смету можно править, добавлять строки и отправлять PDF', () => {

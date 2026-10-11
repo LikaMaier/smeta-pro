@@ -137,7 +137,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
   app.post('/api/designer/pdf/send', { bodyLimit: 4 * 1024 * 1024 }, async (req) => {
     const b = z.object({ title: z.string().trim().min(1).max(200), params: paramsSchema, lines: z.array(lineSchema).max(500).optional() }).parse(req.body);
     if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
-    const r = buildCanopy(b.params as any);
+    const r = buildCanopy(b.params as any, (req.user as any).designPrices || null);
     const u: any = req.user;
     const data = designPdfData(r, {
       title: b.title, company: u.companyName || [u.firstName, u.username ? `@${u.username}` : ''].filter(Boolean).join(' '),

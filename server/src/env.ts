@@ -16,6 +16,11 @@ export const env = {
   OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
   OPENAI_STT_MODEL: process.env.OPENAI_STT_MODEL || 'gpt-4o-mini-transcribe',
   AI_PROVIDER: process.env.OPENAI_API_KEY ? 'openai' : '',
+  // ЮKassa: оплата картой и СБП. Без ключей кнопка оплаты через ЮKassa скрыта.
+  YOOKASSA_SHOP_ID: process.env.YOOKASSA_SHOP_ID || '',
+  YOOKASSA_SECRET_KEY: process.env.YOOKASSA_SECRET_KEY || '',
+  YOOKASSA_RECEIPT: process.env.YOOKASSA_RECEIPT === '1', // отправлять чек 54-ФЗ (нужен email покупателя)
+  YOOKASSA_VAT_CODE: Number(process.env.YOOKASSA_VAT_CODE || 1), // 1 — без НДС
 };
 
 export function assertEnv() {

@@ -251,6 +251,16 @@ def build(d):
         draw_sheet(c, s, cx, cy, cw, ch)
     c.showPage(); page += 1
 
+    # --- 3а. Узлы
+    nodes = [s for s in sheets if s["title"].startswith("Узел")]
+    if nodes:
+        frame(c, d, page, "Узлы (типовые, масштаб условный)")
+        for i, s in enumerate(nodes[:4]):
+            cx = M + (i % 2) * (cw + 8 * mm)
+            cy = M + 20 * mm + (1 - i // 2) * (ch + 4 * mm)
+            draw_sheet(c, s, cx, cy, cw, ch)
+        c.showPage(); page += 1
+
     # --- 4. Металл: раскрой
     wood = bool(d.get("wood"))
     frame(c, d, page, "Спецификация пиломатериалов и раскрой" if wood else "Спецификация металла и раскрой")

@@ -1,9 +1,11 @@
 /**
- * Бесплатный доступ без подписки: одна смета (создать, править, PDF), калькуляторы и справочник цен.
+ * Бесплатный доступ без подписки: три сметы (создать, править, PDF), калькуляторы и справочник цен.
  * Всё остальное — объекты, финансы, календарь, фото, напоминания, записная книжка, ИИ — по подписке.
  * Просмотр (GET) доступен всегда: данные не теряются.
  */
-export interface FreeCtx { estimateCount: number; firstEstimateId: string | null }
+/** Сколько смет можно сделать без подписки */
+export const FREE_ESTIMATES = 3;
+export interface FreeCtx { estimateCount: number; freeEstimateIds: string[] }
 
 const ALWAYS = [/^\/api\/auth\//, /^\/api\/me$/, /^\/api\/me\/brand\/(logo|sign)$/, /^\/api\/pay\//];
 const CATALOG = [/^\/api\/items(\/|$)/, /^\/api\/pricelists(\/|$)/];
@@ -15,9 +17,9 @@ export function freeWriteAllowed(method: string, url: string, ctx: FreeCtx): boo
   if (ALWAYS.some((r) => r.test(url))) return true;
   if (CATALOG.some((r) => r.test(url))) return true;
   if (DESIGNER.some((r) => r.test(url))) return true;
-  if (method === 'POST' && (url === '/api/estimates' || url === '/api/estimates/import')) return ctx.estimateCount === 0;
+  if (method === 'POST' && (url === '/api/estimates' || url === '/api/estimates/import')) return ctx.estimateCount < FREE_ESTIMATES;
   const m = /^\/api\/estimates\/([^/]+)(\/.*)?$/.exec(url);
-  if (m && ctx.firstEstimateId && m[1] === ctx.firstEstimateId && FIRST_ESTIMATE_SUB.includes(m[2] || '')) return true;
+  if (m && ctx.freeEstimateIds.includes(m[1]) && FIRST_ESTIMATE_SUB.includes(m[2] || '')) return true;
   return false;
 }
 

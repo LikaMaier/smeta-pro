@@ -24,7 +24,7 @@ export function createBot() {
       '💰 Расходы, оплаты и реальная прибыль по каждому объекту\n' +
       '📷 Календарь с фото и напоминаниями\n' +
       '🤝 Ссылка для заказчика, договор и акт\n\n' +
-      '<b>Первая смета — бесплатно.</b> Дальше — по подписке.',
+      '<b>Первые 3 сметы — бесплатно.</b> Дальше — по подписке.',
       { parse_mode: 'HTML', reply_markup: appKb() },
     );
   });
@@ -39,7 +39,7 @@ export function createBot() {
     if (ctx.message.text?.startsWith('/')) return next();
     const user = await prisma.user.findUnique({ where: { tgId: BigInt(ctx.from.id) } });
     if (!user) return ctx.reply('Сначала откройте приложение командой /start');
-    if (!accessOf(user).active) return ctx.reply('ИИ-сметчик доступен по подписке. Первая смета — бесплатно, её можно составить вручную в приложении.', { reply_markup: appKb() });
+    if (!accessOf(user).active) return ctx.reply('ИИ-сметчик доступен по подписке. Первые 3 сметы — бесплатно, их можно составить вручную в приложении.', { reply_markup: appKb() });
     if (!user.aiEnabled) return ctx.reply('ИИ-сметчик выключен. Включите его в Настройках приложения, если нужен — или составьте смету вручную.', { reply_markup: appKb() });
     if (!env.OPENAI_API_KEY) return ctx.reply('ИИ-сметчик ещё не подключён на сервере. Пока составьте смету вручную.', { reply_markup: appKb() });
     try {
@@ -102,8 +102,8 @@ export const BOT_DESCRIPTION =
   '• Расходы, оплаты и реальная прибыль по каждому объекту\n' +
   '• Ссылка для заказчика с кнопкой «Согласовать», договор и акт\n' +
   '• Календарь с фото и напоминаниями\n\n' +
-  'Первая смета — бесплатно. Дальше — по подписке.';
-export const BOT_SHORT = 'Сметы, расчёты и прибыль по объектам для строителей. Первая смета — бесплатно.';
+  'Первые 3 сметы — бесплатно. Дальше — по подписке.';
+export const BOT_SHORT = 'Сметы, расчёты и прибыль по объектам для строителей. Первые 3 сметы — бесплатно.';
 
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);

@@ -46,9 +46,9 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
     req.user = user;
     const isWrite = req.method !== 'GET';
     if (isWrite && !OPEN_WRITE.some((r) => r.test(url)) && !accessOf(user).active) {
-      const ctx = needsEstimateCtx(url) ? await freeCtx(user.id) : { estimateCount: 1, firstEstimateId: null };
+      const ctx = needsEstimateCtx(url) ? await freeCtx(user.id) : { estimateCount: 99, freeEstimateIds: [] };
       if (!freeWriteAllowed(req.method, url, ctx)) {
-        return reply.status(402).send({ error: 'Это доступно по подписке. Первая смета — бесплатно, дальше — по подписке.', code: 'subscription_required' });
+        return reply.status(402).send({ error: 'Это доступно по подписке. Первые 3 сметы — бесплатно, дальше — по подписке.', code: 'subscription_required' });
       }
     }
   });
