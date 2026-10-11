@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { z } from 'zod';
 import { env } from '../env';
 import { prisma, plain, audit, accessOf, HttpError } from '../util';
-import { loadEstimate, estimateTotals, estimateNumber } from './estimates';
+import { loadEstimate, estimateTotals, estimateNumber, estimatePaid, docData } from './estimates';
 import { pdfData, renderPdf, fileName } from '../pdf';
 import { brandPath } from '../brand';
 import { botLink } from '../botInfo';
@@ -74,7 +74,7 @@ export async function shareRoutes(app: FastifyInstance, opts: { bot?: any } = {}
       if (first.count) await notify(opts.bot, e, `👀 Заказчик открыл смету «${esc(e.title)}».`);
     }
     const number = await estimateNumber(e.userId, e);
-    return reply.send(estimatePage(pdfData(e, e.user, number), {
+    return reply.send(estimatePage(pdfData(e, e.user, number, false, await estimatePaid(e)), {
       token: (req.params as any).token, number, hasLogo: Boolean(brandPath(e.user.logoFile)), approvedAt: e.approvedAt,
       title: e.title, customer: e.customer, address: e.address, date: e.date, validDays: e.validDays ?? 14,
       paymentTerms: e.paymentTerms, notes: e.notes, botUrl: botLink('site'),
@@ -84,7 +84,7 @@ export async function shareRoutes(app: FastifyInstance, opts: { bot?: any } = {}
   app.get('/s/:token/pdf', async (req, reply) => {
     const e = await byToken((req.params as any).token);
     if (!e) return reply.status(404).send({ error: 'Смета недоступна' });
-    const pdf = await renderPdf(pdfData(e, e.user, await estimateNumber(e.userId, e), !accessOf(e.user).active));
+    const pdf = await renderPdf(await docData(e, e.user, !accessOf(e.user).active));
     return reply.header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(fileName(e.title, 'pdf'))}`).send(pdf);
   });

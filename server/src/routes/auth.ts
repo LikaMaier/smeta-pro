@@ -4,6 +4,7 @@ import { env } from '../env';
 import { prisma, plain, accessOf, HttpError, freeCtx } from '../util';
 import { verifyInitData, signSession } from '../auth';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
+import { compositionFor } from '../../../shared/compositions';
 import { brandUrl } from './brand';
 import { botLink } from '../botInfo';
 
@@ -35,6 +36,7 @@ export async function upsertUser(tgId: number, firstName?: string, username?: st
         userId: user.id, priceListId: user.priceLists[0].id, name: r.name, category: r.category, unit: r.unit, price: r.price,
         type: r.category === 'Аренда техники' ? 'equipment' : r.name.startsWith('Вывоз') || r.category === 'Доставка' ? 'service' : 'work',
         notes: 'Примерная цена — проверьте и поправьте под свой регион', params: { starter: true },
+        description: compositionFor(r.name)?.join('\n') ?? null,
       })),
     });
   } catch { /* справочник можно добавить позже вручную */ }
@@ -50,7 +52,7 @@ export async function meView(user: any) {
     access: { ...accessOf(user), freeEstimateLeft: free.estimateCount === 0, freeEstimateId: free.firstEstimateId, estimateCount: free.estimateCount },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
     logoUrl: brandUrl(user.logoFile), signUrl: brandUrl(user.signFile),
-    weeklyDigest: user.weeklyDigest ?? true,
+    weeklyDigest: user.weeklyDigest ?? true, docStyle: user.docStyle || 'classic',
     refLink: botLink(`ref_${user.id}`),
   });
 }
@@ -88,6 +90,7 @@ export async function authRoutes(app: FastifyInstance) {
     const body = z.object({
       aiEnabled: z.boolean().optional(),
       weeklyDigest: z.boolean().optional(),
+      docStyle: z.enum(['classic', 'modern']).optional(),
       theme: z.enum(['steel', 'gold', 'carbon', 'blueprint', 'malachite']).optional(),
       companyName: z.string().max(200).nullable().optional(),
       contacts: z.string().max(500).nullable().optional(),

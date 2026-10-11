@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma, plain, notFound, audit, num, HttpError, accessOf } from '../util';
 import { calcEstimate } from '../../../shared/estimate';
-import { pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind } from '../pdf';
+import { runImport, pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind } from '../pdf';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { getTemplate } from '../../../shared/templates';
+import { compositionFor } from '../../../shared/compositions';
 
 const STATUSES = ['draft', 'sent', 'approved', 'rejected', 'archived'] as const;
 const nonneg = z.coerce.number().min(0, 'не может быть отрицательным');
@@ -19,6 +21,9 @@ const lineSchema = z.object({
   qty: nonneg.max(1e9),
   price: nonneg.max(1e11),
   costPrice: nonneg.max(1e11).nullable().optional(),
+  matPrice: nonneg.max(1e11).nullable().optional(),
+  coef: z.coerce.number().min(0.01, 'коэффициент больше нуля').max(100).optional(),
+  composition: z.string().max(3000).nullable().optional(),
   catalogItemId: z.string().nullable().optional(),
   note: z.string().max(1000).nullable().optional(),
   unconfirmed: z.boolean().optional(),
@@ -40,12 +45,22 @@ const headerSchema = z.object({
   workStart: z.coerce.date().nullable().optional(),
   workEnd: z.coerce.date().nullable().optional(),
   warrantyMonths: z.coerce.number().int().min(0).max(120).optional(),
+  sectionCoefs: z.record(z.string().max(100), z.coerce.number().min(0.01).max(100)).nullable().optional(),
+  paySchedule: z.array(z.object({ title: z.string().trim().min(1).max(200), pct: z.coerce.number().min(0).max(100) })).max(10).nullable().optional(),
+  purchased: z.array(z.string().max(400)).max(2000).nullable().optional(),
 });
+
+/** Json-поля: null → очистить в базе (Prisma требует DbNull) */
+export function jsonFields<T extends Record<string, any>>(o: T): T {
+  const r: any = { ...o };
+  for (const k of ['sectionCoefs', 'paySchedule', 'purchased']) if (r[k] === null) r[k] = Prisma.DbNull;
+  return r;
+}
 
 export function estimateTotals(e: any) {
   return calcEstimate(
-    (e.lines || []).map((l: any) => ({ qty: num(l.qty), price: num(l.price), costPrice: l.costPrice == null ? null : num(l.costPrice), type: l.type, category: l.category })),
-    { discountPct: num(e.discountPct), markupPct: num(e.markupPct), taxPct: num(e.taxPct), lossReservePct: num(e.lossReservePct), delivery: num(e.delivery), extraCosts: num(e.extraCosts) },
+    (e.lines || []).map((l: any) => ({ qty: num(l.qty), price: num(l.price), matPrice: l.matPrice == null ? null : num(l.matPrice), coef: l.coef == null ? 1 : num(l.coef), costPrice: l.costPrice == null ? null : num(l.costPrice), type: l.type, category: l.category })),
+    { discountPct: num(e.discountPct), markupPct: num(e.markupPct), taxPct: num(e.taxPct), lossReservePct: num(e.lossReservePct), delivery: num(e.delivery), extraCosts: num(e.extraCosts), sectionCoefs: (e.sectionCoefs as any) || null },
   );
 }
 
@@ -64,7 +79,8 @@ async function checkProject(userId: string, projectId?: string | null) {
 }
 
 async function cloneEstimate(userId: string, src: any, overrides: any) {
-  const { id, createdAt, updatedAt, lines, project, shareToken, sharedAt, viewedAt, approvedAt, customerComment, ...rest } = src;
+  const { id, createdAt, updatedAt, lines, project, acts, shareToken, sharedAt, viewedAt, approvedAt, customerComment, purchased, ...rest } = src;
+  for (const k of ['sectionCoefs', 'paySchedule', 'budget']) if (rest[k] === null) delete rest[k];
   return prisma.estimate.create({
     data: {
       ...rest, ...overrides, userId,
@@ -86,9 +102,24 @@ async function priceTemplateLines(userId: string, lines: { name: string; qty: nu
     return {
       position: i, name: l.name, qty: l.qty, unit: own?.unit || l.unit, type: l.type, category: l.category,
       price: own ? own.price : st ? st.price : 0, costPrice: own?.costPrice ?? null, catalogItemId: own?.id ?? null,
+      composition: own?.description || compositionFor(l.name)?.join('\n') || null,
       note: note ? `${note}; количество типовое — уточните` : 'Количество типовое — уточните', unconfirmed: true,
     };
   });
+}
+
+/** Сколько заказчик уже заплатил по смете: поступления объекта, если смета у объекта одна */
+export async function estimatePaid(e: any): Promise<number | null> {
+  if (!e.projectId) return null;
+  const n = await prisma.estimate.count({ where: { projectId: e.projectId, deletedAt: null, isTemplate: false } });
+  if (n !== 1) return null;
+  const agg = await prisma.financeOp.aggregate({ where: { projectId: e.projectId, deletedAt: null, kind: 'income', incomeType: { in: ['advance', 'interim', 'final'] } }, _sum: { amount: true } });
+  return num(agg._sum.amount);
+}
+
+export async function docData(e: any, user: any, free: boolean) {
+  const [number, paid] = await Promise.all([estimateNumber(user.id ?? e.userId, e), estimatePaid(e)]);
+  return pdfData(e, user, number, free, paid);
 }
 
 export async function estimateNumber(userId: string, e: any) {
@@ -112,7 +143,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       return { buf: await renderXlsx(xlsxEstimateData(e, user, number, kind === 'xlsxown')), name: fileName(kind === 'xlsxown' ? `${e.title} (для себя)` : e.title, 'xlsx'),
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
     }
-    const data: any = pdfData(e, user, number, !accessOf(user).active);
+    const data: any = pdfData(e, user, number, !accessOf(user).active, await estimatePaid(e));
     if (kind === 'act') Object.assign(data, { docType: 'act', actDate: actDate || new Date().toISOString().slice(0, 10) });
     if (kind === 'contract') Object.assign(data, { docType: 'contract', contractDate: actDate || new Date().toISOString().slice(0, 10) });
     const title = kind === 'act' ? `Акт — ${e.title}` : kind === 'contract' ? `Договор — ${e.title}` : e.title;
@@ -161,6 +192,35 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     const f = await buildFile(e, e.user, kind);
     return reply.header('Content-Type', f.type)
       .header('Content-Disposition', `${f.type === 'application/pdf' ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`).send(f.buf);
+  });
+
+  // ---- Импорт сметы из Excel ----
+  app.post('/api/estimates/import', { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
+    const { data, fileName: fname, projectId } = z.object({ data: z.string().min(10), fileName: z.string().max(200).optional(), projectId: z.string().nullable().optional() }).parse(req.body);
+    const buf = Buffer.from(data.replace(/^data:[^,]*,/, ''), 'base64');
+    if (buf.length > 8 * 1024 * 1024) throw new HttpError(413, 'Файл больше 8 МБ');
+    if (!(buf[0] === 0x50 && buf[1] === 0x4b)) throw new HttpError(400, 'Нужен файл Excel в формате .xlsx (старый .xls сначала пересохраните как .xlsx)');
+    await checkProject(req.user.id, projectId);
+    const parsed = JSON.parse((await runImport(buf)).toString('utf8'));
+    const lines = z.array(lineSchema).max(2000).parse(parsed.lines);
+    const title = String(parsed.title || fname?.replace(/\.xlsx$/i, '') || 'Смета из Excel').slice(0, 200);
+    const e = await prisma.estimate.create({
+      data: {
+        userId: req.user.id, title, projectId: projectId || null, source: 'import',
+        lines: { create: lines.map(({ id: _i, ...l }: any, i: number) => ({ ...l, position: i })) },
+      },
+      include: { lines: { orderBy: { position: 'asc' } } },
+    });
+    await audit(req.user.id, 'estimate', e.id, 'import', { lines: lines.length });
+    return { ...view(e), warnings: parsed.warnings || [] };
+  });
+
+  // Ведомость закупки: отметки «куплено»
+  app.patch('/api/estimates/:id/purchased', async (req) => {
+    const e = await loadEstimate(req.user.id, (req.params as any).id);
+    const { purchased } = z.object({ purchased: z.array(z.string().max(400)).max(2000) }).parse(req.body);
+    await prisma.estimate.update({ where: { id: e.id }, data: { purchased } });
+    return { ok: true, purchased };
   });
 
   app.get('/api/estimates', async (req) => {
@@ -217,8 +277,8 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       await audit(req.user.id, 'estimate', e.id, 'create', { fromId: src.id });
       return view(e);
     }
-    const { fromId, ...data } = body;
-    const e = await prisma.estimate.create({ data: { ...data, title: data.title || 'Новая смета', userId: req.user.id }, include: { lines: true } });
+    const { fromId, templateId, ...data } = body;
+    const e = await prisma.estimate.create({ data: { ...jsonFields(data), title: data.title || 'Новая смета', userId: req.user.id }, include: { lines: true } });
     await audit(req.user.id, 'estimate', e.id, 'create');
     return view(e);
   });
@@ -251,8 +311,8 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       prisma.estimate.update({
         where: { id },
         data: {
-          ...header,
-          lines: { create: lines.map(({ id: _i, ...l }, i) => ({ ...l, position: i })) },
+          ...jsonFields(header),
+          lines: { create: lines.map(({ id: _i, ...l }: any, i: number) => ({ ...l, position: i })) },
         },
       }),
     ]);

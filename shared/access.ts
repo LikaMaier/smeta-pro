@@ -7,12 +7,12 @@ export interface FreeCtx { estimateCount: number; firstEstimateId: string | null
 
 const ALWAYS = [/^\/api\/auth\//, /^\/api\/me$/, /^\/api\/me\/brand\/(logo|sign)$/, /^\/api\/pay\//];
 const CATALOG = [/^\/api\/items(\/|$)/, /^\/api\/pricelists(\/|$)/];
-const FIRST_ESTIMATE_SUB = ['', '/lines', '/pdf/send', '/file/pdf/send', '/refresh-prices', '/share'];
+const FIRST_ESTIMATE_SUB = ['', '/lines', '/pdf/send', '/file/pdf/send', '/refresh-prices', '/share', '/purchased'];
 
 export function freeWriteAllowed(method: string, url: string, ctx: FreeCtx): boolean {
   if (ALWAYS.some((r) => r.test(url))) return true;
   if (CATALOG.some((r) => r.test(url))) return true;
-  if (method === 'POST' && url === '/api/estimates') return ctx.estimateCount === 0;
+  if (method === 'POST' && (url === '/api/estimates' || url === '/api/estimates/import')) return ctx.estimateCount === 0;
   const m = /^\/api\/estimates\/([^/]+)(\/.*)?$/.exec(url);
   if (m && ctx.firstEstimateId && m[1] === ctx.firstEstimateId && FIRST_ESTIMATE_SUB.includes(m[2] || '')) return true;
   return false;

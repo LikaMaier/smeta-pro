@@ -54,3 +54,28 @@ test('валидация отрицательных значений', () => {
   assert.ok(validateLine({ qty: 1, price: -10 }));
   assert.equal(validateLine({ qty: 0, price: 0 }), null);
 });
+
+test('работа + материал в одной строке: части идут в свои подытоги', () => {
+  const t = calcEstimate([{ qty: 105, price: 1145, matPrice: 1122, type: 'work', category: 'Ограждения' }, { qty: 1, price: 23048, type: 'service', category: 'Прочее' }]);
+  assert.equal(t.lineAmounts[0], 238035);
+  assert.equal(t.lineWork[0], 120225);
+  assert.equal(t.lineMat[0], 117810);
+  assert.equal(t.worksSubtotal, 120225);
+  assert.equal(t.materialsSubtotal, 117810);
+  assert.equal(t.otherSubtotal, 23048);
+  assert.equal(t.total, 238035 + 23048);
+  assert.deepEqual(t.sections.map((s) => [s.name, s.amount]), [['Ограждения', 238035], ['Прочее', 23048]]);
+});
+
+test('коэффициенты строки и раздела перемножаются', () => {
+  const t = calcEstimate([{ qty: 10, price: 100, coef: 1.15, type: 'work', category: 'Зима' }], { sectionCoefs: { Зима: 1.1 } });
+  assert.equal(t.lineAmounts[0], 1265); // 10 × 100 × 1,15 × 1,1
+  assert.equal(t.lineUnit[0].work, 126.5);
+  const none = calcEstimate([{ qty: 10, price: 100, coef: 0, type: 'work' }]);
+  assert.equal(none.lineAmounts[0], 1000); // коэффициент 0 считается как 1
+});
+
+test('резерв на потери считается и от материала внутри строки работы', () => {
+  const t = calcEstimate([{ qty: 1, price: 1000, matPrice: 2000, type: 'work' }], { lossReservePct: 5 });
+  assert.equal(t.reserve, 100);
+});

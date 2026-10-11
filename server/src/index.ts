@@ -4,10 +4,19 @@ import { createBot, setupBot } from './bot';
 import { seedPlans } from './routes/billing';
 import { prisma } from './util';
 import { startReminderLoop } from './routes/organizer';
+import { COMPOSITIONS } from '../../shared/compositions';
+
+/** Стартовым позициям справочника без состава — добавить типовой «в составе» (свои позиции не трогаем) */
+async function backfillCompositions() {
+  for (const [name, list] of Object.entries(COMPOSITIONS)) {
+    await prisma.catalogItem.updateMany({ where: { name, description: null, notes: { startsWith: 'Примерная цена' } }, data: { description: list.join('\n') } });
+  }
+}
 
 async function main() {
   assertEnv();
   await seedPlans();
+  backfillCompositions().catch((e) => console.error('backfill compositions', e));
   const bot = createBot();
   if (bot) await bot.init();
   const app = await buildApp({ bot });

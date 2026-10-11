@@ -2,27 +2,33 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom';
 import { get, post, put, del } from '../api';
 import { calcEstimate } from '../../../shared/estimate';
+import { checkEstimate } from '../../../shared/estimateCheck';
+import { payStages, DEFAULT_SCHEDULE } from '../../../shared/payments';
 import { useMe } from '../App';
 import { Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog, haptic, tg } from '../tg';
 
-type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
+type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; matPrice: string; coef: string; composition: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
 type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string; customerDetails: string; workStart: string; workEnd: string; warrantyMonths: string;
+  sectionCoefs: Record<string, number>; paySchedule: { title: string; pct: string }[];
   discountPct: string; markupPct: string; taxPct: string; lossReservePct: string; delivery: string; extraCosts: string };
 
 let seq = 0;
 const key = () => `l${Date.now()}_${seq++}`;
-const toL = (l: any): L => ({ k: key(), id: l.id, name: l.name, qty: String(l.qty ?? ''), unit: l.unit || 'шт', price: String(l.price ?? ''), costPrice: l.costPrice == null ? '' : String(l.costPrice), type: l.type || 'work', category: l.category || '', note: l.note || '', catalogItemId: l.catalogItemId, unconfirmed: l.unconfirmed });
+const toL = (l: any): L => ({ k: key(), id: l.id, name: l.name, qty: String(l.qty ?? ''), unit: l.unit || 'шт', price: String(l.price ?? ''), matPrice: l.matPrice == null || Number(l.matPrice) === 0 ? '' : String(l.matPrice), coef: l.coef == null || Number(l.coef) === 1 ? '' : String(l.coef), composition: l.composition || '', costPrice: l.costPrice == null ? '' : String(l.costPrice), type: l.type || 'work', category: l.category || '', note: l.note || '', catalogItemId: l.catalogItemId, unconfirmed: l.unconfirmed });
 const toH = (e: any): H => ({ title: e.title, customer: e.customer || '', address: e.address || '', date: dateInput(e.date), status: e.status, projectId: e.projectId, notes: e.notes || '', paymentTerms: e.paymentTerms || '', validDays: String(e.validDays ?? 14),
   customerDetails: e.customerDetails || '', workStart: e.workStart ? dateInput(e.workStart) : '', workEnd: e.workEnd ? dateInput(e.workEnd) : '', warrantyMonths: String(e.warrantyMonths ?? 12),
+  sectionCoefs: (e.sectionCoefs && typeof e.sectionCoefs === 'object' ? e.sectionCoefs : {}), paySchedule: Array.isArray(e.paySchedule) ? e.paySchedule.map((x: any) => ({ title: x.title, pct: String(x.pct) })) : [],
   discountPct: String(e.discountPct || 0), markupPct: String(e.markupPct || 0), taxPct: String(e.taxPct || 0), lossReservePct: String(e.lossReservePct || 0), delivery: String(e.delivery || 0), extraCosts: String(e.extraCosts || 0) });
 const payload = (h: H, lines: L[]) => ({
   title: h.title.trim() || 'Без названия', customer: h.customer || null, address: h.address || null, date: h.date || undefined, status: h.status, projectId: h.projectId || null, notes: h.notes || null,
   paymentTerms: h.paymentTerms || null, validDays: Math.max(1, Math.round(parseNum(h.validDays)) || 14),
   customerDetails: h.customerDetails || null, workStart: h.workStart || null, workEnd: h.workEnd || null, warrantyMonths: Math.max(0, Math.min(120, Math.round(parseNum(h.warrantyMonths)))),
+  sectionCoefs: Object.keys(h.sectionCoefs).length ? h.sectionCoefs : null,
+  paySchedule: h.paySchedule.filter((x) => x.title.trim() && parseNum(x.pct) > 0).length ? h.paySchedule.filter((x) => x.title.trim() && parseNum(x.pct) > 0).map((x) => ({ title: x.title.trim(), pct: parseNum(x.pct) })) : null,
   discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts),
-  lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), qty: parseNum(l.qty), unit: l.unit || 'шт', price: parseNum(l.price), costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category || null, note: l.note || null, catalogItemId: l.catalogItemId || null, unconfirmed: Boolean(l.unconfirmed) })),
+  lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), qty: parseNum(l.qty), unit: l.unit || 'шт', price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), coef: l.coef === '' ? 1 : (parseNum(l.coef) > 0 ? parseNum(l.coef) : 1), composition: l.composition.trim() || null, costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category || null, note: l.note || null, catalogItemId: l.catalogItemId || null, unconfirmed: Boolean(l.unconfirmed) })),
 });
 const draftKey = (id: string) => `smeta_draft_${id}`;
 
@@ -41,10 +47,13 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [lines, setLines] = useState<L[]>(() => initial.lines.map(toL));
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
-  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract'>(null);
+  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract' | 'pay' | 'check'>(null);
   const [share, setShare] = useState<any>(() => ({ url: null, sharedAt: initial.sharedAt, viewedAt: initial.viewedAt, approvedAt: initial.approvedAt, customerComment: initial.customerComment }));
   const [editLine, setEditLine] = useState<string | null>(null);
-  const [grouped, setGrouped] = useState(false);
+  const [secEdit, setSecEdit] = useState<string | null>(null);
+  const [pending, setPending] = useState<null | (() => void)>(null);
+  const [raise, setRaise] = useState({ pct: '', scope: 'all' });
+  const [grouped, setGrouped] = useState(() => initial.lines.some((l: any) => l.category));
   const [restore, setRestore] = useState<any>(null);
   const saving = useRef(false);
 
@@ -89,8 +98,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   useEffect(() => { if (dirty) save(); /* eslint-disable-next-line */ }, [debounced]);
 
   const totals = useMemo(() => calcEstimate(
-    lines.map((l) => ({ qty: parseNum(l.qty), price: parseNum(l.price), costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category })),
-    { discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts) },
+    lines.map((l) => ({ qty: parseNum(l.qty), price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), coef: l.coef === '' ? 1 : parseNum(l.coef), costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category })),
+    { discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts), sectionCoefs: h.sectionCoefs },
   ), [lines, h]);
 
   const move = (k: string, dir: -1 | 1) => {
@@ -104,7 +113,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     setLines((ls) => ls.filter((x) => x.k !== k)); change(); setSheet(null);
   };
   const addLines = (ls: Partial<L>[]) => {
-    setLines((cur) => [...cur, ...ls.map((l) => ({ k: key(), name: '', qty: '1', unit: 'шт', price: '0', costPrice: '', type: 'work', category: '', note: '', ...l }))]);
+    setLines((cur) => [...cur, ...ls.map((l) => ({ k: key(), name: '', qty: '1', unit: 'шт', price: '0', matPrice: '', coef: '', composition: '', costPrice: '', type: 'work', category: '', note: '', ...l }))]);
     change(); haptic('light');
   };
 
@@ -121,7 +130,14 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     try { if (dirty) await save(); await post(`/estimates/${initial.id}/file/${kind}/send`); haptic('success'); toast(FILE_OK[kind]); }
     catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setPdfBusy(false); }
   };
-  const sendPdf = () => sendFile('pdf');
+  const issues = useMemo(() => checkEstimate({
+    title: h.title, customer: h.customer, address: h.address, total: totals.total,
+    lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name, qty: parseNum(l.qty), price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), unit: l.unit, note: l.note, unconfirmed: l.unconfirmed })),
+    paySchedule: h.paySchedule.filter((x) => x.title.trim()).map((x) => ({ title: x.title, pct: parseNum(x.pct) })),
+  }), [h, lines, totals.total]);
+  /** Перед отправкой заказчику — проверка; при замечаниях показываем их и даём отправить всё равно */
+  const guard = (fn: () => void) => { if (issues.length) { setPending(() => fn); setSheet('check'); } else fn(); };
+  const sendPdf = () => guard(() => sendFile('pdf'));
   const openFile = async (kind: 'pdf' | 'act' | 'contract') => {
     setPdfBusy(true);
     try {
@@ -149,7 +165,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const order = useMemo(() => {
     if (!grouped) return [{ cat: null as string | null, items: lines }];
     const m = new Map<string, L[]>();
-    lines.forEach((l) => { const c = l.category || 'Без категории'; m.set(c, [...(m.get(c) || []), l]); });
+    lines.forEach((l) => { const c = l.category || 'Без раздела'; m.set(c, [...(m.get(c) || []), l]); });
     return [...m.entries()].map(([cat, items]) => ({ cat, items }));
   }, [lines, grouped]);
   const idx = new Map(lines.map((l, i) => [l.k, i]));
@@ -179,7 +195,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <div className="row between" style={{ marginBottom: 8 }}>
         <span className="xs muted">{readOnly ? 'Только просмотр' : saveState === 'saving' ? 'Сохраняю…' : saveState === 'error' ? 'Не сохранено' : dirty ? 'Есть изменения' : 'Сохранено'}</span>
         <div className="row">
-          <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По категориям</button>
+          <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По разделам</button>
           <button className="icon-btn" aria-label="Действия" onClick={() => setSheet('more')}><Icon.more /></button>
         </div>
       </div>
@@ -190,21 +206,39 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <div className="list">
           {order.map((g) => (
             <React.Fragment key={g.cat || 'all'}>
-              {g.cat && <div className="cat-head"><span>{g.cat}</span><span className="num">{rub(g.items.reduce((a, l) => a + totals.lineAmounts[idx.get(l.k)!], 0))}</span></div>}
+              {g.cat && (
+                <button className="cat-head" style={{ width: '100%', background: 'none', border: 0, cursor: readOnly ? 'default' : 'pointer', font: 'inherit' }} onClick={() => !readOnly && setSecEdit(g.cat)}>
+                  <span>{g.cat}{h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!] ? ` · ×${n(h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!])}` : ''}</span>
+                  <span className="num">{rub(g.items.reduce((a, l) => a + totals.lineAmounts[idx.get(l.k)!], 0))}</span>
+                </button>
+              )}
               {g.items.map((l) => (
                 <div key={l.k} className={`line ${l.unconfirmed ? 'unconfirmed' : ''}`}>
                   <div className="line-top">
                     <input className="line-name" value={l.name} placeholder="Название позиции" onChange={(e) => setLine(l.k, { name: e.target.value })} readOnly={readOnly} aria-label="Название" />
                     <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Подробнее" onClick={() => { setEditLine(l.k); setSheet('line'); }}><Icon.more /></button>
                   </div>
+                  {l.composition.trim() && (
+                    <button className="line-comp" onClick={() => { setEditLine(l.k); setSheet('line'); }}>
+                      в составе: {l.composition.split('\n').map((x) => x.replace(/^[-–•\s]+/, '').trim()).filter(Boolean).join('; ')}
+                    </button>
+                  )}
                   <div className="line-grid">
                     <NumInput value={l.qty} onChange={(v) => setLine(l.k, { qty: v })} placeholder="Кол-во" aria-label="Количество" readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
                     <select className="select" style={{ minHeight: 40, padding: '6px 4px' }} value={l.unit} onChange={(e) => setLine(l.k, { unit: e.target.value })} disabled={readOnly} aria-label="Единица">
                       {[...new Set([l.unit, ...UNITS])].map((u) => <option key={u}>{u}</option>)}
                     </select>
-                    <NumInput value={l.price} onChange={(v) => setLine(l.k, { price: v })} unit="₽" aria-label="Цена" readOnly={readOnly} invalid={parseNum(l.price) < 0} />
+                    <NumInput value={l.price} onChange={(v) => setLine(l.k, { price: v })} unit="₽" aria-label={l.matPrice !== '' ? 'Цена работы' : 'Цена'} placeholder={l.matPrice !== '' ? 'Работа' : 'Цена'} readOnly={readOnly} invalid={parseNum(l.price) < 0} />
                   </div>
-                  <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.unconfirmed ? ' · требует уточнения' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>
+                  {l.matPrice !== '' && (
+                    <div className="line-grid mat">
+                      <span className="xs muted" style={{ alignSelf: 'center' }}>+ материал</span>
+                      <span />
+                      <NumInput value={l.matPrice} onChange={(v) => setLine(l.k, { matPrice: v })} unit="₽" aria-label="Цена материала" readOnly={readOnly} />
+                    </div>
+                  )}
+                  <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.coef !== '' && parseNum(l.coef) !== 1 ? ` · ×${l.coef}` : ''}{l.unconfirmed ? ' · требует уточнения' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>
+                  {l.matPrice !== '' && totals.lineMat[idx.get(l.k)!] > 0 && <div className="xs muted" style={{ textAlign: 'right' }}>работа {rub(totals.lineWork[idx.get(l.k)!])} + материал {rub(totals.lineMat[idx.get(l.k)!])}</div>}
                 </div>
               ))}
             </React.Fragment>
@@ -239,11 +273,20 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <button className="btn block" style={{ marginTop: 12 }} onClick={() => setSheet('params')} disabled={readOnly}>Скидка, наценка, налог, доставка</button>
       </div>
 
+      <button className="list-item panel" style={{ marginTop: 12 }} onClick={() => setSheet('pay')}>
+        <div className="grow">
+          <div className="title">График оплаты</div>
+          <div className="xs muted">{h.paySchedule.length ? payStages(totals.total, h.paySchedule.map((x) => ({ title: x.title, pct: parseNum(x.pct) }))).map((x) => `${x.pct}% — ${rub(x.amount)}`).join(' · ') : 'Не задан — например, 50% аванс, 30% материал, 20% по окончании'}</div>
+        </div>
+        <Icon.chevron className="chev" width={20} />
+      </button>
+      {issues.length > 0 && <button className="xs" style={{ background: 'none', border: 0, padding: '8px 0 0', color: issues.some((i) => i.level === 'error') ? 'var(--bad)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={() => { setPending(null); setSheet('check'); }}>⚠️ Проверка сметы: замечаний {issues.length} — посмотреть</button>}
+
       <div className="grid2" style={{ marginTop: 12 }}>
         <button className="btn primary" disabled={pdfBusy} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 PDF в Telegram'}</button>
-        <button className="btn" disabled={pdfBusy} onClick={() => openPdf()}>Открыть PDF</button>
+        <button className="btn" disabled={pdfBusy} onClick={() => guard(openPdf)}>Открыть PDF</button>
       </div>
-      <button className="btn block" style={{ marginTop: 8 }} disabled={pdfBusy} onClick={openShare}>🔗 Ссылка для заказчика</button>
+      <button className="btn block" style={{ marginTop: 8 }} disabled={pdfBusy} onClick={() => guard(openShare)}>🔗 Ссылка для заказчика</button>
       {(share.approvedAt || share.viewedAt || share.sharedAt) && (
         <button className="xs" style={{ background: 'none', border: 0, padding: '6px 0 0', color: share.approvedAt ? 'var(--ok)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={openShare}>
           {share.approvedAt ? `✓ Согласована заказчиком ${date(share.approvedAt)}` : share.viewedAt ? `👀 Заказчик открыл ${date(share.viewedAt)}, ещё не согласовал` : 'Ссылка отправлена, заказчик ещё не открывал'}
@@ -301,6 +344,55 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
       </Sheet>
 
+      {/* ---- Проверка перед отправкой ---- */}
+      <Sheet open={sheet === 'check'} onClose={() => { setSheet(null); setPending(null); }} title="Проверка сметы">
+        <div className="stack">
+          {issues.length ? issues.map((i, k) => (
+            <div key={k} className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
+              <span>{i.level === 'error' ? '⛔' : '⚠️'}</span><span className="small">{i.text}</span>
+            </div>
+          )) : <p className="small">Замечаний нет — смета готова к отправке.</p>}
+          {pending && <button className="btn primary block lg" onClick={() => { const f = pending; setPending(null); setSheet(null); f(); }}>Всё равно отправить</button>}
+          <button className="btn block" onClick={() => { setSheet(null); setPending(null); }}>Исправить</button>
+        </div>
+      </Sheet>
+
+      {/* ---- График оплаты ---- */}
+      <Sheet open={sheet === 'pay'} onClose={() => setSheet(null)} title="График оплаты">
+        <div className="stack">
+          <p className="small muted" style={{ margin: 0 }}>Этапы попадут в смету, договор и на страницу заказчика. Оплаченные этапы отмечаются сами — по поступлениям объекта.</p>
+          {h.paySchedule.map((x, i) => (
+            <div key={i} className="row" style={{ gap: 6 }}>
+              <input className="input grow" value={x.title} onChange={(e) => setHead({ paySchedule: h.paySchedule.map((y, j) => (j === i ? { ...y, title: e.target.value } : y)) })} placeholder="Аванс" readOnly={readOnly} />
+              <div style={{ width: 92 }}><NumInput value={x.pct} onChange={(v) => setHead({ paySchedule: h.paySchedule.map((y, j) => (j === i ? { ...y, pct: v } : y)) })} unit="%" readOnly={readOnly} /></div>
+              {!readOnly && <button className="icon-btn" aria-label="Удалить этап" onClick={() => setHead({ paySchedule: h.paySchedule.filter((_, j) => j !== i) })}><Icon.trash width={18} /></button>}
+            </div>
+          ))}
+          {h.paySchedule.length > 0 && <div className="xs muted">Итого: {h.paySchedule.reduce((a, x) => a + parseNum(x.pct), 0)}% {h.paySchedule.reduce((a, x) => a + parseNum(x.pct), 0) !== 100 ? '— должно быть 100%' : '✓'}</div>}
+          {!readOnly && (
+            <div className="row wrap">
+              <button className="btn sm" onClick={() => setHead({ paySchedule: [...h.paySchedule, { title: '', pct: '' }] })}><Icon.plus width={16} />Этап</button>
+              <button className="btn sm" onClick={() => setHead({ paySchedule: DEFAULT_SCHEDULE.map((x) => ({ title: x.title, pct: String(x.pct) })) })}>50 / 30 / 20</button>
+              <button className="btn sm" onClick={() => setHead({ paySchedule: [{ title: 'Аванс', pct: '50' }, { title: 'По окончании работ', pct: '50' }] })}>50 / 50</button>
+              {h.paySchedule.length > 0 && <button className="btn sm ghost" onClick={() => setHead({ paySchedule: [] })}>Убрать график</button>}
+            </div>
+          )}
+          <button className="btn primary block" onClick={() => setSheet(null)}>Готово</button>
+        </div>
+      </Sheet>
+
+      {/* ---- Раздел ---- */}
+      <Sheet open={!!secEdit} onClose={() => setSecEdit(null)} title="Раздел">
+        {secEdit && <SectionForm name={secEdit === 'Без раздела' ? '' : secEdit} coef={h.sectionCoefs[secEdit === 'Без раздела' ? '' : secEdit]}
+          onSave={(newName, coef) => {
+            const old = secEdit === 'Без раздела' ? '' : secEdit;
+            if (newName !== old) setLines((ls) => ls.map((l) => ((l.category || '') === old ? { ...l, category: newName } : l)));
+            const sc = { ...h.sectionCoefs }; delete sc[old];
+            if (coef && coef !== 1) sc[newName] = coef;
+            setHead({ sectionCoefs: sc }); setSecEdit(null);
+          }} />}
+      </Sheet>
+
       {/* ---- Шапка ---- */}
       <Sheet open={sheet === 'head'} onClose={() => setSheet(null)} title="Данные сметы">
         <HeadForm h={h} setHead={setHead} readOnly={readOnly} />
@@ -317,7 +409,28 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             <Field label="Доставка"><NumInput value={h.delivery} onChange={(v) => setHead({ delivery: v })} unit="₽" /></Field>
             <Field label="Доп. расходы"><NumInput value={h.extraCosts} onChange={(v) => setHead({ extraCosts: v })} unit="₽" /></Field>
           </div>
-          <p className="xs muted">Порядок: подытог → резерв → наценка → скидка → доставка и доп. расходы → налог.</p>
+          <p className="xs muted">Порядок: подытог → резерв → наценка → скидка → доставка и доп. расходы → налог. Коэффициенты строк и разделов применяются к ценам.</p>
+          <div className="panel stack">
+            <div className="title" style={{ fontWeight: 700 }}>Поднять все цены</div>
+            <div className="row" style={{ gap: 6 }}>
+              <div style={{ width: 110 }}><NumInput value={raise.pct} onChange={(v) => setRaise((r) => ({ ...r, pct: v }))} unit="%" placeholder="10" /></div>
+              <select className="select grow" value={raise.scope} onChange={(e) => setRaise((r) => ({ ...r, scope: e.target.value }))}>
+                <option value="all">всё</option><option value="work">только работы</option><option value="mat">только материалы</option>
+              </select>
+            </div>
+            <button className="btn block" disabled={readOnly || !parseNum(raise.pct)} onClick={() => {
+              const k = 1 + parseNum(raise.pct) / 100;
+              const r2 = (v: string) => (v === '' ? v : String(Math.round(parseNum(v) * k * 100) / 100));
+              setLines((ls) => ls.map((l) => {
+                const isMat = l.type === 'material';
+                const work = raise.scope !== 'mat' && !isMat;
+                const mat = raise.scope !== 'work';
+                return { ...l, price: (isMat ? mat : work) ? r2(l.price) : l.price, matPrice: mat ? r2(l.matPrice) : l.matPrice };
+              }));
+              change(); toast(`Цены ${parseNum(raise.pct) > 0 ? 'подняты' : 'снижены'} на ${Math.abs(parseNum(raise.pct))}%`); setRaise({ pct: '', scope: raise.scope });
+            }}>Применить</button>
+            <div className="xs muted">Например, материалы подорожали на 8% — поднимите только материалы. Отрицательное число — снизить.</div>
+          </div>
           <button className="btn primary block" onClick={() => setSheet(null)}>Готово</button>
         </div>
       </Sheet>
@@ -329,13 +442,19 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             <Field label="Название"><input className="input" value={current.name} onChange={(e) => setLine(current.k, { name: e.target.value })} readOnly={readOnly} /></Field>
             <div className="grid2">
               <Field label="Тип"><select className="select" value={current.type} onChange={(e) => setLine(current.k, { type: e.target.value })} disabled={readOnly}>{Object.entries(TYPE_LABEL).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></Field>
-              <Field label="Категория"><input className="input" value={current.category} onChange={(e) => setLine(current.k, { category: e.target.value })} readOnly={readOnly} placeholder="Напр. Фундамент" /></Field>
+              <Field label="Раздел"><input className="input" value={current.category} onChange={(e) => setLine(current.k, { category: e.target.value })} readOnly={readOnly} placeholder="Напр. Фундамент" list="sections" /></Field>
               <Field label="Количество"><NumInput value={current.qty} onChange={(v) => setLine(current.k, { qty: v })} unit={current.unit} readOnly={readOnly} /></Field>
               <Field label="Единица"><input className="input" value={current.unit} onChange={(e) => setLine(current.k, { unit: e.target.value })} readOnly={readOnly} /></Field>
-              <Field label="Цена заказчику"><NumInput value={current.price} onChange={(v) => setLine(current.k, { price: v })} unit="₽" readOnly={readOnly} /></Field>
+              <Field label={current.matPrice !== '' ? 'Цена работы за ед.' : 'Цена за ед.'}><NumInput value={current.price} onChange={(v) => setLine(current.k, { price: v })} unit="₽" readOnly={readOnly} /></Field>
+              <Field label="Цена материала за ед." hint="Если работа с материалом — в одной строке"><NumInput value={current.matPrice} onChange={(v) => setLine(current.k, { matPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>
+              <Field label="Коэффициент" hint="Зима, высота, стеснённо: 1,15"><NumInput value={current.coef} onChange={(v) => setLine(current.k, { coef: v })} unit="×" readOnly={readOnly} placeholder="1" /></Field>
               <Field label="Закупочная / себестоимость" hint="Не видна заказчику"><NumInput value={current.costPrice} onChange={(v) => setLine(current.k, { costPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>
             </div>
+            <Field label="В составе" hint="Каждый пункт с новой строки — в смете будет списком под названием">
+              <textarea className="textarea" style={{ minHeight: 96 }} value={current.composition} onChange={(e) => setLine(current.k, { composition: e.target.value })} readOnly={readOnly} placeholder={'сетка Гиттер 1,73 м\nстолбы 60×60×3000 мм\nметод монтажа — бутование'} />
+            </Field>
             <Field label="Примечание"><input className="input" value={current.note} onChange={(e) => setLine(current.k, { note: e.target.value })} readOnly={readOnly} /></Field>
+            <datalist id="sections">{[...new Set(lines.map((x) => x.category).filter(Boolean))].map((c) => <option key={c} value={c} />)}</datalist>
             {current.unconfirmed && <label className="row small"><input type="checkbox" checked={!current.unconfirmed} onChange={() => setLine(current.k, { unconfirmed: false })} />Позиция уточнена</label>}
             {!readOnly && (
               <div className="row wrap">
@@ -351,7 +470,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
 
       {/* ---- Добавить из справочника ---- */}
       <Sheet open={sheet === 'add'} onClose={() => setSheet(null)} title="Добавить из справочника">
-        {sheet === 'add' && <CatalogPicker onPick={(it) => addLines([{ name: it.name, unit: it.unit, price: String(it.price), costPrice: it.costPrice == null ? '' : String(it.costPrice), type: it.type, category: it.category, catalogItemId: it.id }])} />}
+        {sheet === 'add' && <CatalogPicker onPick={(it) => addLines([{ name: it.name, unit: it.unit, price: String(it.price), composition: it.description || '', costPrice: it.costPrice == null ? '' : String(it.costPrice), type: it.type, category: it.category, catalogItemId: it.id }])} />}
       </Sheet>
 
       {/* ---- Действия ---- */}
@@ -366,6 +485,9 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           {!initial.isTemplate && <button className="list-item" disabled={readOnly} onClick={() => action(async () => { await post(`/estimates/${initial.id}/save-as-template`, {}); setSheet(null); }, 'Шаблон сохранён')}>
             <div className="grow title">Сохранить как шаблон</div>
           </button>}
+          <button className="list-item" onClick={() => nav(`/estimates/${initial.id}/acts`)}><div className="grow"><div className="title">Акты выполненных работ, КС-2, КС-3</div><div className="xs muted">Промежуточные акты по частям и остаток работ</div></div></button>
+          <button className="list-item" onClick={() => nav(`/estimates/${initial.id}/purchase`)}><div className="grow"><div className="title">Ведомость закупки материалов</div><div className="xs muted">Что купить, с отметками и отправкой поставщику</div></div></button>
+          <button className="list-item" onClick={() => setSheet('params')}><div className="grow"><div className="title">Поднять цены на %</div><div className="xs muted">Подорожали материалы — пересчитать всё разом</div></div></button>
           <button className="list-item" onClick={() => setSheet('history')}><div className="grow title">История изменений</div></button>
           <button className="list-item" disabled={readOnly} onClick={async () => {
             if (!(await confirmDialog('Удалить смету? Её можно будет восстановить по запросу в поддержку.'))) return;
@@ -492,6 +614,21 @@ function ShareSheet({ id, title, total, share, setShare, onClose }: { id: string
         if (!(await confirmDialog('Отозвать ссылку? Старая перестанет открываться, новую можно сделать в любой момент.'))) return;
         try { setShare({ ...(await del(`/estimates/${id}/share`)), url: null }); toast('Ссылка отозвана'); onClose(); } catch (e: any) { toast(e.message, true); }
       }}>Отозвать ссылку</button>
+    </div>
+  );
+}
+
+function SectionForm({ name, coef, onSave }: { name: string; coef?: number; onSave: (name: string, coef: number) => void }) {
+  const [v, setV] = useState(name);
+  const [k, setK] = useState(coef && coef !== 1 ? String(coef) : '');
+  return (
+    <div className="stack">
+      <Field label="Название раздела" hint="Изменится у всех позиций раздела"><input className="input" value={v} onChange={(e) => setV(e.target.value)} placeholder="Напр. Ограждения и ворота" /></Field>
+      <Field label="Коэффициент на раздел" hint="Применяется ко всем ценам раздела: зимние работы 1,15, стеснённые условия 1,1">
+        <NumInput value={k} onChange={setK} unit="×" placeholder="1" />
+      </Field>
+      <div className="seg">{['1.1', '1.15', '1.2', '1.3'].map((x) => <button key={x} className={`chip ${k === x ? 'on' : ''}`} onClick={() => setK(x)}>×{x.replace('.', ',')}</button>)}<button className="chip" onClick={() => setK('')}>без</button></div>
+      <button className="btn primary block" onClick={() => onSave(v.trim(), parseNum(k) > 0 ? parseNum(k) : 1)}>Сохранить</button>
     </div>
   );
 }

@@ -63,6 +63,7 @@ export default function Estimates() {
 
       <Sheet open={newOpen} onClose={() => setNewOpen(false)} title="Новая смета">
         <button className="btn primary block lg" onClick={() => create()}>Пустая смета</button>
+        <ImportButton onDone={(id) => nav(`/estimates/${id}`)} />
         <h4 className="muted small" style={{ margin: '20px 0 8px' }}>Готовые шаблоны</h4>
         <div className="list">
           {TEMPLATES.map((t) => (
@@ -77,6 +78,30 @@ export default function Estimates() {
           {(ts) => <div className="list">{ts.map((t) => <button key={t.id} className="list-item" onClick={() => create(t.id)}><div className="grow"><div className="title">{t.title}</div><div className="xs muted">{t.linesCount} поз.</div></div><Icon.chevron className="chev" width={18} /></button>)}</div>}
         </Load>
       </Sheet>
+    </>
+  );
+}
+
+/** Загрузка своей старой сметы из Excel (.xlsx) */
+function ImportButton({ onDone }: { onDone: (id: string) => void }) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const pick = async (f?: File | null) => {
+    if (!f) return;
+    setBusy(true); setErr('');
+    try {
+      if (f.size > 8 * 1024 * 1024) throw new Error('Файл больше 8 МБ');
+      const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error('Не удалось прочитать файл')); r.readAsDataURL(f); });
+      const e = await post('/estimates/import', { data, fileName: f.name });
+      onDone(e.id);
+    } catch (e: any) { if (e.code !== 'subscription_required') setErr(e.message); } finally { setBusy(false); if (ref.current) ref.current.value = ''; }
+  };
+  return (
+    <>
+      <button className="btn block" style={{ marginTop: 10 }} disabled={busy} onClick={() => ref.current?.click()}>{busy ? 'Читаю файл…' : '📥 Загрузить из Excel'}</button>
+      <input ref={ref} type="file" hidden accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(e) => pick(e.target.files?.[0])} />
+      {err ? <div className="banner" style={{ marginTop: 8 }}>{err}</div> : <p className="xs muted" style={{ margin: '6px 0 0' }}>Своя смета в .xlsx: найдём наименования, единицы, количество, цены, разделы и «в составе».</p>}
     </>
   );
 }

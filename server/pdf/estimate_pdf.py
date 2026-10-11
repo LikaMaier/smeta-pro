@@ -10,7 +10,7 @@ import sys
 from datetime import date, datetime, timedelta
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -171,7 +171,13 @@ def header(d, W):
     return [head, Spacer(1, 8)]
 
 
-def items_block(d, W):
+def items_block(d, W, with_paid=False):
+    if d.get("style") == "classic":
+        return classic_items(d, W, with_paid)
+    return modern_items(d, W, with_paid)
+
+
+def modern_items(d, W, with_paid=False):
     """Таблица позиций и итоги — общая для сметы, акта и приложения к договору"""
     els = []
     cw = [9 * mm, W - 9 * mm - 18 * mm - 14 * mm - 24 * mm - 27 * mm, 18 * mm, 14 * mm, 24 * mm, 27 * mm]
@@ -198,6 +204,10 @@ def items_block(d, W):
         for l in items:
             n += 1
             name = esc(l.get("name"))
+            if l.get("composition"):
+                name = f"<b>{name}</b>, в составе:<br/>" + "<br/>".join("– " + esc(c) for c in l["composition"])
+            if d.get("split") and l.get("mat"):
+                name += f"<br/><font color='#7A6450' size='7.5'>работа {money(l.get('work'))} + материал {money(l.get('mat'))}</font>"
             if l.get("note"):
                 name += f"<br/><font color='#7A6450' size='7.5'>{esc(l.get('note'))}</font>"
             rows.append([Paragraph(str(n), S["cell"]), Paragraph(name, S["cell"]), Paragraph(qty(l.get("qty")), S["cellr"]),
@@ -215,6 +225,8 @@ def items_block(d, W):
     def add(label, value, neg=False):
         if value:
             tr.append([Paragraph(label, S["labelr"]), Paragraph(("−" if neg else "") + money(value), S["labelr"])])
+    if t.get("totalLabel"):
+        add("Итого по позициям", t.get("subtotal"))
     add("Работы", t.get("works"))
     add("Материалы", t.get("materials"))
     add("Техника, услуги и прочее", t.get("other"))
@@ -223,12 +235,164 @@ def items_block(d, W):
     add("Дополнительные расходы", t.get("extraCosts"))
     add(f"Скидка {qty(t.get('discountPct'))}%", t.get("discount"), neg=True)
     add(f"Налог {qty(t.get('taxPct'))}%", t.get("tax"))
-    tr.append([Paragraph("Итого к оплате", S["totalr"]), Paragraph(money(t.get("total")), S["totalr"])])
+    gi = len(tr)
+    tr.append([Paragraph(t.get("totalLabel") or "Итого", S["totalr"]), Paragraph(money(t.get("total")), S["totalr"])])
+    if with_paid and d.get("paid"):
+        tr.append([Paragraph("Получено", S["labelr"]), Paragraph(money(d.get("paid")), S["labelr"])])
+        tr.append([Paragraph("Всего к оплате", S["totalr"]), Paragraph(money(d.get("toPay")), S["totalr"])])
     tt = Table(tr, colWidths=[W - 42 * mm, 42 * mm])
-    tt.setStyle(TableStyle([("LINEABOVE", (0, len(tr) - 1), (-1, len(tr) - 1), 1.2, GOLD), ("TOPPADDING", (0, len(tr) - 1), (-1, len(tr) - 1), 6),
+    tt.setStyle(TableStyle([("LINEABOVE", (0, gi), (-1, gi), 1.2, GOLD), ("TOPPADDING", (0, gi), (-1, gi), 6),
                             ("RIGHTPADDING", (0, 0), (-1, -1), 3), ("TOPPADDING", (0, 0), (-1, -2), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -2), 1.5)]))
-    els.append(KeepTogether([tt, Spacer(1, 3), Paragraph(f"Сумма прописью: {rub_words(t.get('total'))}", ParagraphStyle('wr', parent=S['words'], alignment=TA_RIGHT))]))
+    words_sum = d.get("toPay") if with_paid and d.get("paid") else t.get("total")
+    els.append(KeepTogether([tt, Spacer(1, 3), Paragraph(f"Сумма прописью: {rub_words(words_sum)}", ParagraphStyle('wr', parent=S['words'], alignment=TA_RIGHT))]))
     return els
+
+
+# ---------- классический вид: таблица с рамками, как «Объектная смета» ----------
+CG = colors.HexColor("#222222")
+CGRID = colors.HexColor("#555555")
+CHEAD = colors.HexColor("#EFEFEF")
+CSEC = colors.HexColor("#F6F6F6")
+
+
+def cst(name, **k):
+    return ParagraphStyle(name, fontName=k.pop("f", "DV"), fontSize=k.pop("s", 8), leading=k.pop("l", 10), textColor=CG, **k)
+
+
+C_T, C_R, C_C = cst("ct"), cst("cr", alignment=TA_RIGHT), cst("cc", alignment=TA_CENTER)
+C_H = cst("ch", f="DV-B", alignment=TA_CENTER)
+C_SEC = cst("csec", f="DV-B", alignment=TA_CENTER, s=8.5)
+C_BR = cst("cbr", f="DV-B", alignment=TA_RIGHT)
+
+
+def num0(v):
+    # деньги без знака рубля — для колонок таблицы
+    return money(v).replace("\u00a0₽", "")
+
+
+def rub_r(v):
+    return money(v).replace("\u00a0₽", "\u00a0р.")
+
+
+def classic_items(d, W, with_paid=False):
+    split = bool(d.get("split"))
+    if split:
+        cw = [8 * mm, None, 15 * mm, 15 * mm, 19 * mm, 19 * mm, 22 * mm]
+        head = ["№", "Наименование работ", "Ед. изм.", "Кол-во", "Работа, р.", "Матер., р.", "Сумма, р."]
+    else:
+        cw = [8 * mm, None, 16 * mm, 16 * mm, 22 * mm, 24 * mm]
+        head = ["№", "Наименование работ", "Ед. изм.", "Кол-во", "Цена, р.", "Сумма, р."]
+    cw[1] = W - sum(c for c in cw if c)
+    ncol = len(cw)
+    rows = [[Paragraph(h, C_H) for h in head]]
+    style = [("GRID", (0, 0), (-1, -1), 0.5, CGRID), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("BACKGROUND", (0, 0), (-1, 0), CHEAD),
+             ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5), ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]
+    lines = d.get("lines") or []
+    order = []
+    for l in lines:
+        c = l.get("category") or ""
+        if c not in order:
+            order.append(c)
+    many = len(order) > 1 or bool(order and order[0])
+    n = 0
+    for cat in order:
+        items = [l for l in lines if (l.get("category") or "") == cat]
+        if many:
+            rows.append([Paragraph(esc(cat or "Прочие работы").upper(), C_SEC)] + [""] * (ncol - 1))
+            i = len(rows) - 1
+            style += [("SPAN", (0, i), (-1, i)), ("BACKGROUND", (0, i), (-1, i), CSEC)]
+        for l in items:
+            n += 1
+            comp = l.get("composition") or []
+            txt = (f"<b>{esc(l.get('name'))}</b>, в составе:<br/>" + "<br/>".join("– " + esc(c) for c in comp)) if comp else esc(l.get("name"))
+            if l.get("note"):
+                txt += f"<br/><font size='7' color='#666666'>{esc(l.get('note'))}</font>"
+            row = [Paragraph(str(n), C_C), Paragraph(txt, C_T), Paragraph(esc(l.get("unit")), C_C), Paragraph(qty(l.get("qty")), C_C)]
+            if split:
+                row += [Paragraph(num0(l.get("unitWork")), C_R) if l.get("unitWork") else Paragraph("—", C_C),
+                        Paragraph(num0(l.get("unitMat")), C_R) if l.get("unitMat") else Paragraph("—", C_C)]
+            else:
+                row += [Paragraph(num0(l.get("price")), C_R)]
+            row += [Paragraph(num0(l.get("amount")), C_R)]
+            rows.append(row)
+        if many:
+            rows.append([""] + [Paragraph("Итого по разделу:", C_BR)] + [""] * (ncol - 3) + [Paragraph(num0(sum(float(i.get("amount") or 0) for i in items)), C_BR)])
+            i = len(rows) - 1
+            style.append(("SPAN", (1, i), (ncol - 2, i)))
+    if n == 0:
+        rows.append([""] + [Paragraph("Позиции не добавлены", C_T)] + [""] * (ncol - 2))
+    tb = Table(rows, colWidths=cw, repeatRows=1)
+    tb.setStyle(TableStyle(style))
+    els = [tb, Spacer(1, 6)]
+
+    t = d.get("totals") or {}
+    tot = []
+
+    def add(label, v, bold=False, neg=False):
+        if v:
+            tot.append((label, ("−" if neg else "") + rub_r(v), bold))
+    if t.get("totalLabel"):
+        add("Итого по позициям:", t.get("subtotal"))
+    add("Работы:", t.get("works"))
+    add("Материалы:", t.get("materials"))
+    add("Техника, услуги и прочее:", t.get("other"))
+    add("Накладные и непредвиденные расходы:", t.get("overhead"))
+    add("Доставка:", t.get("delivery"))
+    add("Дополнительные расходы:", t.get("extraCosts"))
+    add(f"Скидка {qty(t.get('discountPct'))}%:", t.get("discount"), neg=True)
+    add(f"Налог {qty(t.get('taxPct'))}%:", t.get("tax"))
+    tot.append((t.get("totalLabel", "Сметная стоимость") + ":", rub_r(t.get("total")), True))
+    if with_paid and d.get("paid") is not None:
+        tot.append(("Получено:", rub_r(d.get("paid") or 0), False))
+        tot.append(("Всего к оплате:", rub_r(d.get("toPay")), True))
+    tt = Table([[Paragraph(f"<b>{a}</b>" if b else a, C_R), Paragraph(f"<b>{v}</b>" if b else v, C_R)] for a, v, b in tot], colWidths=[W - 36 * mm, 36 * mm])
+    tt.setStyle(TableStyle([("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]))
+    words_sum = d.get("toPay") if with_paid and d.get("paid") else t.get("total")
+    els.append(KeepTogether([tt, Paragraph(f"Сумма прописью: {rub_words(words_sum)}", cst("cw", alignment=TA_RIGHT, s=7.5))]))
+    return els
+
+
+def stages_block(d, W):
+    st = d.get("stages") or []
+    if not st:
+        return []
+    classic = d.get("style") == "classic"
+    P, PR, PC = (C_T, C_R, C_C) if classic else (S["cell"], S["cellr"], S["cell"])
+    lab = {"paid": "✓ оплачено", "partial": "частично", "due": ""}
+    rows = [[Paragraph("<b>Этап оплаты</b>", P), Paragraph("<b>%</b>", PC), Paragraph("<b>Сумма, р.</b>", PR), Paragraph("<b>Статус</b>", PC)]]
+    for x in st:
+        rows.append([Paragraph(esc(x["title"]), P), Paragraph(qty(x["pct"]), PC), Paragraph(num0(x["amount"]), PR), Paragraph(lab.get(x["status"], ""), PC)])
+    tb = Table(rows, colWidths=[W - 78 * mm, 14 * mm, 32 * mm, 32 * mm])
+    tb.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, CGRID if classic else LINE), ("BACKGROUND", (0, 0), (-1, 0), CHEAD if classic else BAND),
+                            ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    return [Spacer(1, 8), KeepTogether([Paragraph("График оплаты", S["h2"]), tb])]
+
+
+def classic_head(d, W, title, sub):
+    # шапка «Объектной сметы»: логотип, заголовок по центру, три колонки — подрядчик, объект, заказчик
+    logo = image(d.get("logoPath"), 26 * mm, 12 * mm)
+    top = Table([[logo or "", Paragraph(f"<b>{title}</b>", cst("tt", f="DV-B", s=13, l=16, alignment=TA_CENTER)), ""]], colWidths=[30 * mm, W - 60 * mm, 30 * mm])
+    top.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
+    t = d.get("totals") or {}
+    obj = [f"<b>Объект:</b> {esc(d.get('address') or d.get('title') or '')}", f"<b>Сметная стоимость:</b> {rub_r(t.get('total'))}"]
+    if d.get("paid") is not None:
+        obj += [f"<b>Оплачено:</b> {rub_r(d.get('paid') or 0)}", f"<b>Всего к оплате:</b> {rub_r(d.get('toPay'))}"]
+    left = f"<b>Подрядчик:</b> {esc(d.get('company') or '')}" + (f"<br/>{esc(d.get('contacts'))}" if d.get("contacts") else "")
+    right = f"<b>Заказчик:</b> {esc(d.get('customer') or '')}"
+    parties = Table([[Paragraph(left, C_T), Paragraph("<br/>".join(obj), C_T), Paragraph(right, C_T)]], colWidths=[W * 0.34, W * 0.4, W * 0.26])
+    parties.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
+    return [top, Paragraph(sub, cst("sub", alignment=TA_CENTER, s=9)), Spacer(1, 6), parties, Spacer(1, 8)]
+
+
+def classic_signs(d, W, left="Подрядчик", right="Заказчик"):
+    sig = image(d.get("signPath"), 34 * mm, 13 * mm)
+    r1 = Table([[Paragraph(f"{right}: ______________________ / ____________", C_T)]], colWidths=[W])
+    r2 = Table([[Paragraph(f"{left}:", C_T), sig or "", Paragraph("______________________ / ____________", C_T)]], colWidths=[24 * mm, 36 * mm, W - 60 * mm])
+    for tb in (r1, r2):
+        tb.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
+    return KeepTogether([Spacer(1, 14), r1, Spacer(1, 10), r2])
+
+
 
 
 def sign_block(d, W, left="Исполнитель", right="Заказчик", captions=None):
@@ -257,7 +421,9 @@ def contract(d, W):
     start = ws.strftime("%d.%m.%Y") if ws else "в течение 3 (трёх) рабочих дней после поступления аванса"
     end = we.strftime("%d.%m.%Y") if we else "в сроки, согласованные Сторонами"
     warranty = int(d.get("warrantyMonths") or 0)
-    terms = esc(d.get("paymentTerms")) if d.get("paymentTerms") else \
+    stages = d.get("stages") or []
+    stage_txt = "; ".join(f"{esc(x['title'])} — {qty(x['pct'])}% ({money(x['amount'])})" for x in stages)
+    terms = ". ".join(x for x in [stage_txt, esc(d.get("paymentTerms") or "").rstrip(".")] if x) + "." if (stage_txt or d.get("paymentTerms")) else \
         "Окончательный расчёт производится в течение 3 (трёх) рабочих дней после подписания Сторонами Акта выполненных работ."
     els = [Paragraph(f"Договор подряда{(' № ' + esc(num)) if num else ''}", S["title"]),
            Paragraph(f"{cd.strftime('%d.%m.%Y')}", S["sub"]), Spacer(1, 8),
@@ -329,42 +495,52 @@ def build(d):
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=14 * mm, bottomMargin=16 * mm,
                             title=titles.get(kind, d.get("title") or "Смета"), author=d.get("company") or "")
     W = doc.width
-    els = header(d, W)
+    classic = d.get("style") == "classic"
+    els = []
 
     if kind == "contract":
-        els += contract(d, W)
+        els += header(d, W) + contract(d, W)
     else:
         is_act = kind == "act"
         dd = fmt_date(d.get("actDate") if is_act else d.get("date"), date.today())
         valid = d.get("validDays") or 14
         number = d.get("number") or ""
-        if is_act:
-            els.append(Paragraph(f"Акт{(' № ' + esc(number)) if number else ''} выполненных работ", S["title"]))
-            els.append(Paragraph(f"от {dd.strftime('%d.%m.%Y')} · по смете «{esc(d.get('title') or '')}»", S["sub"]))
+        if classic and not is_act:
+            els += classic_head(d, W, f"Объектная смета{(' № ' + esc(number)) if number else ''}",
+                                f"от {dd.strftime('%d.%m.%Y')} · {esc(d.get('title') or '')} · действительна до {(dd + timedelta(days=int(valid))).strftime('%d.%m.%Y')}")
         else:
-            els.append(Paragraph(esc(d.get("title") or "Смета"), S["title"]))
-            els.append(Paragraph(f"Смета{(' № ' + esc(number)) if number else ''} от {dd.strftime('%d.%m.%Y')} · действительна до {(dd + timedelta(days=int(valid))).strftime('%d.%m.%Y')}", S["sub"]))
-        els.append(Spacer(1, 8))
-        info = [(k, v) for k, v in ([("Исполнитель", d.get("company"))] if is_act else []) + [("Заказчик", d.get("customer")), ("Адрес объекта", d.get("address"))] if v]
-        if info:
-            t = Table([[Paragraph(k, S["sub"]), Paragraph(esc(v), S["label"])] for k, v in info], colWidths=[32 * mm, W - 32 * mm])
-            t.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
-            els += [t, Spacer(1, 10)]
-        els += items_block(d, W)
+            els += header(d, W)
+            if is_act:
+                els.append(Paragraph(f"Акт{(' № ' + esc(number)) if number else ''} выполненных работ", S["title"]))
+                pf = fmt_date(d.get("periodFrom"))
+                period = f" · за период {pf.strftime('%d.%m.%Y')} — {dd.strftime('%d.%m.%Y')}" if pf else ""
+                els.append(Paragraph(f"от {dd.strftime('%d.%m.%Y')} · по смете{(' № ' + esc(d.get('estimateNumber'))) if d.get('estimateNumber') else ''} «{esc(d.get('title') or '')}»{period}", S["sub"]))
+            else:
+                els.append(Paragraph(esc(d.get("title") or "Смета"), S["title"]))
+                els.append(Paragraph(f"Смета{(' № ' + esc(number)) if number else ''} от {dd.strftime('%d.%m.%Y')} · действительна до {(dd + timedelta(days=int(valid))).strftime('%d.%m.%Y')}", S["sub"]))
+            els.append(Spacer(1, 8))
+            info = [(k, v) for k, v in ([("Исполнитель", d.get("company"))] if is_act else []) + [("Заказчик", d.get("customer")), ("Адрес объекта", d.get("address"))] if v]
+            if info:
+                t = Table([[Paragraph(k, S["sub"]), Paragraph(esc(v), S["label"])] for k, v in info], colWidths=[32 * mm, W - 32 * mm])
+                t.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+                els += [t, Spacer(1, 10)]
+        els += items_block(d, W, with_paid=not is_act)
         t = d.get("totals") or {}
         if is_act:
+            done = d.get("actTotal") if d.get("actTotal") is not None else t.get("total")
             els += [Spacer(1, 10), Paragraph(
-                f"Вышеперечисленные работы выполнены полностью и в срок на общую сумму {money(t.get('total'))}. "
+                f"Вышеперечисленные работы выполнены полностью и в срок на общую сумму {money(done)}. "
                 "Заказчик претензий по объёму, качеству и срокам выполнения работ не имеет.", S["body"])]
+            els += [Spacer(1, 22), KeepTogether(sign_block(d, W, captions=("Работы сдал:", "Работы принял:")))]
         else:
-            if d.get("paymentTerms"):
-                els += [Paragraph("Условия оплаты", S["h2"]), Paragraph(esc(d.get("paymentTerms")), S["body"])]
-            if d.get("notes"):
-                els += [Paragraph("Примечания", S["h2"]), Paragraph(esc(d.get("notes")), S["body"])]
+            note = "\n".join(x for x in [d.get("paymentTerms"), d.get("notes")] if x)
+            if note:
+                els += [Spacer(1, 8), Paragraph(f"<b>Примечание:</b> {esc(note)}", C_T if classic else S["body"])]
+            els += stages_block(d, W)
             if d.get("approvedAt"):
                 ad = fmt_date(d.get("approvedAt"))
                 els += [Spacer(1, 6), Paragraph(f"✓ Смета согласована заказчиком онлайн {ad.strftime('%d.%m.%Y') if ad else ''}", S["ok"])]
-        els += [Spacer(1, 22), KeepTogether(sign_block(d, W, captions=("Работы сдал:", "Работы принял:") if is_act else None))]
+            els += [classic_signs(d, W)] if classic else [Spacer(1, 22), KeepTogether(sign_block(d, W))]
 
     def footer(canvas, doc_):
         canvas.saveState()

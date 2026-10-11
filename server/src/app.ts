@@ -19,6 +19,7 @@ import { calendarRoutes } from './routes/calendar';
 import { organizerRoutes } from './routes/organizer';
 import { shareRoutes } from './routes/share';
 import { brandRoutes } from './routes/brand';
+import { actRoutes } from './routes/acts';
 
 declare module 'fastify' {
   interface FastifyRequest { user: User }
@@ -63,6 +64,7 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
   await app.register(organizerRoutes);
   await app.register(shareRoutes, { bot: opts.bot });
   await app.register(brandRoutes);
+  await app.register(actRoutes, { bot: opts.bot });
 
   // Telegram webhook
   if (opts.bot && env.PUBLIC_URL) {

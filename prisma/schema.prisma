@@ -28,6 +28,7 @@ model User {
   logoFile          String? // логотип для документов (файл в PHOTO_DIR/brand)
   signFile          String? // подпись/печать для документов
   weeklyDigest      Boolean   @default(true)
+  docStyle          String    @default("classic") // classic (таблица с рамками) | modern
   lastDigestAt      DateTime?
   referredById      String? // кто пригласил
   referralRewardedAt DateTime? // когда пригласившему начислен бонусный месяц
@@ -46,6 +47,26 @@ model User {
   reminders  Reminder[]
   addressBook Contact[]
   aiSessions AiSession[]
+  workActs   WorkAct[]
+}
+
+// Акт выполненных работ (в т.ч. промежуточный): снимок выполненных объёмов на дату
+model WorkAct {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  estimateId String
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  number     Int
+  date       DateTime
+  periodFrom DateTime?
+  items      Json // [{ key, name, unit, qty, unitPrice, amount, category }]
+  subtotal   Decimal  @db.Decimal(14, 2) // по позициям
+  total      Decimal  @db.Decimal(14, 2) // с накладными, скидкой, налогом пропорционально
+  deletedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([estimateId])
 }
 
 // Напоминание: бот присылает сообщение в заданное время
@@ -213,6 +234,10 @@ model Estimate {
   viewedAt       DateTime?
   approvedAt     DateTime?
   customerComment String?
+  sectionCoefs   Json? // { "Название раздела": 1.15 }
+  paySchedule    Json? // [{ title, pct }]
+  purchased      Json? // ключи материалов, отмеченных как купленные
+  acts           WorkAct[]
   deletedAt      DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -234,6 +259,9 @@ model EstimateLine {
   qty           Decimal  @db.Decimal(14, 4)
   price         Decimal  @db.Decimal(14, 2) // скопирована из справочника на момент добавления
   costPrice     Decimal? @db.Decimal(14, 2)
+  matPrice      Decimal? @db.Decimal(14, 2) // цена материала за единицу в строке работы
+  coef          Decimal  @default(1) @db.Decimal(8, 4)
+  composition   String? // «в составе»: по строке на пункт
   catalogItemId String?
   note          String?
   unconfirmed   Boolean  @default(false) // для черновиков ИИ: позиция требует уточнения

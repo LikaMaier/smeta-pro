@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, plain, notFound, HttpError, DEFAULT_CATEGORIES, num } from '../util';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
+import { compositionFor } from '../../../shared/compositions';
 
 const ITEM_TYPES = ['work', 'material', 'equipment', 'service', 'other'] as const;
 const money = z.coerce.number().min(0, 'не может быть отрицательной').max(1e11);
@@ -159,6 +160,7 @@ export async function catalogRoutes(app: FastifyInstance) {
         userId: req.user.id, priceListId, name: r.name, category: r.category, unit: r.unit, price: r.price, priceUpdatedAt: now,
         type: r.category === 'Аренда техники' ? 'equipment' : r.name.startsWith('Вывоз') || r.category === 'Доставка' ? 'service' : 'work',
         notes: 'Примерная цена — проверьте и поправьте под свой регион', params: { starter: true },
+        description: compositionFor(r.name)?.join('\n') ?? null,
       })),
     });
     const created = await prisma.catalogItem.findMany({ where: { userId: req.user.id, priceListId, priceUpdatedAt: now, deletedAt: null }, select: { id: true, price: true } });

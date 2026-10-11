@@ -27,7 +27,7 @@ export function estimatePage(d: any, m: PageMeta) {
   const validTo = new Date(date.getTime() + (e.validDays ?? 14) * 864e5);
   const rows = groups.map(([cat, items]) => `
     ${cat ? `<div class="cat"><span>${esc(cat)}</span><b>${money(items.reduce((s: number, i: any) => s + i.amount, 0))}</b></div>` : ''}
-    ${items.map((l: any) => `<div class="line"><div class="ln"><div>${esc(l.name)}</div>${l.note ? `<small>${esc(l.note)}</small>` : ''}<small>${qty(l.qty)} ${esc(l.unit)} × ${money(l.price)}</small></div><b>${money(l.amount)}</b></div>`).join('')}
+    ${items.map((l: any) => `<div class="line"><div class="ln"><div>${esc(l.name)}${l.composition?.length ? ', в составе:' : ''}</div>${l.composition?.length ? `<ul>${l.composition.map((c: string) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}${l.note ? `<small>${esc(l.note)}</small>` : ''}<small>${qty(l.qty)} ${esc(l.unit)} × ${money(l.price)}${d.split && l.unitMat && l.unitWork ? ` (работа ${money(l.unitWork)} + материал ${money(l.unitMat)})` : ''}</small></div><b>${money(l.amount)}</b></div>`).join('')}
   `).join('');
   const sum = (label: string, v: number, neg = false) => (v ? `<div class="sum"><span>${label}</span><span>${neg ? '−' : ''}${money(v)}</span></div>` : '');
   const approved = e.approvedAt ? new Date(e.approvedAt) : null;
@@ -51,8 +51,10 @@ export function estimatePage(d: any, m: PageMeta) {
       ${sum('Накладные и непредвиденные расходы', t.overhead)}${sum('Доставка', t.delivery)}${sum('Дополнительные расходы', t.extraCosts)}
       ${sum(`Скидка ${t.discountPct}%`, t.discount, true)}${sum(`Налог ${t.taxPct}%`, t.tax)}
       <div class="sum grand"><span>Итого</span><span>${money(t.total)}</span></div>
+      ${d.paid ? `<div class="sum"><span>Получено</span><span>${money(d.paid)}</span></div><div class="sum grand2"><span>Всего к оплате</span><span>${money(d.toPay)}</span></div>` : ''}
     </div>
   </div>
+  ${d.stages?.length ? `<div class="card"><h2>График оплаты</h2>${d.stages.map((x: any) => `<div class="sum"><span>${esc(x.title)} · ${x.pct}%</span><span>${money(x.amount)}${x.status === 'paid' ? ' ✓' : ''}</span></div>`).join('')}</div>` : ''}
   ${e.paymentTerms ? `<div class="card"><h2>Условия оплаты</h2><p class="pre">${esc(e.paymentTerms)}</p></div>` : ''}
   ${e.notes ? `<div class="card"><h2>Примечания</h2><p class="pre">${esc(e.notes)}</p></div>` : ''}
   <div class="card" id="act">
@@ -116,6 +118,7 @@ main{max-width:640px;margin:0 auto;padding:16px}
 .line{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
 .line b{white-space:nowrap}.ln small{display:block;color:var(--muted);font-size:13px}
 .sums{margin-top:12px}.sum{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:15px}.sum span:last-child{white-space:nowrap}
+.ln ul{margin:4px 0 2px;padding-left:18px;font-size:14px;color:var(--muted)}.sum.grand2{font-weight:800;font-size:17px}
 .sum.grand{font-weight:800;font-size:19px;border-top:2px solid var(--accent);margin-top:8px;padding-top:10px}
 .btn{display:block;width:100%;text-align:center;padding:14px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-weight:600;margin-top:10px;text-decoration:none;cursor:pointer}
 .btn.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-size:17px}

@@ -77,7 +77,7 @@ def estimate_sheet(wb, d):
             c.font, c.fill = Font(bold=True), CAT_FILL
             r += 1
         n += 1
-        vals = [n, l["name"] + (f" ({l['note']})" if l.get("note") else ""), l["unit"], l["qty"], l["price"], f"=D{r}*E{r}"]
+        vals = [n, l["name"] + (", в составе:\n" + "\n".join("– " + c for c in l["composition"]) if l.get("composition") else "") + (f" ({l['note']})" if l.get("note") else ""), l["unit"], l["qty"], l["price"], f"=D{r}*E{r}"]
         for i, v in enumerate(vals, 1):
             c = ws.cell(row=r, column=i, value=v)
             c.border = BORDER

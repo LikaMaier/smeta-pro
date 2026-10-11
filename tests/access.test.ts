@@ -38,3 +38,10 @@ test('PDF первой сметы — бесплатно; акт и Excel — п
   assert.equal(freeWriteAllowed('POST', '/api/estimates/e1/file/xlsx/send', used), false);
   assert.equal(freeWriteAllowed('POST', '/api/projects/p1/xlsx/send', used), false);
 });
+
+test('импорт из Excel — как создание первой сметы; акты — по подписке', () => {
+  assert.equal(freeWriteAllowed('POST', '/api/estimates/import', fresh), true);
+  assert.equal(freeWriteAllowed('POST', '/api/estimates/import', used), false);
+  assert.equal(freeWriteAllowed('POST', '/api/estimates/e1/acts', used), false);
+  assert.equal(freeWriteAllowed('PATCH', '/api/estimates/e1/purchased', used), true);
+});

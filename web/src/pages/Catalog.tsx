@@ -162,7 +162,7 @@ function ItemSheet({ item, onClose, onSaved, categories, readOnly }: { item: any
           <Field label="Ваша цена" error={err.price}><NumInput value={f.price} onChange={(v) => set({ price: v })} unit="₽" readOnly={readOnly} /></Field>
           <Field label="Закупочная / себестоимость" error={err.costPrice} hint="Для расчёта прибыли"><NumInput value={f.costPrice} onChange={(v) => set({ costPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>
         </div>
-        <Field label="Описание"><input className="input" value={f.description || ''} onChange={(e) => set({ description: e.target.value })} readOnly={readOnly} /></Field>
+        <Field label="В составе" hint="Каждый пункт с новой строки — подставится в смету списком под названием"><textarea className="textarea" style={{ minHeight: 80 }} value={f.description || ''} onChange={(e) => set({ description: e.target.value })} readOnly={readOnly} placeholder={'материал, размеры, метод монтажа…'} /></Field>
         <Field label="Примечания"><input className="input" value={f.notes || ''} onChange={(e) => set({ notes: e.target.value })} readOnly={readOnly} /></Field>
         <label className="row small"><input type="checkbox" checked={f.active} onChange={(e) => set({ active: e.target.checked })} disabled={readOnly} />Активна (показывать при подборе в смету)</label>
         {f.id && <p className="xs muted">Цена изменена: {date(f.priceUpdatedAt)}. <button className="btn ghost sm" onClick={() => setShowHistory(!showHistory)}>История цен</button></p>}

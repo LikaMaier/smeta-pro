@@ -73,6 +73,13 @@ export default function Settings() {
         <Field label="Компания или имя мастера"><input className="input" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="ИП Иванов Иван Иванович" /></Field>
         <Field label="Контакты и реквизиты" hint="Попадут в смету, договор и акт: телефон, ИНН/ОГРНИП, адрес, банк"><textarea className="textarea" style={{ minHeight: 96 }} value={contacts} onChange={(e) => setContacts(e.target.value)} placeholder={'+7 900 000-00-00, Telegram @…\nИНН 000000000000, ОГРНИП …\nр/с … в банке …'} /></Field>
         <button className="btn primary block" onClick={async () => { try { setMe(await patch('/me', { companyName: company || null, contacts: contacts || null })); toast('Сохранено'); } catch (e: any) { toast(e.message, true); } }}>Сохранить</button>
+        <Field label="Вид сметы в PDF">
+          <div className="seg">
+            {[['classic', 'Классический — таблица с рамками'], ['modern', 'Современный']].map(([v, t]) => (
+              <button key={v} className={`chip ${(me.docStyle || 'classic') === v ? 'on' : ''}`} onClick={async () => { try { setMe(await patch('/me', { docStyle: v })); toast('Вид документов изменён'); } catch (e: any) { toast(e.message, true); } }}>{t}</button>
+            ))}
+          </div>
+        </Field>
         <div className="grid2">
           <BrandSlot kind="logo" title="Логотип" url={me.logoUrl} hint="PNG или фото, лучше квадратный" />
           <BrandSlot kind="sign" title="Подпись / печать" url={me.signUrl} hint="Распишитесь на белом листе и сфотографируйте" />

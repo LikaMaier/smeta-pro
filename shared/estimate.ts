@@ -2,7 +2,8 @@ import { toKop, fromKop, pctOfKop } from './money';
 
 /**
  * Расчёт итогов сметы. Порядок применения (един для всего приложения):
- *  1. Сумма строки            = кол-во × цена (округление до копеек)
+ *  1. Сумма строки            = кол-во × (цена работы + цена материала) × коэф. строки × коэф. раздела
+ *     (часть «работа» и часть «материал» считаются отдельно и идут в свои подытоги)
  *  2. Подытог                 = Σ сумм строк
  *  3. Резерв на потери        = подытог материалов × резерв%
  *  4. Наценка                 = (подытог + резерв) × наценка%
@@ -18,8 +19,10 @@ export type LineType = 'work' | 'material' | 'equipment' | 'service' | 'other';
 
 export interface LineInput {
   qty: number;
-  price: number;
-  costPrice?: number | null;
+  price: number;              // цена за единицу (для работ — цена работы)
+  matPrice?: number | null;   // цена материала за единицу в той же строке (работа + материал)
+  coef?: number | null;       // коэффициент строки (зимние работы ×1,15 и т.п.)
+  costPrice?: number | null;  // себестоимость единицы (вся строка)
   type?: LineType | string;
   category?: string | null;
 }
@@ -31,10 +34,15 @@ export interface EstimateParams {
   lossReservePct?: number;
   delivery?: number;
   extraCosts?: number;
+  sectionCoefs?: Record<string, number> | null; // коэффициент на раздел (по названию раздела)
 }
 
 export interface EstimateTotals {
   lineAmounts: number[];
+  lineWork: number[];      // часть суммы строки «работа»
+  lineMat: number[];       // часть суммы строки «материал»
+  lineUnit: { work: number; mat: number; k: number }[]; // цены за единицу с учётом коэффициентов
+  sections: { name: string; amount: number; work: number; mat: number }[];
   subtotal: number;
   worksSubtotal: number;
   materialsSubtotal: number;
@@ -77,8 +85,20 @@ export function costGroupOf(type?: string): 'materials' | 'equipment' | 'labor' 
   return 'other';
 }
 
+const posNum = (v: any, d = 0) => (Number.isFinite(Number(v)) && Number(v) >= 0 && v !== null && v !== '' ? Number(v) : d);
+/** Итоговый коэффициент строки: свой × коэффициент раздела */
+export function lineCoef(l: LineInput, sectionCoefs?: Record<string, number> | null) {
+  const own = posNum(l.coef, 1) || 1;
+  const sec = sectionCoefs ? posNum(sectionCoefs[l.category || ''], 1) || 1 : 1;
+  return own * sec;
+}
+
 export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): EstimateTotals {
-  const amountsKop = lines.map((l) => lineAmountKop(l.qty, l.price));
+  const ks = lines.map((l) => lineCoef(l, p.sectionCoefs));
+  const workKop = lines.map((l, i) => Math.round(Number(l.qty) * toKop(Number(l.price) * ks[i])));
+  const matKop = lines.map((l, i) => Math.round(Number(l.qty) * toKop(posNum(l.matPrice) * ks[i])));
+  const amountsKop = lines.map((_, i) => workKop[i] + matKop[i]);
+  const secMap = new Map<string, { a: number; w: number; m: number }>();
   const subtotalKop = amountsKop.reduce((a, b) => a + b, 0);
   let worksKop = 0, materialsKop = 0, otherKop = 0;
   const catMap = new Map<string, number>();
@@ -88,9 +108,15 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
 
   lines.forEach((l, i) => {
     const a = amountsKop[i];
-    if (l.type === 'material') materialsKop += a;
-    else if (l.type === 'work') worksKop += a;
-    else otherKop += a;
+    // материал внутри строки работы — в подытог материалов; строка-материал целиком — материалы
+    const w = l.type === 'material' ? 0 : workKop[i];
+    const m = l.type === 'material' ? a : matKop[i];
+    materialsKop += m;
+    if (l.type === 'work' || l.type === 'material') worksKop += w; else otherKop += w;
+    const sec = l.category || '';
+    const sm = secMap.get(sec) || { a: 0, w: 0, m: 0 };
+    sm.a += a; sm.w += w; sm.m += m;
+    secMap.set(sec, sm);
     const cat = l.category || 'Без категории';
     catMap.set(cat, (catMap.get(cat) || 0) + a);
     if (l.costPrice != null && l.costPrice !== ('' as any)) {
@@ -115,6 +141,10 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
 
   return {
     lineAmounts: amountsKop.map(fromKop),
+    lineWork: lines.map((l, i) => fromKop(l.type === 'material' ? 0 : workKop[i])),
+    lineMat: lines.map((l, i) => fromKop(l.type === 'material' ? amountsKop[i] : matKop[i])),
+    lineUnit: lines.map((l, i) => ({ work: Math.round(Number(l.price) * ks[i] * 100) / 100, mat: Math.round(posNum(l.matPrice) * ks[i] * 100) / 100, k: ks[i] })),
+    sections: [...secMap.entries()].map(([name, v]) => ({ name, amount: fromKop(v.a), work: fromKop(v.w), mat: fromKop(v.m) })),
     subtotal: fromKop(subtotalKop),
     worksSubtotal: fromKop(worksKop),
     materialsSubtotal: fromKop(materialsKop),

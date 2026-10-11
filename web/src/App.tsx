@@ -15,6 +15,8 @@ import Projects from './pages/Projects';
 import ProjectPage from './pages/ProjectPage';
 import Finance from './pages/Finance';
 import Settings from './pages/Settings';
+import Acts from './pages/Acts';
+import Purchase from './pages/Purchase';
 import Assistant from './pages/Assistant';
 import More from './pages/More';
 import Reminders from './pages/Reminders';
@@ -40,6 +42,8 @@ function titleOf(path: string): string {
     notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Меню', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
+  if (seg[0] === 'estimates' && seg[2] === 'acts') return 'Акты';
+  if (seg[0] === 'estimates' && seg[2] === 'purchase') return 'Закупка';
   if (seg[0] === 'estimates' && seg[1]) return 'Смета';
   if (seg[0] === 'projects' && seg[1]) return 'Объект';
   if (seg[0] === 'calendar' && seg[1]) return new Date(`${seg[1]}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
@@ -125,6 +129,8 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/" element={<Home />} />
               <Route path="/estimates" element={<Estimates />} />
               <Route path="/estimates/:id" element={<EstimateEditor />} />
+              <Route path="/estimates/:id/acts" element={<Acts />} />
+              <Route path="/estimates/:id/purchase" element={<Purchase />} />
               <Route path="/catalog" element={<Catalog />} />
               <Route path="/calculators" element={<Calculators />} />
               <Route path="/calculators/:id" element={<CalculatorPage />} />
