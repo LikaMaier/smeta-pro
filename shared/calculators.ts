@@ -49,6 +49,10 @@ export interface Calculator {
   description: string;
   fields: CalcField[];
   compute: (v: Record<string, any>) => CalcOutput;
+  /** Короткое название для шапки и плитки */
+  short?: string;
+  /** К какой строке результата относится «Цена за …» (индекс в rows). По умолчанию — основная строка */
+  priceRow?: number;
 }
 
 export const CALC_GROUPS = ['Геометрия', 'Бетон и растворы', 'Кирпич и кладка', 'Гипсокартон', 'Отделка', 'Древесина'];
@@ -464,7 +468,7 @@ export const CALCULATORS: Calculator[] = [
       { key: 'area', label: 'Площадь укладки', unit: 'м²', min: 0, default: 10 },
       { key: 'tw', label: 'Ширина плитки', unit: 'см', min: 1, default: 30 },
       { key: 'th', label: 'Длина плитки', unit: 'см', min: 1, default: 60 },
-      { key: 'glue', label: 'Расход клея', unit: 'кг/м²', min: 0, default: '', hint: 'По упаковке клея для вашего зуба шпателя' },
+      { key: 'glue', label: 'Расход клея', unit: 'кг/м²', min: 0, default: '', optional: true, hint: 'По упаковке клея для вашего зуба шпателя. Пусто — клей не считаю' },
       { key: 'bag', label: 'Мешок клея', unit: 'кг', min: 1, default: 25 },
       { ...RESERVE, default: 10 },
     ],
@@ -476,14 +480,13 @@ export const CALCULATORS: Calculator[] = [
         rows: [
           { label: 'Плитка', value: n, unit: 'шт', primary: true },
           { label: 'Плитка', value: r(n * one, 2), unit: 'м²' },
-          { label: 'Клей', value: r(g, 1), unit: 'кг' },
-          { label: 'Клей', value: ceil(g / bag - 1e-9), unit: 'мешков' },
+          ...(glue > 0 ? [{ label: 'Клей', value: r(g, 1), unit: 'кг' }, { label: 'Клей', value: ceil(g / bag - 1e-9), unit: 'мешков' }] : []),
         ],
-        formula: [`Плитка = ${area} / (${tw / 100} × ${th / 100}) + ${reserve}% → ${n} шт`, `Клей = ${area} × ${glue} = ${r(g, 1)} кг`],
+        formula: [`Плитка = ${area} / (${tw / 100} × ${th / 100}) + ${reserve}% → ${n} шт`, ...(glue > 0 ? [`Клей = ${area} × ${glue} = ${r(g, 1)} кг`] : [])],
         warnings: [],
         suggestions: [
           { name: `Плитка ${tw}×${th}`, qty: r(n * one, 2), unit: 'м²', type: 'material' },
-          { name: `Плиточный клей (${bag} кг)`, qty: ceil(g / bag - 1e-9), unit: 'шт', type: 'material' },
+          ...(glue > 0 ? [{ name: `Плиточный клей (${bag} кг)`, qty: ceil(g / bag - 1e-9), unit: 'шт', type: 'material' as const }] : []),
           { name: 'Укладка плитки', qty: area, unit: 'м²', type: 'work' },
         ],
       };
@@ -643,6 +646,129 @@ export const CALCULATORS: Calculator[] = [
       };
     },
   },
+
+  // ---------- НОВЫЕ ----------
+  {
+    id: 'corners', group: 'Геометрия', title: 'Проверка прямого угла', short: 'Углы',
+    description: 'Диагональ для разметки и проверки угла 90°',
+    fields: [
+      { key: 'a', label: 'Сторона A', unit: 'м', min: 0, default: 3 },
+      { key: 'b', label: 'Сторона B', unit: 'м', min: 0, default: 4 },
+      { key: 'c', label: 'Замер диагонали', unit: 'м', min: 0, default: '', optional: true, hint: 'Если уже замерили — покажу отклонение угла' },
+    ],
+    compute: ({ a, b, c }) => {
+      const d = Math.sqrt(a * a + b * b);
+      const rows: CalcResultRow[] = [{ label: 'Диагональ для прямого угла', value: r(d, 3), unit: 'м', primary: true }];
+      const w: string[] = [];
+      if (c > 0 && a > 0 && b > 0) {
+        const cos = (a * a + b * b - c * c) / (2 * a * b);
+        const ang = (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI;
+        rows.push({ label: 'Отклонение диагонали', value: r((c - d) * 1000, 0), unit: 'мм' });
+        rows.push({ label: 'Фактический угол', value: r(ang, 2), unit: '°' });
+        if (Math.abs(c - d) > 0.005) w.push(c > d ? 'Угол больше 90° — сведите стороны' : 'Угол меньше 90° — разведите стороны');
+      }
+      return { rows, formula: [`D = √(${a}² + ${b}²) = ${r(d, 3)} м`], warnings: w, suggestions: [] };
+    },
+  },
+  {
+    id: 'grout', group: 'Отделка', title: 'Затирка для швов плитки', short: 'Затирка',
+    description: 'Расход затирки по размеру плитки и шва',
+    fields: [
+      { key: 'area', label: 'Площадь', unit: 'м²', min: 0, default: 10 },
+      { key: 'l', label: 'Длина плитки', unit: 'см', min: 1, default: 60 },
+      { key: 'w', label: 'Ширина плитки', unit: 'см', min: 1, default: 30 },
+      { key: 't', label: 'Толщина плитки', unit: 'мм', min: 1, default: 8 },
+      { key: 'j', label: 'Ширина шва', unit: 'мм', min: 0.5, default: 2 },
+      { key: 'rho', label: 'Плотность затирки', unit: 'кг/дм³', min: 0.5, max: 3, default: 1.8, hint: 'Указана на упаковке, обычно 1,5–1,9' },
+      { key: 'pack', label: 'Фасовка', unit: 'кг', min: 0.1, default: 2 },
+      { ...RESERVE, default: 10 },
+    ],
+    compute: ({ area, l, w, t, j, rho, pack, reserve }) => {
+      const L = l * 10, W = w * 10;
+      const perM2 = ((L + W) / (L * W)) * t * j * rho;
+      const kg = withReserve(perM2 * area, reserve);
+      return {
+        rows: [
+          { label: 'Затирка', value: r(kg, 2), unit: 'кг', primary: true },
+          { label: 'Упаковок', value: ceil(kg / pack - 1e-9), unit: 'шт' },
+          { label: 'Расход на 1 м²', value: r(perM2, 3), unit: 'кг' },
+        ],
+        formula: [`Расход = (${L} + ${W}) / (${L} × ${W}) × ${t} × ${j} × ${rho} = ${r(perM2, 3)} кг/м²`, `Всего = ${r(perM2, 3)} × ${area} + ${reserve}% = ${r(kg, 2)} кг`],
+        warnings: [],
+        suggestions: [{ name: `Затирка (${pack} кг)`, qty: ceil(kg / pack - 1e-9), unit: 'шт', type: 'material' }, { name: 'Затирка швов', qty: area, unit: 'м²', type: 'work' }],
+      };
+    },
+    priceRow: 1,
+  },
+  {
+    id: 'slat-ceiling', group: 'Отделка', title: 'Реечный потолок', short: 'Реечный потолок',
+    description: 'Рейки, траверсы, угол, подвесы',
+    fields: [
+      { key: 'a', label: 'Длина помещения', unit: 'м', min: 0, default: 3, hint: 'Вдоль реек' },
+      { key: 'b', label: 'Ширина помещения', unit: 'м', min: 0, default: 2 },
+      { key: 'sw', label: 'Ширина рейки', unit: 'см', min: 1, default: 10 },
+      { key: 'sl', label: 'Длина рейки', unit: 'м', min: 0.5, default: 3 },
+      { key: 'step', label: 'Шаг траверс', unit: 'м', min: 0.3, default: 1 },
+      { key: 'tl', label: 'Длина траверсы', unit: 'м', min: 0.5, default: 4 },
+      { ...RESERVE, default: 5 },
+    ],
+    compute: ({ a, b, sw, sl, step, tl, reserve }) => {
+      const rows = ceil(b / (sw / 100) - 1e-9);
+      const slatM = rows * a;
+      const slats = ceil(withReserve(slatM, reserve) / sl - 1e-9);
+      const trav = ceil(a / step - 1e-9) + 1;
+      const travPcs = ceil((trav * b) / tl - 1e-9);
+      const angle = ceil(withReserve(2 * (a + b), reserve) / 3 - 1e-9);
+      const hangers = trav * (ceil(b / 1.2 - 1e-9) + 1);
+      return {
+        rows: [
+          { label: 'Рейки', value: slats, unit: `шт по ${sl} м`, primary: true },
+          { label: 'Траверсы (стрингеры)', value: travPcs, unit: `шт по ${tl} м` },
+          { label: 'Пристенный угол', value: angle, unit: 'шт по 3 м' },
+          { label: 'Подвесы', value: hangers, unit: 'шт' },
+          { label: 'Площадь', value: r(a * b, 2), unit: 'м²' },
+        ],
+        formula: [`Рядов реек = ${b} / ${sw / 100} → ${rows}`, `Длина реек = ${rows} × ${a} = ${r(slatM, 2)} м`, `Траверс = ${a}/${step} + 1 = ${trav} рядов по ${b} м`],
+        warnings: ['Подвесы — шаг вдоль траверсы до 1,2 м. Уточните по инструкции производителя.'],
+        suggestions: [
+          { name: `Рейка ${sw} см × ${sl} м`, qty: slats, unit: 'шт', type: 'material' },
+          { name: `Траверса ${tl} м`, qty: travPcs, unit: 'шт', type: 'material' },
+          { name: 'Монтаж реечного потолка', qty: r(a * b, 2), unit: 'м²', type: 'work' },
+        ],
+      };
+    },
+  },
+  {
+    id: 'paint', group: 'Отделка', title: 'Краска', short: 'Краска',
+    description: 'Литры и банки по площади и слоям',
+    fields: [
+      { key: 'area', label: 'Площадь', unit: 'м²', min: 0, default: 40 },
+      { key: 'layers', label: 'Слоёв', unit: 'шт', min: 1, max: 5, default: 2, integer: true },
+      { key: 'rate', label: 'Расход на 1 слой', unit: 'л/м²', min: 0.01, default: '', hint: 'На банке: например «1 л на 8–10 м²» = 0,1–0,125' },
+      { key: 'can', label: 'Объём банки', unit: 'л', min: 0.1, default: 2.5 },
+      { ...RESERVE, default: 5 },
+    ],
+    compute: ({ area, layers, rate, can, reserve }) => {
+      const l = withReserve(area * layers * rate, reserve);
+      return {
+        rows: [{ label: 'Краска', value: r(l, 2), unit: 'л', primary: true }, { label: 'Банок', value: ceil(l / can - 1e-9), unit: `шт по ${can} л` }],
+        formula: [`V = ${area} × ${layers} × ${rate} + ${reserve}% = ${r(l, 2)} л`],
+        warnings: [],
+        suggestions: [{ name: `Краска (банка ${can} л)`, qty: ceil(l / can - 1e-9), unit: 'шт', type: 'material' }, { name: 'Окраска', qty: area, unit: 'м²', type: 'work' }],
+      };
+    },
+    priceRow: 1,
+  },
 ];
+
+const SHORT: Record<string, string> = {
+  'area-rect': 'Площадь', 'area-multi': 'Площадь участков', room: 'Комната', 'volume-box': 'Объём', 'volume-cyl': 'Объём цилиндра',
+  trench: 'Котлован', 'concrete-slab': 'Бетонная плита', 'strip-foundation': 'Фундамент', 'mix-recipe': 'Раствор и бетон', brick: 'Кирпич',
+  'gkl-wall': 'Гипсокартон', 'gkl-ceiling': 'Потолок ГКЛ', tile: 'Плитка', wallpaper: 'Обои', 'floor-packs': 'Ламинат и панели',
+  linoleum: 'Линолеум', plinth: 'Плинтус', 'self-level': 'Наливной пол', lumber: 'Доски и брус', logs: 'Брёвна',
+};
+const PRICE_ROW: Record<string, number> = { tile: 1, 'floor-packs': 0, wallpaper: 0 };
+CALCULATORS.forEach((c) => { c.short ||= SHORT[c.id]; if (c.priceRow == null && PRICE_ROW[c.id] != null) c.priceRow = PRICE_ROW[c.id]; });
+
 
 export const getCalculator = (id: string) => CALCULATORS.find((c) => c.id === id);

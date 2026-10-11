@@ -57,3 +57,15 @@ test('все калькуляторы считаются со значениям
     for (const r of output!.rows) assert.ok(Number.isFinite(r.value), `${c.id}: ${r.label}`);
   }
 });
+
+test('затирка: плитка 30×30, шов 2 мм, толщина 8 мм, 1,8 кг/дм³ → 0,192 кг/м²', () => {
+  const out = runCalc(getCalculator('grout')!, { area: 10, l: 30, w: 30, t: 8, j: 2, rho: 1.8, pack: 2, reserve: 0 }).output!;
+  assert.equal(out.rows[2].value, 0.192);
+  assert.equal(out.rows[0].value, 1.92);
+});
+
+test('углы: 3-4-5 и отклонение диагонали', () => {
+  const out = runCalc(getCalculator('corners')!, { a: 3, b: 4, c: 5.01 }).output!;
+  assert.equal(out.rows[0].value, 5);
+  assert.equal(out.rows[1].value, 10);
+});

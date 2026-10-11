@@ -31,6 +31,42 @@ model User {
   notes      Note[]
   payments   Payment[]
   audit      AuditLog[]
+  photos     Photo[]
+  workLogs   WorkLog[]
+}
+
+// Фото объекта, привязанное к дню календаря. Файлы лежат на диске (PHOTO_DIR), в БД — метаданные.
+model Photo {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  date      DateTime // день календаря (UTC-полночь)
+  caption   String?
+  file      String
+  thumb     String
+  size      Int
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, date])
+}
+
+// Запись журнала работ за день
+model WorkLog {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  date      DateTime
+  text      String
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, date])
 }
 
 model PriceList {
@@ -148,6 +184,8 @@ model Project {
   estimates      Estimate[]
   financeOps     FinanceOp[]
   projectNotes   Note[]
+  photos         Photo[]
+  workLogs       WorkLog[]
 
   @@index([userId, deletedAt])
 }

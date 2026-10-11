@@ -6,7 +6,7 @@ import { Chips, Field, Icon, Load, NumInput, Sheet, State, useLoad, useToast } f
 import { rub, pct, date, dateInput, parseNum, n, PROJ_STATUS, EXP_GROUP, INCOME_TYPE, groupLabel, UNITS } from '../format';
 import { confirmDialog, haptic } from '../tg';
 
-type Tab = 'summary' | 'ops' | 'planfact' | 'estimates' | 'close';
+type Tab = 'summary' | 'ops' | 'planfact' | 'estimates' | 'photos' | 'close';
 
 export default function ProjectPage() {
   const { id } = useParams();
@@ -51,7 +51,7 @@ function Project({ p, setP, reload }: { p: any; setP: (x: any) => void; reload: 
 
       <Chips value={tab} onChange={setTab} options={[
         { value: 'summary', label: 'Сводка' }, { value: 'ops', label: 'Доходы и расходы' }, { value: 'planfact', label: 'План-факт' },
-        { value: 'estimates', label: 'Сметы' }, { value: 'close', label: 'Закрытие' },
+        { value: 'estimates', label: 'Сметы' }, { value: 'photos', label: 'Фото' }, { value: 'close', label: 'Закрытие' },
       ]} />
 
       {tab === 'summary' && (
@@ -99,6 +99,8 @@ function Project({ p, setP, reload }: { p: any; setP: (x: any) => void; reload: 
       {tab === 'planfact' && <PlanFact p={p} onSave={(budget) => update({ budget })} readOnly={ro} />}
 
       {tab === 'estimates' && <LinkedEstimates p={p} setP={setP} readOnly={ro} />}
+
+      {tab === 'photos' && <ProjectPhotos projectId={p.id} />}
 
       {tab === 'close' && (
         <div className="panel">
@@ -177,7 +179,7 @@ function Ops({ ops, onEdit, onAdd, readOnly }: { ops: any; onEdit: (o: any) => v
 const COUNTERPARTY: Record<string, string> = { materials: 'Поставщик', equipment: 'Арендодатель', labor: 'Сотрудник или подрядчик', other: 'Кому оплачено' };
 const TITLE_HINT: Record<string, string> = { materials: 'Цемент М500, доставка песка…', equipment: 'Экскаватор, доставка техники, топливо…', labor: 'Бетонные работы, бригада Ивана…', other: 'Вывоз мусора, проживание…' };
 
-function OpSheet({ op, projectId, onClose, onSaved, readOnly }: { op: any; projectId: string; onClose: () => void; onSaved: () => void; readOnly: boolean }) {
+export function OpSheet({ op, projectId, onClose, onSaved, readOnly }: { op: any; projectId: string; onClose: () => void; onSaved: () => void; readOnly: boolean }) {
   const toast = useToast();
   const [f, setF] = useState<any>(null);
   const [err, setErr] = useState<string>('');
@@ -202,11 +204,12 @@ function OpSheet({ op, projectId, onClose, onSaved, readOnly }: { op: any; proje
   const save = async () => {
     const amount = parseNum(f.amount);
     const paidAmount = isExp ? (f.fullyPaid ? amount : parseNum(f.paidAmount)) : 0;
-    if (!f.title.trim()) return setErr('Введите название');
+    const title = f.title.trim() || (isExp ? '' : INCOME_TYPE[f.incomeType]);
+    if (!title) return setErr('Введите название');
     if (f.amount === '' ) return setErr('Введите сумму');
     if (isExp && paidAmount > amount) return setErr('Оплачено больше начисленного');
     const body = {
-      kind: f.kind, incomeType: isExp ? null : f.incomeType, category: isExp ? f.category : null, title: f.title,
+      kind: f.kind, incomeType: isExp ? null : f.incomeType, category: isExp ? f.category : null, title,
       qty: f.qty === '' ? null : parseNum(f.qty), unit: f.unit || null, unitPrice: f.unitPrice === '' ? null : parseNum(f.unitPrice),
       amount, paidAmount, counterparty: f.counterparty || null, date: f.date, note: f.note || null,
     };
@@ -354,5 +357,39 @@ function ProjectEdit({ open, p, onClose, onSave, readOnly }: { open: boolean; p:
         }}>Сохранить</button>}
       </div>
     </Sheet>
+  );
+}
+
+function ProjectPhotos({ projectId }: { projectId: string }) {
+  const photos = useLoad(() => get<any[]>('/photos', { projectId }), [projectId]);
+  const [open, setOpen] = useState<any>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <>
+      <Link to={`/calendar/${today}?p=${projectId}`} className="btn primary block" style={{ marginBottom: 12 }}>📷 Добавить фото за сегодня</Link>
+      <Load state={photos} empty={(d) => (d.length ? null : <State title="Фото пока нет" text="Фото добавляются в календаре — по дням." />)}>
+        {(list) => {
+          const byDay = new Map<string, any[]>();
+          list.forEach((ph) => { const k = ph.date.slice(0, 10); byDay.set(k, [...(byDay.get(k) || []), ph]); });
+          return (
+            <>
+              {[...byDay].map(([d, ps]) => (
+                <section key={d}>
+                  <Link to={`/calendar/${d}?p=${projectId}`} className="tile-group" style={{ display: 'block' }}>{date(d)}</Link>
+                  <div className="photo-grid">{ps.map((ph) => <button key={ph.id} onClick={() => setOpen(ph)}><img src={ph.thumbUrl} alt={ph.caption || ''} loading="lazy" /></button>)}</div>
+                </section>
+              ))}
+            </>
+          );
+        }}
+      </Load>
+      {open && (
+        <div className="viewer" role="dialog" aria-modal="true" onClick={() => setOpen(null)}>
+          <div className="bar"><button className="icon-btn" aria-label="Закрыть"><Icon.close /></button><span className="grow small muted">{date(open.date)}</span></div>
+          <img src={open.url} alt={open.caption || 'Фото объекта'} />
+          {open.caption && <div className="bar">{open.caption}</div>}
+        </div>
+      )}
+    </>
   );
 }

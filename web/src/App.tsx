@@ -3,6 +3,9 @@ import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 
 import { post, get, setToken, onApiError } from './api';
 import { tg, inTelegram, initTelegram } from './tg';
 import { Boundary, Icon, State, ToastProvider, useToast } from './components/ui';
+import QuickCalc from './components/QuickCalc';
+import Calendar, { CalendarDay } from './pages/Calendar';
+import { getCalculator } from '../../shared/calculators';
 import Home from './pages/Home';
 import Estimates from './pages/Estimates';
 import EstimateEditor from './pages/EstimateEditor';
@@ -24,26 +27,48 @@ export interface Me {
 const MeCtx = createContext<{ me: Me; setMe: (m: Me) => void; refreshMe: () => Promise<void> }>(null as any);
 export const useMe = () => useContext(MeCtx);
 
-const TABS = [
-  { to: '/', label: 'Главная', icon: Icon.home, end: true },
-  { to: '/estimates', label: 'Сметы', icon: Icon.doc },
-  { to: '/projects', label: 'Объекты', icon: Icon.site },
-  { to: '/catalog', label: 'Справочник', icon: Icon.book },
-  { to: '/more', label: 'Ещё', icon: Icon.more },
-];
-const ROOTS = TABS.map((t) => t.to);
+const ROOTS = ['/'];
 
-function TabBar() {
+/** Заголовок экрана в шапке */
+function titleOf(path: string): string {
+  const seg = path.split('/').filter(Boolean);
+  if (!seg.length) return 'СМЕТА PRO';
+  const map: Record<string, string> = {
+    estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
+    notes: 'Заметки', assistant: 'ИИ-помощник', settings: 'Настройки', more: 'Меню', calendar: 'Календарь',
+  };
+  if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
+  if (seg[0] === 'estimates' && seg[1]) return 'Смета';
+  if (seg[0] === 'projects' && seg[1]) return 'Объект';
+  if (seg[0] === 'calendar' && seg[1]) return new Date(`${seg[1]}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  return map[seg[0]] || 'СМЕТА PRO';
+}
+
+const Wrench = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-1 1-3.3-.9-8.6 8.6a2 2 0 0 1-2.8-2.8l8.6-8.6L13 7l1-1z" />
+  </svg>
+);
+const CalcIcon = (p: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" {...p}>
+    <rect x="3" y="2.5" width="18" height="19" rx="2.5" fill="#D9D9D9" />
+    <rect x="5" y="4.5" width="14" height="4" rx="1" fill="#3B4A3B" />
+    <text x="17.6" y="7.8" fontSize="3.4" fill="#FFE01B" textAnchor="end" fontWeight="700">90</text>
+    {[0, 1, 2].map((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={5 + c * 4.9} y={10.5 + r * 3.6} width="3.8" height="2.6" rx=".6" fill={c === 2 && r === 2 ? '#FFE01B' : '#8A8A8A'} />))}
+  </svg>
+);
+
+function TopBar({ onCalc }: { onCalc: () => void }) {
+  const loc = useLocation();
+  const nav = useNavigate();
+  const root = loc.pathname === '/';
   return (
-    <div className="tabbar">
-      <nav>
-        {TABS.map((t) => (
-          <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>
-            <t.icon />{t.label}
-          </NavLink>
-        ))}
-      </nav>
-    </div>
+    <header className="topbar"><div className="in">
+      {!root && !inTelegram && <button aria-label="Назад" onClick={() => nav(-1)}><Icon.back /></button>}
+      <h1>{titleOf(loc.pathname)}</h1>
+      <button aria-label="Калькулятор" onClick={onCalc}><CalcIcon /></button>
+      <button aria-label="Настройки" onClick={() => nav('/settings')}><Wrench /></button>
+    </div></header>
   );
 }
 
@@ -71,11 +96,14 @@ function ApiErrorToasts() {
 
 function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
   const refreshMe = useCallback(async () => setMe(await get<Me>('/me')), [setMe]);
+  const [calc, setCalc] = useState(false);
   return (
     <MeCtx.Provider value={{ me, setMe, refreshMe }}>
       <BrowserRouter>
         <TgBack />
         <ApiErrorToasts />
+        <TopBar onCalc={() => setCalc(true)} />
+        <QuickCalc open={calc} onClose={() => setCalc(false)} />
         <div className="app">
           {!me.access.active && (
             <NavLink to="/settings" className="banner bad" style={{ display: 'block' }}>
@@ -97,11 +125,12 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/assistant" element={<Assistant />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/more" element={<More />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/calendar/:date" element={<CalendarDay />} />
               <Route path="*" element={<State title="Страница не найдена" />} />
             </Routes>
           </Boundary>
         </div>
-        <TabBar />
       </BrowserRouter>
     </MeCtx.Provider>
   );
