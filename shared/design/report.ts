@@ -1,23 +1,29 @@
 /** Данные для PDF «Эскизный проект» и подписи параметров */
-import type { CanopyResult, Wall } from './canopy';
+import { OBJ_LABEL, type CanopyResult, type Wall } from './canopy';
 import { render3d, drawings } from './render';
 
-export const WALL_LABEL: Record<Wall, string> = { open: 'открыто', prof: 'профлист', prof_full: 'профлист на всю высоту', mesh: 'сетка', prof_mesh: 'профлист + сетка до кровли' };
+export const WALL_LABEL: Record<Wall, string> = { open: 'открыто', prof: 'профлист', prof_full: 'профлист на всю высоту', mesh: 'сетка', prof_mesh: 'профлист + сетка до кровли', rail: 'перила 1,0 м' };
 const SIDE_LABEL = { front: 'Спереди (въезд)', back: 'Сзади', left: 'Слева', right: 'Справа' } as const;
 
 export function paramRows(r: CanopyResult): [string, string][] {
   const p = r.params, i = r.info;
+  const pitch = Math.round((Math.atan((i.hHigh - i.hLow) / (p.roof === 'single' ? i.span : i.span / 2)) * 180) / Math.PI);
   const rows: [string, string][] = [
+    ['Объект', OBJ_LABEL[p.kind] + (p.attach ? ', примыкает к стене дома' : '')],
     ['Размер в плане', `${p.L} × ${p.W} м`],
-    ['Кровля', p.roof === 'single' ? `односкатная, уклон ${Math.round(((i.hHigh - i.hLow) / i.span) * 100)}%` : 'двускатная'],
+    ['Кровля', (p.roof === 'single' ? 'односкатная' : p.roof === 'gable' ? 'двускатная' : 'четырёхскатная') + `, уклон ${pitch}°`],
     [p.roof === 'single' ? 'Высота: высокая / низкая сторона' : 'Высота: конёк / карниз', `${i.hHigh} / ${i.hLow} м`],
-    ['Покрытие', p.cover === 'prof' ? `профнастил НС-35, ${p.color}` : p.cover === 'poly' ? 'поликарбонат 8 мм' : 'без кровли'],
+    ['Покрытие', p.cover === 'prof' ? `профнастил НС-35, ${p.color}` : p.cover === 'tile' ? `металлочерепица, ${p.color}` : p.cover === 'poly' ? 'поликарбонат 8 мм' : 'без кровли'],
     ['Столбы', `${i.posts} шт, ${i.postProf}, шаг до ${p.postStep} м`],
     [i.truss ? 'Фермы' : 'Стропила', `${i.rafters} шт, ${i.rafterProf}`],
     ['Прогоны', `${i.purlins} рядов, ${i.purProf}`],
   ];
-  for (const s of ['front', 'back', 'left', 'right'] as const) rows.push([SIDE_LABEL[s], WALL_LABEL[p.walls[s]] + (p.walls[s] === 'prof' || p.walls[s] === 'prof_mesh' ? ` ${p.profH} м` : '')]);
-  rows.push(['Основание', p.base === 'slab' ? `плита ${Math.round(p.slabT * 1000)} мм, щебень ${Math.round(p.gravel * 1000)}, песок ${Math.round(p.sand * 1000)}` : p.base === 'piles' ? 'сваи под столбы' : 'нет']);
+  for (const s of ['front', 'back', 'left', 'right'] as const) {
+    const ops = r.openings.filter((o) => o.side === s).map((o) => (o.kind === 'gate' ? `ворота ${p.gate === 'sectional' ? 'секционные' : 'распашные'} ${Math.round((o.a1 - o.a0) * 100) / 100}×${Math.round(o.h * 100) / 100} м` : 'дверь'));
+    rows.push([SIDE_LABEL[s], (p.attach && s === p.highSide ? 'стена дома' : WALL_LABEL[p.walls[s]] + (p.walls[s] === 'prof' || p.walls[s] === 'prof_mesh' ? ` ${p.profH} м` : '')) + (ops.length ? `, ${ops.join(', ')}` : '')]);
+  }
+  if (p.insulate) rows.push(['Утепление', 'минвата 100 мм, стены и кровля']);
+  rows.push(['Основание', p.base === 'slab' ? `плита ${Math.round(p.slabT * 1000)} мм, щебень ${Math.round(p.gravel * 1000)}, песок ${Math.round(p.sand * 1000)}` : p.base === 'piles' ? 'сваи под столбы' : p.base === 'deck' ? 'настил из террасной доски на винтовых сваях' : 'нет']);
   rows.push(['Снеговой район / запас', `${p.snow} / ${p.waste}%`]);
   return rows;
 }

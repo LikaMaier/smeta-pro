@@ -1,31 +1,41 @@
 /**
- * Параметрическая модель навеса (в т.ч. площадки ТКО под навесом).
- * Из размеров строит каркас (столбы, обвязка, стропила или фермы, прогоны, ригели обшивки),
- * панели (кровля, профлист, сетка, плита) для 2D/3D, спецификацию с раскроем и строки сметы.
+ * Параметрическая модель лёгкого металлического строения: навес, площадка ТКО под навесом,
+ * пристенный навес (к стене дома), беседка, гараж / мастерская из профлиста.
+ * Из размеров строит каркас (столбы, обвязка, стропила или фермы, прогоны, ригели обшивки, рамы проёмов, перила),
+ * панели (кровля, профлист, сетка, ворота, плита, настил) для 2D/3D, спецификацию с раскроем и строки сметы.
  * Это эскиз и расчёт материалов, а не расчёт прочности: сечения — по типовым таблицам.
  */
 import { cutStock, tubeKgPerM, tubeM2PerM } from './cut';
 import { Builder } from '../masters';
 
 export type V3 = [number, number, number];
-export interface Member { kind: 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail'; profile: string; a: V3; b: V3 }
-export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab'; pts: V3[] }
-export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh';
+export type MemberKind = 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster';
+export interface Member { kind: MemberKind; profile: string; a: V3; b: V3 }
+export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house'; pts: V3[] }
+export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh' | 'rail';
 export type Side = 'front' | 'back' | 'left' | 'right';
+export type ObjKind = 'canopy' | 'tko' | 'lean' | 'gazebo' | 'garage';
+export const OBJ_LABEL: Record<ObjKind, string> = { canopy: 'Навес', tko: 'Площадка ТКО', lean: 'Пристенный навес', gazebo: 'Беседка', garage: 'Гараж / мастерская' };
 
 export interface CanopyParams {
-  L: number;            // длина (вдоль въезда, ось X), м
+  kind: ObjKind;        // тип объекта (подписи и типовые решения)
+  L: number;            // длина (по фасаду, ось X), м
   W: number;            // глубина (ось Y), м
-  roof: 'single' | 'gable';
-  hHigh: number;        // односкатная: высокая сторона; двускатная: конёк
-  hLow: number;         // односкатная: низкая сторона; двускатная: карнизы
-  highSide: Side;       // односкатная: где высокая сторона (двускатная: конёк вдоль X при front/back, вдоль Y при left/right)
+  roof: 'single' | 'gable' | 'hip';
+  hHigh: number;        // односкатная: высокая сторона; двускатная/четырёхскатная: конёк
+  hLow: number;         // односкатная: низкая сторона; иначе: карниз
+  highSide: Side;       // односкатная: где высокая сторона; двускатная: конёк вдоль X при front/back, вдоль Y при left/right
+  attach: boolean;      // пристенный: высокая сторона крепится к стене дома (только односкатная)
   postStep: number;     // шаг столбов, м
   overhang: number;     // свесы кровли, м
-  cover: 'prof' | 'poly' | 'none';
+  cover: 'prof' | 'tile' | 'poly' | 'none';
   walls: Record<Side, Wall>;
-  profH: number;        // высота профлиста при «профлист + сетка» / «профлист»
-  base: 'slab' | 'piles' | 'none';
+  profH: number;        // высота профлиста при «профлист» / «профлист + сетка»
+  gate: 'none' | 'swing' | 'sectional'; // ворота в передней стене
+  gateW: number; gateH: number;
+  door: boolean;        // дверь / калитка 0,9×2,05
+  insulate: boolean;    // утепление стен и кровли (гараж, мастерская)
+  base: 'slab' | 'piles' | 'deck' | 'none';
   slabT: number; sand: number; gravel: number; slabOver: number;
   rebar: 'steel' | 'composite';
   snow: number;         // снеговой район 1–8
@@ -34,8 +44,9 @@ export interface CanopyParams {
 }
 
 export const CANOPY_DEFAULT: CanopyParams = {
-  L: 10.2, W: 9.2, roof: 'single', hHigh: 6, hLow: 5, highSide: 'left', postStep: 3, overhang: 0.3, cover: 'prof',
+  kind: 'tko', L: 10.2, W: 9.2, roof: 'single', hHigh: 6, hLow: 5, highSide: 'left', attach: false, postStep: 3, overhang: 0.3, cover: 'prof',
   walls: { front: 'open', back: 'prof_mesh', left: 'prof_mesh', right: 'prof_mesh' }, profH: 2,
+  gate: 'none', gateW: 3, gateH: 2.5, door: false, insulate: false,
   base: 'slab', slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite', snow: 3, color: 'RAL 7024', waste: 5,
 };
 
@@ -43,7 +54,7 @@ export const CANOPY_DEFAULT: CanopyParams = {
 interface Prof { a: number; b: number; t: number }
 const P = (s: string): Prof => { const [a, b, t] = s.split('×').map(Number); return { a, b, t }; };
 const postProfile = (h: number) => (h <= 3 ? '80×80×3' : h <= 4.5 ? '100×100×3' : h <= 6.2 ? '120×120×4' : '140×140×5');
-const beamProfile = (step: number) => (step <= 3 ? '100×50×3' : '120×80×4');
+const beamProfile = (step: number) => (step <= 3.2 ? '100×50×3' : step <= 4.5 ? '120×80×4' : '160×80×5');
 const rafterProfile = (span: number) => (span <= 3 ? '60×40×2' : span <= 4.5 ? '80×40×3' : '100×50×3');
 const purlinProfile = (spacing: number) => (spacing <= 1.0 ? '40×20×2' : spacing <= 1.6 ? '60×40×2' : spacing <= 3.2 ? '80×40×3' : '100×50×3');
 const rafterMax = (snow: number) => (snow <= 2 ? 1.5 : snow <= 4 ? 1.2 : 0.9);
@@ -51,14 +62,32 @@ const KG_PRICE = 95; // ₽ за кг трубы, ориентир
 const r2 = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 const dist = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const steps = (len: number, maxStep: number) => { const n = Math.max(1, Math.ceil(len / maxStep - 1e-9)); return Array.from({ length: n + 1 }, (_, i) => (len * i) / n); };
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+/** площадь плоского многоугольника в 3D (веером) */
+const area3 = (pts: V3[]) => {
+  let s = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[0], b = pts[i], c = pts[i + 1];
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    s += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
+  }
+  return s;
+};
+const SIDES: Side[] = ['front', 'back', 'left', 'right'];
+interface Opening { side: Side; a0: number; a1: number; h: number; kind: 'gate' | 'door' }
 
 export function buildCanopy(p0: Partial<CanopyParams>) {
   const p: CanopyParams = { ...CANOPY_DEFAULT, ...p0, walls: { ...CANOPY_DEFAULT.walls, ...(p0.walls || {}) } };
+  if (p.roof !== 'single') p.attach = false;
+  if (p.attach) p.walls = { ...p.walls, [p.highSide]: 'open' };
   const warnings: string[] = [];
   const L = Math.max(1, p.L), W = Math.max(1, p.W);
   const hHigh = Math.max(p.hHigh, p.hLow), hLow = Math.min(p.hHigh, p.hLow);
+  const hip = p.roof === 'hip';
+  const ov = p.overhang;
 
-  // локальные координаты: u — вдоль стропил (уклона), v — поперёк
+  // ---------- геометрия кровли ----------
+  // односкатная/двускатная: u — вдоль стропил (уклона), v — поперёк
   const alongX = p.highSide === 'left' || p.highSide === 'right';
   const span = alongX ? L : W, lenV = alongX ? W : L;
   const highAtStart = p.highSide === 'left' || p.highSide === 'front';
@@ -68,147 +97,299 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     const t = u / span;
     return highAtStart ? hHigh - (hHigh - hLow) * t : hLow + (hHigh - hLow) * t;
   };
+  // четырёхскатная: a — вдоль длинной стороны, b — вдоль короткой
+  const longX = L >= W;
+  const hl = longX ? L : W, hs = longX ? W : L;
+  const kHip = (hHigh - hLow) / (hs / 2);
+  const ab2w = (a: number, b: number, z: number): V3 => (longX ? [a, b, z] : [b, a, z]);
+  const hipZ = (a: number, b: number) => hLow + kHip * Math.min(a, b, hl - a, hs - b, hs / 2);
+  /** низ кровли (верх каркаса) в любой точке плана */
+  const topAt = (x: number, y: number) => (hip ? hipZ(longX ? x : y, longX ? y : x) : hAt(alongX ? x : y));
 
   const members: Member[] = [];
   const panels: Panel[] = [];
-  const add = (kind: Member['kind'], profile: string, a: V3, b: V3) => members.push({ kind, profile, a, b });
+  const add = (kind: MemberKind, profile: string, a: V3, b: V3) => members.push({ kind, profile, a, b });
+
+  // стороны: t — расстояние вдоль стороны от её начала
+  const sideDefs: Record<Side, { pt: (t: number) => [number, number]; len: number }> = {
+    front: { pt: (t) => [t, 0], len: L }, back: { pt: (t) => [t, W], len: L },
+    left: { pt: (t) => [0, t], len: W }, right: { pt: (t) => [L, t], len: W },
+  };
+  const sideOf = (x: number, y: number): { side: Side; t: number }[] => {
+    const r: { side: Side; t: number }[] = [];
+    if (Math.abs(y) < 1e-6) r.push({ side: 'front', t: x });
+    if (Math.abs(y - W) < 1e-6) r.push({ side: 'back', t: x });
+    if (Math.abs(x) < 1e-6) r.push({ side: 'left', t: y });
+    if (Math.abs(x - L) < 1e-6) r.push({ side: 'right', t: y });
+    return r;
+  };
+  // сторона, где наклон кровли меняется посередине (фронтон двускатной)
+  const kinkSide = (s: Side) => p.roof === 'gable' && ((alongX && (s === 'front' || s === 'back')) || (!alongX && (s === 'left' || s === 'right')));
 
   // ---------- столбы по периметру ----------
-  const postProf = postProfile(hHigh);
-  const vPos = steps(lenV, p.postStep);              // вдоль сторон u=0 и u=span (под обвязкой)
-  const uPos = steps(span, p.postStep);              // вдоль торцов v=0 и v=lenV
-  const postSet = new Map<string, V3>();
-  const addPost = (u: number, v: number) => { const k = `${u.toFixed(3)}|${v.toFixed(3)}`; if (!postSet.has(k)) postSet.set(k, toW(u, v, 0)); };
-  vPos.forEach((v) => { addPost(0, v); addPost(span, v); });
-  uPos.forEach((u) => { addPost(u, 0); addPost(u, lenV); });
-  if (p.roof === 'gable') vPos.forEach((v) => (v === 0 || v === lenV) && addPost(span / 2, v));
-  for (const [, base] of postSet) {
-    const u = alongX ? base[0] : base[1];
-    add('post', postProf, base, [base[0], base[1], hAt(u)]);
+
+  const postMap = new Map<string, [number, number]>();
+  const addPost = (x: number, y: number) => { const k = `${x.toFixed(3)}|${y.toFixed(3)}`; if (!postMap.has(k)) postMap.set(k, [x, y]); };
+  steps(L, p.postStep).forEach((x) => { addPost(x, 0); addPost(x, W); });
+  steps(W, p.postStep).forEach((y) => { addPost(0, y); addPost(L, y); });
+  for (const s of SIDES) if (kinkSide(s)) addPost(...sideDefs[s].pt(sideDefs[s].len / 2));
+  // пристенный: со стороны дома столбов нет — несущая балка на анкерах
+  if (p.attach) for (const [k, [x, y]] of postMap) if (sideOf(x, y).some((q) => q.side === p.highSide)) postMap.delete(k);
+
+  // ---------- проёмы: ворота и дверь ----------
+  const openings: Opening[] = [];
+  if (p.gate !== 'none') {
+    const fl = sideDefs.front.len;
+    const gw = clamp(p.gateW, 1.5, fl - 0.6);
+    const minTop = Math.min(topAt(0, 0), topAt(L, 0), topAt(L / 2, 0));
+    const gh = clamp(p.gateH, 1.8, minTop - 0.3);
+    if (gw !== p.gateW) warnings.push(`Ширина ворот уменьшена до ${r2(gw, 2)} м — по ширине фасада`);
+    if (gh !== p.gateH) warnings.push(`Высота ворот уменьшена до ${r2(gh, 2)} м — по высоте карниза`);
+    const a0 = (fl - gw) / 2;
+    openings.push({ side: 'front', a0, a1: a0 + gw, h: gh, kind: 'gate' });
+    // столбы внутри проёма убираем — пролёт перекрывает обвязка, по краям — стойки рамы
+    for (const [k, [x, y]] of postMap) if (Math.abs(y) < 1e-6 && x > a0 - 0.1 && x < a0 + gw + 0.1) postMap.delete(k);
   }
+  if (p.door) {
+    const dw = 0.9, need = dw + 0.2;
+    const order: Side[] = ['front', 'right', 'left', 'back'];
+    let placed = false;
+    for (const s of order) {
+      if (p.attach && s === p.highSide) continue;
+      const d = sideDefs[s];
+      const ts = [...postMap.values()].flatMap(([x, y]) => sideOf(x, y).filter((q) => q.side === s).map((q) => q.t));
+      const busy = openings.filter((o) => o.side === s);
+      for (let t = 0.15; t + need <= d.len - 0.1 + 1e-9; t += 0.05) {
+        const a0 = t + 0.1, a1 = a0 + dw;
+        if (ts.some((x) => x > a0 - 0.12 && x < a1 + 0.12)) continue;
+        if (busy.some((o) => a1 > o.a0 - 0.3 && a0 < o.a1 + 0.3)) continue;
+        if (Math.min(topAt(...d.pt(a0)), topAt(...d.pt(a1))) < 2.3) break;
+        openings.push({ side: s, a0, a1, h: 2.05, kind: 'door' });
+        placed = true; break;
+      }
+      if (placed) { if (s !== 'front') warnings.push(`Дверь размещена ${s === 'right' ? 'справа' : s === 'left' ? 'слева' : 'сзади'} — на фасаде не хватило места между столбами и воротами`); break; }
+    }
+    if (!placed) warnings.push('Дверь не поместилась между столбами — уменьшите шаг столбов или ширину ворот');
+  }
+
+  // сечение столбов — по самому высокому столбу (у четырёхскатной и двускатной без средних стоек это карниз)
+  const postProf = postProfile(Math.max(hLow, ...[...postMap.values()].map(([x, y]) => topAt(x, y))));
+  const postSet = new Map<string, V3>();
+  for (const [k, [x, y]] of postMap) { postSet.set(k, [x, y, 0]); add('post', postProf, [x, y, 0], [x, y, topAt(x, y)]); }
   if (hHigh > 6.2) warnings.push('Высота больше 6 м — сечение столбов и связи нужно проверить расчётом');
 
-  // ---------- обвязка (балки по верху столбов) ----------
-  const beamProf = beamProfile(p.postStep);
-  add('beam', beamProf, toW(0, 0, hAt(0)), toW(0, lenV, hAt(0)));
-  add('beam', beamProf, toW(span, 0, hAt(span)), toW(span, lenV, hAt(span)));
-  // по торцам — наклонные балки (повторяют уклон)
-  for (const v of [0, lenV]) {
-    const us = p.roof === 'gable' ? [0, span / 2, span] : [0, span];
-    for (let i = 0; i < us.length - 1; i++) add('beam', beamProf, toW(us[i], v, hAt(us[i])), toW(us[i + 1], v, hAt(us[i + 1])));
+  // ---------- обвязка по периметру (по верху столбов, повторяет уклон) ----------
+  let beamProf = beamProfile(p.postStep);
+  for (const s of SIDES) {
+    const d = sideDefs[s];
+    const ts = [...postMap.values()].flatMap(([x, y]) => sideOf(x, y).filter((q) => q.side === s).map((q) => q.t))
+      .concat(openings.filter((o) => o.side === s && o.kind === 'gate').flatMap((o) => [o.a0, o.a1])).sort((a, b) => a - b);
+    const isHouse = p.attach && s === p.highSide;
+    let gap = p.postStep;
+    for (let i = 1; i < ts.length; i++) gap = Math.max(gap, ts[i] - ts[i - 1]);
+    const prof = isHouse ? beamProfile(p.postStep) : beamProfile(gap);
+    if (P(prof).a > P(beamProf).a) beamProf = prof;
+    if (gap > 6) warnings.push(`Пролёт обвязки ${r2(gap, 1)} м над проёмом — нужна усиленная балка или ферма, проверьте у конструктора`);
+    const bps = [0, d.len, ...(kinkSide(s) ? [d.len / 2] : [])].sort((a, b) => a - b);
+    for (let i = 0; i < bps.length - 1; i++) {
+      const [x0, y0] = d.pt(bps[i]), [x1, y1] = d.pt(bps[i + 1]);
+      add('beam', prof, [x0, y0, topAt(x0, y0)], [x1, y1, topAt(x1, y1)]);
+    }
   }
 
-  // ---------- стропила или фермы ----------
-  const halfSpan0 = p.roof === 'gable' ? span / 2 : span;
-  const isTruss = Math.hypot(halfSpan0, hHigh - hLow) > 6;
+  // ---------- стропильная система ----------
   const rStepMax = rafterMax(p.snow);
-  // фермы ставим по линиям столбов, обычные стропила — с шагом по снеговой нагрузке
-  const perBay = isTruss ? 1 : Math.max(1, Math.ceil((lenV / (vPos.length - 1)) / rStepMax - 1e-9));
-  const rafV: number[] = [];
-  for (let i = 0; i < vPos.length - 1; i++) for (let k = 0; k < perBay; k++) rafV.push(vPos[i] + ((vPos[i + 1] - vPos[i]) * k) / perBay);
-  rafV.push(lenV);
-  const rafterSpacing = lenV / (rafV.length - 1);
-  const halfSpan = p.roof === 'gable' ? span / 2 : span;
-  const slopeLen = Math.hypot(halfSpan, hHigh - hLow);
-  const truss = isTruss;
-  let rafterProf = rafterProfile(slopeLen), chordProf = '', webProf = '';
-  if (truss) {
-    chordProf = slopeLen <= 9 ? '60×40×3' : '80×60×3'; webProf = '40×40×2'; rafterProf = chordProf;
-    const ht = Math.min(1.0, Math.max(0.4, span / 12));
-    if (slopeLen > 12) warnings.push('Пролёт больше 12 м — ферма требует расчёта конструктора');
-    for (const v of rafV) {
-      const segs: [number, number][] = p.roof === 'gable' ? [[0, span / 2], [span / 2, span]] : [[0, span]];
-      for (const [u0, u1] of segs) {
-        add('chord', chordProf, toW(u0, v, hAt(u0)), toW(u1, v, hAt(u1)));
-        add('chord', chordProf, toW(u0, v, hAt(u0) - ht), toW(u1, v, hAt(u1) - ht));
-        const n = Math.max(2, Math.ceil((u1 - u0) / (ht * 1.4)));
-        for (let k = 0; k <= n; k++) {
-          const u = u0 + ((u1 - u0) * k) / n;
-          add('web', webProf, toW(u, v, hAt(u) - ht), toW(u, v, hAt(u)));
-          if (k < n) {
-            const un = u0 + ((u1 - u0) * (k + 1)) / n;
-            if (k % 2 === 0) add('web', webProf, toW(u, v, hAt(u) - ht), toW(un, v, hAt(un)));
-            else add('web', webProf, toW(u, v, hAt(u)), toW(un, v, hAt(un) - ht));
+  const purStep = p.cover === 'poly' ? 0.7 : p.cover === 'tile' ? 0.35 : p.snow <= 3 ? 1.0 : 0.6;
+  let truss = false, rafterProf = '', chordProf = '', webProf = '', purProf = '', rafterCount = 0, rafterSpacing = 0, purlinRows = 0, slopeLen = 0;
+  const roofPolys: V3[][] = [];
+  let ridgeLen = 0, eaveLen = 0, vergeLen = 0; // для доборных элементов кровли
+
+  if (!hip) {
+    const vPos = steps(lenV, p.postStep);
+    const halfSpan0 = p.roof === 'gable' ? span / 2 : span;
+    truss = Math.hypot(halfSpan0, hHigh - hLow) > 6;
+    // фермы ставим по линиям столбов, обычные стропила — с шагом по снеговой нагрузке
+    const perBay = truss ? 1 : Math.max(1, Math.ceil((lenV / (vPos.length - 1)) / rStepMax - 1e-9));
+    const rafV: number[] = [];
+    for (let i = 0; i < vPos.length - 1; i++) for (let k = 0; k < perBay; k++) rafV.push(vPos[i] + ((vPos[i + 1] - vPos[i]) * k) / perBay);
+    rafV.push(lenV);
+    rafterSpacing = lenV / (rafV.length - 1);
+    rafterCount = rafV.length;
+    slopeLen = Math.hypot(halfSpan0, hHigh - hLow);
+    rafterProf = rafterProfile(slopeLen);
+    if (truss) {
+      chordProf = slopeLen <= 9 ? '60×40×3' : '80×60×3'; webProf = '40×40×2'; rafterProf = chordProf;
+      const ht = Math.min(1.0, Math.max(0.4, span / 12));
+      if (slopeLen > 12) warnings.push('Пролёт больше 12 м — ферма требует расчёта конструктора');
+      for (const v of rafV) {
+        const segs: [number, number][] = p.roof === 'gable' ? [[0, span / 2], [span / 2, span]] : [[0, span]];
+        for (const [u0, u1] of segs) {
+          add('chord', chordProf, toW(u0, v, hAt(u0)), toW(u1, v, hAt(u1)));
+          add('chord', chordProf, toW(u0, v, hAt(u0) - ht), toW(u1, v, hAt(u1) - ht));
+          const n = Math.max(2, Math.ceil((u1 - u0) / (ht * 1.4)));
+          for (let k = 0; k <= n; k++) {
+            const u = u0 + ((u1 - u0) * k) / n;
+            add('web', webProf, toW(u, v, hAt(u) - ht), toW(u, v, hAt(u)));
+            if (k < n) {
+              const un = u0 + ((u1 - u0) * (k + 1)) / n;
+              if (k % 2 === 0) add('web', webProf, toW(u, v, hAt(u) - ht), toW(un, v, hAt(un)));
+              else add('web', webProf, toW(u, v, hAt(u)), toW(un, v, hAt(un) - ht));
+            }
           }
         }
       }
+    } else {
+      // у стены дома свеса нет
+      const o0 = p.attach && highAtStart ? 0 : ov, o1 = p.attach && !highAtStart ? 0 : ov;
+      for (const v of rafV) {
+        if (p.roof === 'gable') { add('rafter', rafterProf, toW(-ov, v, hAt(-ov)), toW(span / 2, v, hAt(span / 2))); add('rafter', rafterProf, toW(span / 2, v, hAt(span / 2)), toW(span + ov, v, hAt(span + ov))); }
+        else add('rafter', rafterProf, toW(-o0, v, hAt(-o0)), toW(span + o1, v, hAt(span + o1)));
+      }
     }
+    // прогоны
+    purProf = purlinProfile(rafterSpacing);
+    const roofTop = (u: number) => hAt(u) + 0.03;
+    const purU: number[] = [];
+    if (p.roof === 'gable') { steps(span / 2, purStep).forEach((u) => purU.push(u)); steps(span / 2, purStep).forEach((u) => purU.push(span / 2 + u)); }
+    else steps(span, purStep).forEach((u) => purU.push(u));
+    const uniq = [...new Set(purU.map((u) => r2(u, 3)))];
+    purlinRows = uniq.length;
+    uniq.forEach((u) => add('purlin', purProf, toW(u, -ov, roofTop(u)), toW(u, lenV + ov, roofTop(u))));
+    // кровля
+    const s0 = p.attach && highAtStart ? 0 : ov, s1 = p.attach && !highAtStart ? 0 : ov;
+    const roofSegs: [number, number][] = p.roof === 'gable' ? [[-ov, span / 2], [span / 2, span + ov]] : [[-s0, span + s1]];
+    const skin = (u: number) => roofTop(u) + 0.05; // кровля лежит поверх прогонов
+    for (const [u0, u1] of roofSegs) roofPolys.push([toW(u0, -ov, skin(u0)), toW(u1, -ov, skin(u1)), toW(u1, lenV + ov, skin(u1)), toW(u0, lenV + ov, skin(u0))]);
+    const slopes = roofSegs.map(([u0, u1]) => Math.hypot(u1 - u0, roofTop(u1) - roofTop(u0)));
+    vergeLen = 2 * slopes.reduce((a, b) => a + b, 0);
+    eaveLen = (p.roof === 'gable' ? 2 : 1) * (lenV + 2 * ov);
+    ridgeLen = p.roof === 'gable' ? lenV + 2 * ov : 0;
   } else {
-    for (const v of rafV) {
-      if (p.roof === 'gable') { add('rafter', rafterProf, toW(-p.overhang, v, hAt(-p.overhang)), toW(span / 2, v, hAt(span / 2))); add('rafter', rafterProf, toW(span / 2, v, hAt(span / 2)), toW(span + p.overhang, v, hAt(span + p.overhang))); }
-      else add('rafter', rafterProf, toW(-p.overhang, v, hAt(-p.overhang)), toW(span + p.overhang, v, hAt(span + p.overhang)));
+    // четырёхскатная (вальмовая; при квадрате — шатровая)
+    slopeLen = Math.hypot(hs / 2, hHigh - hLow);
+    if (slopeLen > 6) warnings.push('Скат длиннее 6 м — для четырёхскатной кровли нужен расчёт стропильной системы');
+    rafterProf = rafterProfile(slopeLen);
+    const hipProf = P(rafterProf).a < 80 ? '80×40×3' : '100×50×4';
+    const z = (a: number, b: number) => hipZ(a, b);
+    const r1: [number, number] = [hs / 2, hs / 2], rr2: [number, number] = [hl - hs / 2, hs / 2];
+    if (hl - hs > 0.01) add('hip', hipProf, ab2w(...r1, hHigh), ab2w(...rr2, hHigh));
+    const corners: [number, number, [number, number]][] = [[-ov, -ov, r1], [hl + ov, -ov, rr2], [hl + ov, hs + ov, rr2], [-ov, hs + ov, r1]];
+    for (const [a, b, r] of corners) add('hip', hipProf, ab2w(a, b, z(a, b)), ab2w(r[0], r[1], hHigh));
+    // рядовые и укороченные стропила
+    for (const a of steps(hl, rStepMax)) {
+      const e = Math.min(hs / 2, a, hl - a);
+      if (e < 0.25) continue;
+      add('rafter', rafterProf, ab2w(a, -ov, z(a, -ov)), ab2w(a, e, z(a, e))); rafterCount++;
+      add('rafter', rafterProf, ab2w(a, hs + ov, z(a, hs + ov)), ab2w(a, hs - e, z(a, hs - e))); rafterCount++;
+    }
+    for (const b of steps(hs, rStepMax)) {
+      const e = Math.min(hs / 2, b, hs - b);
+      if (e < 0.25) continue;
+      add('rafter', rafterProf, ab2w(-ov, b, z(-ov, b)), ab2w(e, b, z(e, b))); rafterCount++;
+      add('rafter', rafterProf, ab2w(hl + ov, b, z(hl + ov, b)), ab2w(hl - e, b, z(hl - e, b))); rafterCount++;
+    }
+    rafterSpacing = rStepMax;
+    purProf = purlinProfile(rafterSpacing);
+    // прогоны — замкнутыми кольцами по скатам
+    for (let t = -ov + 0.05; t < hs / 2 - 0.1; t += purStep) {
+      const zz = hLow + kHip * t + 0.03;
+      const pts: [number, number][] = [[t, t], [hl - t, t], [hl - t, hs - t], [t, hs - t]];
+      for (let i = 0; i < 4; i++) { const [a0, b0] = pts[i], [a1, b1] = pts[(i + 1) % 4]; if (Math.hypot(a1 - a0, b1 - b0) > 0.05) add('purlin', purProf, ab2w(a0, b0, zz), ab2w(a1, b1, zz)); }
+      purlinRows++;
+    }
+    const ez = hLow - kHip * ov + 0.08, rz = hHigh + 0.08; // кровля поверх прогонов
+    const E1 = ab2w(-ov, -ov, ez), E2 = ab2w(hl + ov, -ov, ez), E3 = ab2w(hl + ov, hs + ov, ez), E4 = ab2w(-ov, hs + ov, ez);
+    const R1 = ab2w(...r1, rz), R2 = ab2w(...rr2, rz);
+    // порядок точек: первая и последняя — по карнизу (рёбра профиля идут вниз по скату)
+    roofPolys.push([E1, R1, R2, E2], [E2, R2, R2, E3], [E3, R2, R1, E4], [E4, R1, R1, E1]);
+    ridgeLen = Math.max(0, hl - hs) + 4 * dist(E1, R1);
+    eaveLen = 2 * (hl + hs + 4 * ov);
+  }
+  if (p.cover !== 'none') roofPolys.forEach((pts) => panels.push({ kind: 'roof', pts }));
+  const roofArea = roofPolys.reduce((a, q) => a + area3(q), 0);
+
+  // ---------- стены: обшивка, перила, проёмы ----------
+  let profFixedSheets = 0, profFixedArea = 0, profFullArea = 0, meshArea = 0, railLen = 0, wallAvgH = 0;
+  for (const side of SIDES) {
+    const w = p.walls[side];
+    const ops = openings.filter((o) => o.side === side);
+    if (w === 'open' && !ops.length) continue;
+    const d = sideDefs[side];
+    const top = (t: number) => topAt(...d.pt(t)) - 0.05;
+    const bps = [...new Set([0, d.len, ...ops.flatMap((o) => [o.a0, o.a1]), ...(kinkSide(side) ? [d.len / 2] : [])].map((v) => r2(v, 4)))].sort((a, b) => a - b);
+    const quad = (t0: number, t1: number, z0: (t: number) => number, z1: (t: number) => number, kind: Panel['kind']) => {
+      const [x0, y0] = d.pt(t0), [x1, y1] = d.pt(t1);
+      if (z1(t0) - z0(t0) < 0.02 && z1(t1) - z0(t1) < 0.02) return 0;
+      panels.push({ kind, pts: [[x0, y0, z0(t0)], [x1, y1, z0(t1)], [x1, y1, z1(t1)], [x0, y0, z1(t0)]] });
+      return (t1 - t0) * ((z1(t0) - z0(t0)) + (z1(t1) - z0(t1))) / 2;
+    };
+    const railAt = (t0: number, t1: number, z: number) => { const [x0, y0] = d.pt(t0), [x1, y1] = d.pt(t1); if (z < Math.min(top(t0), top(t1)) - 0.05) add('rail', '40×20×2', [x0, y0, z], [x1, y1, z]); };
+    for (let i = 0; i < bps.length - 1; i++) {
+      const t0 = bps[i], t1 = bps[i + 1];
+      if (t1 - t0 < 0.01) continue;
+      const tm = (t0 + t1) / 2;
+      const op = ops.find((o) => tm > o.a0 && tm < o.a1);
+      const zb = op ? op.h : 0.05;
+      const c = (v: number) => () => v;
+      if (w === 'prof_full') {
+        profFullArea += quad(t0, t1, c(zb), top, 'prof');
+        for (let z = op ? op.h + 0.6 : 0.2; z < Math.max(top(t0), top(t1)); z += 1.2) railAt(t0, t1, z);
+      } else if (w === 'mesh') {
+        meshArea += quad(t0, t1, c(zb), top, 'mesh');
+        if (!op) [0.2, 1.5].forEach((z) => railAt(t0, t1, z));
+      } else if (w === 'prof' || w === 'prof_mesh') {
+        if (zb < p.profH) { const a = quad(t0, t1, c(zb), (t) => Math.min(p.profH, top(t)), 'prof'); profFixedArea += a; profFixedSheets += Math.ceil((t1 - t0) / 1.15 - 1e-9); }
+        if (w === 'prof_mesh') meshArea += quad(t0, t1, c(Math.max(zb, p.profH)), top, 'mesh');
+        if (!op) [0.2, p.profH - 0.1].forEach((z) => railAt(t0, t1, z));
+        if (w === 'prof_mesh') railAt(t0, t1, Math.max(zb, p.profH));
+      } else if (w === 'rail' && !op) {
+        const [x0, y0] = d.pt(t0), [x1, y1] = d.pt(t1);
+        add('handrail', '40×40×2', [x0, y0, 1.0], [x1, y1, 1.0]);
+        add('handrail', '40×20×2', [x0, y0, 0.12], [x1, y1, 0.12]);
+        const n = Math.max(1, Math.round((t1 - t0) / 0.13));
+        for (let k = 1; k < n; k++) { const [x, y] = d.pt(t0 + ((t1 - t0) * k) / n); add('baluster', '20×20×1.5', [x, y, 0.12], [x, y, 1.0]); }
+        railLen += t1 - t0;
+      }
+    }
+    if (w === 'prof_full') wallAvgH = Math.max(wallAvgH, (top(0) + top(d.len)) / 2);
+    // проёмы: полотна и рамы
+    for (const o of ops) {
+      const [x0, y0] = d.pt(o.a0), [x1, y1] = d.pt(o.a1);
+      panels.push({ kind: o.kind, pts: [[x0, y0, 0.05], [x1, y1, 0.05], [x1, y1, o.h], [x0, y0, o.h]] });
+      const fp = o.kind === 'gate' ? postProf : '60×40×2';
+      add('frame', fp, [x0, y0, 0], [x0, y0, top(o.a0) + 0.05]);
+      add('frame', fp, [x1, y1, 0], [x1, y1, top(o.a1) + 0.05]);
+      add('frame', o.kind === 'gate' ? '80×40×3' : '60×40×2', [x0, y0, o.h], [x1, y1, o.h]);
     }
   }
+  const profArea = profFixedArea + profFullArea;
 
-  // ---------- прогоны ----------
-  const purStep = p.cover === 'poly' ? 0.7 : p.snow <= 3 ? 1.0 : 0.6;
-  const purProf = purlinProfile(rafterSpacing);
-  const roofTop = (u: number) => hAt(u) + 0.03;
-  const purU: number[] = [];
-  if (p.roof === 'gable') { steps(span / 2, purStep).forEach((u) => purU.push(u)); steps(span / 2, purStep).forEach((u) => purU.push(span / 2 + u)); }
-  else steps(span, purStep).forEach((u) => purU.push(u));
-  [...new Set(purU.map((u) => r2(u, 3)))].forEach((u) => add('purlin', purProf, toW(u, -p.overhang, roofTop(u)), toW(u, lenV + p.overhang, roofTop(u))));
-
-  // ---------- кровля ----------
-  const roofSegs: [number, number][] = p.roof === 'gable' ? [[-p.overhang, span / 2], [span / 2, span + p.overhang]] : [[-p.overhang, span + p.overhang]];
-  const zAt = (u: number) => roofTop(u); // hAt линейно продолжается за пределы пролёта — свесы по уклону
-  if (p.cover !== 'none') for (const [u0, u1] of roofSegs) panels.push({ kind: 'roof', pts: [toW(u0, -p.overhang, zAt(u0)), toW(u1, -p.overhang, zAt(u1)), toW(u1, lenV + p.overhang, zAt(u1)), toW(u0, lenV + p.overhang, zAt(u0))] });
-  const roofSlopeLen = roofSegs.reduce((a, [u0, u1]) => a + Math.hypot(u1 - u0, zAt(u1) - zAt(u0)), 0);
-  const roofArea = roofSlopeLen * (lenV + 2 * p.overhang);
-
-  // ---------- стены: обшивка ----------
-  const sideDefs: Record<Side, { pts: (t: number) => [number, number]; len: number }> = {
-    front: { pts: (t) => [t * L, 0], len: L }, back: { pts: (t) => [t * L, W], len: L },
-    left: { pts: (t) => [0, t * W], len: W }, right: { pts: (t) => [L, t * W], len: W },
-  };
-  const hWorld = (x: number, y: number) => hAt(alongX ? x : y);
-  let profArea = 0, meshArea = 0, railLen = 0, wallSheets = 0;
-  const railPieces: number[] = [];
-  for (const side of ['front', 'back', 'left', 'right'] as Side[]) {
-    const w = p.walls[side];
-    if (w === 'open') continue;
-    const d = sideDefs[side];
-    const N = 12;
-    const samples = Array.from({ length: N + 1 }, (_, i) => { const [x, y] = d.pts(i / N); return { x, y, h: hWorld(x, y) - 0.05 }; });
-    const avgH = samples.reduce((a, s) => a + s.h, 0) / samples.length;
-    const minH = Math.min(...samples.map((s) => s.h));
-    const pH = w === 'prof_full' ? null : Math.min(p.profH, minH);
-    const quad = (z0: number, top: (s: typeof samples[0]) => number, kind: Panel['kind']) => {
-      const a = samples[0], b = samples[N];
-      panels.push({ kind, pts: [[a.x, a.y, z0], [b.x, b.y, z0], [b.x, b.y, top(b)], [a.x, a.y, top(a)]] });
-    };
-    if (w === 'prof' || w === 'prof_mesh') { quad(0.05, () => pH!, 'prof'); profArea += d.len * pH!; wallSheets += Math.ceil(d.len / 1.15 - 1e-9); railPieces.push(d.len, d.len); }
-    if (w === 'prof_full') { quad(0.05, (s) => s.h, 'prof'); profArea += d.len * avgH; wallSheets += Math.ceil(d.len / 1.15 - 1e-9); const rows = Math.max(2, Math.ceil(avgH / 1.5) + 1); for (let i = 0; i < rows; i++) railPieces.push(d.len); }
-    if (w === 'mesh') { quad(0.05, (s) => s.h, 'mesh'); meshArea += d.len * avgH; railPieces.push(d.len, d.len); }
-    if (w === 'prof_mesh') { quad(pH!, (s) => s.h, 'mesh'); meshArea += d.len * Math.max(0, avgH - pH!); railPieces.push(d.len); }
-  }
-  railLen = railPieces.reduce((a, b) => a + b, 0);
-  // ригели обшивки (для отрисовки — по уровням)
-  for (const side of ['front', 'back', 'left', 'right'] as Side[]) {
-    const w = p.walls[side];
-    if (w === 'open') continue;
-    const d = sideDefs[side];
-    const [x0, y0] = d.pts(0), [x1, y1] = d.pts(1);
-    const levels = w === 'prof' ? [0.2, p.profH - 0.1] : w === 'prof_mesh' ? [0.2, p.profH - 0.1, p.profH] : w === 'mesh' ? [0.2, 1.5] : [0.2, 1.5, 2.8];
-    for (const z of levels) if (z < Math.min(hWorld(x0, y0), hWorld(x1, y1))) add('rail', '40×20×2', [x0, y0, z], [x1, y1, z]);
+  // стена дома (для пристенного) — только для показа
+  let houseLen = 0;
+  if (p.attach) {
+    const d = sideDefs[p.highSide];
+    const out = 0.06;
+    const [nx, ny] = p.highSide === 'front' ? [0, -out] : p.highSide === 'back' ? [0, out] : p.highSide === 'left' ? [-out, 0] : [out, 0];
+    const [x0, y0] = d.pt(-1.2), [x1, y1] = d.pt(d.len + 1.2);
+    panels.push({ kind: 'house', pts: [[x0 + nx, y0 + ny, -0.1], [x1 + nx, y1 + ny, -0.1], [x1 + nx, y1 + ny, hHigh + 0.9], [x0 + nx, y0 + ny, hHigh + 0.9]] });
+    houseLen = d.len;
   }
 
   // ---------- основание ----------
   const sx = L + 2 * p.slabOver, sy = W + 2 * p.slabOver;
   const slabArea = sx * sy;
   if (p.base === 'slab') panels.push({ kind: 'slab', pts: [[-p.slabOver, -p.slabOver, 0], [L + p.slabOver, -p.slabOver, 0], [L + p.slabOver, W + p.slabOver, 0], [-p.slabOver, W + p.slabOver, 0]] });
+  if (p.base === 'deck') panels.push({ kind: 'deck', pts: [[0, 0, 0], [L, 0, 0], [L, W, 0], [0, W, 0]] });
 
   // =====================================================================
   // Металл: длины по профилям и раскрой
   // =====================================================================
   const byProf = new Map<string, { pieces: number[]; kinds: Set<string> }>();
   for (const m of members) {
-    if (m.kind === 'rail') continue; // ригели считаем по фактическим сторонам ниже
     const g = byProf.get(m.profile) || { pieces: [], kinds: new Set() };
     g.pieces.push(dist(m.a, m.b)); g.kinds.add(m.kind); byProf.set(m.profile, g);
   }
-  if (railPieces.length) { const g = byProf.get('40×20×2') || { pieces: [], kinds: new Set() }; g.pieces.push(...railPieces); g.kinds.add('rail'); byProf.set('40×20×2', g); }
-  const KIND: Record<string, string> = { post: 'столбы', beam: 'обвязка', rafter: 'стропила', chord: 'пояса ферм', web: 'решётка ферм', purlin: 'прогоны', rail: 'ригели обшивки' };
+  const KIND: Record<string, string> = { post: 'столбы', beam: 'обвязка', rafter: 'стропила', chord: 'пояса ферм', web: 'решётка ферм', purlin: 'прогоны', rail: 'ригели обшивки', frame: 'рамы проёмов', hip: 'конёк и рёбра', handrail: 'перила', baluster: 'балясины' };
   const steel = [...byProf.entries()].map(([profile, g]) => {
     const pr = P(profile);
     const stock = pr.a >= 80 ? 12 : 6;
@@ -216,44 +397,68 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     const len = g.pieces.reduce((a, b) => a + b, 0);
     const kgm = tubeKgPerM(pr.a, pr.b, pr.t);
     return { profile, use: [...g.kinds].map((k) => KIND[k]).join(', '), pieces: g.pieces.length, length: r2(len, 1), bars: cut.bars, stock, wastePct: cut.wastePct, kg: r2(cut.bars * stock * kgm, 0), kgNet: r2(len * kgm, 0), m2: r2(len * tubeM2PerM(pr.a, pr.b), 1), pricePerM: Math.round(kgm * KG_PRICE) };
-  }).sort((a, b) => P(b.profile).a - P(a.profile).a);
+  }).sort((a, b) => P(b.profile).a - P(a.profile).a || P(b.profile).b - P(a.profile).b);
   const steelKg = steel.reduce((a, s) => a + s.kgNet, 0);
+  // перила считаются отдельной работой «Изготовление перил» — их вес не входит в изготовление/монтаж каркаса
+  const railKg = members.filter((m) => m.kind === 'handrail' || m.kind === 'baluster').reduce((a, m) => { const pr = P(m.profile); return a + dist(m.a, m.b) * tubeKgPerM(pr.a, pr.b, pr.t); }, 0);
+  const frameKg = steelKg - railKg;
   const paintM2 = steel.reduce((a, s) => a + s.m2, 0);
 
   // =====================================================================
   // Смета: работы (из справочника) и материалы (ориентировочные цены)
   // =====================================================================
   const k = 1 + p.waste / 100;
+  const nPosts = postSet.size + openings.filter((o) => o.kind === 'gate').length * 2;
   const b = new Builder('Металлокаркас');
   for (const s of steel) b.mat(`Труба профильная ${s.profile} (${s.use}), хлыст ${s.stock} м`, s.bars, 'шт', s.pricePerM * s.stock);
-  b.mat('Закладные пластины 300×300×10 с анкерами', postSet.size, 'шт', 1400);
+  if (p.base === 'slab' || p.base === 'none') b.mat('Закладные пластины 300×300×10 с анкерами', nPosts, 'шт', 1400);
   b.mat(`Грунт-эмаль по металлу 3 в 1, ${p.color}`, Math.ceil(paintM2 * 2 * 0.12 * k / 0.9), 'банка 0,9 кг', 950);
-  b.work('Изготовление металлоконструкций', steelKg);
-  b.work('Монтаж металлоконструкций', steelKg);
+  b.work('Изготовление металлоконструкций', frameKg);
+  b.work('Монтаж металлоконструкций', frameKg);
   b.work('Покраска металлоконструкций', paintM2);
-  if (hHigh > 3.5) b.work('Автовышка', Math.max(1, Math.ceil(steelKg / 1500)));
+  if (hHigh > 3.5) b.work('Автовышка', Math.max(1, Math.ceil(frameKg / 1500)));
   if (steelKg > 1500) b.work('Автокран 25 т', 1);
+  if (p.attach) {
+    b.mat('Анкерные болты М12×150 с шайбами (крепление к стене)', Math.ceil(houseLen / 0.6) + 1, 'шт', 90);
+    b.work('Крепление навеса к стене дома анкерами', houseLen);
+    warnings.push('Пристенный навес крепится к несущей стене (кирпич, бетон, брус), а не к утеплителю или облицовке фасада. Примыкание к стене — планка с герметиком.');
+    b.mat('Планка примыкания к стене + герметик', houseLen * k, 'пог. м', 450);
+  }
 
   b.sec('Кровля');
+  const ral = p.color;
   if (p.cover === 'prof') {
-    const wUse = 1.0;
-    const sheetsAcross = Math.ceil((lenV + 2 * p.overhang) / wUse - 1e-9);
-    const segs = roofSegs.map(([u0, u1]) => Math.hypot(u1 - u0, zAt(u1) - zAt(u0)));
-    segs.forEach((sl) => b.mat(`Профнастил кровельный НС-35 ${p.color}, лист 1,06 × ${r2(sl, 2)} м`, sheetsAcross, 'лист', Math.round(1.06 * sl * 780)));
+    if (!hip) {
+      const sheetsAcross = Math.ceil((lenV + 2 * ov) / 1.0 - 1e-9);
+      roofPolys.forEach((q) => b.mat(`Профнастил кровельный НС-35 ${ral}, лист 1,06 × ${r2(dist(q[0], q[1]), 2)} м`, sheetsAcross, 'лист', Math.round(1.06 * dist(q[0], q[1]) * 780)));
+    } else b.mat(`Профнастил кровельный НС-35 ${ral} (с подрезкой под вальмы)`, roofArea * 1.18 * k, 'м²', 780);
     b.mat('Саморезы кровельные 4,8×35 в цвет', Math.ceil(roofArea * 7 * k), 'шт', 3);
-    if (p.roof === 'gable') b.mat('Конёк + уплотнитель', (lenV + 2 * p.overhang) * k, 'пог. м', 650);
-    b.mat('Ветровая и карнизная планки', (2 * roofSlopeLen + 2 * (lenV + 2 * p.overhang)) * k, 'пог. м', 380);
     b.work('Монтаж профнастила на кровлю', roofArea);
   }
+  if (p.cover === 'tile') {
+    b.mat(`Металлочерепица ${ral}${hip ? ' (с подрезкой под вальмы)' : ''}`, roofArea * (hip ? 1.2 : 1.1) * k, 'м²', 720);
+    b.mat('Саморезы кровельные 4,8×35 в цвет', Math.ceil(roofArea * 8 * k), 'шт', 3);
+    b.work('Монтаж металлочерепицы', roofArea);
+  }
+  if (p.cover === 'prof' || p.cover === 'tile') {
+    if (ridgeLen > 0) b.mat(hip ? 'Конёк и накладки на рёбра вальм + уплотнитель' : 'Конёк + уплотнитель', ridgeLen * k, 'пог. м', 650);
+    b.mat(hip ? 'Карнизная планка' : 'Ветровая и карнизная планки', (vergeLen + eaveLen) * k, 'пог. м', 380);
+  }
   if (p.cover === 'poly') {
-    b.mat('Поликарбонат сотовый 8 мм (2,1×12 м)', Math.ceil(roofArea * k / 25.2), 'лист', 13500);
+    b.mat('Поликарбонат сотовый 8 мм (2,1×12 м)', Math.ceil(roofArea * (hip ? 1.25 : 1) * k / 25.2), 'лист', 13500);
     b.mat('Профили и термошайбы для поликарбоната', Math.ceil(roofArea / 10), 'компл', 1500);
     b.work('Монтаж поликарбоната на кровлю', roofArea);
   }
 
   b.sec('Ограждение');
+  if (profFixedArea > 0) {
+    b.mat(`Профнастил стеновой С-8 ${ral}, лист 1,2 × ${p.profH} м`, Math.ceil(profFixedSheets * k), 'лист', Math.round(1.2 * p.profH * 480));
+  }
+  if (profFullArea > 0) {
+    b.mat(`Профнастил стеновой С-8 ${ral}${kinkSide('front') || kinkSide('left') ? ' (с подрезкой фронтонов)' : ''}`, profFullArea * 1.1 * k, 'м²', 480);
+    b.mat('Уголки наружные и обрамление проёмов', (4 * Math.max(wallAvgH, 2) + openings.reduce((a, o) => a + 2 * o.h + (o.a1 - o.a0), 0)) * k, 'пог. м', 350);
+  }
   if (profArea > 0) {
-    b.mat(`Профнастил стеновой С-8 ${p.color}, лист 1,2 × ${p.profH} м`, Math.ceil(wallSheets * k), 'лист', Math.round(1.2 * p.profH * 480));
     b.mat('Саморезы кровельные 4,8×19 в цвет', Math.ceil(profArea * 8 * k), 'шт', 3);
     b.work('Обшивка каркаса профлистом', profArea);
   }
@@ -261,6 +466,39 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     b.mat('Сетка сварная 50×50×4 мм (панели), окраска в цвет', meshArea * k, 'м²', 550);
     b.mat('Крепёж сетки (болты, пластины)', Math.ceil(meshArea / 4), 'компл', 120);
     b.work('Монтаж сетки на каркас', meshArea);
+  }
+  if (railLen > 0) b.work('Изготовление перил', railLen);
+
+  // ворота и двери
+  const gate = openings.find((o) => o.kind === 'gate');
+  if (gate) {
+    b.sec('Ворота и двери');
+    const gw = r2(gate.a1 - gate.a0, 2), gh = r2(gate.h, 2);
+    if (p.gate === 'sectional') {
+      b.mat(`Ворота секционные ${gw} × ${gh} м, ручной привод (комплект)`, 1, 'шт', Math.round(45000 + gw * gh * 7000));
+      b.work('Монтаж гаражных ворот секционных', 1);
+      b.warn('Электропривод секционных ворот в смету не включён — добавьте при необходимости');
+    } else {
+      b.mat(`Ворота распашные ${gw} × ${gh} м: каркас створок, профлист ${ral}, петли, засов`, 1, 'компл', Math.round(gw * gh * 3200));
+      b.work('Изготовление ворот распашных (работа)', 1);
+      b.work('Установка распашных ворот', 1);
+    }
+  }
+  if (openings.some((o) => o.kind === 'door')) {
+    if (!gate) b.sec('Ворота и двери');
+    b.mat('Дверь металлическая уличная 900×2050', 1, 'шт', 18000);
+    b.work('Монтаж входной металлической двери', 1);
+  }
+
+  if (p.insulate) {
+    b.sec('Утепление');
+    const wallIns = profFullArea + profFixedArea;
+    b.mat('Минвата 100 мм (плиты)', (wallIns + roofArea) * 1.05 * k, 'м²', 380);
+    b.mat('Пароизоляция', (wallIns + roofArea) * 1.15, 'м²', 25);
+    b.work('Утепление стен изнутри', wallIns);
+    b.work('Утепление кровли', roofArea);
+    b.work('Монтаж пароизоляции', wallIns + roofArea);
+    b.warn('Утепление посчитано без внутренней обшивки (ОСБ, вагонка или профлист) — добавьте её отдельно');
   }
 
   if (p.base === 'slab') {
@@ -281,15 +519,30 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     b.work('Армирование сеткой', slabArea * layers);
     b.mat('Бетон М300 с доставкой', slabArea * p.slabT * 1.03, 'м³', 7200);
     b.work('Бетонирование плиты/площадки', slabArea * p.slabT);
-    b.work('Монтаж закладных и гильз', postSet.size);
+    b.work('Монтаж закладных и гильз', nPosts);
     b.sum('Плита', slabArea, 'м²').sum('Бетон', slabArea * p.slabT, 'м³').sum('Выемка грунта', digArea * depth, 'м³');
   }
   if (p.base === 'piles') {
     b.sec('Основание (сваи)');
-    const n = postSet.size;
+    const n = nPosts;
     b.work('Бурение под сваи ТИСЭ', n); b.work('Бетонирование столбов', n);
     b.mat('Бетон М300 на сваи Ø300×1,5 м', n * Math.PI * 0.15 ** 2 * 1.5 * 1.05, 'м³', 7200);
     b.mat('Арматура А500 Ø12 для свай', n * 4 * 1.8 * 0.888 / 1000 * 1.05, 'т', 72000);
+  }
+  if (p.base === 'deck') {
+    b.sec('Основание (настил на сваях)');
+    const nx = Math.ceil(L / 2 - 1e-9) + 1, ny = Math.ceil(W / 2 - 1e-9) + 1;
+    const piles = nPosts + Math.max(0, nx - 2) * Math.max(0, ny - 2);
+    const deckArea = L * W;
+    const lagRows = Math.ceil(W / 0.5 - 1e-9) + 1;
+    b.mat('Свая винтовая 89×2000 с оголовком', piles, 'шт', 2900);
+    b.work('Монтаж винтовых свай', piles);
+    b.mat('Брус для лаг 50×150, антисептированный', lagRows * L * 0.05 * 0.15 * 1.1 * k, 'м³', 25000);
+    b.mat('Доска террасная лиственница 28×140', deckArea * 1.1 * k, 'м²', 2200);
+    b.mat('Крепёж террасной доски (кляймеры, саморезы)', Math.ceil(deckArea / 5), 'компл', 600);
+    b.mat('Масло для террасы', Math.ceil(deckArea / 15), 'л', 1200);
+    b.work('Монтаж террасной доски', deckArea);
+    b.sum('Настил', deckArea, 'м²').sum('Свай', piles, 'шт');
   }
   b.sec('Прочее'); b.work('Доставка материалов по городу', Math.max(1, Math.ceil(steelKg / 3000) + 1));
 
@@ -299,14 +552,15 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     { label: 'Кровля', value: r2(roofArea, 1), unit: 'м²' },
     { label: 'Профлист на стенах', value: r2(profArea, 1), unit: 'м²' },
     { label: 'Сетка', value: r2(meshArea, 1), unit: 'м²' },
-    { label: 'Столбов', value: postSet.size, unit: 'шт' },
+    { label: 'Перила', value: r2(railLen, 1), unit: 'пог. м' },
+    { label: 'Столбов', value: nPosts, unit: 'шт' },
   );
   if (truss) warnings.push(`Пролёт ${r2(slopeLen, 1)} м — стропила заменены фермами (пояса ${chordProf}, решётка ${webProf})`);
   warnings.push('Эскиз и расчёт материалов, а не расчёт прочности. Сечения подобраны по типовым таблицам — для ответственных объектов проверьте у конструктора.');
 
   return {
-    params: p, members, panels, steel, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings],
-    info: { span, lenV, alongX, truss, rafterProf, purProf, beamProf, postProf, rafters: rafV.length, rafterSpacing: r2(rafterSpacing), purlins: [...new Set(purU)].length, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: postSet.size, hHigh, hLow, steelKg: r2(steelKg, 0) },
+    params: p, members, panels, steel, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings], openings, topAt,
+    info: { span: hip ? hs : span, lenV: hip ? hl : lenV, alongX, truss, rafterProf, purProf, beamProf, postProf, rafters: rafterCount, rafterSpacing: r2(rafterSpacing), purlins: purlinRows, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: nPosts, hHigh, hLow, steelKg: r2(steelKg, 0) },
   };
 }
 export type CanopyResult = ReturnType<typeof buildCanopy>;

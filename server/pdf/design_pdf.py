@@ -58,9 +58,9 @@ def draw_view3d(c, v, x, y, w, h, bg=None):
                 path.lineTo(*q)
             path.close()
             c.setFillColor(hexc(it["fill"]), alpha=it.get("opacity", 1))
-            c.setStrokeColor(hexc(it["stroke"]))
+            c.setStrokeColor(hexc(it["stroke"]), alpha=it.get("opacity", 1))
             c.setLineWidth(max(0.2, it.get("sw", 0.5) * k))
-            c.drawPath(path, stroke=1, fill=1)
+            c.drawPath(path, stroke=1 if it.get("sw", 0.5) > 0 else 0, fill=1)
         else:
             a, b = P(it["a"]), P(it["b"])
             c.setStrokeColor(hexc(it["stroke"]), alpha=it.get("opacity", 1))

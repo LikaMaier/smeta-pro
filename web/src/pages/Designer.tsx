@@ -5,7 +5,7 @@ import CalcResult from '../components/CalcResult';
 import { n, rub0, parseNum } from '../format';
 import { haptic, confirmDialog } from '../tg';
 import { useMe } from '../App';
-import { buildCanopy, CANOPY_DEFAULT, type CanopyParams, type Side, type Wall } from '../../../shared/design/canopy';
+import { buildCanopy, CANOPY_DEFAULT, OBJ_LABEL, type CanopyParams, type ObjKind, type Side, type Wall } from '../../../shared/design/canopy';
 import { render3d, drawings, view3dToSvg, sheetToSvg, RAL } from '../../../shared/design/render';
 import { WALL_LABEL } from '../../../shared/design/report';
 
@@ -13,19 +13,29 @@ import { WALL_LABEL } from '../../../shared/design/report';
  * ИИ-проектировщик (навесы, площадки ТКО): описание словами или параметры → 3D, чертежи с размерами,
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
-const PRESETS: { id: string; label: string; title: string; p: Partial<CanopyParams> }[] = [
-  { id: 'tko', label: 'Площадка ТКО', title: 'Площадка ТКО под навесом', p: CANOPY_DEFAULT },
-  { id: 'car', label: 'Навес для авто', title: 'Навес для автомобиля', p: { L: 6, W: 5.5, roof: 'single', hHigh: 2.8, hLow: 2.4, highSide: 'back', postStep: 3, overhang: 0.3, cover: 'poly', walls: { front: 'open', back: 'open', left: 'open', right: 'open' }, base: 'piles', color: 'RAL 8017', snow: 3, waste: 5 } },
-  { id: 'gable', label: 'Двускатный', title: 'Навес двускатный', p: { L: 8, W: 6, roof: 'gable', hHigh: 3.6, hLow: 2.6, highSide: 'front', postStep: 3, overhang: 0.4, cover: 'prof', walls: { front: 'open', back: 'open', left: 'open', right: 'open' }, base: 'slab', slabT: 0.12, sand: 0.15, gravel: 0.15, slabOver: 0.3, rebar: 'steel', color: 'RAL 3005', snow: 3, waste: 5 } },
+const OPEN = { front: 'open', back: 'open', left: 'open', right: 'open' } as const;
+const PRESETS: { id: string; kind: ObjKind; label: string; title: string; p: Partial<CanopyParams> }[] = [
+  { id: 'car', kind: 'canopy', label: 'Навес для авто', title: 'Навес для автомобиля', p: { kind: 'canopy', L: 6, W: 5.5, roof: 'single', hHigh: 2.8, hLow: 2.4, highSide: 'back', postStep: 3, overhang: 0.3, cover: 'poly', walls: OPEN, base: 'piles', color: 'RAL 8017' } },
+  { id: 'gable', kind: 'canopy', label: 'Двускатный навес', title: 'Навес двускатный', p: { kind: 'canopy', L: 8, W: 6, roof: 'gable', hHigh: 3.6, hLow: 2.6, highSide: 'front', postStep: 3, overhang: 0.4, cover: 'prof', walls: OPEN, base: 'slab', slabT: 0.12, sand: 0.15, gravel: 0.15, slabOver: 0.3, rebar: 'steel', color: 'RAL 3005' } },
+  { id: 'tko', kind: 'tko', label: 'Площадка ТКО', title: 'Площадка ТКО под навесом', p: CANOPY_DEFAULT },
+  { id: 'tko-s', kind: 'tko', label: 'ТКО на 2 контейнера', title: 'Площадка ТКО на 2 контейнера', p: { kind: 'tko', L: 4, W: 2.5, roof: 'single', hHigh: 2.6, hLow: 2.3, highSide: 'front', postStep: 2, overhang: 0.2, cover: 'prof', walls: { front: 'open', back: 'prof_full', left: 'prof_full', right: 'prof_full' }, base: 'slab', slabT: 0.15, sand: 0.15, gravel: 0.15, slabOver: 0.2, rebar: 'composite', color: 'RAL 6005' } },
+  { id: 'lean', kind: 'lean', label: 'Навес к дому', title: 'Навес к стене дома', p: { kind: 'lean', L: 6, W: 4, roof: 'single', hHigh: 3, hLow: 2.5, highSide: 'back', attach: true, postStep: 3, overhang: 0.3, cover: 'poly', walls: OPEN, base: 'piles', color: 'RAL 8017' } },
+  { id: 'gazebo', kind: 'gazebo', label: 'Беседка 4×3', title: 'Беседка 4×3 м', p: { kind: 'gazebo', L: 4, W: 3, roof: 'hip', hHigh: 3.4, hLow: 2.3, postStep: 2, overhang: 0.5, cover: 'tile', walls: { front: 'open', back: 'rail', left: 'rail', right: 'rail' }, base: 'deck', color: 'RAL 8017' } },
+  { id: 'gazebo-sq', kind: 'gazebo', label: 'Беседка шатровая 3×3', title: 'Беседка шатровая 3×3 м', p: { kind: 'gazebo', L: 3, W: 3, roof: 'hip', hHigh: 3.5, hLow: 2.3, postStep: 3, overhang: 0.5, cover: 'tile', walls: { front: 'open', back: 'rail', left: 'rail', right: 'rail' }, base: 'deck', color: 'RAL 3005' } },
+  { id: 'garage', kind: 'garage', label: 'Гараж 6×6', title: 'Гараж из профлиста 6×6 м', p: { kind: 'garage', L: 6, W: 6, roof: 'gable', highSide: 'left', hHigh: 3.6, hLow: 2.8, postStep: 3, overhang: 0.3, cover: 'prof', walls: { front: 'prof_full', back: 'prof_full', left: 'prof_full', right: 'prof_full' }, gate: 'sectional', gateW: 3, gateH: 2.5, door: true, base: 'slab', slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'steel', color: 'RAL 7024' } },
+  { id: 'hangar', kind: 'garage', label: 'Ангар 12×18', title: 'Ангар / склад 12×18 м', p: { kind: 'garage', L: 12, W: 18, roof: 'gable', highSide: 'left', hHigh: 6.5, hLow: 5, postStep: 6, overhang: 0.3, cover: 'prof', walls: { front: 'prof_full', back: 'prof_full', left: 'prof_full', right: 'prof_full' }, gate: 'swing', gateW: 4.5, gateH: 4.5, door: true, base: 'slab', slabT: 0.2, sand: 0.2, gravel: 0.3, slabOver: 0, rebar: 'steel', color: 'RAL 5005' } },
 ];
-const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
-const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste'] as const;
+// пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
+const BLANK: Partial<CanopyParams> = { attach: false, gate: 'none', door: false, insulate: false, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
+const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste'] as const;
 type NumKey = (typeof NUMS)[number];
 const MM = new Set<NumKey>(['slabT', 'sand', 'gravel']); // в форме — в миллиметрах
 const toStr = (p: CanopyParams) => Object.fromEntries(NUMS.map((k) => [k, String(MM.has(k) ? Math.round(p[k] * 1000) : p[k])])) as Record<NumKey, string>;
 const SIDES: { s: Side; label: string }[] = [{ s: 'front', label: 'Спереди (въезд)' }, { s: 'back', label: 'Сзади' }, { s: 'left', label: 'Слева' }, { s: 'right', label: 'Справа' }];
 const SIDE_SHORT: Record<Side, string> = { front: 'спереди', back: 'сзади', left: 'слева', right: 'справа' };
 const DRAFT = 'smeta_designer_draft';
+const KIND_ICON: Record<ObjKind, string> = { canopy: '⛱', tko: '🗑', lean: '🏠', gazebo: '🛖', garage: '🚗' };
 
 type Tab = 'params' | 'draw' | 'steel' | 'est';
 
@@ -106,15 +116,24 @@ export default function Designer() {
           <span className="xs muted">{me.aiAvailable ? 'ИИ заполнит параметры' : 'ИИ не подключён — заполните ниже'}</span>
         </div>
         <textarea className="input textarea" style={{ minHeight: 84 }} value={text} onChange={(e) => setText(e.target.value)}
-          placeholder="Например: навес над мусорными контейнерами 10,2 на 9,2 м, односкатный, высота 6 м и 5 м, профлист 2 м и сетка до крыши с трёх сторон, спереди открыто, плита 150 мм, RAL 7024" />
+          placeholder="Например: гараж 6 на 6, двускатная крыша, конёк 3,6 м, стены 2,8 м, профлист, секционные ворота 3×2,5 и дверь, плита 150 мм. Или: беседка 4×3 с четырёхскатной крышей из металлочерепицы, перила с трёх сторон, пол на винтовых сваях" />
         <button className="btn primary block" style={{ marginTop: 8 }} disabled={busy === 'ai'} onClick={parse}>{busy === 'ai' ? 'Разбираю…' : '✨ Заполнить параметры по описанию'}</button>
         {questions.length > 0 && <div className="xs" style={{ marginTop: 8 }}><b>Уточните:</b>{questions.map((q, i) => <div key={i}>• {q}</div>)}</div>}
       </div>
 
-      <div className="row wrap" style={{ gap: 6, margin: '12px 0 8px' }}>
-        <span className="xs muted">Шаблон:</span>
-        {PRESETS.map((pr) => <button key={pr.id} className="chip" onClick={() => apply(pr.p, pr.title)}>{pr.label}</button>)}
+      <div className="dz-kinds">
+        {(Object.keys(OBJ_LABEL) as ObjKind[]).map((k) => (
+          <button key={k} className={`dz-kind ${base.kind === k ? 'on' : ''}`} onClick={() => { const pr = PRESETS.find((x) => x.kind === k)!; apply(pr.p, pr.title); }}>
+            <span aria-hidden="true">{KIND_ICON[k]}</span>{OBJ_LABEL[k]}
+          </button>
+        ))}
       </div>
+      {PRESETS.filter((x) => x.kind === base.kind).length > 1 && (
+        <div className="row wrap" style={{ gap: 6, margin: '0 0 8px' }}>
+          <span className="xs muted">Типовые:</span>
+          {PRESETS.filter((x) => x.kind === base.kind).map((pr) => <button key={pr.id} className="chip" onClick={() => apply(pr.p, pr.title)}>{pr.label}</button>)}
+        </div>
+      )}
 
       <Field label="Название проекта"><input className="input" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></Field>
 
@@ -130,18 +149,22 @@ export default function Designer() {
         <div className="stack">
           <div className="csection" style={{ marginTop: 0 }}>Размеры</div>
           <div className="grid2">{num('L', 'Длина (по фасаду)', 'м')}{num('W', 'Глубина', 'м')}</div>
-          <Field label="Кровля"><Chips value={base.roof} onChange={(v) => setB({ roof: v })} options={[{ value: 'single', label: 'Односкатная' }, { value: 'gable', label: 'Двускатная' }]} /></Field>
+          <Field label="Кровля"><Chips value={base.roof} onChange={(v) => setB({ roof: v, ...(v !== 'single' ? { attach: false } : {}) })} options={[{ value: 'single', label: 'Односкатная' }, { value: 'gable', label: 'Двускатная' }, { value: 'hip', label: 'Четырёхскатная' }]} /></Field>
           <div className="grid2">
             {num('hHigh', base.roof === 'single' ? 'Высокая сторона' : 'Высота в коньке', 'м')}
             {num('hLow', base.roof === 'single' ? 'Низкая сторона' : 'Высота карниза', 'м')}
           </div>
           <Field label={base.roof === 'single' ? 'Где высокая сторона' : 'Скаты на стороны'}>
-            {base.roof === 'single'
+            {base.roof === 'hip' ? <p className="xs muted" style={{ margin: 0 }}>Конёк — вдоль длинной стороны; при квадрате кровля шатровая</p>
+              : base.roof === 'single'
               ? <Chips value={base.highSide} onChange={(v) => setB({ highSide: v })} options={SIDES.map((x) => ({ value: x.s, label: SIDE_SHORT[x.s] }))} />
               : <Chips value={base.highSide === 'left' || base.highSide === 'right' ? 'left' : 'front'} onChange={(v) => setB({ highSide: v as Side })} options={[{ value: 'front', label: 'спереди и сзади' }, { value: 'left', label: 'слева и справа' }]} />}
           </Field>
+          {base.roof === 'single' && (
+            <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.attach} onChange={(e) => setB({ attach: e.target.checked })} />Крепится к стене дома высокой стороной ({SIDE_SHORT[base.highSide]}) — без столбов у стены</label>
+          )}
           <div className="grid2">{num('postStep', 'Шаг столбов, до', 'м')}{num('overhang', 'Свес кровли', 'м')}</div>
-          <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'none', label: 'Без кровли' }]} /></Field>
+          <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'tile', label: 'Металлочерепица' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'none', label: 'Без кровли' }]} /></Field>
           <Field label="Цвет (RAL)">
             <div className="row wrap" style={{ gap: 6 }}>
               {Object.entries(RAL).map(([code, hex]) => (
@@ -151,7 +174,7 @@ export default function Designer() {
           </Field>
 
           <div className="csection">Стены</div>
-          {SIDES.map(({ s, label }) => (
+          {SIDES.map(({ s, label }) => base.attach && s === base.highSide ? <Field key={s} label={label}><div className="small muted">стена дома</div></Field> : (
             <Field key={s} label={label}>
               <select className="select" value={base.walls[s]} onChange={(e) => setWall(s, e.target.value as Wall)}>
                 {(Object.keys(WALL_LABEL) as Wall[]).map((w) => <option key={w} value={w}>{WALL_LABEL[w]}</option>)}
@@ -160,8 +183,16 @@ export default function Designer() {
           ))}
           {Object.values(base.walls).some((w) => w === 'prof' || w === 'prof_mesh') && num('profH', 'Высота профлиста', 'м')}
 
+          <div className="csection">Ворота и дверь</div>
+          <Field label="Ворота в передней стене"><Chips value={base.gate} onChange={(v) => setB({ gate: v })} options={[{ value: 'none', label: 'Нет' }, { value: 'swing', label: 'Распашные' }, { value: 'sectional', label: 'Секционные' }]} /></Field>
+          {base.gate !== 'none' && <div className="grid2">{num('gateW', 'Ширина ворот', 'м')}{num('gateH', 'Высота ворот', 'м')}</div>}
+          <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.door} onChange={(e) => setB({ door: e.target.checked })} />Дверь 0,9×2,05 м (место подберётся между столбами)</label>
+          {Object.values(base.walls).some((w) => w === 'prof_full' || w === 'prof') && (
+            <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.insulate} onChange={(e) => setB({ insulate: e.target.checked })} />Утеплить стены и кровлю (минвата 100 мм)</label>
+          )}
+
           <div className="csection">Основание</div>
-          <Chips value={base.base} onChange={(v) => setB({ base: v })} options={[{ value: 'slab', label: 'Бетонная плита' }, { value: 'piles', label: 'Сваи под столбы' }, { value: 'none', label: 'Нет' }]} />
+          <Chips value={base.base} onChange={(v) => setB({ base: v })} options={[{ value: 'slab', label: 'Бетонная плита' }, { value: 'piles', label: 'Сваи под столбы' }, { value: 'deck', label: 'Настил на винтовых сваях' }, { value: 'none', label: 'Нет' }]} />
           {base.base === 'slab' && (
             <>
               <div className="grid3">{num('slabT', 'Плита', 'мм')}{num('gravel', 'Щебень', 'мм')}{num('sand', 'Песок', 'мм')}</div>

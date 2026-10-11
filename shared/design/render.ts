@@ -4,7 +4,7 @@
  *  - 2D: чертёжные листы (план, фасады, разрез основания) из примитивов с размерами.
  * Один и тот же результат рисуется в приложении (SVG) и в PDF (reportlab).
  */
-import type { CanopyResult, V3, Side } from './canopy';
+import type { CanopyResult, V3, Side, Member } from './canopy';
 
 export const RAL: Record<string, string> = {
   'RAL 7024': '#474A51', 'RAL 8017': '#45322E', 'RAL 6005': '#114232', 'RAL 3005': '#5E2129', 'RAL 5005': '#1E4E8C',
@@ -44,19 +44,33 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
   const camN = (n: V3) => { const y1 = n[0] * sy + n[1] * cy; return y1 * cp - n[2] * sp; };
   const light = norm([-0.45, -0.7, 0.85]);
   const frame = shade(colorOf(res.params.color), 1.25);
-  const faces: { pts: V3[]; fill: string; stroke: string; opacity: number; d: number; sw: number }[] = [];
-  const lines3: { a: V3; b: V3; stroke: string; sw: number; opacity: number }[] = [];
+  const faces: { pts: V3[]; fill: string; stroke: string; opacity: number; d: number; sw: number; ground?: boolean; bias?: number }[] = [];
+  const lines3: { a: V3; b: V3; stroke: string; sw: number; opacity: number; ground?: boolean }[] = [];
 
   // плита и земля
   for (const p of res.panels) {
     if (p.kind === 'slab') {
       const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], q[2] - res.params.slabT] as V3);
-      faces.push({ pts: top, fill: '#C9C6BF', stroke: '#9d9a93', opacity: 1, d: 0, sw: 0.6 });
-      for (let i = 0; i < 4; i++) faces.push({ pts: [top[i], top[(i + 1) % 4], bot[(i + 1) % 4], bot[i]], fill: '#A8A59E', stroke: '#8a877f', opacity: 1, d: 0, sw: 0.5 });
+      faces.push({ pts: top, fill: '#C9C6BF', stroke: '#9d9a93', opacity: 1, d: 0, sw: 0.6, ground: true });
+      for (let i = 0; i < 4; i++) faces.push({ pts: [top[i], top[(i + 1) % 4], bot[(i + 1) % 4], bot[i]], fill: '#A8A59E', stroke: '#8a877f', opacity: 1, d: 0, sw: 0.5, ground: true });
     }
+    if (p.kind === 'deck') {
+      // настил на сваях: доски вдоль X
+      const top = p.pts.map((q) => [q[0], q[1], q[2] + 0.02] as V3), bot = p.pts.map((q) => [q[0], q[1], q[2] - 0.2] as V3);
+      faces.push({ pts: top, fill: '#B07D4F', stroke: '#7a5232', opacity: 1, d: 0, sw: 0.6, ground: true });
+      for (let i = 0; i < 4; i++) faces.push({ pts: [top[i], top[(i + 1) % 4], bot[(i + 1) % 4], bot[i]], fill: '#8A5E3A', stroke: '#6a4428', opacity: 1, d: 0, sw: 0.5, ground: true });
+      const [a, b2, , d2] = top; const n = Math.round(Math.hypot(...sub(d2, a)) / 0.145);
+      for (let i = 1; i < n; i++) { const t = i / n; lines3.push({ a: addv(a, mul(sub(d2, a), t)), b: addv(b2, mul(sub(d2, a), t)), stroke: '#7a5232', sw: 0.4, opacity: 0.7, ground: true }); }
+    }
+    if (p.kind === 'house') faces.push({ pts: p.pts, fill: '#D8CBB6', stroke: '#a89b86', opacity: 0.55, d: 0, sw: 0.8 });
   }
   // элементы каркаса — бруски
+  const segs: (Member & { c0: boolean; c1: boolean })[] = [];
   for (const m of res.members) {
+    const len = Math.hypot(...sub(m.b, m.a)), n = Math.max(1, Math.ceil(len / 1.0));
+    for (let i = 0; i < n; i++) segs.push({ ...m, a: addv(m.a, mul(sub(m.b, m.a), i / n)), b: addv(m.a, mul(sub(m.b, m.a), (i + 1) / n)), c0: i === 0, c1: i === n - 1 });
+  }
+  for (const m of segs) {
     const [w0, h0] = sizeOf(m.profile);
     const w = Math.max(w0, 0.03), h = Math.max(h0, 0.03);
     const d = norm(sub(m.b, m.a));
@@ -66,9 +80,9 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
     const A = [c(m.a, -1, -1), c(m.a, 1, -1), c(m.a, 1, 1), c(m.a, -1, 1)], B = [c(m.b, -1, -1), c(m.b, 1, -1), c(m.b, 1, 1), c(m.b, -1, 1)];
     const quads: [V3[], V3][] = [
       [[A[0], A[1], B[1], B[0]], mul(e2, -1)], [[A[1], A[2], B[2], B[1]], e1], [[A[2], A[3], B[3], B[2]], e2], [[A[3], A[0], B[0], B[3]], mul(e1, -1)],
-      [[A[0], A[3], A[2], A[1]], mul(d, -1)], [[B[0], B[1], B[2], B[3]], d],
+      ...(m.c0 ? [[[A[0], A[3], A[2], A[1]], mul(d, -1)] as [V3[], V3]] : []), ...(m.c1 ? [[[B[0], B[1], B[2], B[3]], d] as [V3[], V3]] : []),
     ];
-    const base = m.kind === 'rail' || m.kind === 'web' || m.kind === 'purlin' ? shade(frame, 1.1) : frame;
+    const base = m.kind === 'rail' || m.kind === 'web' || m.kind === 'purlin' || m.kind === 'baluster' ? shade(frame, 1.1) : frame;
     for (const [q, n] of quads) {
       if (camN(n) > 0.02) continue; // невидимая грань
       const k = 0.55 + 0.5 * Math.max(0, dot(n, light));
@@ -78,7 +92,7 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
   // панели: кровля, профлист, сетка
   const col = colorOf(res.params.color);
   for (const p of res.panels) {
-    if (p.kind === 'slab') continue;
+    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house') continue;
     if (p.kind === 'mesh') {
       // сетка — прозрачная, с линиями
       const [a, b, c2, d2] = p.pts;
@@ -90,21 +104,32 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
     }
     const n = norm(cross(sub(p.pts[1], p.pts[0]), sub(p.pts[3], p.pts[0])));
     const k = 0.6 + 0.45 * Math.abs(dot(n, light));
-    const fill = p.kind === 'roof' ? (res.params.cover === 'poly' ? '#9fc4d9' : shade(col, k * 0.95)) : shade(col, k);
-    faces.push({ pts: p.pts, fill, stroke: shade(col, 0.7), opacity: p.kind === 'roof' ? (res.params.cover === 'poly' ? 0.55 : 0.93) : 1, d: 0, sw: 0.6 });
+    const fill = p.kind === 'roof' ? (res.params.cover === 'poly' ? '#9fc4d9' : shade(col, k * 0.95)) : p.kind === 'door' ? shade('#3a3d42', k) : p.kind === 'gate' ? shade(col, k * 0.82) : shade(col, k);
+    const opacity = p.kind === 'roof' ? (res.params.cover === 'poly' ? 0.55 : 1) : 1;
+    // большие плоскости дробим на ячейки ~0,7 м — так сортировка по глубине не путает их с каркасом
+    {
+      const [a, b2, c2, d2] = p.pts;
+      const nu = Math.max(1, Math.round(Math.max(Math.hypot(...sub(b2, a)), Math.hypot(...sub(c2, d2))) / 0.7));
+      const nv = Math.max(1, Math.round(Math.max(Math.hypot(...sub(d2, a)), Math.hypot(...sub(c2, b2))) / 0.7));
+      const at = (u: number, v: number): V3 => { const p0 = addv(a, mul(sub(b2, a), u)), p1 = addv(d2, mul(sub(c2, d2), u)); return addv(p0, mul(sub(p1, p0), v)); };
+      for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++)
+        faces.push({ pts: [at(i / nu, j / nv), at((i + 1) / nu, j / nv), at((i + 1) / nu, (j + 1) / nv), at(i / nu, (j + 1) / nv)], fill, stroke: fill, opacity, d: 0, sw: opacity < 1 ? 0 : 0.8, bias: p.kind === 'roof' ? 0.45 : 0.15 });
+      const edge = shade(col, 0.6);
+      [[a, b2], [b2, c2], [c2, d2], [d2, a]].forEach(([q0, q1]) => { if (Math.hypot(...sub(q1, q0)) > 0.01) lines3.push({ a: q0, b: q1, stroke: edge, sw: 0.8, opacity: 1 }); });
+    }
     // рёбра профлиста
-    if (p.kind === 'prof' || (p.kind === 'roof' && res.params.cover === 'prof')) {
+    if (p.kind === 'prof' || p.kind === 'gate' || (p.kind === 'roof' && (res.params.cover === 'prof' || res.params.cover === 'tile'))) {
       const [a, b, c2, d2] = p.pts;
       const len = Math.hypot(...sub(b, a)), ribs = Math.round(len / (p.kind === 'roof' ? 0.2 : 0.115));
-      const ribDirAlongAB = p.kind === 'prof';
+      const ribDirAlongAB = p.kind === 'prof' || p.kind === 'gate';
       if (ribDirAlongAB) for (let i = 1; i < ribs; i++) { const t = i / ribs; lines3.push({ a: addv(a, mul(sub(b, a), t)), b: addv(d2, mul(sub(c2, d2), t)), stroke: shade(col, 0.75), sw: 0.4, opacity: 0.8 }); }
       else { const l2 = Math.hypot(...sub(d2, a)), r2n = Math.round(l2 / 0.2); for (let i = 1; i < r2n; i++) { const t = i / r2n; lines3.push({ a: addv(a, mul(sub(d2, a), t)), b: addv(b, mul(sub(c2, b), t)), stroke: shade(col, 0.75), sw: 0.4, opacity: 0.6 }); } }
     }
   }
 
   // проекция, сортировка
-  const all = faces.map((f) => { const cs = f.pts.map(cam); return { ...f, cs, d: cs.reduce((a, c) => a + c.d, 0) / cs.length }; });
-  const ls = lines3.map((l) => { const a = cam(l.a), b = cam(l.b); return { ...l, ca: a, cb: b, d: (a.d + b.d) / 2 }; });
+  const all = faces.map((f) => { const cs = f.pts.map(cam); return { ...f, cs, d: f.ground ? 1e9 - (f.pts[0][2] > -0.01 ? 0 : 1) : cs.reduce((a, c) => a + c.d, 0) / cs.length - (f.bias || 0) }; });
+  const ls = lines3.map((l) => { const a = cam(l.a), b = cam(l.b); return { ...l, ca: a, cb: b, d: l.ground ? 1e9 - 0.5 : (a.d + b.d) / 2 }; });
   const xs = [...all.flatMap((f) => f.cs.map((c) => c.sx)), ...ls.flatMap((l) => [l.ca.sx, l.cb.sx])];
   const ys = [...all.flatMap((f) => f.cs.map((c) => c.sy)), ...ls.flatMap((l) => [l.ca.sy, l.cb.sy])];
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -142,23 +167,47 @@ export function drawings(res: CanopyResult): Sheet[] {
     const roof = res.panels.filter((p) => p.kind === 'roof');
     for (const r of roof) pr.push({ t: 'poly', pts: r.pts.map((q) => [q[0], q[1]] as [number, number]), c: '#555', w: 0.6 });
     for (const m of res.members) {
-      if (m.kind === 'chord' || m.kind === 'rafter') pr.push({ t: 'line', x1: m.a[0], y1: m.a[1], x2: m.b[0], y2: m.b[1], w: 0.6, dash: true, c: '#777' });
+      if (m.kind === 'chord' || m.kind === 'rafter' || m.kind === 'hip') pr.push({ t: 'line', x1: m.a[0], y1: m.a[1], x2: m.b[0], y2: m.b[1], w: 0.6, dash: true, c: '#777' });
       if (m.kind === 'beam') pr.push({ t: 'line', x1: m.a[0], y1: m.a[1], x2: m.b[0], y2: m.b[1], w: 1.2, c: '#333' });
     }
     const wallLine: Record<Side, [number, number, number, number]> = { front: [0, 0, L, 0], back: [0, W, L, W], left: [0, 0, 0, W], right: [L, 0, L, W] };
     for (const s of ['front', 'back', 'left', 'right'] as Side[]) {
       const [x1, y1, x2, y2] = wallLine[s];
-      if (walls[s] !== 'open') pr.push({ t: 'line', x1, y1, x2, y2, w: 3, c: col, dash: walls[s] === 'mesh' });
+      if (walls[s] !== 'open') pr.push({ t: 'line', x1, y1, x2, y2, w: walls[s] === 'rail' ? 1.6 : 3, c: col, dash: walls[s] === 'mesh' || walls[s] === 'rail' });
+    }
+    // проёмы
+    for (const o of res.openings) {
+      const [x1, y1, x2, y2] = wallLine[o.side];
+      const ux = (x2 - x1) / (Math.hypot(x2 - x1, y2 - y1) || 1), uy = (y2 - y1) / (Math.hypot(x2 - x1, y2 - y1) || 1);
+      const a: [number, number] = [x1 + ux * o.a0, y1 + uy * o.a0], b: [number, number] = [x1 + ux * o.a1, y1 + uy * o.a1];
+      pr.push({ t: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1], w: 3.4, c: '#ffffff' });
+      pr.push({ t: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1], w: 0.8, c: '#333', dash: true });
+      const nx = o.side === 'front' ? 0 : o.side === 'back' ? 0 : o.side === 'left' ? 0.35 : -0.35, ny = o.side === 'front' ? 0.35 : o.side === 'back' ? -0.45 : 0;
+      pr.push({ t: 'text', x: (a[0] + b[0]) / 2 + nx, y: (a[1] + b[1]) / 2 + ny, s: o.kind === 'gate' ? `ворота ${f2(o.a1 - o.a0)} м` : 'дверь', size: 0.24, anchor: 'middle', rot: o.side === 'left' || o.side === 'right' ? 90 : 0, c: '#333' });
+    }
+    // стена дома
+    const house = res.panels.find((q) => q.kind === 'house');
+    if (house) {
+      const [x1, y1, x2, y2] = wallLine[res.params.highSide];
+      const t = 0.35, out = res.params.highSide === 'front' || res.params.highSide === 'left' ? -1 : 1;
+      const pts: [number, number][] = x1 === x2
+        ? [[x1 + out * 0.06, y1 - 1.2], [x1 + out * (0.06 + t), y1 - 1.2], [x1 + out * (0.06 + t), y2 + 1.2], [x1 + out * 0.06, y2 + 1.2]]
+        : [[x1 - 1.2, y1 + out * 0.06], [x2 + 1.2, y1 + out * 0.06], [x2 + 1.2, y1 + out * (0.06 + t)], [x1 - 1.2, y1 + out * (0.06 + t)]];
+      pr.push({ t: 'poly', pts, fill: '#E3D7C3', c: '#555', w: 0.8, hatch: 'concrete' });
+      const cx = (pts[0][0] + pts[2][0]) / 2, cy = (pts[0][1] + pts[2][1]) / 2;
+      pr.push({ t: 'text', x: cx + (x1 === x2 ? out * 0.4 : 0), y: cy + (x1 === x2 ? 0 : out * 0.4), s: 'стена дома', size: 0.26, anchor: 'middle', rot: x1 === x2 ? 90 : 0, c: '#555' });
     }
     for (const p of posts) { const [w] = sizeOf(p.profile); pr.push({ t: 'poly', pts: [[p.a[0] - w / 2, p.a[1] - w / 2], [p.a[0] + w / 2, p.a[1] - w / 2], [p.a[0] + w / 2, p.a[1] + w / 2], [p.a[0] - w / 2, p.a[1] + w / 2]], fill: '#222', c: '#222', w: 0.5 }); }
     pr.push({ t: 'dim', x1: 0, y1: 0, x2: L, y2: 0, off: -1.0 - ov, s: `${f2(L)} м` });
     pr.push({ t: 'dim', x1: 0, y1: 0, x2: 0, y2: W, off: -1.0 - ov, s: `${f2(W)} м` });
     // въезд и уклон
-    const open = (['front', 'back', 'left', 'right'] as Side[]).find((s) => walls[s] === 'open');
-    if (open) { const [x1, y1, x2, y2] = wallLine[open]; const mx = (x1 + x2) / 2, my = (y1 + y2) / 2; pr.push({ t: 'text', x: mx, y: my + (open === 'front' ? -0.5 : open === 'back' ? 0.35 : 0), s: '▲ въезд', size: 0.35, anchor: 'middle', bold: true, rot: open === 'left' || open === 'right' ? 90 : 0 }); }
-    const sl = res.params.roof === 'single' ? `уклон кровли → ${res.params.highSide === 'left' ? 'вправо' : res.params.highSide === 'right' ? 'влево' : res.params.highSide === 'front' ? 'назад' : 'вперёд'}, ${Math.round(((res.info.hHigh - res.info.hLow) / res.info.span) * 100)}%` : 'двускатная кровля';
+    const gateSide = res.openings.find((o) => o.kind === 'gate')?.side;
+    const open = gateSide || (['front', 'back', 'left', 'right'] as Side[]).find((s) => walls[s] === 'open' && !(res.params.attach && s === res.params.highSide));
+    const entry = gateSide ? '▲ ворота' : res.params.kind === 'gazebo' || res.params.kind === 'lean' ? '▲ вход' : '▲ въезд';
+    if (open && !gateSide) { const [x1, y1, x2, y2] = wallLine[open]; const mx = (x1 + x2) / 2, my = (y1 + y2) / 2; pr.push({ t: 'text', x: mx, y: my + (open === 'front' ? -0.5 : open === 'back' ? 0.35 : 0), s: entry, size: 0.35, anchor: 'middle', bold: true, rot: open === 'left' || open === 'right' ? 90 : 0 }); }
+    const sl = res.params.roof === 'single' ? `уклон кровли → ${res.params.highSide === 'left' ? 'вправо' : res.params.highSide === 'right' ? 'влево' : res.params.highSide === 'front' ? 'назад' : 'вперёд'}, ${Math.round(((res.info.hHigh - res.info.hLow) / res.info.span) * 100)}%` : res.params.roof === 'gable' ? 'двускатная кровля' : 'четырёхскатная кровля';
     pr.push({ t: 'text', x: L / 2, y: W / 2, s: sl, size: 0.3, anchor: 'middle', c: '#555' });
-    pr.push({ t: 'text', x: L / 2, y: W / 2 - 0.45, s: `столбов ${res.info.posts}, ${res.info.truss ? 'ферм' : 'стропил'} ${res.info.rafters}`, size: 0.26, anchor: 'middle', c: '#777' });
+    pr.push({ t: 'text', x: L / 2, y: W / 2 - 0.45, s: `столбов ${res.info.posts}, ${res.info.truss ? 'ферм' : 'стропил'} ${res.info.rafters}${res.params.base === 'deck' ? ', настил на винтовых сваях' : ''}`, size: 0.26, anchor: 'middle', c: '#777' });
     sheets.push({ title: 'План (вид сверху)', x0: -ov - 2, y0: -ov - 2, x1: L + ov + 1, y1: W + ov + 1, prims: pr });
   }
 
@@ -174,6 +223,17 @@ export function drawings(res: CanopyResult): Sheet[] {
     const pr: Prim[] = [];
     pr.push({ t: 'line', x1: -1, y1: 0, x2: width + 1, y2: 0, w: 1.2, c: '#555' });
     if (res.params.base === 'slab') pr.push({ t: 'poly', pts: [[-res.params.slabOver, 0], [width + res.params.slabOver, 0], [width + res.params.slabOver, -res.params.slabT], [-res.params.slabOver, -res.params.slabT]], fill: '#D8D5CE', c: '#888', w: 0.6, hatch: 'concrete' });
+    if (res.params.base === 'deck') pr.push({ t: 'poly', pts: [[0, 0.02], [width, 0.02], [width, -0.2], [0, -0.2]], fill: '#C49A6C', c: '#7a5232', w: 0.6 });
+    // стена дома, если видна сбоку
+    for (const hq of res.panels.filter((q) => q.kind === 'house')) {
+      const ds = hq.pts.map(depth);
+      if (ds.every((v) => v < 0.25)) continue;
+      const hs = hq.pts.map(H); const h0 = Math.min(...hs), h1 = Math.max(...hs);
+      if (h1 - h0 > 0.6) continue;
+      const hx = (h0 + h1) / 2, out = hx < width / 2 ? -1 : 1;
+      pr.push({ t: 'poly', pts: [[hx, -0.1], [hx + out * 0.35, -0.1], [hx + out * 0.35, hq.pts[2][2]], [hx, hq.pts[2][2]]], fill: '#E3D7C3', c: '#555', w: 0.8, hatch: 'concrete' });
+      pr.push({ t: 'text', x: hx + out * 0.17, y: hq.pts[2][2] + 0.15, s: 'стена дома', size: 0.26, anchor: 'middle', c: '#555' });
+    }
     // кровля — силуэт
     for (const r of res.panels.filter((p) => p.kind === 'roof')) {
       const pts = r.pts.map((q) => [H(q), q[2]] as [number, number]);
@@ -183,8 +243,10 @@ export function drawings(res: CanopyResult): Sheet[] {
       void hs; void zMax;
     }
     // обшивка этой стороны
-    for (const p of res.panels.filter((q) => (q.kind === 'prof' || q.kind === 'mesh') && q.pts.every(near))) {
-      pr.push({ t: 'poly', pts: p.pts.map((q) => [H(q), q[2]] as [number, number]), fill: p.kind === 'prof' ? col : undefined, c: '#333', w: 0.6, hatch: p.kind === 'prof' ? 'prof' : 'mesh' });
+    for (const p of res.panels.filter((q) => (q.kind === 'prof' || q.kind === 'mesh' || q.kind === 'gate' || q.kind === 'door') && q.pts.every(near))) {
+      const fill = p.kind === 'prof' ? col : p.kind === 'gate' ? shade(col, 0.8) : p.kind === 'door' ? '#3a3d42' : undefined;
+      pr.push({ t: 'poly', pts: p.pts.map((q) => [H(q), q[2]] as [number, number]), fill, c: '#333', w: p.kind === 'gate' || p.kind === 'door' ? 1.1 : 0.6, hatch: p.kind === 'prof' || p.kind === 'gate' ? 'prof' : p.kind === 'mesh' ? 'mesh' : undefined });
+      if (p.kind === 'gate' && res.params.gate === 'swing') { const xs = p.pts.map((q) => H(q)); const m = (Math.min(...xs) + Math.max(...xs)) / 2; pr.push({ t: 'line', x1: m, y1: 0.05, x2: m, y2: p.pts[2][2], w: 1, c: '#222' }); }
     }
     // каркас этой стороны
     for (const m of res.members.filter((q) => near(q.a) && near(q.b))) {
@@ -193,17 +255,21 @@ export function drawings(res: CanopyResult): Sheet[] {
       else pr.push({ t: 'line', x1: H(m.a), y1: m.a[2], x2: H(m.b), y2: m.b[2], w: m.kind === 'web' || m.kind === 'rail' ? 0.8 : 1.4, c: '#222' });
     }
     // размеры: ширина и высоты по краям
-    const sidePosts = posts.filter((p) => near(p.a));
-    const hL = sidePosts.reduce((a, p) => (H(p.a) < 0.05 ? p.b[2] : a), 0) || Math.min(...sidePosts.map((p) => p.b[2]));
-    const hR = sidePosts.reduce((a, p) => (H(p.a) > width - 0.05 ? p.b[2] : a), 0) || Math.max(...sidePosts.map((p) => p.b[2]));
+    void posts;
+    const corner = (h: number): [number, number] => (side === 'front' ? [h, 0] : side === 'back' ? [L - h, W] : side === 'left' ? [0, W - h] : [L, h]);
+    const hL = Math.round(res.topAt(...corner(0)) * 100) / 100, hR = Math.round(res.topAt(...corner(width)) * 100) / 100;
     pr.push({ t: 'dim', x1: 0, y1: 0, x2: width, y2: 0, off: -0.9, s: `${f2(width)} м` });
     pr.push({ t: 'dim', x1: 0, y1: 0, x2: 0, y2: hL, off: -0.8, s: `${f2(hL)} м` });
     pr.push({ t: 'dim', x1: width, y1: 0, x2: width, y2: hR, off: 0.8, s: `${f2(hR)} м` });
     const wt = res.params.walls[side];
-    const wtLabel = { open: 'открытая сторона', prof: `профлист ${res.params.profH} м`, prof_full: 'профлист на всю высоту', mesh: 'сетка на всю высоту', prof_mesh: `профлист ${res.params.profH} м + сетка до кровли` }[wt];
-    pr.push({ t: 'text', x: width / 2, y: -1.55, s: wtLabel, size: 0.3, anchor: 'middle', c: '#555' });
-    const zTop = Math.max(res.info.hHigh, ...res.panels.filter((p) => p.kind === 'roof').flatMap((p) => p.pts.map((q) => q[2])));
-    sheets.push({ title, x0: -2, y0: -2.1, x1: width + 2, y1: zTop + 0.8, prims: pr });
+    const isHouse = res.params.attach && side === res.params.highSide;
+    const ops = res.openings.filter((o) => o.side === side).map((o) => (o.kind === 'gate' ? `ворота ${res.params.gate === 'sectional' ? 'секционные' : 'распашные'} ${f2(o.a1 - o.a0)}×${f2(o.h)} м` : 'дверь 0,9×2,05 м'));
+    const wtLabel = (isHouse ? 'со стороны дома (стена дома не показана)' : { open: 'открытая сторона', prof: `профлист ${res.params.profH} м`, prof_full: 'профлист на всю высоту', mesh: 'сетка на всю высоту', prof_mesh: `профлист ${res.params.profH} м + сетка до кровли`, rail: 'перила 1,0 м' }[wt]) + (ops.length ? `; ${ops.join(', ')}` : '');
+    const [l1, l2] = wtLabel.split('; ');
+    pr.push({ t: 'text', x: width / 2, y: -1.55, s: l1, size: 0.3, anchor: 'middle', c: '#555' });
+    if (l2) pr.push({ t: 'text', x: width / 2, y: -1.95, s: l2, size: 0.3, anchor: 'middle', c: '#555' });
+    const zTop = Math.max(res.info.hHigh, ...res.panels.filter((p) => p.kind === 'roof' || p.kind === 'house').flatMap((p) => p.pts.map((q) => q[2])));
+    sheets.push({ title, x0: -2, y0: l2 ? -2.4 : -2.1, x1: width + 2, y1: zTop + 0.8, prims: pr });
   }
 
   // ---------- разрез основания ----------
