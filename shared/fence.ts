@@ -223,9 +223,9 @@ export function fenceEstimate(i: FenceInput): { lines: FenceLine[]; summary: { l
   if (i.demolish) work('Демонтаж забора', i.demolish, 'пог. м', 300, 'демонтаж полотна и лаг\nвыемка столбов\nскладирование на участке');
   if (i.caps && metalPosts) work('Монтаж колпаков на столбы', posts, 'шт', 300);
   if (i.paint) work('Покраска забора', L * h, 'м²', 300);
-  if (['concrete', 'buta', 'tise'].includes(m) && posts > 25) lines.push({ name: 'Ямобур', qty: ceil(posts / 60), unit: 'смена', type: 'equipment', price: 15000, category: C });
-  if (m === 'strip' && L > 30) lines.push({ name: 'Мини-экскаватор', qty: ceil(L / 80), unit: 'смена', type: 'equipment', price: 20000, category: C });
-  lines.push({ name: 'Доставка материалов за город', qty: 1, unit: 'рейс', type: 'service', price: 6000, category: C });
+  if (['concrete', 'buta', 'tise'].includes(m) && posts > 25) lines.push({ name: 'Ямобур', qty: ceil(posts / 8), unit: 'час', type: 'equipment', price: 3500, category: C });
+  if (m === 'strip' && L > 30) lines.push({ name: 'Мини-экскаватор', qty: ceil(L / 80), unit: 'смена', type: 'equipment', price: 16000, category: C });
+  lines.push({ name: 'Доставка материалов за город', qty: 60, unit: 'км', type: 'service', price: 60, category: C });
   if (i.slope) {
     for (const l of lines) if (l.type === 'work') l.note = 'Монтаж на склоне ступенями (+15%)';
     lines.forEach((l) => { if (l.type === 'work') l.price = Math.round(l.price * 1.15); });

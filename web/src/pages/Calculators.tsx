@@ -9,7 +9,8 @@ import { n, rub, parseNum, TYPE_LABEL } from '../format';
 export default function Calculators() {
   return (
     <>
-      {CALC_GROUPS.map((g) => (
+      <Link to="/masters" className="tile wide slim" style={{ marginBottom: 8, display: 'flex' }}>👷 Мастера под ключ: забор, плитка, кровля, электрика и др.</Link>
+      {CALC_GROUPS.filter((g) => g !== 'Мастера').map((g) => (
         <section key={g}>
           <div className="tile-group">{g}</div>
           <div className="tiles">
@@ -96,7 +97,7 @@ export function CalculatorPage() {
           <div className="formula num" style={{ marginTop: 8 }}>{out.formula.map((f, i) => <div key={i}>{f}</div>)}</div>
           {out.warnings.map((w, i) => <div key={i} className="banner" style={{ marginTop: 12, marginBottom: 0 }}>{w}</div>)}
           {out.suggestions.length > 0 && <button className="btn primary block lg" style={{ marginTop: 16 }} onClick={() => setAddOpen(true)}><Icon.plus width={20} />Добавить в смету</button>}
-          <AddToEstimate open={addOpen} onClose={() => setAddOpen(false)} suggestions={out.suggestions} estimateTitle={calc.id === 'fence-pro' ? `Забор: ${(calc.fields[0].options || []).find((o) => o.value === values.type)?.label || ''}, ${values.len} м` : calc.title} />
+          <AddToEstimate open={addOpen} onClose={() => setAddOpen(false)} suggestions={out.suggestions} estimateTitle={calc.id === 'fence-pro' ? `Забор: ${(calc.fields[0].options || []).find((o) => o.value === values.type)?.label || ''}, ${values.len} м` : calc.group === 'Мастера' ? `${calc.short}: ${calc.title.split(':')[0]}` : calc.title} />
         </>
       ) : (
         <div className="state">Заполните параметры — результат появится сразу.</div>

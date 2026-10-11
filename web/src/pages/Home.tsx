@@ -5,6 +5,7 @@ import { useMe } from '../App';
 import { useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import { CALCULATORS } from '../../../shared/calculators';
+import { MASTERS } from '../../../shared/masters';
 import Hero from '../components/Hero';
 import Onboarding from '../components/Onboarding';
 
@@ -47,8 +48,8 @@ export default function Home() {
         <Link className="tile" to="/catalog">Справочник цен</Link>
         <Link className="tile" to="/assistant">ИИ-сметчик<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
         <Link className="tile" to="/settings">Настройки<small>подписка, логотип, друзья</small></Link>
-        <Link className="tile slim" to="/calculators/fence-pro">🧱 Мастер забора</Link>
-        <Link className="tile slim" to="/calculators">🧮 Калькуляторы · {CALCULATORS.length}</Link>
+        <Link className="tile slim" to="/masters">👷 Мастера · {MASTERS.length + 1}</Link>
+        <Link className="tile slim" to="/calculators">🧮 Калькуляторы · {CALCULATORS.length - MASTERS.length - 1}</Link>
       </div>
 
     </>

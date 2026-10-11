@@ -1,5 +1,6 @@
 import { roundTo } from './money';
 import { fenceEstimate, FENCE_TYPES, MOUNTS } from './fence';
+import { MASTERS } from './masters';
 
 /**
  * Реестр строительных калькуляторов.
@@ -60,7 +61,7 @@ export interface Calculator {
   priceRow?: number;
 }
 
-export const CALC_GROUPS = ['Геометрия', 'Бетон и растворы', 'Кирпич и кладка', 'Кровля и утепление', 'Гипсокартон', 'Отделка', 'Полы и стены', 'Электрика', 'Наружные сети', 'Благоустройство', 'Древесина'];
+export const CALC_GROUPS = ['Мастера', 'Геометрия', 'Бетон и растворы', 'Кирпич и кладка', 'Кровля и утепление', 'Гипсокартон', 'Отделка', 'Полы и стены', 'Электрика', 'Наружные сети', 'Благоустройство', 'Древесина'];
 
 const RESERVE: CalcField = { key: 'reserve', label: 'Запас', unit: '%', default: 0, min: 0, max: 100, hint: 'Запас на подрезку, бой и потери' };
 const withReserve = (v: number, pct: number) => v * (1 + (Number(pct) || 0) / 100);
@@ -990,7 +991,7 @@ export const CALCULATORS: Calculator[] = [
   },
   // ---------- БЛАГОУСТРОЙСТВО ----------
   {
-    id: 'fence-pro', group: 'Благоустройство', title: 'Забор под ключ: все виды и способы монтажа', short: 'Мастер забора',
+    id: 'fence-pro', group: 'Мастера', title: 'Забор под ключ: все виды и способы монтажа', short: 'Мастер забора',
     description: 'Профлист, евроштакетник, 3D/Гиттер, рабица, жалюзи, ранчо, ДПК, кирпич, блоки, габионы… Бетон, бутование, сваи, лента. Ворота и калитки',
     fields: [
       { key: 'type', label: 'Вид забора', type: 'select', default: 'profnastil', options: Object.entries(FENCE_TYPES).map(([value, v]) => ({ value, label: v.label })) },
@@ -1098,6 +1099,30 @@ export const CALCULATORS: Calculator[] = [
   },
 ];
 
+
+/** Мастера по специальностям — те же калькуляторы: поля → готовые строки сметы */
+for (const m of MASTERS) {
+  CALCULATORS.push({
+    id: m.id, group: 'Мастера', title: m.title, short: m.trade, description: m.description, fields: m.fields,
+    compute: (v) => {
+      const b = m.build(v);
+      const total = b.lines.reduce((a, l) => a + l.qty * l.price, 0);
+      const works = b.lines.filter((l) => l.type !== 'material').reduce((a, l) => a + l.qty * l.price, 0);
+      return {
+        rows: [
+          { label: 'Ориентировочно под ключ', value: Math.round(total), unit: '₽', primary: true },
+          { label: 'в т.ч. работы', value: Math.round(works), unit: '₽' },
+          { label: 'в т.ч. материалы', value: Math.round(total - works), unit: '₽' },
+          ...b.summary,
+          { label: 'Позиций для сметы', value: b.lines.length, unit: 'шт' },
+        ],
+        formula: b.lines.map((l) => `${l.name}: ${l.qty} ${l.unit}`),
+        warnings: b.warnings,
+        suggestions: b.lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, type: l.type, price: l.price, note: l.note, composition: l.composition, category: l.category })),
+      };
+    },
+  });
+}
 
 const SHORT: Record<string, string> = {
   'area-rect': 'Площадь', 'area-multi': 'Площадь участков', room: 'Комната', 'volume-box': 'Объём', 'volume-cyl': 'Объём цилиндра',
