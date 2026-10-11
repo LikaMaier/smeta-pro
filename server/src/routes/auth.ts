@@ -4,15 +4,25 @@ import { env } from '../env';
 import { prisma, plain, accessOf, HttpError, freeCtx } from '../util';
 import { verifyInitData, signSession } from '../auth';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
+import { brandUrl } from './brand';
+import { botLink } from '../botInfo';
 
-async function upsertUser(tgId: number, firstName?: string, username?: string) {
+/** Кто пригласил: payload вида ref_<id пользователя> из /start или startapp */
+async function referrerId(payload?: string | null) {
+  const m = /^ref_([a-z0-9]{10,40})$/i.exec(payload || '');
+  if (!m) return null;
+  const r = await prisma.user.findUnique({ where: { id: m[1] }, select: { id: true } });
+  return r?.id ?? null;
+}
+
+export async function upsertUser(tgId: number, firstName?: string, username?: string, startPayload?: string | null) {
   const existing = await prisma.user.findUnique({ where: { tgId: BigInt(tgId) } });
   if (existing) {
     return prisma.user.update({ where: { id: existing.id }, data: { firstName, username } });
   }
   const user = await prisma.user.create({
     data: {
-      tgId: BigInt(tgId), firstName, username,
+      tgId: BigInt(tgId), firstName, username, referredById: await referrerId(startPayload),
       trialEndsAt: new Date(Date.now() + env.TRIAL_DAYS * 86400000),
       priceLists: { create: { name: 'Основной прайс', isDefault: true } },
     },
@@ -39,6 +49,9 @@ export async function meView(user: any) {
     aiAvailable: Boolean(env.AI_PROVIDER),
     access: { ...accessOf(user), freeEstimateLeft: free.estimateCount === 0, freeEstimateId: free.firstEstimateId, estimateCount: free.estimateCount },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
+    logoUrl: brandUrl(user.logoFile), signUrl: brandUrl(user.signFile),
+    weeklyDigest: user.weeklyDigest ?? true,
+    refLink: botLink(`ref_${user.id}`),
   });
 }
 
@@ -48,7 +61,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!env.BOT_TOKEN) throw new HttpError(503, 'Бот ещё не настроен на сервере (нет BOT_TOKEN)', 'bot_not_configured');
     let tg;
     try { tg = verifyInitData(initData, env.BOT_TOKEN); } catch (e: any) { throw new HttpError(401, e.message, 'bad_init_data'); }
-    const user = await upsertUser(tg.id, tg.first_name, tg.username);
+    const user = await upsertUser(tg.id, tg.first_name, tg.username, new URLSearchParams(initData).get('start_param'));
     return { token: signSession(user.id, env.SESSION_SECRET), user: await meView(user) };
   });
 
@@ -62,9 +75,19 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get('/api/me', async (req) => meView(req.user));
 
+  // «Приведи друга»: сколько пришло и сколько оплатили
+  app.get('/api/referrals', async (req) => {
+    const [invited, paid] = await Promise.all([
+      prisma.user.count({ where: { referredById: req.user.id } }),
+      prisma.user.count({ where: { referredById: req.user.id, referralRewardedAt: { not: null } } }),
+    ]);
+    return { link: botLink(`ref_${req.user.id}`), invited, paid, bonusMonths: paid };
+  });
+
   app.patch('/api/me', async (req) => {
     const body = z.object({
       aiEnabled: z.boolean().optional(),
+      weeklyDigest: z.boolean().optional(),
       theme: z.enum(['steel', 'gold', 'carbon', 'blueprint', 'malachite']).optional(),
       companyName: z.string().max(200).nullable().optional(),
       contacts: z.string().max(500).nullable().optional(),

@@ -36,6 +36,10 @@ const headerSchema = z.object({
   notes: z.string().max(5000).nullable().optional(),
   paymentTerms: z.string().max(2000).nullable().optional(),
   validDays: z.coerce.number().int().min(1).max(365).optional(),
+  customerDetails: z.string().max(1000).nullable().optional(),
+  workStart: z.coerce.date().nullable().optional(),
+  workEnd: z.coerce.date().nullable().optional(),
+  warrantyMonths: z.coerce.number().int().min(0).max(120).optional(),
 });
 
 export function estimateTotals(e: any) {
@@ -60,7 +64,7 @@ async function checkProject(userId: string, projectId?: string | null) {
 }
 
 async function cloneEstimate(userId: string, src: any, overrides: any) {
-  const { id, createdAt, updatedAt, lines, project, ...rest } = src;
+  const { id, createdAt, updatedAt, lines, project, shareToken, sharedAt, viewedAt, approvedAt, customerComment, ...rest } = src;
   return prisma.estimate.create({
     data: {
       ...rest, ...overrides, userId,
@@ -87,7 +91,7 @@ async function priceTemplateLines(userId: string, lines: { name: string; qty: nu
   });
 }
 
-async function estimateNumber(userId: string, e: any) {
+export async function estimateNumber(userId: string, e: any) {
   return prisma.estimate.count({ where: { userId, isTemplate: false, createdAt: { lte: e.createdAt } } });
 }
 
@@ -95,12 +99,12 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
   app.get('/api/templates', async () => (await import('../../../shared/templates')).TEMPLATES.map((t) => ({ id: t.id, title: t.title, description: t.description, lines: t.lines.length })));
 
   // ---- Файлы: PDF сметы, акт выполненных работ, Excel (для заказчика и для себя) ----
-  const KINDS = ['pdf', 'act', 'xlsx', 'xlsxown'] as const;
+  const KINDS = ['pdf', 'act', 'contract', 'xlsx', 'xlsxown'] as const;
   type EKind = typeof KINDS[number];
-  const PAID: EKind[] = ['act', 'xlsx', 'xlsxown']; // бесплатно — только PDF первой сметы
+  const PAID: EKind[] = ['act', 'contract', 'xlsx', 'xlsxown']; // бесплатно — только PDF первой сметы
   const needPaid = (user: any, kind: EKind) => {
     if (PAID.includes(kind) && !accessOf(user).active)
-      throw new HttpError(402, 'Акт и экспорт в Excel доступны по подписке.', 'subscription_required');
+      throw new HttpError(402, 'Договор, акт и экспорт в Excel доступны по подписке.', 'subscription_required');
   };
   async function buildFile(e: any, user: any, kind: EKind, actDate?: string) {
     const number = await estimateNumber(user.id, e);
@@ -110,11 +114,14 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     }
     const data: any = pdfData(e, user, number, !accessOf(user).active);
     if (kind === 'act') Object.assign(data, { docType: 'act', actDate: actDate || new Date().toISOString().slice(0, 10) });
-    return { buf: await renderPdf(data), name: fileName(kind === 'act' ? `Акт — ${e.title}` : e.title, 'pdf'), type: 'application/pdf' };
+    if (kind === 'contract') Object.assign(data, { docType: 'contract', contractDate: actDate || new Date().toISOString().slice(0, 10) });
+    const title = kind === 'act' ? `Акт — ${e.title}` : kind === 'contract' ? `Договор — ${e.title}` : e.title;
+    return { buf: await renderPdf(data), name: fileName(title, 'pdf'), type: 'application/pdf' };
   }
   const CAPTION: Record<EKind, (e: any) => string> = {
     pdf: (e) => `Смета «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Перешлите заказчику.`,
     act: (e) => `Акт выполненных работ по смете «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Распечатайте в 2 экземплярах и подпишите с заказчиком.`,
+    contract: (e) => `Договор подряда по смете «${e.title}» — смета приложена. Проверьте условия, распечатайте в 2 экземплярах и подпишите с заказчиком.`,
     xlsx: (e) => `Смета «${e.title}» в Excel — для заказчика (без себестоимости).`,
     xlsxown: (e) => `Смета «${e.title}» в Excel — для себя: себестоимость и прибыль. Заказчику не пересылайте.`,
   };
@@ -225,7 +232,20 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     const body = headerSchema.extend({ lines: z.array(lineSchema).max(2000) }).parse(req.body);
     await checkProject(req.user.id, body.projectId);
     const prevTotal = estimateTotals(prev).total;
-    const { lines, ...header } = body;
+    const { lines, ...header } = body as any;
+    // Статус меняют и заказчик (ссылка), и сервер: не откатываем «отправлена/согласована» старым состоянием экрана
+    if (header.status && (prev.sharedAt || prev.approvedAt)) {
+      if (prev.approvedAt && ['draft', 'sent'].includes(header.status)) header.status = prev.status;
+      else if (prev.status === 'sent' && header.status === 'draft') header.status = prev.status;
+    }
+    // Сумма изменилась после согласования — согласование больше не действует
+    const newTotal = estimateTotals({ ...prev, ...header, lines }).total;
+    if (prev.approvedAt && Math.abs(newTotal - prevTotal) > 0.009) {
+      Object.assign(header, {
+        approvedAt: null, status: 'sent',
+        customerComment: `${prev.customerComment ? `${prev.customerComment}\n` : ''}[${new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })}] ✏️ Смета изменена после согласования — нужно согласовать заново`,
+      });
+    }
     await prisma.$transaction([
       prisma.estimateLine.deleteMany({ where: { estimateId: id } }),
       prisma.estimate.update({

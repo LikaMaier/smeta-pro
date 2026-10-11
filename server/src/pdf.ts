@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { env } from './env';
 import { num } from './util';
 import { estimateTotals } from './routes/estimates';
+import { brandPath } from './brand';
 
 const DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../pdf');
 const SCRIPT = path.join(DIR, 'estimate_pdf.py');
@@ -19,6 +20,11 @@ export function pdfData(e: any, user: any, number: number, free = false) {
     freeMark: free, title: e.title, number: String(number), customer: e.customer, address: e.address,
     date: new Date(e.date).toISOString().slice(0, 10), validDays: e.validDays ?? 14,
     paymentTerms: e.paymentTerms, notes: e.notes,
+    logoPath: brandPath(user.logoFile), signPath: brandPath(user.signFile),
+    customerDetails: e.customerDetails || '', warrantyMonths: e.warrantyMonths ?? 12,
+    workStart: e.workStart ? new Date(e.workStart).toISOString().slice(0, 10) : null,
+    workEnd: e.workEnd ? new Date(e.workEnd).toISOString().slice(0, 10) : null,
+    approvedAt: e.approvedAt ? new Date(e.approvedAt).toISOString().slice(0, 10) : null,
     grouped: e.lines.some((l: any) => l.category),
     lines: e.lines.map((l: any, i: number) => ({ name: l.name, category: l.category, qty: num(l.qty), unit: l.unit, price: num(l.price), amount: t.lineAmounts[i], note: l.note })),
     totals: {
@@ -52,13 +58,13 @@ function runPy(script: string, data: any, what: string): Promise<Buffer> {
 
 /** Подписанные ссылки на файлы — открываются во внешнем браузере без заголовка авторизации.
  *  kind: pdf | act | xlsx | xlsxown (смета) ; pxlsx (объект) */
-export type FileKind = 'pdf' | 'act' | 'xlsx' | 'xlsxown' | 'pxlsx';
+export type FileKind = 'pdf' | 'act' | 'contract' | 'xlsx' | 'xlsxown' | 'pxlsx';
 const sign = (kind: string, id: string, exp: number | string) =>
   crypto.createHmac('sha256', env.SESSION_SECRET || 'dev-secret').update(`${kind}:${id}:${exp}`).digest('base64url');
 
 export function fileLink(kind: FileKind, id: string, ttlSec = 3600) {
   const exp = Math.floor(Date.now() / 1000) + ttlSec;
-  const base = kind === 'pxlsx' ? `/files/projects/${id}.xlsx` : `/files/estimates/${id}.${kind === 'pdf' || kind === 'act' ? 'pdf' : 'xlsx'}`;
+  const base = kind === 'pxlsx' ? `/files/projects/${id}.xlsx` : `/files/estimates/${id}.${kind === 'xlsx' || kind === 'xlsxown' ? 'xlsx' : 'pdf'}`;
   return `${base}?kind=${kind}&exp=${exp}&sig=${sign(kind, id, exp)}`;
 }
 export const pdfLink = (id: string) => fileLink('pdf', id);

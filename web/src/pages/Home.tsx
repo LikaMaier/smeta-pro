@@ -41,15 +41,13 @@ export default function Home() {
         <button className="tile wide" onClick={() => (me.access.active || me.access.freeEstimateLeft ? createEstimate() : nav('/settings'))} disabled={busy}>
           + Новая смета{!me.access.active && me.access.freeEstimateLeft ? <small>первая — бесплатно</small> : null}
         </button>
-        <Link className="tile" to="/calculators">Расчёты<small>калькуляторов: {CALCULATORS.length}</small></Link>
         <Link className="tile" to="/estimates">Сметы</Link>
-        <Link className="tile" to="/projects">Объекты{active ? <small>в работе: {active}</small> : null}</Link>
-        <Link className="tile" to="/calendar">Календарь и деньги<small>фото, доходы, прибыль</small></Link>
+        <Link className="tile" to="/projects">Объекты{active ? <small>в работе: {active}</small> : <small>деньги и контакты</small>}</Link>
+        <Link className="tile" to="/calendar">Календарь<small>фото, деньги, напоминания</small></Link>
         <Link className="tile" to="/catalog">Справочник цен</Link>
-        <Link className="tile" to="/reminders">Напоминания</Link>
-        <Link className="tile" to="/contacts">Записная книжка<small>телефоны по датам</small></Link>
         <Link className="tile" to="/assistant">ИИ-сметчик<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
-        <Link className="tile wide" to="/settings">Настройки и подписка</Link>
+        <Link className="tile" to="/settings">Настройки<small>подписка, логотип, друзья</small></Link>
+        <Link className="tile wide slim" to="/calculators">🧮 Калькуляторы · {CALCULATORS.length}</Link>
       </div>
 
     </>

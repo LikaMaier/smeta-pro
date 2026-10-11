@@ -8,17 +8,19 @@ import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS }
 import { confirmDialog, haptic, tg } from '../tg';
 
 type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
-type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string;
+type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string; customerDetails: string; workStart: string; workEnd: string; warrantyMonths: string;
   discountPct: string; markupPct: string; taxPct: string; lossReservePct: string; delivery: string; extraCosts: string };
 
 let seq = 0;
 const key = () => `l${Date.now()}_${seq++}`;
 const toL = (l: any): L => ({ k: key(), id: l.id, name: l.name, qty: String(l.qty ?? ''), unit: l.unit || 'шт', price: String(l.price ?? ''), costPrice: l.costPrice == null ? '' : String(l.costPrice), type: l.type || 'work', category: l.category || '', note: l.note || '', catalogItemId: l.catalogItemId, unconfirmed: l.unconfirmed });
 const toH = (e: any): H => ({ title: e.title, customer: e.customer || '', address: e.address || '', date: dateInput(e.date), status: e.status, projectId: e.projectId, notes: e.notes || '', paymentTerms: e.paymentTerms || '', validDays: String(e.validDays ?? 14),
+  customerDetails: e.customerDetails || '', workStart: e.workStart ? dateInput(e.workStart) : '', workEnd: e.workEnd ? dateInput(e.workEnd) : '', warrantyMonths: String(e.warrantyMonths ?? 12),
   discountPct: String(e.discountPct || 0), markupPct: String(e.markupPct || 0), taxPct: String(e.taxPct || 0), lossReservePct: String(e.lossReservePct || 0), delivery: String(e.delivery || 0), extraCosts: String(e.extraCosts || 0) });
 const payload = (h: H, lines: L[]) => ({
   title: h.title.trim() || 'Без названия', customer: h.customer || null, address: h.address || null, date: h.date || undefined, status: h.status, projectId: h.projectId || null, notes: h.notes || null,
   paymentTerms: h.paymentTerms || null, validDays: Math.max(1, Math.round(parseNum(h.validDays)) || 14),
+  customerDetails: h.customerDetails || null, workStart: h.workStart || null, workEnd: h.workEnd || null, warrantyMonths: Math.max(0, Math.min(120, Math.round(parseNum(h.warrantyMonths)))),
   discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts),
   lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), qty: parseNum(l.qty), unit: l.unit || 'шт', price: parseNum(l.price), costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category || null, note: l.note || null, catalogItemId: l.catalogItemId || null, unconfirmed: Boolean(l.unconfirmed) })),
 });
@@ -39,7 +41,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [lines, setLines] = useState<L[]>(() => initial.lines.map(toL));
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
-  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line'>(null);
+  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract'>(null);
+  const [share, setShare] = useState<any>(() => ({ url: null, sharedAt: initial.sharedAt, viewedAt: initial.viewedAt, approvedAt: initial.approvedAt, customerComment: initial.customerComment }));
   const [editLine, setEditLine] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(false);
   const [restore, setRestore] = useState<any>(null);
@@ -109,16 +112,17 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const FILE_OK: Record<string, string> = {
     pdf: 'PDF отправлен вам в чат бота — перешлите заказчику',
     act: 'Акт отправлен вам в чат бота — распечатайте и подпишите с заказчиком',
+    contract: 'Договор отправлен вам в чат бота — проверьте условия и подпишите с заказчиком',
     xlsx: 'Excel отправлен вам в чат бота',
     xlsxown: 'Excel «для себя» отправлен вам в чат бота — заказчику его не пересылайте',
   };
-  const sendFile = async (kind: 'pdf' | 'act' | 'xlsx' | 'xlsxown') => {
+  const sendFile = async (kind: 'pdf' | 'act' | 'contract' | 'xlsx' | 'xlsxown') => {
     setPdfBusy(true);
     try { if (dirty) await save(); await post(`/estimates/${initial.id}/file/${kind}/send`); haptic('success'); toast(FILE_OK[kind]); }
     catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setPdfBusy(false); }
   };
   const sendPdf = () => sendFile('pdf');
-  const openFile = async (kind: 'pdf' | 'act') => {
+  const openFile = async (kind: 'pdf' | 'act' | 'contract') => {
     setPdfBusy(true);
     try {
       if (dirty) await save();
@@ -128,6 +132,15 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     } catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setPdfBusy(false); }
   };
   const openPdf = () => openFile('pdf');
+
+  const openShare = async () => {
+    setPdfBusy(true);
+    try {
+      if (dirty) await save();
+      const r = await post(`/estimates/${initial.id}/share`);
+      setShare(r); setH((x) => ({ ...x, status: r.status || x.status })); setSheet('share');
+    } catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setPdfBusy(false); }
+  };
 
   const action = async (fn: () => Promise<any>, ok?: string) => {
     try { if (dirty) await save(); await fn(); if (ok) toast(ok); } catch (e: any) { toast(e.message, true); }
@@ -230,11 +243,19 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <button className="btn primary" disabled={pdfBusy} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 PDF в Telegram'}</button>
         <button className="btn" disabled={pdfBusy} onClick={() => openPdf()}>Открыть PDF</button>
       </div>
-      <div className="grid2" style={{ marginTop: 8 }}>
-        <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт работ</button>
+      <button className="btn block" style={{ marginTop: 8 }} disabled={pdfBusy} onClick={openShare}>🔗 Ссылка для заказчика</button>
+      {(share.approvedAt || share.viewedAt || share.sharedAt) && (
+        <button className="xs" style={{ background: 'none', border: 0, padding: '6px 0 0', color: share.approvedAt ? 'var(--ok)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={openShare}>
+          {share.approvedAt ? `✓ Согласована заказчиком ${date(share.approvedAt)}` : share.viewedAt ? `👀 Заказчик открыл ${date(share.viewedAt)}, ещё не согласовал` : 'Ссылка отправлена, заказчик ещё не открывал'}
+          {share.customerComment && /💬/.test(share.customerComment) ? ' · есть вопросы' : ''}
+        </button>
+      )}
+      <div className="grid3" style={{ marginTop: 8 }}>
+        <button className="btn" disabled={pdfBusy} onClick={() => setSheet('contract')}>📝 Договор</button>
+        <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт</button>
         <button className="btn" disabled={pdfBusy} onClick={() => sendFile('xlsx')}>📊 Excel</button>
       </div>
-      <p className="xs muted">В PDF, акте и Excel только то, что видит заказчик: без закупочных цен и вашей прибыли. Реквизиты — в Настройках.{!me.access.active && ' Акт и Excel — по подписке.'}</p>
+      <p className="xs muted">В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!me.access.active && ' Договор, акт и Excel — по подписке.'}</p>
 
       <h2 className="section-title">Для себя</h2>
       <div className="panel">
@@ -253,6 +274,32 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         {!readOnly && <button className="btn primary" onClick={save} disabled={!dirty || saveState === 'saving'}>{saveState === 'saving' ? 'Сохраняю…' : dirty ? 'Сохранить' : 'Сохранено'}</button>}
       </div></div>
       <div style={{ height: 80 }} />
+
+      {/* ---- Ссылка для заказчика ---- */}
+      <Sheet open={sheet === 'share'} onClose={() => setSheet(null)} title="Ссылка для заказчика">
+        <ShareSheet id={initial.id} title={h.title} total={totals.total} share={share} setShare={setShare} onClose={() => setSheet(null)} />
+      </Sheet>
+
+      {/* ---- Договор ---- */}
+      <Sheet open={sheet === 'contract'} onClose={() => setSheet(null)} title="Договор подряда">
+        <div className="stack">
+          <p className="small muted" style={{ margin: 0 }}>Типовой договор подряда, смета — приложением № 1. Стороны, адрес, сумма и условия оплаты берутся из сметы.</p>
+          <Field label="Паспорт или реквизиты заказчика" hint="Можно оставить пустым — будет строка для заполнения от руки">
+            <textarea className="textarea" style={{ minHeight: 64 }} value={h.customerDetails} onChange={(e) => setHead({ customerDetails: e.target.value })} placeholder="Паспорт 0000 000000, выдан …; тел. +7 …" readOnly={readOnly} />
+          </Field>
+          <div className="grid2">
+            <Field label="Начало работ"><input className="input" type="date" value={h.workStart} onChange={(e) => setHead({ workStart: e.target.value })} readOnly={readOnly} /></Field>
+            <Field label="Окончание"><input className="input" type="date" value={h.workEnd} onChange={(e) => setHead({ workEnd: e.target.value })} readOnly={readOnly} /></Field>
+          </div>
+          <Field label="Гарантия на работы"><NumInput value={h.warrantyMonths} onChange={(v) => setHead({ warrantyMonths: v })} unit="мес." readOnly={readOnly} /></Field>
+          {!h.customer.trim() && <div className="banner">Укажите заказчика в данных сметы — иначе в договоре будет пустая строка.</div>}
+          <div className="grid2">
+            <button className="btn primary" disabled={pdfBusy} onClick={() => sendFile('contract')}>{pdfBusy ? 'Готовлю…' : 'В Telegram'}</button>
+            <button className="btn" disabled={pdfBusy} onClick={() => openFile('contract')}>Открыть</button>
+          </div>
+          <p className="xs muted" style={{ margin: 0 }}>Это типовой шаблон, а не юридическая консультация. Перед подписанием проверьте условия под свою ситуацию; при крупных суммах покажите договор юристу.</p>
+        </div>
+      </Sheet>
 
       {/* ---- Шапка ---- */}
       <Sheet open={sheet === 'head'} onClose={() => setSheet(null)} title="Данные сметы">
@@ -413,5 +460,38 @@ function History({ id }: { id: string }) {
         </div>
       )}
     </Load>
+  );
+}
+
+function ShareSheet({ id, title, total, share, setShare, onClose }: { id: string; title: string; total: number; share: any; setShare: (s: any) => void; onClose: () => void }) {
+  const toast = useToast();
+  if (!share?.url) return <p className="small muted">Готовлю ссылку…</p>;
+  const text = `Смета «${title}» на ${rub(total)}. Посмотрите и нажмите «Согласовать», если всё устраивает:`;
+  const sendTg = () => {
+    const u = `https://t.me/share/url?url=${encodeURIComponent(share.url)}&text=${encodeURIComponent(text)}`;
+    if (tg?.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank');
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(`${text}\n${share.url}`); haptic('success'); toast('Скопировано — вставьте в WhatsApp, SMS или почту'); }
+    catch { toast('Не удалось скопировать — выделите ссылку вручную', true); }
+  };
+  return (
+    <div className="stack">
+      <p className="small muted" style={{ margin: 0 }}>Заказчик откроет смету в браузере без Telegram и сможет нажать «Согласовать» или задать вопрос. Уведомление придёт вам в бот. Закупочные цены и прибыль заказчик не видит.</p>
+      <input className="input" readOnly value={share.url} onFocus={(e) => e.target.select()} aria-label="Ссылка" />
+      <button className="btn primary block lg" onClick={sendTg}>Отправить в Telegram</button>
+      <div className="grid2">
+        <button className="btn" onClick={copy}>Скопировать</button>
+        <button className="btn" onClick={() => (tg?.openLink ? tg.openLink(share.url) : window.open(share.url, '_blank'))}>Как видит заказчик</button>
+      </div>
+      <div className="panel">
+        <div className="small">{share.approvedAt ? <b style={{ color: 'var(--ok)' }}>✓ Согласована {date(share.approvedAt)}</b> : share.viewedAt ? `👀 Открыта заказчиком ${date(share.viewedAt)}` : 'Заказчик ещё не открывал'}</div>
+        {share.customerComment && <div className="xs" style={{ whiteSpace: 'pre-wrap', marginTop: 8 }}>{share.customerComment}</div>}
+      </div>
+      <button className="btn ghost block" onClick={async () => {
+        if (!(await confirmDialog('Отозвать ссылку? Старая перестанет открываться, новую можно сделать в любой момент.'))) return;
+        try { setShare({ ...(await del(`/estimates/${id}/share`)), url: null }); toast('Ссылка отозвана'); onClose(); } catch (e: any) { toast(e.message, true); }
+      }}>Отозвать ссылку</button>
+    </div>
   );
 }

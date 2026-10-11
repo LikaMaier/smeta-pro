@@ -4,7 +4,8 @@ import { get, post, patch, del } from '../api';
 import { useMe } from '../App';
 import { Chips, Field, Icon, Load, NumInput, Sheet, State, useLoad, useToast } from '../components/ui';
 import { rub, pct, date, dateInput, parseNum, n, PROJ_STATUS, EXP_GROUP, INCOME_TYPE, groupLabel, UNITS } from '../format';
-import { confirmDialog, haptic } from '../tg';
+import { confirmDialog, haptic, tg } from '../tg';
+import { ContactSheet, CONTACT_CAT, telLink } from './Contacts';
 
 type Tab = 'summary' | 'ops' | 'planfact' | 'estimates' | 'photos' | 'close';
 
@@ -95,6 +96,7 @@ function Project({ p, setP, reload }: { p: any; setP: (x: any) => void; reload: 
             try { await post(`/projects/${p.id}/xlsx/send`); haptic('success'); toast('Excel по объекту отправлен вам в чат бота'); }
             catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); }
           }}>📊 Выгрузить в Excel</button>
+          <ProjectContacts projectId={p.id} />
         </>
       )}
 
@@ -394,6 +396,36 @@ function ProjectPhotos({ projectId }: { projectId: string }) {
           {open.caption && <div className="bar">{open.caption}</div>}
         </div>
       )}
+    </>
+  );
+}
+
+/** Контакты объекта: заказчик, техника, рабочие — с кнопкой «Позвонить» */
+function ProjectContacts({ projectId }: { projectId: string }) {
+  const list = useLoad(() => get<any[]>('/contacts', { projectId }), [projectId]);
+  const [edit, setEdit] = useState<any>(null);
+  const items = list.data || [];
+  return (
+    <>
+      <div className="row between" style={{ alignItems: 'baseline' }}>
+        <h2 className="section-title">Контакты объекта</h2>
+        <Link to="/contacts" className="xs muted">вся книжка →</Link>
+      </div>
+      {items.length ? (
+        <div className="list">
+          {items.map((c) => (
+            <div key={c.id} className="list-item">
+              <button className="grow" style={{ background: 'none', border: 0, textAlign: 'left', padding: 0, cursor: 'pointer', color: 'var(--text)' }} onClick={() => setEdit(c)}>
+                <div className="title ellipsis">{c.name}</div>
+                <div className="xs muted ellipsis">{[CONTACT_CAT[c.category], c.phone, c.note].filter(Boolean).join(' · ')}</div>
+              </button>
+              {c.phone && <a className="btn sm primary" href={telLink(c.phone)} onClick={(e) => { if (tg?.openLink) { e.preventDefault(); tg.openLink(telLink(c.phone)); } }} aria-label={`Позвонить ${c.name}`}>📞</a>}
+            </div>
+          ))}
+        </div>
+      ) : <p className="small muted">Телефоны заказчика, техники и рабочих по этому объекту — под рукой.</p>}
+      <button className="btn block" style={{ marginTop: 8 }} onClick={() => setEdit({ projectId })}><Icon.plus width={18} />Добавить контакт</button>
+      <ContactSheet c={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); list.reload(); }} readOnly={false} />
     </>
   );
 }

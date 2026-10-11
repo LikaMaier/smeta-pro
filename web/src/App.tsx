@@ -95,7 +95,7 @@ function Paywall() {
   return (
     <Sheet open={open} onClose={() => setOpen(false)} title="Нужна подписка">
       <div className="stack">
-        <p style={{ margin: 0 }}>Первая смета — бесплатно. Чтобы создавать новые сметы, вести объекты, деньги, календарь с фото, делать акты выполненных работ и выгружать в Excel, оформите подписку.</p>
+        <p style={{ margin: 0 }}>Первая смета — бесплатно. Чтобы создавать новые сметы, вести объекты, деньги, календарь с фото, делать договоры и акты, выгружать в Excel, оформите подписку.</p>
         <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
         <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
       </div>

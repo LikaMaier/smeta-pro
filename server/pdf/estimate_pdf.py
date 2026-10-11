@@ -16,7 +16,9 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Image, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 FONT_DIRS = [os.environ.get("PDF_FONT_DIR", ""), "/usr/share/fonts/truetype/dejavu", os.path.join(os.path.dirname(__file__), "fonts")]
 
@@ -31,6 +33,7 @@ def find_font(name):
 
 pdfmetrics.registerFont(TTFont("DV", find_font("DejaVuSans.ttf")))
 pdfmetrics.registerFont(TTFont("DV-B", find_font("DejaVuSans-Bold.ttf")))
+registerFontFamily("DV", normal="DV", bold="DV-B", italic="DV", boldItalic="DV-B")
 
 INK = colors.HexColor("#2B1A0E")
 MUTED = colors.HexColor("#7A6450")
@@ -55,6 +58,8 @@ S = {
     "words": ParagraphStyle("w", fontName="DV", fontSize=9, leading=12, textColor=MUTED),
     "h2": ParagraphStyle("h2", fontName="DV-B", fontSize=10.5, leading=13, textColor=INK, spaceBefore=10, spaceAfter=3),
     "body": ParagraphStyle("b", fontName="DV", fontSize=9.5, leading=13, textColor=INK),
+    "clause": ParagraphStyle("cl", fontName="DV", fontSize=9.3, leading=12.6, textColor=INK, spaceAfter=2.5),
+    "ok": ParagraphStyle("ok", fontName="DV-B", fontSize=9.5, leading=12, textColor=colors.HexColor("#2E7D4F")),
 }
 
 
@@ -134,43 +139,41 @@ def rub_words(v):
 
 
 # ---------- документ ----------
-def build(d):
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=14 * mm, bottomMargin=16 * mm,
-                            title=d.get("title") or "Смета", author=d.get("company") or "")
-    W = doc.width
-    els = []
+def fmt_date(v, default=None):
+    try:
+        return datetime.fromisoformat(str(v)[:10]).date()
+    except (TypeError, ValueError):
+        return default
 
-    # Шапка: исполнитель и контакты
-    head = Table([[Paragraph(esc(d.get("company") or "Смета"), S["company"]), Paragraph(esc(d.get("contacts")), S["contacts"])]],
-                 colWidths=[W * 0.55, W * 0.45])
+
+def image(path, max_w, max_h):
+    """Картинка с сохранением пропорций; None, если файла нет или он битый"""
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        iw, ih = ImageReader(path).getSize()
+        k = min(max_w / iw, max_h / ih)
+        return Image(path, width=iw * k, height=ih * k)
+    except Exception:
+        return None
+
+
+def header(d, W):
+    logo = image(d.get("logoPath"), 38 * mm, 16 * mm)
+    name = Paragraph(esc(d.get("company") or "Смета"), S["company"])
+    left = Table([[logo, name]], colWidths=[logo.drawWidth + 4 * mm, None]) if logo else name
+    if logo:
+        left.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                  ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+    head = Table([[left, Paragraph(esc(d.get("contacts")), S["contacts"])]], colWidths=[W * 0.62, W * 0.38])
     head.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEBELOW", (0, 0), (-1, 0), 1.2, GOLD),
                               ("BOTTOMPADDING", (0, 0), (-1, -1), 8), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
-    els += [head, Spacer(1, 8)]
+    return [head, Spacer(1, 8)]
 
-    is_act = d.get("docType") == "act"
-    d_date = (date.today().isoformat() if is_act and not d.get("actDate") else d.get("actDate")) if is_act else (d.get("date") or date.today().isoformat())
-    try:
-        dd = datetime.fromisoformat(d_date[:10]).date()
-    except ValueError:
-        dd = date.today()
-    valid = d.get("validDays") or 14
-    number = d.get("number") or ""
-    if is_act:
-        els.append(Paragraph(f"Акт{(' № ' + esc(number)) if number else ''} выполненных работ", S["title"]))
-        els.append(Paragraph(f"от {dd.strftime('%d.%m.%Y')} · по смете «{esc(d.get('title') or '')}»", S["sub"]))
-    else:
-        els.append(Paragraph(esc(d.get("title") or "Смета"), S["title"]))
-        els.append(Paragraph(f"Смета{(' № ' + esc(number)) if number else ''} от {dd.strftime('%d.%m.%Y')} · действительна до {(dd + timedelta(days=int(valid))).strftime('%d.%m.%Y')}", S["sub"]))
-    els.append(Spacer(1, 8))
 
-    info = [(k, v) for k, v in ([("Исполнитель", d.get("company"))] if is_act else []) + [("Заказчик", d.get("customer")), ("Адрес объекта", d.get("address"))] if v]
-    if info:
-        t = Table([[Paragraph(k, S["sub"]), Paragraph(esc(v), S["label"])] for k, v in info], colWidths=[32 * mm, W - 32 * mm])
-        t.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
-        els += [t, Spacer(1, 10)]
-
-    # Таблица позиций
+def items_block(d, W):
+    """Таблица позиций и итоги — общая для сметы, акта и приложения к договору"""
+    els = []
     cw = [9 * mm, W - 9 * mm - 18 * mm - 14 * mm - 24 * mm - 27 * mm, 18 * mm, 14 * mm, 24 * mm, 27 * mm]
     rows = [[Paragraph("№", S["head"]), Paragraph("Наименование работ и материалов", S["head"]), Paragraph("Кол-во", S["headr"]),
              Paragraph("Ед.", S["head"]), Paragraph("Цена", S["headr"]), Paragraph("Сумма", S["headr"])]]
@@ -178,7 +181,6 @@ def build(d):
              ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4), ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3)]
     lines = d.get("lines") or []
     grouped = d.get("grouped") and any(l.get("category") for l in lines)
-    groups = []
     if grouped:
         order = []
         for l in lines:
@@ -207,9 +209,9 @@ def build(d):
     table.setStyle(TableStyle(style))
     els += [table, Spacer(1, 8)]
 
-    # Итоги (без внутренней экономики)
     t = d.get("totals") or {}
     tr = []
+
     def add(label, value, neg=False):
         if value:
             tr.append([Paragraph(label, S["labelr"]), Paragraph(("−" if neg else "") + money(value), S["labelr"])])
@@ -226,22 +228,143 @@ def build(d):
     tt.setStyle(TableStyle([("LINEABOVE", (0, len(tr) - 1), (-1, len(tr) - 1), 1.2, GOLD), ("TOPPADDING", (0, len(tr) - 1), (-1, len(tr) - 1), 6),
                             ("RIGHTPADDING", (0, 0), (-1, -1), 3), ("TOPPADDING", (0, 0), (-1, -2), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -2), 1.5)]))
     els.append(KeepTogether([tt, Spacer(1, 3), Paragraph(f"Сумма прописью: {rub_words(t.get('total'))}", ParagraphStyle('wr', parent=S['words'], alignment=TA_RIGHT))]))
+    return els
 
-    if is_act:
-        els += [Spacer(1, 10), Paragraph(
-            f"Вышеперечисленные работы выполнены полностью и в срок на общую сумму {money(t.get('total'))}. "
-            "Заказчик претензий по объёму, качеству и срокам выполнения работ не имеет.", S["body"])]
-    if d.get("paymentTerms") and not is_act:
-        els += [Paragraph("Условия оплаты", S["h2"]), Paragraph(esc(d.get("paymentTerms")), S["body"])]
-    if d.get("notes") and not is_act:
-        els += [Paragraph("Примечания", S["h2"]), Paragraph(esc(d.get("notes")), S["body"])]
 
-    sign_rows = [[Paragraph("Исполнитель ____________________", S["label"]), Paragraph("Заказчик ____________________", S["labelr"])]]
-    if is_act:
-        sign_rows = [[Paragraph("Работы сдал:", S["sub"]), Paragraph("Работы принял:", ParagraphStyle('sr', parent=S['sub'], alignment=TA_RIGHT))]] + sign_rows
-    sign = Table(sign_rows, colWidths=[W / 2, W / 2])
-    sign.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
-    els += [Spacer(1, 22), KeepTogether([sign])]
+def sign_block(d, W, left="Исполнитель", right="Заказчик", captions=None):
+    """Строки подписей; подпись/печать исполнителя (картинка) ставится над его линией"""
+    sig = image(d.get("signPath"), 42 * mm, 18 * mm)
+    rows = []
+    if captions:
+        rows.append([Paragraph(captions[0], S["sub"]), Paragraph(captions[1], ParagraphStyle('sr', parent=S['sub'], alignment=TA_RIGHT))])
+    rows.append([sig or "", ""])
+    rows.append([Paragraph(f"{left} ____________________", S["label"]), Paragraph(f"{right} ____________________", S["labelr"])])
+    t = Table(rows, colWidths=[W / 2, W / 2], rowHeights=[None] * (len(rows) - 2) + [(sig.drawHeight if sig else 4 * mm), None])
+    t.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+                           ("BOTTOMPADDING", (0, len(rows) - 2), (-1, len(rows) - 2), -6 * mm if sig else 0), ("LEFTPADDING", (0, len(rows) - 2), (0, len(rows) - 2), 24 * mm)]))
+    return t
+
+
+def contract(d, W):
+    """Договор подряда: текст + реквизиты, смета — приложением № 1"""
+    t = d.get("totals") or {}
+    num = d.get("number") or ""
+    cd = fmt_date(d.get("contractDate"), date.today())
+    exe = esc(d.get("company") or "______________________")
+    cust = esc(d.get("customer") or "______________________")
+    addr = esc(d.get("address") or "______________________")
+    ws, we = fmt_date(d.get("workStart")), fmt_date(d.get("workEnd"))
+    start = ws.strftime("%d.%m.%Y") if ws else "в течение 3 (трёх) рабочих дней после поступления аванса"
+    end = we.strftime("%d.%m.%Y") if we else "в сроки, согласованные Сторонами"
+    warranty = int(d.get("warrantyMonths") or 0)
+    terms = esc(d.get("paymentTerms")) if d.get("paymentTerms") else \
+        "Окончательный расчёт производится в течение 3 (трёх) рабочих дней после подписания Сторонами Акта выполненных работ."
+    els = [Paragraph(f"Договор подряда{(' № ' + esc(num)) if num else ''}", S["title"]),
+           Paragraph(f"{cd.strftime('%d.%m.%Y')}", S["sub"]), Spacer(1, 8),
+           Paragraph(f"{exe}, именуемый(ая) в дальнейшем «Подрядчик», с одной стороны, и {cust}, именуемый(ая) в дальнейшем «Заказчик», "
+                     "с другой стороны, вместе именуемые «Стороны», заключили настоящий Договор о нижеследующем.", S["body"])]
+    sections = [
+        ("1. Предмет договора", [
+            f"1.1. Подрядчик обязуется по заданию Заказчика выполнить работы на объекте по адресу: {addr}, а Заказчик обязуется принять результат работ и оплатить его.",
+            "1.2. Состав, объём и стоимость работ и материалов определяются Сметой (Приложение № 1), которая является неотъемлемой частью Договора.",
+        ]),
+        ("2. Стоимость и порядок оплаты", [
+            f"2.1. Стоимость работ по Договору составляет {money(t.get('total'))} ({rub_words(t.get('total'))}).",
+            f"2.2. Порядок оплаты: {terms}",
+            "2.3. Работы, не предусмотренные Сметой, выполняются по дополнительному соглашению Сторон и оплачиваются отдельно.",
+        ]),
+        ("3. Сроки выполнения работ", [
+            f"3.1. Начало работ: {start}. Окончание работ: {end}.",
+            "3.2. Сроки переносятся соразмерно задержке, если Заказчик задерживает оплату или не обеспечивает доступ на объект, "
+            "а также при погодных условиях, при которых выполнение работ невозможно по технологии.",
+        ]),
+        ("4. Обязанности сторон", [
+            "4.1. Подрядчик обязуется: выполнить работы качественно, в соответствии со Сметой и строительными нормами; соблюдать технику безопасности; "
+            "сообщать Заказчику об обстоятельствах, которые могут повлиять на сроки или качество работ; после окончания работ передать Заказчику объект и Акт выполненных работ.",
+            "4.2. Заказчик обязуется: обеспечить доступ на объект, а также электроэнергию и воду, необходимые для работ; своевременно производить оплату; принять выполненные работы.",
+        ]),
+        ("5. Приёмка работ", [
+            "5.1. По окончании работ Подрядчик передаёт Заказчику Акт выполненных работ. В течение 3 (трёх) рабочих дней Заказчик подписывает Акт "
+            "либо передаёт Подрядчику письменный мотивированный отказ с перечнем недостатков.",
+            "5.2. Недостатки, допущенные по вине Подрядчика, устраняются им за свой счёт в согласованный Сторонами срок.",
+        ]),
+        ("6. Гарантия", [
+            (f"6.1. Гарантийный срок на выполненные работы — {warranty} мес. с даты подписания Акта выполненных работ." if warranty else
+             "6.1. Гарантийный срок на выполненные работы определяется законодательством Российской Федерации."),
+            "6.2. Гарантия не распространяется на недостатки, возникшие вследствие нормального износа, неправильной эксплуатации или вмешательства третьих лиц.",
+        ]),
+        ("7. Ответственность и разрешение споров", [
+            "7.1. За неисполнение или ненадлежащее исполнение обязательств Стороны несут ответственность в соответствии с законодательством Российской Федерации.",
+            "7.2. Споры решаются путём переговоров, а при недостижении согласия — в порядке, установленном законодательством Российской Федерации.",
+        ]),
+        ("8. Заключительные положения", [
+            "8.1. Договор вступает в силу с момента подписания и действует до полного исполнения Сторонами обязательств.",
+            "8.2. Изменения и дополнения к Договору действительны, если они оформлены письменно и подписаны Сторонами.",
+            "8.3. Договор составлен в двух экземплярах, имеющих равную силу, по одному для каждой из Сторон.",
+            "8.4. Приложение: № 1 — Смета.",
+        ]),
+    ]
+    for title, items in sections:
+        els.append(Paragraph(title, S["h2"]))
+        for it in items:
+            els.append(Paragraph(it, S["clause"]))
+    # Реквизиты
+    req_l = f"<b>Подрядчик</b><br/>{exe}" + (f"<br/>{esc(d.get('contacts'))}" if d.get("contacts") else "")
+    req_r = f"<b>Заказчик</b><br/>{cust}" + (f"<br/>{esc(d.get('customerDetails'))}" if d.get("customerDetails") else "<br/>Паспорт / реквизиты: ____________________")
+    req = Table([[Paragraph(req_l, S["body"]), Paragraph(req_r, S["body"])]], colWidths=[W / 2, W / 2])
+    req.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 8)]))
+    els += [KeepTogether([Paragraph("9. Реквизиты и подписи Сторон", S["h2"]), req, Spacer(1, 14), sign_block(d, W, "Подрядчик", "Заказчик")])]
+    # Приложение № 1 — смета
+    els += [PageBreak(), Paragraph(f"Приложение № 1 к Договору подряда{(' № ' + esc(num)) if num else ''} от {cd.strftime('%d.%m.%Y')}", S["sub"]),
+            Paragraph(f"Смета: {esc(d.get('title') or '')}", S["title"]), Spacer(1, 8)]
+    els += items_block(d, W)
+    els += [Spacer(1, 22), KeepTogether(sign_block(d, W, "Подрядчик", "Заказчик"))]
+    return els
+
+
+def build(d):
+    buf = io.BytesIO()
+    kind = d.get("docType") or "estimate"
+    titles = {"act": "Акт выполненных работ", "contract": "Договор подряда"}
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm, topMargin=14 * mm, bottomMargin=16 * mm,
+                            title=titles.get(kind, d.get("title") or "Смета"), author=d.get("company") or "")
+    W = doc.width
+    els = header(d, W)
+
+    if kind == "contract":
+        els += contract(d, W)
+    else:
+        is_act = kind == "act"
+        dd = fmt_date(d.get("actDate") if is_act else d.get("date"), date.today())
+        valid = d.get("validDays") or 14
+        number = d.get("number") or ""
+        if is_act:
+            els.append(Paragraph(f"Акт{(' № ' + esc(number)) if number else ''} выполненных работ", S["title"]))
+            els.append(Paragraph(f"от {dd.strftime('%d.%m.%Y')} · по смете «{esc(d.get('title') or '')}»", S["sub"]))
+        else:
+            els.append(Paragraph(esc(d.get("title") or "Смета"), S["title"]))
+            els.append(Paragraph(f"Смета{(' № ' + esc(number)) if number else ''} от {dd.strftime('%d.%m.%Y')} · действительна до {(dd + timedelta(days=int(valid))).strftime('%d.%m.%Y')}", S["sub"]))
+        els.append(Spacer(1, 8))
+        info = [(k, v) for k, v in ([("Исполнитель", d.get("company"))] if is_act else []) + [("Заказчик", d.get("customer")), ("Адрес объекта", d.get("address"))] if v]
+        if info:
+            t = Table([[Paragraph(k, S["sub"]), Paragraph(esc(v), S["label"])] for k, v in info], colWidths=[32 * mm, W - 32 * mm])
+            t.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+            els += [t, Spacer(1, 10)]
+        els += items_block(d, W)
+        t = d.get("totals") or {}
+        if is_act:
+            els += [Spacer(1, 10), Paragraph(
+                f"Вышеперечисленные работы выполнены полностью и в срок на общую сумму {money(t.get('total'))}. "
+                "Заказчик претензий по объёму, качеству и срокам выполнения работ не имеет.", S["body"])]
+        else:
+            if d.get("paymentTerms"):
+                els += [Paragraph("Условия оплаты", S["h2"]), Paragraph(esc(d.get("paymentTerms")), S["body"])]
+            if d.get("notes"):
+                els += [Paragraph("Примечания", S["h2"]), Paragraph(esc(d.get("notes")), S["body"])]
+            if d.get("approvedAt"):
+                ad = fmt_date(d.get("approvedAt"))
+                els += [Spacer(1, 6), Paragraph(f"✓ Смета согласована заказчиком онлайн {ad.strftime('%d.%m.%Y') if ad else ''}", S["ok"])]
+        els += [Spacer(1, 22), KeepTogether(sign_block(d, W, captions=("Работы сдал:", "Работы принял:") if is_act else None))]
 
     def footer(canvas, doc_):
         canvas.saveState()

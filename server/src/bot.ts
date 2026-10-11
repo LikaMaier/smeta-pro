@@ -2,6 +2,8 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { env } from './env';
 import { prisma, accessOf } from './util';
 import { applyPayment } from './routes/billing';
+import { upsertUser } from './routes/auth';
+import { botInfo } from './botInfo';
 import { handleMessage } from './ai/assistant';
 import { transcribe } from './ai/openai';
 
@@ -13,12 +15,15 @@ export function createBot() {
   const appKb = () => env.PUBLIC_URL ? new InlineKeyboard().webApp('Открыть СМЕТА PRO', env.PUBLIC_URL) : undefined;
 
   bot.command('start', async (ctx) => {
+    // Регистрируем сразу: так запоминаем, кто пригласил (ссылка t.me/бот?start=ref_…)
+    if (ctx.from) await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username, String(ctx.match || '')).catch((e) => console.error('upsertUser', e));
     await ctx.reply(
       '<b>СМЕТА PRO</b> — сметы и прибыль по объектам прямо в Telegram.\n\n' +
       '📐 Смета за 5 минут: ваш прайс, 34 калькулятора, готовые шаблоны\n' +
       '📄 PDF для заказчика в один тап\n' +
       '💰 Расходы, оплаты и реальная прибыль по каждому объекту\n' +
-      '📷 Календарь с фото, напоминания, записная книжка\n\n' +
+      '📷 Календарь с фото и напоминаниями\n' +
+      '🤝 Ссылка для заказчика, договор и акт\n\n' +
       '<b>Первая смета — бесплатно.</b> Дальше — по подписке.',
       { parse_mode: 'HTML', reply_markup: appKb() },
     );
@@ -76,7 +81,12 @@ export function createBot() {
     const [userId, planCode] = p.invoice_payload.split(':');
     const user = await prisma.user.findFirst({ where: { id: userId, tgId: BigInt(ctx.from.id) } });
     if (!user) return;
-    await applyPayment(userId, planCode, p.total_amount, p.telegram_payment_charge_id);
+    const res = await applyPayment(userId, planCode, p.total_amount, p.telegram_payment_charge_id);
+    if (res && res.referrer) {
+      await bot.api.sendMessage(Number(res.referrer.tgId),
+        `🎁 Ваш друг оформил подписку СМЕТА PRO — дарим вам месяц бесплатно!\nПодписка продлена до ${res.referrer.until.toLocaleDateString('ru-RU')}.`,
+        { reply_markup: appKb() }).catch(() => {});
+    }
     const fresh = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
     await ctx.reply(`Оплата прошла. Подписка активна до ${new Date(fresh.subscriptionUntil!).toLocaleDateString('ru-RU')}.`, { reply_markup: appKb() });
   });
@@ -90,11 +100,14 @@ export const BOT_DESCRIPTION =
   '• Смета за 5 минут: свой прайс, калькуляторы, готовые шаблоны\n' +
   '• PDF для заказчика в один тап\n' +
   '• Расходы, оплаты и реальная прибыль по каждому объекту\n' +
-  '• Календарь с фото, напоминания, записная книжка\n\n' +
+  '• Ссылка для заказчика с кнопкой «Согласовать», договор и акт\n' +
+  '• Календарь с фото и напоминаниями\n\n' +
   'Первая смета — бесплатно. Дальше — по подписке.';
 export const BOT_SHORT = 'Сметы, расчёты и прибыль по объектам для строителей. Первая смета — бесплатно.';
 
 export async function setupBot(bot: Bot) {
+  const me = await bot.api.getMe().catch(() => null);
+  if (me?.username) botInfo.username = me.username;
   await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }]);
   // Тексты, которые видно до нажатия «Старт» и в профиле бота
   await bot.api.setMyDescription(BOT_DESCRIPTION).catch(() => {});

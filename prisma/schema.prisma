@@ -25,6 +25,12 @@ model User {
   subscriptionUntil DateTime?
   subNotice3At      DateTime? // когда отправлено «подписка заканчивается через 3 дня»
   subNoticeEndAt    DateTime? // когда отправлено «подписка закончилась»
+  logoFile          String? // логотип для документов (файл в PHOTO_DIR/brand)
+  signFile          String? // подпись/печать для документов
+  weeklyDigest      Boolean   @default(true)
+  lastDigestAt      DateTime?
+  referredById      String? // кто пригласил
+  referralRewardedAt DateTime? // когда пригласившему начислен бонусный месяц
   createdAt         DateTime  @default(now())
 
   priceLists PriceList[]
@@ -198,6 +204,15 @@ model Estimate {
   source         String         @default("manual") // manual | ai
   paymentTerms   String?
   validDays      Int            @default(14)
+  customerDetails String? // паспорт / реквизиты заказчика для договора
+  workStart      DateTime?
+  workEnd        DateTime?
+  warrantyMonths Int            @default(12)
+  shareToken     String?        @unique // ссылка для заказчика
+  sharedAt       DateTime?
+  viewedAt       DateTime?
+  approvedAt     DateTime?
+  customerComment String?
   deletedAt      DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt

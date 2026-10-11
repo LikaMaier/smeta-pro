@@ -1,6 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma, plain, notFound } from '../util';
+import { prisma, plain, notFound, accessOf, num } from '../util';
+import { digestDue, lastWeek, digestText } from '../../../shared/digest';
+import { summarize } from '../../../shared/calendar';
+import { projectFinance } from './projects';
 import { env } from '../env';
 import { nextRun } from '../../../shared/reminders';
 
@@ -67,10 +70,10 @@ export async function organizerRoutes(app: FastifyInstance) {
     projectId: z.string().nullable().optional(),
   });
   app.get('/api/contacts', async (req) => {
-    const q = z.object({ q: z.string().optional(), category: z.string().optional() }).parse(req.query);
+    const q = z.object({ q: z.string().optional(), category: z.string().optional(), projectId: z.string().optional() }).parse(req.query);
     return plain(await prisma.contact.findMany({
       where: {
-        userId: req.user.id, deletedAt: null, ...(q.category ? { category: q.category } : {}),
+        userId: req.user.id, deletedAt: null, ...(q.category ? { category: q.category } : {}), ...(q.projectId ? { projectId: q.projectId } : {}),
         ...(q.q ? { OR: [{ name: { contains: q.q, mode: 'insensitive' as const } }, { phone: { contains: q.q } }, { note: { contains: q.q, mode: 'insensitive' as const } }] } : {}),
       },
       include: { project: { select: { id: true, name: true } } },
@@ -124,6 +127,7 @@ export function startReminderLoop(bot: any, log: { error: (o: any, m?: string) =
         } catch (e) { log.error({ err: e }, 'Не удалось отправить напоминание'); }
       }
       await subscriptionNotices(bot, log, appUrl);
+      await weeklyDigests(bot, log, appUrl);
     } catch (e) { log.error({ err: e }, 'Ошибка планировщика напоминаний'); } finally { running = false; }
   };
   setInterval(tick, 30000);
@@ -170,5 +174,49 @@ async function subscriptionNotices(bot: any, log: { error: (o: any, m?: string) 
     const stats = await userStats(u.id);
     await bot.api.sendMessage(Number(u.tgId), `🔒 <b>Подписка СМЕТА PRO закончилась.</b>\n${stats} Все данные сохранены и доступны для просмотра. Продлите подписку, чтобы снова их изменять.`, { parse_mode: 'HTML', reply_markup: kb })
       .catch((e: any) => log.error({ err: e }, 'Не удалось отправить уведомление о подписке'));
+  }
+}
+
+/** Итоги недели: понедельник после 9:00 МСК, только тем, у кого есть доступ и включена рассылка */
+async function weeklyDigests(bot: any, log: { error: (o: any, m?: string) => void }, appUrl: string) {
+  const now = new Date();
+  if (!digestDue(now, null)) return;
+  const { from, to } = lastWeek(now);
+  const users = await prisma.user.findMany({
+    where: { weeklyDigest: true, OR: [{ lastDigestAt: null }, { lastDigestAt: { lt: new Date(now.getTime() - 6 * 864e5) } }] },
+    take: 30,
+  });
+  for (const u of users) {
+    const claimed = await prisma.user.updateMany({
+      where: { id: u.id, OR: [{ lastDigestAt: null }, { lastDigestAt: { lt: new Date(now.getTime() - 6 * 864e5) } }] },
+      data: { lastDigestAt: now },
+    });
+    if (!claimed.count || !accessOf(u).active) continue;
+    try {
+      const where = { userId: u.id, deletedAt: null };
+      const [ops, photos, logs, estimates, approved, projects, rems] = await Promise.all([
+        prisma.financeOp.findMany({ where: { ...where, date: { gte: from, lt: to }, project: { deletedAt: null } } }),
+        prisma.photo.count({ where: { ...where, createdAt: { gte: from, lt: to } } }),
+        prisma.workLog.count({ where: { ...where, createdAt: { gte: from, lt: to } } }),
+        prisma.estimate.count({ where: { ...where, isTemplate: false, createdAt: { gte: from, lt: to } } }),
+        prisma.estimate.count({ where: { ...where, approvedAt: { gte: from, lt: to } } }),
+        prisma.project.findMany({
+          where: { ...where, status: { notIn: ['archived', 'draft'] } },
+          include: { estimates: { where: { deletedAt: null }, include: { lines: true } }, financeOps: { where: { deletedAt: null } } },
+        }),
+        prisma.reminder.findMany({ where: { ...where, active: true, remindAt: { gte: now, lt: new Date(now.getTime() + 7 * 864e5) } }, orderBy: { remindAt: 'asc' }, take: 5 }),
+      ]);
+      const s = summarize(ops.map((o) => ({ kind: o.kind, incomeType: o.incomeType, amount: num(o.amount), paidAmount: num(o.paidAmount), date: o.date, projectId: o.projectId })));
+      const debts = projects.map((p) => ({ name: p.name, amount: projectFinance(p).customerDebt })).filter((d) => d.amount > 0);
+      const text = digestText({
+        received: s.total.received, spent: s.total.spent, unpaid: s.total.unpaid, photos, logs, estimates, approved, debts,
+        reminders: rems.map((r) => ({ text: r.text, at: r.remindAt })),
+      });
+      if (!text) continue;
+      await bot.api.sendMessage(Number(u.tgId), `${text}\n\n<i>Отключить итоги недели можно в Настройках.</i>`, {
+        parse_mode: 'HTML',
+        ...(appUrl ? { reply_markup: { inline_keyboard: [[{ text: 'Открыть календарь', web_app: { url: `${appUrl}/calendar` } }]] } } : {}),
+      });
+    } catch (e) { log.error({ err: e }, 'Не удалось отправить итоги недели'); }
   }
 }

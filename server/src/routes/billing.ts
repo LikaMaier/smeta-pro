@@ -20,7 +20,7 @@ export async function seedPlans() {
 }
 
 /** Продление подписки после ПОДТВЕРЖДЁННОЙ оплаты (вызывается только из обработчика successful_payment бота) */
-export async function applyPayment(userId: string, planCode: string, stars: number, chargeId: string) {
+export async function applyPayment(userId: string, planCode: string, stars: number, chargeId: string): Promise<{ referrer?: { tgId: bigint; until: Date } } | void> {
   const exists = await prisma.payment.findUnique({ where: { telegramChargeId: chargeId } });
   if (exists) return; // идемпотентность: повторное уведомление не продлевает дважды
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
@@ -33,6 +33,21 @@ export async function applyPayment(userId: string, planCode: string, stars: numb
     prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId } }),
     prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until, subNotice3At: null, subNoticeEndAt: null } }),
   ]);
+  return { referrer: (await rewardReferrer(user)) ?? undefined };
+}
+
+/** «Приведи друга»: за первую оплату приглашённого пригласившему +1 месяц (один раз на друга) */
+export async function rewardReferrer(friend: { id: string; referredById: string | null }) {
+  if (!friend.referredById || friend.referredById === friend.id) return null;
+  const claimed = await prisma.user.updateMany({ where: { id: friend.id, referralRewardedAt: null }, data: { referralRewardedAt: new Date() } });
+  if (!claimed.count) return null;
+  const ref = await prisma.user.findUnique({ where: { id: friend.referredById } });
+  if (!ref) return null;
+  const base = ref.subscriptionUntil && ref.subscriptionUntil > new Date() ? ref.subscriptionUntil : new Date();
+  const until = new Date(base);
+  until.setMonth(until.getMonth() + 1);
+  await prisma.user.update({ where: { id: ref.id }, data: { subscriptionUntil: until, subNotice3At: null, subNoticeEndAt: null } });
+  return { tgId: ref.tgId, until };
 }
 
 export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {

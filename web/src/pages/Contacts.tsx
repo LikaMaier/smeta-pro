@@ -54,7 +54,9 @@ export default function Contacts() {
   );
 }
 
-function ContactSheet({ c, onClose, onSaved, readOnly }: { c: any; onClose: () => void; onSaved: () => void; readOnly: boolean }) {
+export const telLink = telHref;
+
+export function ContactSheet({ c, onClose, onSaved, readOnly }: { c: any; onClose: () => void; onSaved: () => void; readOnly: boolean }) {
   const toast = useToast();
   const projects = useLoad(() => (c ? get<any[]>('/projects') : Promise.resolve([])), [!!c]);
   const [f, setF] = useState<any>(null);

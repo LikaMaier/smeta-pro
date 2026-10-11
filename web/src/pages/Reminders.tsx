@@ -56,14 +56,20 @@ export default function Reminders() {
   );
 }
 
-function ReminderSheet({ r, onClose, onSaved, readOnly }: { r: any; onClose: () => void; onSaved: () => void; readOnly: boolean }) {
+export const remDayKey = (iso: string) => localDate(new Date(iso));
+
+export function ReminderSheet({ r, onClose, onSaved, readOnly }: { r: any; onClose: () => void; onSaved: () => void; readOnly: boolean }) {
   const toast = useToast();
   const projects = useLoad(() => (r ? get<any[]>('/projects') : Promise.resolve([])), [!!r]);
   const [f, setF] = useState<any>(null);
   useEffect(() => {
     if (!r) return setF(null);
-    const base = r.remindAt && new Date(r.remindAt) > new Date() ? new Date(r.remindAt) : new Date(Date.now() + 3600e3);
+    let base = r.remindAt && new Date(r.remindAt) > new Date() ? new Date(r.remindAt) : new Date(Date.now() + 3600e3);
     if (!r.remindAt) base.setMinutes(0, 0, 0);
+    if (!r.id && r.date) { // создание из дня календаря: этот день, 9:00 (если день сегодня и 9:00 прошло — через час)
+      const d9 = new Date(`${r.date}T09:00:00`);
+      if (d9 > new Date()) base = d9; else if (r.date === localDate(new Date())) base = new Date(Date.now() + 3600e3); else base = d9;
+    }
     setF({ text: r.text || '', date: localDate(base), time: localTime(base), repeat: r.repeat || 'none', projectId: r.projectId || '' });
   }, [r]);
   if (!r || !f) return null;

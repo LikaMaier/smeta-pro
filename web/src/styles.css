@@ -93,6 +93,8 @@ a { color: var(--amber); text-decoration: none; }
 .grow { flex: 1; min-width: 0; }
 .stack > * + * { margin-top: var(--s3); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s2); }
+.grid3 .btn { padding-left: 4px; padding-right: 4px; }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .right { text-align: right; }
 
@@ -253,6 +255,7 @@ h1.page-title { display: none; }
 .tile:active { background: var(--weave), var(--tile-press); border-color: var(--gold); }
 .tile small { display: block; margin-top: 6px; font-size: 13px; font-weight: 500; font-style: normal; color: var(--muted); }
 .tile.wide { grid-column: 1 / -1; min-height: 84px; }
+.tile.slim { min-height: 56px; font-size: 17px; }
 .tiles.one .tile { min-height: 86px; }
 .tile-group { margin: var(--s4) 0 var(--s2); color: var(--muted); font-size: var(--fs-s); font-style: italic; }
 
@@ -337,3 +340,9 @@ select.cinput option { color: #000; }
 .hero .over b { display: block; color: var(--accent); font-size: 20px; font-style: italic; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
 .hero .over span { color: var(--text); font-size: 13px; opacity: .85; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
 .hero .over b span { font-size: inherit; color: inherit; opacity: 1; }
+
+/* Логотип и подпись в настройках */
+.brand-slot { display: flex; flex-direction: column; gap: 6px; }
+.brand-box { height: 96px; border-radius: var(--r-l); border: 1.5px dashed var(--tile-border, var(--line)); background: #fff; display: flex; align-items: center; justify-content: center; padding: 8px; cursor: pointer; }
+.brand-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.brand-box .muted { color: #6b6257; }
