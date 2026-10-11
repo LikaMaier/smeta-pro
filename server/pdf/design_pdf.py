@@ -252,17 +252,19 @@ def build(d):
     c.showPage(); page += 1
 
     # --- 4. Металл: раскрой
-    frame(c, d, page, "Спецификация металла и раскрой")
+    wood = bool(d.get("wood"))
+    frame(c, d, page, "Спецификация пиломатериалов и раскрой" if wood else "Спецификация металла и раскрой")
     if len(d["view3d"]) > 1:
         draw_view3d(c, d["view3d"][1], PW - M - 95 * mm, PH - M - 75 * mm, 90 * mm, 65 * mm, bg="#EEF3F7")
-    head = [Paragraph(x, ST["h"]) for x in ["Профиль, мм", "Назначение", "Кусков", "Длина, м", "Хлыст", "Хлыстов", "Обрезь", "Масса, кг"]]
+    mk, unit_t = ("volNet", "Объём, м³") if wood else ("kgNet", "Масса, кг")
+    head = [Paragraph(x, ST["h"]) for x in ["Сечение, мм" if wood else "Профиль, мм", "Назначение", "Кусков", "Длина, м", "Доска/брус" if wood else "Хлыст", "Штук" if wood else "Хлыстов", "Обрезь", unit_t]]
     rows = [head] + [[Paragraph(s["profile"], ST["tb"]), Paragraph(esc(s["use"]), ST["t"]), Paragraph(str(s["pieces"]), ST["tc"]), Paragraph(qty(s["length"]), ST["tr"]),
-                      Paragraph(f"{s['stock']} м", ST["tc"]), Paragraph(f"<b>{s['bars']}</b>", ST["tc"]), Paragraph(f"{qty(s['wastePct'])}%", ST["tc"]), Paragraph(qty(s["kgNet"]), ST["tr"])] for s in d["steel"]]
-    rows.append([Paragraph("<b>Итого металл</b>", ST["t"]), "", "", Paragraph(qty(sum(s["length"] for s in d["steel"])), ST["tr"]), "", Paragraph(f"<b>{sum(s['bars'] for s in d['steel'])}</b>", ST["tc"]), "",
-                 Paragraph(f"<b>{qty(sum(s['kgNet'] for s in d['steel']))}</b>", ST["tr"])])
+                      Paragraph(f"{s['stock']} м", ST["tc"]), Paragraph(f"<b>{s['bars']}</b>", ST["tc"]), Paragraph(f"{qty(s['wastePct'])}%", ST["tc"]), Paragraph(qty(s[mk]), ST["tr"])] for s in d["steel"]]
+    rows.append([Paragraph("<b>Итого</b>", ST["t"]), "", "", Paragraph(qty(sum(s["length"] for s in d["steel"])), ST["tr"]), "", Paragraph(f"<b>{sum(s['bars'] for s in d['steel'])}</b>", ST["tc"]), "",
+                 Paragraph(f"<b>{qty(sum(s[mk] for s in d['steel']))}</b>", ST["tr"])])
     table(c, rows, [28 * mm, 50 * mm, 16 * mm, 20 * mm, 16 * mm, 18 * mm, 16 * mm, 20 * mm], M, PH - M - 14 * mm)
     c.setFont("DV", 7); c.setFillColor(MUT)
-    c.drawString(M, M + 22 * mm, "Хлысты — с учётом раскроя (пропил 3 мм). Масса — по фактической длине без обрези.")
+    c.drawString(M, M + 22 * mm, "Доски и брус по 6 м — с учётом раскроя. Объём — по фактической длине без обрези." if wood else "Хлысты — с учётом раскроя (пропил 3 мм). Масса — по фактической длине без обрези.")
     c.showPage(); page += 1
 
     # --- 5. Ведомость материалов и работ

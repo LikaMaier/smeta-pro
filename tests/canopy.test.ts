@@ -75,3 +75,55 @@ test('гараж 6×6: секционные ворота 3×2,5 и дверь н
   assert.ok(r.lines.some((l) => l.name === 'Монтаж входной металлической двери'));
   assert.ok(r.lines.some((l) => l.name === 'Утепление кровли'));
 });
+
+import { PRESETS } from '../shared/design/presets';
+import { drawings, render3d } from '../shared/design/render';
+import { designPdfData } from '../shared/design/report';
+
+test('все типовые проекты строятся: 3D, чертежи, смета без пустых строк', () => {
+  for (const pr of PRESETS) {
+    const r = buildCanopy(pr.p);
+    assert.ok(r.members.length > 5, pr.id);
+    for (const m of r.members) for (const c of [...m.a, ...m.b]) assert.ok(Number.isFinite(c), `${pr.id}: ${m.kind}`);
+    for (const l of r.lines) assert.ok(l.qty > 0 && Number.isFinite(l.price) && l.price >= 0, `${pr.id}: ${l.name}`);
+    assert.ok(r.lines.length > 5, pr.id);
+    assert.ok(render3d(r).items.length > 20, pr.id);
+    assert.ok(drawings(r).length >= 5, pr.id);
+    const d = designPdfData(r, { title: pr.title });
+    assert.ok(d.total > 10000, `${pr.id}: ${d.total}`);
+    if (pr.p.door) assert.ok(r.openings.some((o) => o.kind === 'door'), `${pr.id}: дверь не поставилась`);
+  }
+});
+
+test('арочная теплица 3×6: дуга по высоте 1,5→2,5, гибка трубы, поликарбонат на стенах', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'gh-36')!.p);
+  assert.ok(Math.abs(r.topAt(1.5, 3) - 2.5) < 0.01 && Math.abs(r.topAt(0, 3) - 1.5) < 0.01);
+  assert.ok(r.lines.some((l) => l.name === 'Гибка профильной трубы'));
+  assert.ok(r.lines.some((l) => l.name === 'Обшивка каркаса поликарбонатом'));
+  assert.ok(r.panels.filter((p) => p.kind === 'roof').length >= 16);
+  const door = r.openings.find((o) => o.kind === 'door')!;
+  assert.equal(door.side, 'front');
+});
+
+test('деревянный каркас: брус и доска в м³, сборка каркаса, без металла', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'gazebo-wood')!.p);
+  assert.ok(r.info.wood && r.info.woodVol > 0.3);
+  assert.ok(r.lines.some((l) => l.name.startsWith('Брус 150×150')));
+  assert.ok(r.lines.some((l) => l.name === 'Сборка деревянного каркаса'));
+  assert.ok(!r.lines.some((l) => l.name.startsWith('Труба профильная')));
+  assert.ok(!r.lines.some((l) => l.name === 'Изготовление металлоконструкций'));
+});
+
+test('козырёк: без столбов, на консолях, с анкерами', () => {
+  const r = buildCanopy(PRESETS.find((p) => p.id === 'visor')!.p);
+  assert.equal(r.members.filter((m) => m.kind === 'post').length, 0);
+  assert.ok(r.members.filter((m) => m.kind === 'brace').length >= 2);
+  assert.ok(r.lines.some((l) => l.name.startsWith('Анкерные болты')));
+});
+
+test('доп. опции: водосток, снегозадержатели, освещение, плитка', () => {
+  const r = buildCanopy({ kind: 'canopy', L: 6, W: 6, roof: 'gable', highSide: 'front', hHigh: 3.5, hLow: 2.6, cover: 'prof', walls: { front: 'open', back: 'open', left: 'open', right: 'open' }, base: 'paving', gutter: true, snowGuard: true, lights: 3 });
+  const has = (n: string) => r.lines.some((l) => l.name === n);
+  assert.ok(has('Монтаж водосточной системы') && has('Монтаж снегозадержателей') && has('Монтаж светильника') && has('Укладка тротуарной плитки (с основанием)'));
+  assert.equal(r.lines.find((l) => l.name === 'Монтаж светильника')!.qty, 3);
+});
