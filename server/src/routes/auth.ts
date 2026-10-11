@@ -21,7 +21,7 @@ async function upsertUser(tgId: number, firstName?: string, username?: string) {
 export function meView(user: any) {
   return plain({
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
-    companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled,
+    companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.theme,
     aiAvailable: Boolean(env.AI_PROVIDER),
     access: accessOf(user),
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
@@ -51,6 +51,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.patch('/api/me', async (req) => {
     const body = z.object({
       aiEnabled: z.boolean().optional(),
+      theme: z.enum(['gold', 'carbon', 'blueprint', 'malachite']).optional(),
       companyName: z.string().max(200).nullable().optional(),
       contacts: z.string().max(500).nullable().optional(),
     }).parse(req.body);

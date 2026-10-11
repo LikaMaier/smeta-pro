@@ -2,6 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, plain, notFound, audit, num, HttpError } from '../util';
 import { calcEstimate } from '../../../shared/estimate';
+import { pdfData, renderPdf, pdfLink, checkPdfSig, pdfFileName } from '../pdf';
+import { STARTER_PRICES } from '../../../shared/starterPrices';
+import { getTemplate } from '../../../shared/templates';
 
 const STATUSES = ['draft', 'sent', 'approved', 'rejected', 'archived'] as const;
 const nonneg = z.coerce.number().min(0, 'не может быть отрицательным');
@@ -31,6 +34,8 @@ const headerSchema = z.object({
   discountPct: pct.optional(), markupPct: pct.optional(), taxPct: pct.optional(), lossReservePct: pct.optional(),
   delivery: nonneg.optional(), extraCosts: nonneg.optional(),
   notes: z.string().max(5000).nullable().optional(),
+  paymentTerms: z.string().max(2000).nullable().optional(),
+  validDays: z.coerce.number().int().min(1).max(365).optional(),
 });
 
 export function estimateTotals(e: any) {
@@ -65,7 +70,58 @@ async function cloneEstimate(userId: string, src: any, overrides: any) {
   });
 }
 
-export async function estimateRoutes(app: FastifyInstance) {
+/** Цены для строк шаблона: свой справочник → примерные цены на работы → 0 (заполнить вручную) */
+async function priceTemplateLines(userId: string, lines: { name: string; qty: number; unit: string; type: string; category: string }[]) {
+  const items = await prisma.catalogItem.findMany({ where: { userId, deletedAt: null, active: true } });
+  const byName = new Map(items.map((i) => [i.name.toLowerCase(), i]));
+  const starter = new Map(STARTER_PRICES.map((p) => [p.name.toLowerCase(), p]));
+  return lines.map((l, i) => {
+    const own = byName.get(l.name.toLowerCase());
+    const st = starter.get(l.name.toLowerCase());
+    const note = own ? null : st ? 'Примерная цена — проверьте' : 'Укажите цену';
+    return {
+      position: i, name: l.name, qty: l.qty, unit: own?.unit || l.unit, type: l.type, category: l.category,
+      price: own ? own.price : st ? st.price : 0, costPrice: own?.costPrice ?? null, catalogItemId: own?.id ?? null,
+      note: note ? `${note}; количество типовое — уточните` : 'Количество типовое — уточните', unconfirmed: true,
+    };
+  });
+}
+
+async function estimateNumber(userId: string, e: any) {
+  return prisma.estimate.count({ where: { userId, isTemplate: false, createdAt: { lte: e.createdAt } } });
+}
+
+export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
+  app.get('/api/templates', async () => (await import('../../../shared/templates')).TEMPLATES.map((t) => ({ id: t.id, title: t.title, description: t.description, lines: t.lines.length })));
+
+  // ---- PDF ----
+  app.post('/api/estimates/:id/pdf/send', async (req) => {
+    const e = await loadEstimate(req.user.id, (req.params as any).id);
+    if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить PDF в чат нельзя', 'bot_not_configured');
+    const pdf = await renderPdf(pdfData(e, req.user, await estimateNumber(req.user.id, e)));
+    const { InputFile } = await import('grammy');
+    await opts.bot.api.sendDocument(Number(req.user.tgId), new InputFile(pdf, pdfFileName(e.title)), {
+      caption: `Смета «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Перешлите заказчику.`,
+    });
+    await audit(req.user.id, 'estimate', e.id, 'pdf_sent');
+    return { ok: true };
+  });
+
+  app.get('/api/estimates/:id/pdf/link', async (req) => {
+    const e = await loadEstimate(req.user.id, (req.params as any).id);
+    return { url: pdfLink(e.id) };
+  });
+
+  app.get('/files/estimates/:file', async (req, reply) => {
+    const id = String((req.params as any).file).replace(/\.pdf$/, '');
+    const { exp, sig } = req.query as any;
+    if (!checkPdfSig(id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте PDF из приложения заново' });
+    const e = await prisma.estimate.findFirst({ where: { id, deletedAt: null }, include: { lines: { orderBy: { position: 'asc' } }, user: true } });
+    if (!e) return reply.status(404).send({ error: 'Смета не найдена' });
+    const pdf = await renderPdf(pdfData(e, e.user, await estimateNumber(e.userId, e)));
+    return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(pdfFileName(e.title))}`).send(pdf);
+  });
+
   app.get('/api/estimates', async (req) => {
     const q = z.object({
       q: z.string().optional(), status: z.string().optional(), template: z.string().optional(),
@@ -94,8 +150,21 @@ export async function estimateRoutes(app: FastifyInstance) {
   });
 
   app.post('/api/estimates', async (req) => {
-    const body = headerSchema.partial({ title: true }).extend({ fromId: z.string().optional() }).parse(req.body);
+    const body = headerSchema.partial({ title: true }).extend({ fromId: z.string().optional(), templateId: z.string().optional() }).parse(req.body);
     await checkProject(req.user.id, body.projectId);
+    if (body.templateId) {
+      const tpl = getTemplate(body.templateId);
+      if (!tpl) throw notFound('Шаблон');
+      const e = await prisma.estimate.create({
+        data: {
+          userId: req.user.id, title: body.title || tpl.title, projectId: body.projectId || null, customer: body.customer || null,
+          lines: { create: await priceTemplateLines(req.user.id, tpl.lines) },
+        },
+        include: { lines: { orderBy: { position: 'asc' } } },
+      });
+      await audit(req.user.id, 'estimate', e.id, 'create', { template: tpl.id });
+      return view(e);
+    }
     if (body.fromId) {
       // создать из шаблона или копии другой сметы
       const src = await loadEstimate(req.user.id, body.fromId);

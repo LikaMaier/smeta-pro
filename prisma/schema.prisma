@@ -19,6 +19,7 @@ model User {
   companyName       String?
   contacts          String?
   aiEnabled         Boolean   @default(false)
+  theme             String    @default("gold")
   trialEndsAt       DateTime
   subscriptionUntil DateTime?
   createdAt         DateTime  @default(now())
@@ -33,6 +34,62 @@ model User {
   audit      AuditLog[]
   photos     Photo[]
   workLogs   WorkLog[]
+  reminders  Reminder[]
+  contacts   Contact[]
+  aiSessions AiSession[]
+}
+
+// Напоминание: бот присылает сообщение в заданное время
+model Reminder {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId  String?
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  text       String
+  remindAt   DateTime // следующий момент отправки (UTC)
+  repeat     String    @default("none") // none | daily | weekly | monthly
+  active     Boolean   @default(true)
+  lastSentAt DateTime?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([active, remindAt])
+  @@index([userId])
+}
+
+// Записная книжка: заказчики, техника, поставщики, рабочие
+model Contact {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  name      String
+  phone     String?
+  category  String    @default("customer") // customer | equipment | supplier | worker | other
+  note      String?
+  date      DateTime // дата записи (по ней группировка)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, date])
+}
+
+// Диалог с ИИ-сметчиком
+model AiSession {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages   Json     // [{role, content}]
+  draft      Json?    // последний черновик сметы
+  estimateId String?
+  status     String   @default("active") // active | done
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, status])
 }
 
 // Фото объекта, привязанное к дню календаря. Файлы лежат на диске (PHOTO_DIR), в БД — метаданные.
@@ -136,6 +193,8 @@ model Estimate {
   extraCosts     Decimal        @default(0) @db.Decimal(14, 2)
   notes          String?
   source         String         @default("manual") // manual | ai
+  paymentTerms   String?
+  validDays      Int            @default(14)
   deletedAt      DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -186,6 +245,8 @@ model Project {
   projectNotes   Note[]
   photos         Photo[]
   workLogs       WorkLog[]
+  reminders      Reminder[]
+  contacts       Contact[]
 
   @@index([userId, deletedAt])
 }

@@ -4,6 +4,7 @@ import { useMe } from '../App';
 import { Field, Load, Switch, useLoad, useToast } from '../components/ui';
 import { date } from '../format';
 import { openInvoice, haptic } from '../tg';
+import { THEMES, applyTheme } from '../theme';
 
 export default function Settings() {
   const { me, setMe, refreshMe } = useMe();
@@ -42,6 +43,17 @@ export default function Settings() {
         </div>
       </div>
 
+      <h2 className="section-title">Оформление</h2>
+      <div className="themes">
+        {THEMES.map((t) => (
+          <button key={t.id} className={`theme-card ${(me.theme || 'gold') === t.id ? 'on' : ''}`} aria-pressed={(me.theme || 'gold') === t.id}
+            onClick={async () => { applyTheme(t.id); try { setMe(await patch('/me', { theme: t.id })); } catch (e: any) { toast(e.message, true); } }}>
+            <div className="sw" style={{ background: t.bg, color: t.fg }}>СМЕТА</div>
+            <div className="nm">{t.name}</div>
+          </button>
+        ))}
+      </div>
+
       <h2 className="section-title">Тарифы</h2>
       <Load state={plans}>{(list) => (
         <div className="list">
@@ -55,7 +67,7 @@ export default function Settings() {
       )}</Load>
       <p className="xs muted">Оплата в Telegram Stars. Доступ продлевается только после подтверждения платежа Telegram.</p>
 
-      <h2 className="section-title">ИИ-помощник</h2>
+      <h2 className="section-title">ИИ-сметчик (OpenAI)</h2>
       <div className="panel">
         <div className="row between">
           <div className="grow"><div style={{ fontWeight: 600 }}>{me.aiEnabled ? 'Включён' : 'Выключен'}</div>

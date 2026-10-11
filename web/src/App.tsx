@@ -18,10 +18,13 @@ import Notes from './pages/Notes';
 import Settings from './pages/Settings';
 import Assistant from './pages/Assistant';
 import More from './pages/More';
+import Reminders from './pages/Reminders';
+import Contacts from './pages/Contacts';
+import { applyTheme } from './theme';
 
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
-  aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean;
+  aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean; theme?: string;
   access: { active: boolean; mode: 'trial' | 'subscription' | 'expired'; until: string; daysLeft: number };
 }
 const MeCtx = createContext<{ me: Me; setMe: (m: Me) => void; refreshMe: () => Promise<void> }>(null as any);
@@ -35,7 +38,7 @@ function titleOf(path: string): string {
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
     estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-помощник', settings: 'Настройки', more: 'Меню', calendar: 'Календарь',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Меню', calendar: 'Календарь', reminders: 'Напоминания', contacts: 'Записная книжка',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[1]) return 'Смета';
@@ -65,7 +68,7 @@ function TopBar({ onCalc }: { onCalc: () => void }) {
   return (
     <header className="topbar"><div className="in">
       {!root && !inTelegram && <button aria-label="Назад" onClick={() => nav(-1)}><Icon.back /></button>}
-      <h1>{titleOf(loc.pathname)}</h1>
+      <h1 style={titleOf(loc.pathname).length > 13 ? { fontSize: 18 } : undefined}>{titleOf(loc.pathname)}</h1>
       <button aria-label="Калькулятор" onClick={onCalc}><CalcIcon /></button>
       <button aria-label="Настройки" onClick={() => nav('/settings')}><Wrench /></button>
     </div></header>
@@ -97,6 +100,7 @@ function ApiErrorToasts() {
 function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
   const refreshMe = useCallback(async () => setMe(await get<Me>('/me')), [setMe]);
   const [calc, setCalc] = useState(false);
+  useEffect(() => applyTheme(me.theme), [me.theme]);
   return (
     <MeCtx.Provider value={{ me, setMe, refreshMe }}>
       <BrowserRouter>
@@ -126,6 +130,8 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/settings" element={<Settings />} />
               <Route path="/more" element={<More />} />
               <Route path="/calendar" element={<Calendar />} />
+              <Route path="/reminders" element={<Reminders />} />
+              <Route path="/contacts" element={<Contacts />} />
               <Route path="/calendar/:date" element={<CalendarDay />} />
               <Route path="*" element={<State title="Страница не найдена" />} />
             </Routes>

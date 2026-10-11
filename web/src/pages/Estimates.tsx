@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { Chips, Icon, Load, SearchBox, Sheet, State, useDebounced, useLoad } from '../components/ui';
 import { rub, date, EST_STATUS } from '../format';
+import { TEMPLATES } from '../../../shared/templates';
 
 export default function Estimates() {
   const nav = useNavigate();
@@ -16,8 +17,8 @@ export default function Estimates() {
   const [newOpen, setNewOpen] = useState(false);
   const templates = useLoad(() => (newOpen ? get<any[]>('/estimates', { template: '1' }) : Promise.resolve([])), [newOpen]);
 
-  const create = async (fromId?: string) => {
-    const e = await post('/estimates', fromId ? { fromId } : { title: 'Новая смета' });
+  const create = async (fromId?: string, templateId?: string) => {
+    const e = await post('/estimates', templateId ? { templateId } : fromId ? { fromId } : { title: 'Новая смета' });
     nav(`/estimates/${e.id}`);
   };
 
@@ -62,7 +63,16 @@ export default function Estimates() {
 
       <Sheet open={newOpen} onClose={() => setNewOpen(false)} title="Новая смета">
         <button className="btn primary block lg" onClick={() => create()}>Пустая смета</button>
-        <h4 className="muted small" style={{ margin: '20px 0 8px' }}>Или из шаблона</h4>
+        <h4 className="muted small" style={{ margin: '20px 0 8px' }}>Готовые шаблоны</h4>
+        <div className="list">
+          {TEMPLATES.map((t) => (
+            <button key={t.id} className="list-item" onClick={() => create(undefined, t.id)}>
+              <div className="grow"><div className="title">{t.title}</div><div className="xs muted">{t.description}</div></div><Icon.chevron className="chev" width={18} />
+            </button>
+          ))}
+        </div>
+        <p className="xs muted">Цены подставятся из вашего справочника, иначе — примерные. Количество типовое: поправьте под объект.</p>
+        <h4 className="muted small" style={{ margin: '20px 0 8px' }}>Мои шаблоны</h4>
         <Load state={templates} empty={(d) => (d.length ? null : <p className="small muted">Шаблонов пока нет. Сохраните любую смету как шаблон.</p>)}>
           {(ts) => <div className="list">{ts.map((t) => <button key={t.id} className="list-item" onClick={() => create(t.id)}><div className="grow"><div className="title">{t.title}</div><div className="xs muted">{t.linesCount} поз.</div></div><Icon.chevron className="chev" width={18} /></button>)}</div>}
         </Load>

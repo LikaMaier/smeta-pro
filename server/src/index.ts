@@ -3,6 +3,7 @@ import { buildApp } from './app';
 import { createBot, setupBot } from './bot';
 import { seedPlans } from './routes/billing';
 import { prisma } from './util';
+import { startReminderLoop } from './routes/organizer';
 
 async function main() {
   assertEnv();
@@ -14,6 +15,7 @@ async function main() {
   if (bot) {
     // Ошибка настройки бота не должна ронять приложение
     setupBot(bot).catch((e) => app.log.error({ err: e }, 'Не удалось настроить бота'));
+    startReminderLoop(bot, app.log, env.PUBLIC_URL);
   } else {
     app.log.warn('BOT_TOKEN не задан — бот и оплата отключены');
   }

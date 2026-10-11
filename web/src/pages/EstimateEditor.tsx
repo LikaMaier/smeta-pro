@@ -5,19 +5,20 @@ import { calcEstimate } from '../../../shared/estimate';
 import { useMe } from '../App';
 import { Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS } from '../format';
-import { confirmDialog, haptic } from '../tg';
+import { confirmDialog, haptic, tg } from '../tg';
 
 type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
-type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string;
+type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string;
   discountPct: string; markupPct: string; taxPct: string; lossReservePct: string; delivery: string; extraCosts: string };
 
 let seq = 0;
 const key = () => `l${Date.now()}_${seq++}`;
 const toL = (l: any): L => ({ k: key(), id: l.id, name: l.name, qty: String(l.qty ?? ''), unit: l.unit || 'шт', price: String(l.price ?? ''), costPrice: l.costPrice == null ? '' : String(l.costPrice), type: l.type || 'work', category: l.category || '', note: l.note || '', catalogItemId: l.catalogItemId, unconfirmed: l.unconfirmed });
-const toH = (e: any): H => ({ title: e.title, customer: e.customer || '', address: e.address || '', date: dateInput(e.date), status: e.status, projectId: e.projectId, notes: e.notes || '',
+const toH = (e: any): H => ({ title: e.title, customer: e.customer || '', address: e.address || '', date: dateInput(e.date), status: e.status, projectId: e.projectId, notes: e.notes || '', paymentTerms: e.paymentTerms || '', validDays: String(e.validDays ?? 14),
   discountPct: String(e.discountPct || 0), markupPct: String(e.markupPct || 0), taxPct: String(e.taxPct || 0), lossReservePct: String(e.lossReservePct || 0), delivery: String(e.delivery || 0), extraCosts: String(e.extraCosts || 0) });
 const payload = (h: H, lines: L[]) => ({
   title: h.title.trim() || 'Без названия', customer: h.customer || null, address: h.address || null, date: h.date || undefined, status: h.status, projectId: h.projectId || null, notes: h.notes || null,
+  paymentTerms: h.paymentTerms || null, validDays: Math.max(1, Math.round(parseNum(h.validDays)) || 14),
   discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts),
   lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), qty: parseNum(l.qty), unit: l.unit || 'шт', price: parseNum(l.price), costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category || null, note: l.note || null, catalogItemId: l.catalogItemId || null, unconfirmed: Boolean(l.unconfirmed) })),
 });
@@ -102,6 +103,22 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const addLines = (ls: Partial<L>[]) => {
     setLines((cur) => [...cur, ...ls.map((l) => ({ k: key(), name: '', qty: '1', unit: 'шт', price: '0', costPrice: '', type: 'work', category: '', note: '', ...l }))]);
     change(); haptic('light');
+  };
+
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const sendPdf = async () => {
+    setPdfBusy(true);
+    try { if (dirty) await save(); await post(`/estimates/${initial.id}/pdf/send`); haptic('success'); toast('PDF отправлен вам в чат бота — перешлите заказчику'); }
+    catch (e: any) { toast(e.message, true); } finally { setPdfBusy(false); }
+  };
+  const openPdf = async () => {
+    setPdfBusy(true);
+    try {
+      if (dirty) await save();
+      const { url } = await get(`/estimates/${initial.id}/pdf/link`);
+      const full = new URL(url, location.origin).toString();
+      if (tg?.openLink) tg.openLink(full); else window.open(full, '_blank');
+    } catch (e: any) { toast(e.message, true); } finally { setPdfBusy(false); }
   };
 
   const action = async (fn: () => Promise<any>, ok?: string) => {
@@ -201,6 +218,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <button className="btn block" style={{ marginTop: 12 }} onClick={() => setSheet('params')} disabled={readOnly}>Скидка, наценка, налог, доставка</button>
       </div>
 
+      <div className="grid2" style={{ marginTop: 12 }}>
+        <button className="btn primary" disabled={pdfBusy} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 PDF в Telegram'}</button>
+        <button className="btn" disabled={pdfBusy} onClick={() => openPdf()}>Открыть PDF</button>
+      </div>
+      <p className="xs muted">В PDF только то, что видит заказчик: без закупочных цен и вашей прибыли. Реквизиты — в Настройках.</p>
+
       <h2 className="section-title">Для себя</h2>
       <div className="panel">
         <table className="breakdown"><tbody>
@@ -289,7 +312,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             await action(async () => { await del(`/estimates/${initial.id}`); nav('/estimates', { replace: true }); }, 'Смета удалена');
           }}><div className="grow title" style={{ color: 'var(--bad)' }}>Удалить смету</div></button>
         </div>
-        <p className="xs muted" style={{ marginTop: 12 }}>Экспорт в PDF и Excel появится на следующем этапе.</p>
+
       </Sheet>
 
       <Sheet open={sheet === 'history'} onClose={() => setSheet(null)} title="История изменений">
@@ -316,7 +339,11 @@ function HeadForm({ h, setHead, readOnly }: { h: H; setHead: (p: Partial<H>) => 
           {(projects.data || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </Field>
-      <Field label="Примечания"><textarea className="textarea" value={h.notes} onChange={(e) => setHead({ notes: e.target.value })} readOnly={readOnly} /></Field>
+      <Field label="Условия оплаты" hint="Попадут в PDF для заказчика">
+        <textarea className="textarea" style={{ minHeight: 70 }} value={h.paymentTerms} placeholder="Аванс 50% перед началом работ, остаток — после подписания акта" onChange={(e) => setHead({ paymentTerms: e.target.value })} readOnly={readOnly} />
+      </Field>
+      <Field label="Смета действительна, дней"><NumInput value={h.validDays} onChange={(v) => setHead({ validDays: v })} unit="дн." readOnly={readOnly} /></Field>
+      <Field label="Примечания для заказчика"><textarea className="textarea" value={h.notes} onChange={(e) => setHead({ notes: e.target.value })} readOnly={readOnly} /></Field>
     </div>
   );
 }

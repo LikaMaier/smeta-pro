@@ -27,6 +27,36 @@
   --weave: repeating-linear-gradient(45deg, rgba(255,220,150,.03) 0 2px, transparent 2px 4px),
            repeating-linear-gradient(-45deg, rgba(0,0,0,.22) 0 2px, transparent 2px 4px);
   --glow: radial-gradient(120% 60% at 50% -10%, rgba(227,168,70,.22), transparent 60%);
+  --tile-1: #4A2410; --tile-2: #34180A; --tile-press: #5A2C12;
+  --top-1: #4A220A; --top-2: #3A1806;
+  --day: #33170A; --day-has: #4E2A10;
+  --box-bg: rgba(26,10,3,.45);
+}
+
+/* ===== Темы оформления ===== */
+:root[data-theme="carbon"] {
+  --bg: #161616; --surface: #222222; --surface-2: #2B2B2B; --line: #4A4A4A; --tile-border: #9C9C9C;
+  --text: #F4F4F2; --muted: #A6A6A6; --accent: #FFE01B; --accent-press: #E6C800; --gold: #BDBDBD; --amber: #FFE01B; --on-accent: #161616;
+  --ok: #6BD49A; --bad: #FF6B57;
+  --weave: repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 2px, transparent 2px 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,.35) 0 2px, transparent 2px 4px);
+  --glow: none;
+  --tile-1: #262626; --tile-2: #1F1F1F; --tile-press: #303030; --top-1: #1C1C1C; --top-2: #1C1C1C; --day: #202020; --day-has: #2A2A22; --box-bg: rgba(0,0,0,.25);
+}
+:root[data-theme="blueprint"] {
+  --bg: #0D2440; --surface: #12304F; --surface-2: #183A5E; --line: #2F5B86; --tile-border: #6FA8DC;
+  --text: #EAF4FF; --muted: #9DBCDB; --accent: #FFFFFF; --accent-press: #D6E9FF; --gold: #8EC5FF; --amber: #FFFFFF; --on-accent: #0D2440;
+  --ok: #7FE0B0; --bad: #FF8A7A;
+  --weave: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px) 0 0 / 22px 22px, linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px) 0 0 / 22px 22px;
+  --glow: radial-gradient(120% 60% at 50% -10%, rgba(142,197,255,.18), transparent 60%);
+  --tile-1: #16395F; --tile-2: #102B49; --tile-press: #1E4A78; --top-1: #12345A; --top-2: #0D2440; --day: #10304F; --day-has: #1A4570; --box-bg: rgba(5,18,34,.4);
+}
+:root[data-theme="malachite"] {
+  --bg: #0E211B; --surface: #143028; --surface-2: #1A3B31; --line: #2E5A4B; --tile-border: #6E9C83;
+  --text: #EEF6EA; --muted: #A9C4B4; --accent: #F2C94C; --accent-press: #D9AE2F; --gold: #C9A65B; --amber: #F2C94C; --on-accent: #0E211B;
+  --ok: #8FE3A8; --bad: #FF8A6E;
+  --weave: repeating-linear-gradient(45deg, rgba(255,255,255,.02) 0 2px, transparent 2px 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,.25) 0 2px, transparent 2px 4px);
+  --glow: radial-gradient(120% 60% at 50% -10%, rgba(201,166,91,.16), transparent 60%);
+  --tile-1: #1C3F34; --tile-2: #132E26; --tile-press: #24503F; --top-1: #17372E; --top-2: #0F261F; --day: #132C24; --day-has: #1F4636; --box-bg: rgba(3,14,10,.4);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -199,7 +229,7 @@ a { color: var(--amber); text-decoration: none; }
 /* ===== Стиль «прораб»: шапка, плитки, крупные поля ===== */
 h1.page-title { display: none; }
 .page-head { justify-content: flex-end; margin-bottom: var(--s3); }
-.topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 30; height: var(--topbar); background: linear-gradient(180deg, #4A220A, #3A1806); border-bottom: 1px solid var(--gold); box-shadow: 0 2px 10px rgba(0,0,0,.45); }
+.topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 30; height: var(--topbar); background: linear-gradient(180deg, var(--top-1), var(--top-2)); border-bottom: 1px solid var(--gold); box-shadow: 0 2px 10px rgba(0,0,0,.45); }
 .topbar .in { max-width: 640px; margin: 0 auto; height: 100%; display: flex; align-items: center; gap: 6px; padding: 0 var(--s2) 0 var(--s3); }
 .topbar h1 { flex: 1; margin: 0; font-size: 22px; font-weight: 700; font-style: italic; color: var(--accent); text-transform: uppercase; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar button { width: 44px; height: 44px; border: 0; background: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--gold); border-radius: 6px; }
@@ -209,16 +239,16 @@ h1.page-title { display: none; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin: 0 -6px; }
 .tiles.one { grid-template-columns: 1fr; }
 .tile { min-height: 104px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 10px 8px;
-  background: var(--weave), linear-gradient(160deg, #4A2410, #34180A); border: 1.5px solid var(--tile-border); border-radius: 4px; color: var(--accent);
+  background: var(--weave), linear-gradient(160deg, var(--tile-1), var(--tile-2)); border: 1.5px solid var(--tile-border); border-radius: 4px; color: var(--accent);
   box-shadow: inset 0 1px 0 rgba(252,235,191,.08);
   font-size: 21px; font-weight: 700; font-style: italic; line-height: 1.15; cursor: pointer; }
-.tile:active { background: var(--weave), #5A2C12; border-color: var(--gold); }
+.tile:active { background: var(--weave), var(--tile-press); border-color: var(--gold); }
 .tile small { display: block; margin-top: 6px; font-size: 13px; font-weight: 500; font-style: normal; color: var(--muted); }
 .tile.wide { grid-column: 1 / -1; min-height: 84px; }
 .tiles.one .tile { min-height: 86px; }
 .tile-group { margin: var(--s4) 0 var(--s2); color: var(--muted); font-size: var(--fs-s); font-style: italic; }
 
-.box { border: 1.5px solid var(--gold); border-radius: 4px; padding: 10px 12px; text-align: center; color: var(--accent); font-weight: 700; font-style: italic; background: rgba(26,10,3,.45); }
+.box { border: 1.5px solid var(--gold); border-radius: 4px; padding: 10px 12px; text-align: center; color: var(--accent); font-weight: 700; font-style: italic; background: var(--box-bg); }
 .box + .box { margin-top: 8px; }
 .box .line2 { display: block; }
 
@@ -266,13 +296,13 @@ select.cinput option { color: #000; }
 .cal-head b { font-size: 22px; font-style: italic; color: var(--accent); text-transform: capitalize; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .cal-wd { text-align: center; font-size: 12px; color: var(--muted); padding: 4px 0; }
-.cal-day { min-height: 62px; border: 1px solid var(--line); border-radius: 4px; background: var(--weave), #33170A; padding: 4px 3px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: var(--text); }
+.cal-day { min-height: 62px; border: 1px solid var(--line); border-radius: 4px; background: var(--weave), var(--day); padding: 4px 3px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; color: var(--text); }
 .cal-day.empty { visibility: hidden; }
 .cal-day.today { border-color: var(--accent); }
 .cal-day .d { font-weight: 700; font-size: 15px; }
 .cal-day .m { font-size: 10px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .cal-day .marks { display: flex; gap: 3px; font-size: 10px; color: var(--muted); }
-.cal-day.has { background: var(--weave), #4E2A10; }
+.cal-day.has { background: var(--weave), var(--day-has); }
 .bars { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; align-items: end; height: 110px; margin-top: 8px; }
 .bars div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
 .bars i { display: block; width: 100%; background: linear-gradient(180deg, var(--accent), var(--gold)); border-radius: 2px 2px 0 0; min-height: 2px; }
@@ -284,3 +314,10 @@ select.cinput option { color: #000; }
 .viewer { position: fixed; inset: 0; z-index: 70; background: rgba(20,8,2,.96); display: flex; flex-direction: column; }
 .viewer img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
 .viewer .bar { padding: 12px 16px calc(12px + var(--safe-b)); display: flex; gap: 8px; align-items: center; }
+
+/* Выбор темы */
+.themes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.theme-card { border: 2px solid transparent; border-radius: 6px; padding: 0; overflow: hidden; cursor: pointer; text-align: left; background: none; }
+.theme-card.on { border-color: var(--accent); }
+.theme-card .sw { height: 64px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-style: italic; font-size: 18px; }
+.theme-card .nm { padding: 6px 8px; font-size: 13px; color: var(--text); background: var(--surface); }

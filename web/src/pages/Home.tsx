@@ -40,8 +40,10 @@ export default function Home() {
         <Link className="tile" to="/calendar">Календарь<small>фото и заработок</small></Link>
         <Link className="tile" to="/finance">Финансы</Link>
         <Link className="tile" to="/catalog">Справочник цен</Link>
+        <Link className="tile" to="/reminders">Напоминания</Link>
+        <Link className="tile" to="/contacts">Записная книжка<small>телефоны по датам</small></Link>
         <Link className="tile" to="/notes">Заметки</Link>
-        <Link className="tile" to="/assistant">ИИ-помощник<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
+        <Link className="tile" to="/assistant">ИИ-сметчик<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
         <Link className="tile wide" to="/settings">Настройки и подписка</Link>
       </div>
 

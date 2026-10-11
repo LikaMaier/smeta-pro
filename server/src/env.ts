@@ -11,8 +11,11 @@ export const env = {
   TRIAL_DAYS: Number(process.env.TRIAL_DAYS || 7),
   // Только для локальной разработки вне Telegram. На проде не включать.
   DEV_AUTH: process.env.DEV_AUTH === '1',
-  // ИИ (этап 4) — пока не подключён
-  AI_PROVIDER: process.env.AI_PROVIDER || '',
+  // ИИ-сметчик (OpenAI). Без ключа ИИ честно отключён.
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+  OPENAI_STT_MODEL: process.env.OPENAI_STT_MODEL || 'gpt-4o-mini-transcribe',
+  AI_PROVIDER: process.env.OPENAI_API_KEY ? 'openai' : '',
 };
 
 export function assertEnv() {
