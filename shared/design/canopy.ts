@@ -11,7 +11,7 @@ import { Builder } from '../masters';
 export type V3 = [number, number, number];
 export type MemberKind = 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster' | 'brace';
 export interface Member { kind: MemberKind; profile: string; a: V3; b: V3 }
-export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip'; pts: V3[] }
+export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip' | 'container'; pts: V3[] }
 export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh' | 'rail' | 'poly' | 'sandwich' | 'wood' | 'wood_low';
 export type Side = 'front' | 'back' | 'left' | 'right';
 export type ObjKind = 'canopy' | 'tko' | 'lean' | 'visor' | 'gazebo' | 'garage' | 'greenhouse' | 'woodshed';
@@ -34,6 +34,10 @@ export interface CanopyParams {
   midRows: number;      // промежуточные ряды столбов поперёк пролёта (многопролётный навес)
   walls: Record<Side, Wall>;
   profH: number;        // высота профлиста при «профлист» / «профлист + сетка»
+  profGrade: 'C8' | 'C20' | 'HC35'; // марка кровельного профнастила
+  entry: Side | 'none'; // въезд без промежуточных столбов (над проёмом — ферма)
+  containers: number;   // площадка ТКО: сколько контейнеров показать в макете
+  contType: '1.1' | '0.75';
   gate: 'none' | 'swing' | 'sectional'; // ворота в передней стене
   gateW: number; gateH: number;
   door: boolean;        // дверь / калитка 0,9×2,05
@@ -54,7 +58,7 @@ export interface CanopyParams {
 
 export const CANOPY_DEFAULT: CanopyParams = {
   kind: 'tko', L: 10.2, W: 9.2, roof: 'single', layout: 'perimeter', midRows: 0, frame: 'steel', gutter: false, snowGuard: false, lights: 0, hHigh: 6, hLow: 5, highSide: 'left', attach: false, postStep: 3, overhang: 0.3, cover: 'prof',
-  walls: { front: 'open', back: 'prof_mesh', left: 'prof_mesh', right: 'prof_mesh' }, profH: 2,
+  walls: { front: 'open', back: 'prof_mesh', left: 'prof_mesh', right: 'prof_mesh' }, profH: 2, profGrade: 'C8', entry: 'front', containers: 6, contType: '1.1',
   gate: 'none', gateW: 3, gateH: 2.5, door: false, insulate: false,
   base: 'slab', stripW: 0.4, stripD: 0.7, eps: 0.1, city: '', slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite', snow: 3, color: 'RAL 7024', waste: 5,
 };
@@ -67,6 +71,12 @@ const beamProfile = (step: number) => (step <= 3.2 ? '100×50×3' : step <= 4.5 
 const rafterProfile = (span: number) => (span <= 3 ? '60×40×2' : span <= 4.5 ? '80×40×3' : '100×50×3');
 const purlinProfile = (spacing: number) => (spacing <= 1.0 ? '40×20×2' : spacing <= 1.6 ? '60×40×2' : spacing <= 3.2 ? '80×40×3' : '100×50×3');
 const rafterMax = (snow: number, wood: boolean) => (wood ? (snow <= 2 ? 1.0 : snow <= 4 ? 0.8 : 0.6) : snow <= 2 ? 1.5 : snow <= 4 ? 1.2 : 0.9);
+/** кровельный профнастил: ширина листа / полезная, ₽ за м² листа, шаг обрешётки по снегу */
+export const PROF_GRADE = {
+  C8: { name: 'С-8', w: 1.2, use: 1.15, price: 480, step: (snow: number) => (snow <= 2 ? 0.6 : snow <= 3 ? 0.5 : 0.4), minDeg: 10 },
+  C20: { name: 'С-20', w: 1.15, use: 1.1, price: 560, step: (snow: number) => (snow <= 3 ? 0.8 : 0.6), minDeg: 8 },
+  HC35: { name: 'НС-35', w: 1.06, use: 1.0, price: 780, step: (snow: number) => (snow <= 3 ? 1.0 : 0.6), minDeg: 5 },
+} as const;
 const WOOD_M3 = 21000, BOARD_M3 = 19000; // ₽/м³ хвоя, естественной влажности, ориентир
 const KG_PRICE = 95; // ₽ за кг трубы, ориентир
 const r2 = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
@@ -89,6 +99,8 @@ interface Opening { side: Side; a0: number; a1: number; h: number; kind: 'gate' 
 export function buildCanopy(p0: Partial<CanopyParams>) {
   const p: CanopyParams = { ...CANOPY_DEFAULT, ...p0, walls: { ...CANOPY_DEFAULT.walls, ...(p0.walls || {}) } };
   const warnings: string[] = [];
+  if (p0.entry === undefined) p.entry = p.kind === 'tko' ? 'front' : 'none';
+  if (p0.containers === undefined && p.kind !== 'tko') p.containers = 0;
   if (p.kind === 'visor') { p.roof = 'single'; p.attach = true; }
   if (p.roof !== 'single') p.attach = false;
   if (p.attach) p.walls = { ...p.walls, [p.highSide]: 'open' };
@@ -175,6 +187,13 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   // козырёк: столбов нет совсем — консоли (подкосы) от стены
   if (consoles) { postMap.clear(); if (span > 2) warnings.push('Козырёк на консолях — вылет больше 2 м нужно проверить, лучше поставить столбы (тип «Пристенный навес»)'); }
 
+  // въезд без промежуточных столбов (мусоровоз, автомобиль, техника) — остаются только угловые
+  const entry: Side | null = p.entry && p.entry !== 'none' && !center && !consoles && !(p.attach && p.entry === p.highSide) ? p.entry : null;
+  if (entry) for (const [k, [x, y]] of postMap) {
+    const q = sideOf(x, y).find((z) => z.side === entry);
+    if (q && q.t > 0.01 && q.t < sideDefs[entry].len - 0.01) postMap.delete(k);
+  }
+
   // ---------- проёмы: ворота и дверь ----------
   const openings: Opening[] = [];
   if (p.gate !== 'none') {
@@ -224,6 +243,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
 
   // ---------- обвязка по периметру (по верху столбов, повторяет уклон) ----------
   let beamProf = beamProfile(p.postStep);
+  let girder: { side: Side; len: number; h: number } | null = null;
   for (const s of SIDES) {
     const d = sideDefs[s];
     const ts = [...postMap.values()].flatMap(([x, y]) => sideOf(x, y).filter((q) => q.side === s).map((q) => q.t))
@@ -231,6 +251,22 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     const isHouse = p.attach && s === p.highSide;
     let gap = p.postStep;
     for (let i = 1; i < ts.length; i++) gap = Math.max(gap, ts[i] - ts[i - 1]);
+    // над въездом длиннее 6 м — подстропильная ферма вместо балки
+    if (s === entry && gap > 6 && !kinkSide(s)) {
+      const hg = clamp(gap / 10, 0.6, 1.2);
+      const [x0, y0] = d.pt(0), [x1, y1] = d.pt(d.len);
+      const zt = (t: number) => topAt(...d.pt(t));
+      add('beam', '100×100×4', [x0, y0, zt(0)], [x1, y1, zt(d.len)]);
+      add('chord', '100×100×4', [x0, y0, zt(0) - hg], [x1, y1, zt(d.len) - hg]);
+      const n = Math.max(4, Math.ceil(d.len / (hg * 1.2)));
+      for (let i = 0; i <= n; i++) {
+        const t = (d.len * i) / n, [x, y] = d.pt(t);
+        add('web', '60×60×3', [x, y, zt(t) - hg], [x, y, zt(t)]);
+        if (i < n) { const t2 = (d.len * (i + 1)) / n, [x2, y2] = d.pt(t2); if (i % 2 === 0) add('web', '60×60×3', [x, y, zt(t) - hg], [x2, y2, zt(t2)]); else add('web', '60×60×3', [x, y, zt(t)], [x2, y2, zt(t2) - hg]); }
+      }
+      girder = { side: s, len: d.len, h: hg };
+      continue;
+    }
     const prof = isHouse ? beamProfile(p.postStep * snowK) : beamProfile(gap * snowK);
     if (P(prof).a > P(beamProf).a) beamProf = prof;
     if (gap > 6) warnings.push(`Пролёт обвязки ${r2(gap, 1)} м над проёмом — нужна усиленная балка или ферма, проверьте у конструктора`);
@@ -247,7 +283,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   // ---------- стропильная система ----------
   const rStepMax = rafterMax(p.snow, wood || light);
   const slats = p.cover === 'slats';
-  const purStep = slats ? 0.3 : light ? 1.0 : p.cover === 'poly' ? 0.7 : p.cover === 'tile' ? 0.35 : p.cover === 'soft' ? 0.6 : p.cover === 'sandwich' ? 1.5 : p.snow <= 3 ? 1.0 : 0.6;
+  const purStep = slats ? 0.3 : light ? 1.0 : p.cover === 'poly' ? 0.7 : p.cover === 'tile' ? 0.35 : p.cover === 'soft' ? 0.6 : p.cover === 'sandwich' ? 1.5 : (PROF_GRADE[p.profGrade] || PROF_GRADE.C8).step(p.snow);
   let bentLen = 0; // гнутые элементы арки
   let truss = false, rafterProf = '', chordProf = '', webProf = '', purProf = '', rafterCount = 0, rafterSpacing = 0, purlinRows = 0, slopeLen = 0;
   const roofPolys: V3[][] = [];
@@ -477,6 +513,35 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
   if (p.base === 'deck') panels.push({ kind: 'deck', pts: [[0, 0, 0], [L, 0, 0], [L, W, 0], [0, W, 0]] });
   if (p.base === 'paving') panels.push({ kind: 'paving', pts: [[-p.slabOver, -p.slabOver, 0], [L + p.slabOver, -p.slabOver, 0], [L + p.slabOver, W + p.slabOver, 0], [-p.slabOver, W + p.slabOver, 0]] });
 
+  // ---------- площадка ТКО: контейнеры в макете и проезд мусоровоза ----------
+  let contPlaced = 0;
+  if (p.kind === 'tko' && p.containers > 0) {
+    const [cw, cd, ch] = p.contType === '0.75' ? [1.26, 0.78, 1.3] : [1.37, 1.07, 1.47];
+    const gap = 0.3, edge = 0.35;
+    // ряды вдоль стены, противоположной въезду
+    const back: Side = entry === 'back' ? 'front' : entry === 'left' ? 'right' : entry === 'right' ? 'left' : 'back';
+    const along = back === 'front' || back === 'back' ? L : W, across = back === 'front' || back === 'back' ? W : L;
+    const perRow = Math.max(0, Math.floor((along - 2 * edge + gap) / (cw + gap)));
+    const rowsFit = Math.max(0, Math.floor((across - 2.5) / (cd + 0.6))); // 2,5 м — проход к контейнерам
+    const want = Math.round(p.containers);
+    for (let i = 0; i < want && perRow > 0; i++) {
+      const row = Math.floor(i / perRow), col = i % perRow;
+      if (row >= Math.max(1, rowsFit)) break;
+      const a0 = edge + col * (cw + gap), b0 = 0.25 + row * (cd + 0.6);
+      // a — вдоль задней стены, b — от неё внутрь
+      const toXY = (a: number, b: number): [number, number] => back === 'back' ? [a, W - b] : back === 'front' ? [a, b] : back === 'left' ? [b, a] : [L - b, a];
+      const c = [toXY(a0, b0), toXY(a0 + cw, b0), toXY(a0 + cw, b0 + cd), toXY(a0, b0 + cd)];
+      panels.push({ kind: 'container', pts: c.map(([x, y]) => [x, y, ch] as V3) });
+      contPlaced++;
+    }
+    if (contPlaced < want) warnings.push(`Помещается ${contPlaced} контейнер(ов) ${p.contType} м³ из ${want} — увеличьте площадку или уменьшите число контейнеров`);
+  }
+  if (p.kind === 'tko' && entry) {
+    const minH = Math.min(...[0, 0.5, 1].map((f) => topAt(...sideDefs[entry].pt(sideDefs[entry].len * f)))) - (girder ? girder.h : 0.15);
+    if (minH < 3.5) warnings.push(`Высота проезда над въездом ${r2(minH, 2)} м — мусоровозу нужно не меньше 3,5–4 м`);
+  }
+  if (girder) warnings.push(`Въезд без промежуточных столбов: над проёмом ${r2(girder.len, 1)} м — подстропильная ферма высотой ${Math.round(girder.h * 1000)} мм`);
+
   // ---------- теплица: лёгкие оцинкованные профили ----------
   if (light) for (const m of members) m.profile = ({ post: '40×40×2', beam: '40×20×2', rafter: '40×20×2', chord: '40×20×2', web: '20×20×1.5', hip: '40×20×2', purlin: '20×20×1.5', rail: '20×20×1.5', frame: '40×20×2', handrail: '40×20×2', baluster: '20×20×1.5', brace: '40×20×2' } as Record<MemberKind, string>)[m.kind];
   if (light && (span > 4.5 || hHigh > 3.5)) warnings.push('Для теплицы шире 4,5 м или выше 3,5 м лёгкий каркас 40×20 недостаточен — проверьте сечения');
@@ -566,12 +631,17 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
 
   b.sec('Кровля');
   const ral = p.color;
+  const pg = PROF_GRADE[p.profGrade] || PROF_GRADE.C8;
+  if (p.cover === 'prof' && !arch) {
+    const deg = (Math.atan((hHigh - hLow) / (hip ? hs / 2 : p.roof === 'gable' ? span / 2 : span)) * 180) / Math.PI;
+    if (deg < pg.minDeg) warnings.push(`Уклон кровли ${r2(deg, 1)}° — для профнастила ${pg.name} нужно не меньше ${pg.minDeg}°, иначе возможны протечки по нахлёстам. Увеличьте перепад высот или возьмите ${pg.name === 'НС-35' ? 'сэндвич-панели' : 'НС-35'}.`);
+  }
   if (p.cover === 'prof') {
     if (arch) b.mat(`Профнастил арочный (гнутый) ${ral}`, roofArea * 1.1 * k, 'м²', 950);
     else if (!hip) {
-      const sheetsAcross = Math.ceil((lenV + 2 * ov) / 1.0 - 1e-9);
-      roofPolys.forEach((q) => b.mat(`Профнастил кровельный НС-35 ${ral}, лист 1,06 × ${r2(dist(q[0], q[1]), 2)} м`, sheetsAcross, 'лист', Math.round(1.06 * dist(q[0], q[1]) * 780)));
-    } else b.mat(`Профнастил кровельный НС-35 ${ral} (с подрезкой под вальмы)`, roofArea * 1.18 * k, 'м²', 780);
+      const sheetsAcross = Math.ceil((lenV + 2 * ov) / pg.use - 1e-9);
+      roofPolys.forEach((q) => b.mat(`Профнастил ${pg.name} ${ral} на кровлю, лист ${String(pg.w).replace('.', ',')} × ${r2(dist(q[0], q[1]), 2)} м`, sheetsAcross, 'лист', Math.round(pg.w * dist(q[0], q[1]) * pg.price)));
+    } else b.mat(`Профнастил ${pg.name} ${ral} на кровлю (с подрезкой под вальмы)`, roofArea * 1.18 * k, 'м²', pg.price);
     b.mat('Саморезы кровельные 4,8×35 в цвет', Math.ceil(roofArea * 7 * k), 'шт', 3);
     b.work('Монтаж профнастила на кровлю', roofArea);
   }
@@ -829,6 +899,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
     { label: 'Сетка', value: r2(meshArea, 1), unit: 'м²' },
     { label: 'Перила', value: r2(railLen, 1), unit: 'пог. м' },
     { label: 'Столбов', value: nPosts, unit: 'шт' },
+    { label: 'Контейнеров', value: contPlaced, unit: `шт по ${p.contType} м³` },
   );
   if (slats) warnings.push('Пергола: ламели не защищают от дождя — при необходимости добавьте поликарбонат поверх');
   if (midRows) warnings.push(`Многопролётный навес: ${midRows + 1} пролёта по ${r2(span / (midRows + 1), 2)} м, учитывайте промежуточные столбы в схеме проезда и парковки`);
@@ -837,7 +908,7 @@ export function buildCanopy(p0: Partial<CanopyParams>) {
 
   const profOf = (...ks: MemberKind[]) => members.find((m) => ks.includes(m.kind))?.profile;
   return {
-    params: p, members, panels, steel, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings], openings, topAt,
+    params: p, members, panels, steel, entry, girder, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings], openings, topAt,
     info: { wood, woodVol: r2(woodVol, 2), arch, center, midRows, slats, span: hip ? hs : span, lenV: hip ? hl : lenV, alongX, truss, rafterProf: profOf('chord', 'rafter') || rafterProf, purProf: profOf('purlin') || purProf, beamProf: profOf('beam') || beamProf, postProf: profOf('post') || postProf, rafters: rafterCount, rafterSpacing: r2(rafterSpacing), purlins: purlinRows, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: nPosts, hHigh, hLow, steelKg: r2(steelKg, 0) },
   };
 }

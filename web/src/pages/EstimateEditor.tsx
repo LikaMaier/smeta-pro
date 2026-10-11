@@ -261,8 +261,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       )}
       {!readOnly && (
         <div className="grid2" style={{ marginTop: 8 }}>
-          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/masters'); }}>👷 Мастера</button>
-          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/calculators'); }}>🧮 Из калькулятора</button>
+          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/calculators'); }}>🧮 Расчёты и мастера</button>
+          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/designer'); }}>📐 Проектировщик</button>
         </div>
       )}
 

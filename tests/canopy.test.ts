@@ -22,7 +22,11 @@ test('навес площадки ТКО 10,2×9,2, высота 6/5: плита
   assert.equal(line('Бетонирование плиты').qty, 14.08);
   assert.ok(line('Разработка грунта').qty > 51); // с запасом 0,3 м по периметру
   assert.ok(r.info.truss, 'пролёт 10,2 м — фермы');
-  assert.ok(r.info.posts >= 14);
+  assert.ok(r.info.posts >= 12);
+  // въезд мусоровоза спереди: столбы только по углам, над проёмом ферма
+  assert.ok(r.members.filter((m) => m.kind === 'post' && m.a[1] === 0).every((m) => m.a[0] === 0 || m.a[0] === 10.2));
+  assert.ok(r.girder && r.girder.len === 10.2);
+  assert.equal(r.panels.filter((p) => p.kind === 'container').length, 6);
   for (const l of r.lines) assert.ok(Number.isFinite(l.qty) && l.qty > 0 && Number.isFinite(l.price), l.name);
 });
 

@@ -113,6 +113,18 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
   const col = colorOf(res.params.color);
   for (const p of res.panels) {
     if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip') continue;
+    if (p.kind === 'container') {
+      // евроконтейнер: корпус и крышка
+      const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], 0.12] as V3);
+      const sides: [V3[], V3][] = [0, 1, 2, 3].map((i) => {
+        const a = top[i], b2 = top[(i + 1) % 4];
+        const n = norm(cross(sub(b2, a), [0, 0, -1]));
+        return [[a, b2, bot[(i + 1) % 4], bot[i]], n];
+      });
+      for (const [q, nrm] of sides) { const k = 0.6 + 0.45 * Math.abs(dot(nrm, light)); faces.push({ pts: q, fill: shade('#2E7D32', k), stroke: '#1b4d1e', opacity: 1, d: 0, sw: 0.5 }); }
+      faces.push({ pts: top, fill: '#256B29', stroke: '#1b4d1e', opacity: 1, d: 0, sw: 0.6 });
+      continue;
+    }
     if (p.kind === 'mesh') {
       // сетка — прозрачная, с линиями
       const [a, b, c2, d2] = p.pts;
@@ -230,6 +242,11 @@ export function drawings(res: CanopyResult): Sheet[] {
       pr.push({ t: 'poly', pts, fill: '#E3D7C3', c: '#555', w: 0.8, hatch: 'concrete' });
       const cx = (pts[0][0] + pts[2][0]) / 2, cy = (pts[0][1] + pts[2][1]) / 2;
       pr.push({ t: 'text', x: cx + (x1 === x2 ? out * 0.4 : 0), y: cy + (x1 === x2 ? 0 : out * 0.4), s: 'стена дома', size: 0.26, anchor: 'middle', rot: x1 === x2 ? 90 : 0, c: '#555' });
+    }
+    for (const q of res.panels.filter((x) => x.kind === 'container')) {
+      pr.push({ t: 'poly', pts: q.pts.map((v) => [v[0], v[1]] as [number, number]), fill: '#9CCC65', c: '#33691E', w: 0.8 });
+      const cx = q.pts.reduce((a, v) => a + v[0], 0) / 4, cy = q.pts.reduce((a, v) => a + v[1], 0) / 4;
+      pr.push({ t: 'text', x: cx, y: cy - 0.08, s: `${res.params.contType.replace('.', ',')} м³`, size: 0.2, anchor: 'middle', c: '#1B5E20' });
     }
     for (const p of posts) { const [w] = sizeOf(p.profile); pr.push({ t: 'poly', pts: [[p.a[0] - w / 2, p.a[1] - w / 2], [p.a[0] + w / 2, p.a[1] - w / 2], [p.a[0] + w / 2, p.a[1] + w / 2], [p.a[0] - w / 2, p.a[1] + w / 2]], fill: '#222', c: '#222', w: 0.5 }); }
     pr.push({ t: 'dim', x1: 0, y1: 0, x2: L, y2: 0, off: -1.0 - ov, s: `${f2(L)} м` });

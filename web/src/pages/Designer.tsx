@@ -19,9 +19,9 @@ import { PRESETS } from '../../../shared/design/presets';
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
 // пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
-const BLANK: Partial<CanopyParams> = { layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const BLANK: Partial<CanopyParams> = { entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
 const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
-const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows'] as const;
+const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows', 'containers'] as const;
 type NumKey = (typeof NUMS)[number];
 const MM = new Set<NumKey>(['slabT', 'sand', 'gravel', 'stripW', 'stripD', 'eps']); // в форме — в миллиметрах
 const toStr = (p: CanopyParams) => Object.fromEntries(NUMS.map((k) => [k, String(MM.has(k) ? Math.round(p[k] * 1000) : p[k])])) as Record<NumKey, string>;
@@ -203,10 +203,25 @@ export default function Designer() {
               <Chips value={base.layout} onChange={(v) => setB({ layout: v })} options={[{ value: 'perimeter', label: 'По периметру' }, { value: 'center', label: 'Один ряд по центру (консольный)' }]} />
             </Field>
           )}
+          {base.layout === 'perimeter' && base.kind !== 'visor' && (
+            <Field label="Въезд без столбов" hint={base.kind === 'tko' ? 'Мусоровоз заезжает с этой стороны: промежуточных столбов нет, над проёмом — ферма' : 'Промежуточные столбы на этой стороне убираются, над проёмом — балка или ферма'}>
+              <Chips value={base.entry} onChange={(v) => setB({ entry: v })} options={[{ value: 'none', label: 'нет' }, ...SIDES.filter((x) => !(base.attach && x.s === base.highSide)).map((x) => ({ value: x.s, label: SIDE_SHORT[x.s] }))]} />
+            </Field>
+          )}
+          {base.kind === 'tko' && (
+            <>
+              <div className="grid2">
+                {num('containers', 'Контейнеров в макете', 'шт')}
+                <Field label="Объём контейнера"><Chips value={base.contType} onChange={(v) => setB({ contType: v })} options={[{ value: '1.1', label: '1,1 м³' }, { value: '0.75', label: '0,75 м³' }]} /></Field>
+              </div>
+              <p className="xs muted" style={{ margin: 0 }}>Контейнеры ставятся вдоль стены напротив въезда; программа проверит, что они помещаются и остаётся проход.</p>
+            </>
+          )}
           {base.layout === 'perimeter' && base.roof !== 'hip' && !['visor'].includes(base.kind) && num('midRows', 'Промежуточных рядов столбов', 'шт', '0 — один пролёт; 1 и больше — многопролётный навес (стоянки, склады)')}
           <div className="grid2">{base.kind !== 'visor' && num('postStep', 'Шаг столбов, до', 'м')}{num('overhang', 'Свес кровли', 'м')}</div>
           {base.roof !== 'arch' && <Field label="Каркас"><Chips value={base.frame} onChange={(v) => setB({ frame: v })} options={[{ value: 'steel', label: 'Металл (профтруба)' }, { value: 'wood', label: 'Дерево (брус)' }]} /></Field>}
           <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'tile', label: 'Металлочерепица' }, { value: 'soft', label: 'Гибкая черепица' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'sandwich', label: 'Сэндвич' }, { value: 'slats', label: 'Ламели (пергола)' }, { value: 'none', label: 'Без кровли' }]} /></Field>
+          {base.cover === 'prof' && base.roof !== 'arch' && <Field label="Марка профнастила" hint="С-8 — дешевле, нужна частая обрешётка и уклон от 10°; НС-35 — для больших пролётов и малых уклонов"><Chips value={base.profGrade} onChange={(v) => setB({ profGrade: v })} options={[{ value: 'C8', label: 'С-8' }, { value: 'C20', label: 'С-20' }, { value: 'HC35', label: 'НС-35' }]} /></Field>}
           <Field label="Цвет (RAL)">
             <div className="row wrap" style={{ gap: 6 }}>
               {Object.entries(RAL).map(([code, hex]) => (

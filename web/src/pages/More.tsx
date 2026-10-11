@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../components/ui';
 
 const ITEMS = [
-  { to: '/calculators', icon: Icon.calc, title: 'Калькуляторы', text: 'Бетон, кирпич, гипсокартон, отделка, древесина' },
+  { to: '/calculators', icon: Icon.calc, title: 'Расчёты', text: 'Мастера под ключ и быстрые калькуляторы' },
   { to: '/finance', icon: Icon.money, title: 'Финансы', text: 'Прибыль и долги по всем объектам' },
   { to: '/contacts', icon: Icon.book, title: 'Записная книжка', text: 'Все телефоны: заказчики, техника, рабочие' },
   { to: '/reminders', icon: Icon.history, title: 'Напоминания', text: 'Бот напишет в нужное время' },

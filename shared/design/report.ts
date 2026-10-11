@@ -15,7 +15,7 @@ export function paramRows(r: CanopyResult): [string, string][] {
     ['Кровля', p.roof === 'arch' ? `арочная, подъём ${Math.round((i.hHigh - i.hLow) * 100) / 100} м` : (p.roof === 'single' ? 'односкатная' : p.roof === 'gable' ? 'двускатная' : 'четырёхскатная') + `, уклон ${pitch}°`],
     ['Каркас', i.wood ? `деревянный (брус, доска), ${i.woodVol} м³` : `металлический (профтруба), ${i.steelKg} кг`],
     [p.roof === 'single' ? 'Высота: высокая / низкая сторона' : 'Высота: конёк / карниз', `${i.hHigh} / ${i.hLow} м`],
-    ['Покрытие', p.cover === 'prof' ? `профнастил НС-35, ${p.color}` : p.cover === 'tile' ? `металлочерепица, ${p.color}` : p.cover === 'soft' ? 'гибкая черепица по OSB' : p.cover === 'sandwich' ? `сэндвич-панели 150 мм, ${p.color}` : p.cover === 'slats' ? 'ламели (пергола), шаг 300 мм' : p.cover === 'poly' ? 'поликарбонат 8 мм' : 'без кровли'],
+    ['Покрытие', p.cover === 'prof' ? `профнастил ${({ C8: 'С-8', C20: 'С-20', HC35: 'НС-35' } as any)[p.profGrade] || 'С-8'}, ${p.color}` : p.cover === 'tile' ? `металлочерепица, ${p.color}` : p.cover === 'soft' ? 'гибкая черепица по OSB' : p.cover === 'sandwich' ? `сэндвич-панели 150 мм, ${p.color}` : p.cover === 'slats' ? 'ламели (пергола), шаг 300 мм' : p.cover === 'poly' ? 'поликарбонат 8 мм' : 'без кровли'],
     ['Столбы', i.posts ? `${i.posts} шт, шаг до ${p.postStep} м${i.center ? ', один ряд по центру (консольный)' : i.midRows ? `, ${i.midRows + 1} пролёта` : ''}` : 'нет — консоли от стены'],
     [i.truss ? 'Фермы' : p.roof === 'arch' ? 'Арки' : 'Стропила', `${i.rafters} шт, ${i.rafterProf}`],
     [i.wood ? 'Обрешётка' : 'Прогоны', `${i.purlins} рядов, ${i.purProf}`],

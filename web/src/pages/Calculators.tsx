@@ -7,23 +7,8 @@ import { Field, Icon, NumInput, Sheet, State, useLoad, useToast } from '../compo
 import { n, rub, parseNum, TYPE_LABEL } from '../format';
 import CalcResult from '../components/CalcResult';
 
-export default function Calculators() {
-  return (
-    <>
-      <Link to="/masters" className="tile wide slim" style={{ marginBottom: 8, display: 'flex' }}>👷 Мастера под ключ: забор, плитка, кровля, электрика и др.</Link>
-      {CALC_GROUPS.filter((g) => g !== 'Мастера').map((g) => (
-        <section key={g}>
-          <div className="tile-group">{g}</div>
-          <div className="tiles">
-            {CALCULATORS.filter((c) => c.group === g).map((c) => (
-              <Link key={c.id} to={`/calculators/${c.id}`} className="tile" style={{ minHeight: 92 }}>{c.short || c.title}</Link>
-            ))}
-          </div>
-        </section>
-      ))}
-    </>
-  );
-}
+export { default } from './Masters';
+import { COVERED_BY_MASTER } from './Masters';
 
 const storeKey = (id: string) => `smeta_calc_${id}`;
 const load = (id: string) => { try { return JSON.parse(localStorage.getItem(storeKey(id)) || '{}'); } catch { return {}; } };
@@ -56,6 +41,7 @@ export function CalculatorPage() {
   return (
     <>
       <div className="box" style={{ marginBottom: 4 }}>{calc.title}</div>
+      {COVERED_BY_MASTER[calc.id] && <Link to={`/calculators/${COVERED_BY_MASTER[calc.id]}`} className="panel" style={{ display: 'block', padding: 10, margin: '6px 0', color: 'inherit' }}><b>👷 Полный расчёт — у мастера</b><div className="xs muted">Работы, материалы и цены одной сметой</div></Link>}
       {calc.fields.map((f) => {
         const err = touched || values[f.key] !== '' ? res?.errors[f.key] : undefined;
         const set = (v: any) => { setValues((x) => ({ ...x, [f.key]: v })); setTouched(true); };
