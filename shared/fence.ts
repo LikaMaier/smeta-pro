@@ -41,6 +41,8 @@ export interface FenceInput {
   type: FenceType; mount: Mount; len: number; h: number; step?: number; depth?: number;
   slideGates?: number; swingGates?: number; wickets?: number; slideW?: number; swingW?: number;
   demolish?: number; slope?: boolean; caps?: boolean; automation?: boolean; paint?: boolean;
+  postProf?: string;  // свой профиль столба «60×60×2»
+  noPaint?: boolean;  // без покраски — без грунт-эмали
 }
 
 export interface FenceLine {
@@ -165,12 +167,13 @@ export function fenceEstimate(i: FenceInput): { lines: FenceLine[]; summary: { l
 
   // ---------- столбы и монтаж ----------
   if (metalPosts && posts > 0) {
-    const pipe = ['mesh3d', 'gitter'].includes(t) ? 'Столб для 3D-панелей 60×40' : ['sections', 'jalousie'].includes(t) ? 'Труба профильная 80×80 (столб)' : 'Труба профильная 60×60 (столб)';
-    const price = ['mesh3d', 'gitter'].includes(t) ? MAT.pipe6040 : ['sections', 'jalousie'].includes(t) ? MAT.pipe8080 : MAT.pipe6060;
+    const own = i.postProf?.split('×').map(Number);
+    const pipe = own ? `Труба профильная ${i.postProf} (столб)` : ['mesh3d', 'gitter'].includes(t) ? 'Столб для 3D-панелей 60×40' : ['sections', 'jalousie'].includes(t) ? 'Труба профильная 80×80 (столб)' : 'Труба профильная 60×60 (столб)';
+    const price = own ? Math.round(((2 * (own[0] + own[1]) - 4 * own[2]) * own[2] * 7.85) / 1000 * 95) : ['mesh3d', 'gitter'].includes(t) ? MAT.pipe6040 : ['sections', 'jalousie'].includes(t) ? MAT.pipe8080 : MAT.pipe6060;
     mat(`${pipe}, ${postLen} м`, linePosts, 'шт', Math.round(price * postLen));
     if (gatePosts) mat(`Труба профильная 80×80 (столбы ворот), ${r(h + 1.3, 1)} м`, gatePosts, 'шт', Math.round(MAT.pipe8080 * (h + 1.3)));
     mat('Заглушки/колпаки на столбы', posts, 'шт', MAT.cap);
-    if (!['mesh3d', 'gitter'].includes(t)) mat('Грунт-эмаль по металлу (столбы, лаги, сварка)', ceil(posts / 25 + L / 60), 'банка', MAT.primer);
+    if (!['mesh3d', 'gitter'].includes(t) && !i.noPaint) mat('Грунт-эмаль по металлу (столбы, лаги, сварка)', ceil(posts / 25 + L / 60), 'банка', MAT.primer);
   }
   const holeV = Math.PI * 0.1 ** 2 * depth;
   if (m === 'concrete' && metalPosts) mat('Бетон М200 на столбы', posts * holeV * 1.1, 'м³', MAT.concrete);

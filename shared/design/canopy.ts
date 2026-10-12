@@ -61,7 +61,8 @@ export interface CanopyParams {
   slabT: number; sand: number; gravel: number; slabOver: number;
   rebar: 'steel' | 'composite';
   snow: number;         // снеговой район 1–8
-  color: string;        // RAL
+  color: string;        // RAL; 'none' — без покраски (оцинковка / естественный металл)
+  postA?: number; postB?: number; postT?: number; // свой столб: ширина × длина сечения × толщина стенки, мм (пусто — подбирается сам)
   waste: number;        // запас на материалы, %
 }
 
@@ -734,6 +735,23 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     }
   }
 
+  // ---------- свой размер столба ----------
+  const pa = Math.round(Number(p.postA) || 0), pb = Math.round(Number(p.postB) || 0) || pa, pt = Number(p.postT) || 0;
+  let postRec = '';
+  if (pa >= 20 && pa <= 500 && pb >= 20 && pb <= 500) {
+    const posts = members.filter((m) => m.kind === 'post');
+    if (posts.length) {
+      postRec = posts[0].profile;
+      const t = wood ? 0 : clamp(pt || (Math.min(pa, pb) <= 60 ? 2 : Math.min(pa, pb) <= 100 ? 3 : 4), 1, Math.min(pa, pb) / 2 - 1);
+      const own = wood ? `${pa}×${pb}` : `${pa}×${pb}×${String(r2(t, 1))}`;
+      for (const m of posts) m.profile = own;
+      // сравниваем жёсткость по слабой оси с подобранным сечением
+      const inertia = (prof: string) => { const q = P(prof); const a = Math.min(q.a, q.b), b2 = Math.max(q.a, q.b); const tt = wood || !(q.t > 0) ? 0 : q.t; return tt ? (b2 * a ** 3 - (b2 - 2 * tt) * (a - 2 * tt) ** 3) / 12 : (b2 * a ** 3) / 12; };
+      if (inertia(own) < inertia(postRec) * 0.85) warnings.push(`Столб ${own} слабее подобранного по нагрузке ${postRec} — для высоты и снега проверьте расчётом или возьмите сечение больше`);
+      if (own === postRec) postRec = '';
+    }
+  }
+
   // =====================================================================
   // Металл: длины по профилям и раскрой
   // =====================================================================
@@ -772,16 +790,17 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   // =====================================================================
   const k = 1 + p.waste / 100;
   const nPosts = postSet.size + openings.filter((o) => o.kind === 'gate').length * 2;
+  const noPaint = p.color === 'none';
   const b = new Builder(wood ? 'Деревянный каркас' : 'Металлокаркас');
   if (wood) {
     for (const s of steel) b.mat(`${s.isBoard ? 'Доска' : 'Брус'} ${s.profile} мм, хвоя (${s.use}), 6 м`, s.bars, 'шт', s.pricePerM * 6);
     if (nPosts) b.mat('Опора столба П-образная с анкерами', nPosts, 'шт', 900);
     b.mat('Крепёж каркаса: уголки, пластины, шпильки, саморезы', Math.ceil(woodVol * 4) + 1, 'компл', 1500);
     b.mat('Антисептик для древесины', Math.ceil(paintM2 * 0.3 * k), 'л', 180);
-    b.mat('Масло-лазурь для дерева (2 слоя)', Math.ceil(paintM2 * 0.2 * k), 'л', 1300);
+    if (!noPaint) b.mat('Масло-лазурь для дерева (2 слоя)', Math.ceil(paintM2 * 0.2 * k), 'л', 1300);
     b.work('Сборка деревянного каркаса', woodVol);
     b.work('Антисептирование древесины', paintM2);
-    b.work('Покраска древесины в 2 слоя', paintM2);
+    if (!noPaint) b.work('Покраска древесины в 2 слоя', paintM2);
   } else {
     for (const s of steel) b.mat(`Труба профильная${light ? ' оцинкованная' : ''} ${s.profile} (${s.use}), хлыст ${s.stock} м`, s.bars, 'шт', Math.round(s.pricePerM * s.stock * (light ? 1.25 : 1)));
     if (nPosts && light && p.base === 'none') b.mat('Опоры-штыри для теплицы (в грунт)', nPosts, 'шт', 250);
@@ -789,8 +808,10 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     b.work('Изготовление металлоконструкций', frameKg);
     b.work('Монтаж металлоконструкций', frameKg);
     if (!light) {
-      b.mat(`Грунт-эмаль по металлу 3 в 1, ${p.color}`, Math.ceil(paintM2 * 2 * 0.12 * k / 0.9), 'банка 0,9 кг', 950);
-      b.work('Покраска металлоконструкций', paintM2);
+      if (!noPaint) {
+        b.mat(`Грунт-эмаль по металлу 3 в 1, ${p.color}`, Math.ceil(paintM2 * 2 * 0.12 * k / 0.9), 'банка 0,9 кг', 950);
+        b.work('Покраска металлоконструкций', paintM2);
+      } else b.mat('Холодный цинк / антикор для сварных швов', Math.max(1, Math.ceil(members.length / 60)), 'баллон', 650);
     }
     if (bentLen > 0) b.work('Гибка профильной трубы', bentLen);
   }
@@ -804,9 +825,11 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   }
 
   b.sec('Кровля');
-  const ral = p.color;
+  // без покраски: листы — оцинкованные, у сэндвича и черепицы покрытие заводское
+  const ral = noPaint ? 'оцинкованный' : p.color;
+  const ralF = noPaint ? '(заводское покрытие)' : p.color;
   const pg0 = PROF_GRADE[p.profGrade] || PROF_GRADE.C8;
-  const pg = { ...pg0, price: p.profGrade === 'HC35' ? PR.profHC35 : p.profGrade === 'C20' ? PR.profC20 : PR.profC8 };
+  const pg = { ...pg0, price: Math.round((p.profGrade === 'HC35' ? PR.profHC35 : p.profGrade === 'C20' ? PR.profC20 : PR.profC8) * (noPaint ? 0.88 : 1)) };
   if (p.cover === 'prof' && !arch) {
     const deg = (Math.atan((hHigh - hLow) / (hip ? hs / 2 : p.roof === 'gable' ? span / 2 : span)) * 180) / Math.PI;
     if (deg < pg.minDeg) warnings.push(`Уклон кровли ${r2(deg, 1)}° — для профнастила ${pg.name} нужно не меньше ${pg.minDeg}°, иначе возможны протечки по нахлёстам. Увеличьте перепад высот или возьмите ${pg.name === 'НС-35' ? 'сэндвич-панели' : 'НС-35'}.`);
@@ -821,7 +844,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     b.work('Монтаж профнастила на кровлю', roofArea);
   }
   if (p.cover === 'tile') {
-    b.mat(`Металлочерепица ${ral}${hip ? ' (с подрезкой под вальмы)' : ''}`, roofArea * (hip ? 1.2 : 1.1) * k, 'м²', PR.tile);
+    b.mat(`Металлочерепица ${ralF}${hip ? ' (с подрезкой под вальмы)' : ''}`, roofArea * (hip ? 1.2 : 1.1) * k, 'м²', PR.tile);
     b.mat('Саморезы кровельные 4,8×35 в цвет', Math.ceil(roofArea * 8 * k), 'шт', 3);
     b.work('Монтаж металлочерепицы', roofArea);
   }
@@ -834,7 +857,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     b.work('Монтаж мягкой кровли', roofArea);
   }
   if (p.cover === 'sandwich') {
-    b.mat(`Сэндвич-панель кровельная 150 мм, минвата, ${ral}`, roofArea * 1.05 * k, 'м²', PR.sandRoof);
+    b.mat(`Сэндвич-панель кровельная 150 мм, минвата, ${ralF}`, roofArea * 1.05 * k, 'м²', PR.sandRoof);
     b.mat('Крепёж сэндвич-панелей (саморезы с шайбой 250 мм)', Math.ceil(roofArea * 2.5), 'шт', 18);
     b.work('Монтаж кровельных сэндвич-панелей', roofArea);
   }
@@ -871,7 +894,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     b.work('Обшивка каркаса поликарбонатом', polyWall);
   }
   if (sandWall > 0) {
-    b.mat(`Сэндвич-панель стеновая 100 мм, минвата, ${ral}`, sandWall * 1.05 * k, 'м²', PR.sandWall);
+    b.mat(`Сэндвич-панель стеновая 100 мм, минвата, ${ralF}`, sandWall * 1.05 * k, 'м²', PR.sandWall);
     b.mat('Доборные элементы и уплотнители сэндвич-панелей', (4 * Math.max(wallAvgH, 2) + 2 * (L + W) + openings.reduce((a, o) => a + 2 * o.h + (o.a1 - o.a0), 0)) * k, 'пог. м', 450);
     b.work('Монтаж стеновых сэндвич-панелей', sandWall);
   }
@@ -1116,7 +1139,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   const profOf = (...ks: MemberKind[]) => members.find((m) => ks.includes(m.kind) && !girderSet.has(m))?.profile;
   return {
     params: p, members, panels, steel, entry, girder, manualOps: manual, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings], openings, topAt,
-    info: { wood, woodVol: r2(woodVol, 2), arch, center, midRows, slats, span: hip ? hs : span, lenV: hip ? hl : lenV, alongX, truss, rafterProf: profOf('chord', 'rafter') || rafterProf, purProf: profOf('purlin') || purProf, beamProf: profOf('beam') || beamProf, postProf: profOf('post') || postProf, rafters: rafterCount, rafterSpacing: r2(rafterSpacing), purlins: purlinRows, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: nPosts, hHigh, hLow, steelKg: r2(steelKg, 0) },
+    info: { wood, woodVol: r2(woodVol, 2), arch, center, midRows, slats, span: hip ? hs : span, lenV: hip ? hl : lenV, alongX, truss, rafterProf: profOf('chord', 'rafter') || rafterProf, purProf: profOf('purlin') || purProf, beamProf: profOf('beam') || beamProf, postProf: profOf('post') || postProf, postRec, noPaint: p.color === 'none', rafters: rafterCount, rafterSpacing: r2(rafterSpacing), purlins: purlinRows, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: nPosts, hHigh, hLow, steelKg: r2(steelKg, 0) },
   };
 }
 export type CanopyResult = ReturnType<typeof buildCanopy>;

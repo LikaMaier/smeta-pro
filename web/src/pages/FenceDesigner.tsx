@@ -8,6 +8,7 @@ import { n, parseNum } from '../format';
 import { buildFence, FENCE_DEFAULT, FENCE_3D_TYPES, FENCE_SIDE_LABEL, type FenceParams, type FSide } from '../../../shared/design/fence3d';
 import { FENCE_TYPES, MOUNTS, type FenceType, type Mount } from '../../../shared/fence';
 import { RAL } from '../../../shared/design/render';
+import PostSize from '../components/PostSize';
 
 /** Заборы и ворота в 3D: участок, стороны, вид полотна, откатные/распашные ворота, калитка → 3D, чертежи, металл, смета */
 const DRAFT = 'smeta_fence_draft';
@@ -65,7 +66,7 @@ export default function FenceDesigner() {
     <>
       <div className="row wrap" style={{ gap: 6, margin: '0 0 8px' }}>
         <span className="xs muted">Типовые:</span>
-        {PRESETS.map((pr) => <button key={pr.id} className="chip" onClick={() => apply({ ...base, ...pr.p, sides: base.sides, L: params.L, W: params.W }, pr.title)}>{pr.label}</button>)}
+        {PRESETS.map((pr) => <button key={pr.id} className="chip" onClick={() => apply({ ...base, postA: undefined, postB: undefined, postT: undefined, ...pr.p, sides: base.sides, L: params.L, W: params.W }, pr.title)}>{pr.label}</button>)}
       </div>
       <Field label="Название проекта"><input className="input" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></Field>
 
@@ -103,8 +104,10 @@ export default function FenceDesigner() {
               {(Object.keys(MOUNTS) as Mount[]).map((m) => <option key={m} value={m}>{MOUNTS[m].label}</option>)}
             </select>
           </Field>
-          <Field label="Цвет">
+          {(!res.info.masonry || base.type === 'brick') && <Field label="Сечение столба (профтруба)"><PostSize a={base.postA} b={base.postB} t={base.postT} auto={(res.info as any).postAuto || res.info.postProf} onChange={(x) => setB(x)} /></Field>}
+          <Field label="Цвет" hint={base.color === 'none' ? 'Без покраски: оцинкованные столбы и лаги, грунт-эмаль убрана из сметы' : undefined}>
             <div className="row wrap" style={{ gap: 6 }}>
+              <button className={`dz-ral ${base.color === 'none' ? 'on' : ''}`} onClick={() => setB({ color: 'none' })} aria-label="Без покраски"><i style={{ background: 'repeating-linear-gradient(45deg,#C9CED4 0 4px,#A9AFB6 4px 8px)' }} />Без покраски</button>
               {Object.entries(RAL).map(([k, c]) => <button key={k} className={`dz-ral ${base.color === k ? 'on' : ''}`} onClick={() => setB({ color: k })}><i style={{ background: c }} />{k.replace('RAL ', '')}</button>)}
             </div>
           </Field>

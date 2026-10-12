@@ -18,7 +18,8 @@ export interface FenceParams {
   mount: Mount;
   h: number;              // высота полотна, м
   step: number;           // шаг столбов, м
-  color: string;          // RAL полотна и каркаса
+  color: string;          // RAL полотна и каркаса; 'none' — без покраски
+  postA?: number; postB?: number; postT?: number; // свой столб: ширина × длина × стенка, мм
   gate: 'none' | 'slide' | 'swing';
   gateW: number;          // ширина проёма ворот, м
   gateAt: number;         // от левого угла до ворот, м
@@ -84,7 +85,11 @@ export function buildFence(p0: Partial<FenceParams>) {
 
   // ---------- сечения ----------
   const tall = h > 2.2;
-  const postProf = MESHY.includes(t) && t !== 'rabica' && t !== 'welded' ? '60×40×2' : ['sections', 'jalousie'].includes(t) || tall ? '80×80×3' : '60×60×2';
+  const postAuto = MESHY.includes(t) && t !== 'rabica' && t !== 'welded' ? '60×40×2' : ['sections', 'jalousie'].includes(t) || tall ? '80×80×3' : '60×60×2';
+  const pa = Math.round(Number(p.postA) || 0), pb = Math.round(Number(p.postB) || 0) || pa;
+  const own = pa >= 20 && pa <= 300 && pb >= 20 && pb <= 300 ? `${pa}×${pb}×${String(Math.round(clamp(Number(p.postT) || (Math.min(pa, pb) <= 60 ? 2 : 3), 1, Math.min(pa, pb) / 2 - 1) * 10) / 10)}` : '';
+  const postProf = own || postAuto;
+  if (own) { const I = (pr: string) => { const q = P(pr); const a = Math.min(q.a, q.b), b = Math.max(q.a, q.b); return (b * a ** 3 - (b - 2 * q.t) * (a - 2 * q.t) ** 3) / 12; }; if (I(own) < I(postAuto) * 0.85) warnings.push(`Столб ${own} слабее рекомендуемого ${postAuto} для этого забора — при ветре сплошное полотно может качать`); }
   const gatePost = p.gate === 'swing' ? '100×100×3' : '80×80×3';
   const lagProf = '40×20×2';
   const frameProf = '60×40×2';
@@ -241,6 +246,7 @@ export function buildFence(p0: Partial<FenceParams>) {
   const perimeter = (sides.front ? L : 0) + (sides.back ? L : 0) + (sides.left ? W : 0) + (sides.right ? W : 0);
   const est = fenceEstimate({
     type: t, mount: p.mount, len: perimeter, h, step, slideGates: gate && p.gate === 'slide' ? 1 : 0, swingGates: gate && p.gate === 'swing' ? 1 : 0,
+    postProf: own || undefined, noPaint: p.color === 'none',
     wickets: openings.some((o) => o.kind === 'wicket') ? 1 : 0, slideW: gw, swingW: gw, automation: p.automation, caps: p.caps, demolish: p.demolish, slope: p.slope,
   });
   warnings.push(...est.warnings);
@@ -262,7 +268,7 @@ export function buildFence(p0: Partial<FenceParams>) {
     // поля, которые ждут общий 3D-рендер и PDF (как у навеса)
     params: { ...p, L, W, h, step, type: t, frame: 'steel' as const, base: 'none' as const, cover: 'none' as const, slabT: 0, eps: 0, walls: {} as any, overhang: 0 },
     members, panels, steel, lines: est.lines, summary, warnings, openings, tail,
-    info: { hHigh: h + 0.15, hLow: h, wood: false, woodVol: 0, steelKg: Math.round(steelKg), posts, perimeter: r2(perimeter, 1), postProf, gatePost, lagProf, masonry, pillarW },
+    info: { hHigh: h + 0.15, hLow: h, wood: false, woodVol: 0, steelKg: Math.round(steelKg), posts, perimeter: r2(perimeter, 1), postProf, postAuto, gatePost, lagProf, masonry, pillarW },
   };
 }
 export type FenceResult = ReturnType<typeof buildFence>;
@@ -283,6 +289,6 @@ export function fenceParamRows(r: FenceResult): [string, string][] {
     ...(!i.masonry || p.type === 'brick' ? [['Лаги', `труба ${i.lagProf}`] as [string, string]] : []),
     ['Ворота', g ? `${p.gate === 'slide' ? `откатные, проём ${g.a1 - g.a0} м, противовес ${r.tail} м, откат ${p.slideDir === 'right' ? 'вправо' : 'влево'}` : `распашные, проём ${r2(g.a1 - g.a0, 2)} м`}${p.automation ? ', с автоматикой' : ''}` : 'нет'],
     ['Калитка', w ? `1,0 × ${Math.min(p.h, 2.05)} м, в ${r2(w.a0, 1)} м от левого угла` : 'нет'],
-    ['Цвет', p.color],
+    ['Цвет', p.color === 'none' ? 'без покраски (оцинковка)' : p.color],
   ];
 }

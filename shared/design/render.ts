@@ -16,7 +16,9 @@ export const RAL: Record<string, string> = {
   'RAL 7024': '#474A51', 'RAL 8017': '#45322E', 'RAL 6005': '#114232', 'RAL 3005': '#5E2129', 'RAL 5005': '#1E4E8C',
   'RAL 9003': '#ECECE7', 'RAL 1014': '#DFCEA1', 'RAL 7004': '#9C9C9C', 'RAL 9005': '#16171A', 'RAL 3011': '#781F19',
 };
-const colorOf = (ral: string) => RAL[ral] || '#474A51';
+/** 'none' — без покраски: оцинковка / естественный металл */
+export const NO_PAINT_COLOR = '#A9AFB6';
+const colorOf = (ral: string) => (ral === 'none' ? NO_PAINT_COLOR : RAL[ral] || '#474A51');
 const sizeOf = (profile: string) => { const [a, b] = profile.split('×').map(Number); return [a / 1000, b / 1000]; };
 
 // ---------------------------------------------------------------- 3D

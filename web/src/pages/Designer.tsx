@@ -6,6 +6,7 @@ import { normName } from '../../../shared/names';
 import { makeVariants } from '../../../shared/design/variants';
 import CalcResult from '../components/CalcResult';
 import OpeningsEditor from '../components/OpeningsEditor';
+import PostSize from '../components/PostSize';
 import { Viewer, Drawings } from '../components/Design3D';
 import { n, rub0, parseNum } from '../format';
 import { haptic, confirmDialog, tg } from '../tg';
@@ -21,7 +22,7 @@ import { PRESETS } from '../../../shared/design/presets';
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
 // пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
-const BLANK: Partial<CanopyParams> = { block: 0, blockAt: 'left', blockWall: 'prof_full', ties: 'auto', curb: false, bumpers: false, entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, ops: null, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const BLANK: Partial<CanopyParams> = { block: 0, blockAt: 'left', blockWall: 'prof_full', ties: 'auto', curb: false, bumpers: false, entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, ops: null, postA: undefined, postB: undefined, postT: undefined, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
 const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
 const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows', 'containers', 'block'] as const;
 type NumKey = (typeof NUMS)[number];
@@ -247,11 +248,13 @@ export default function Designer() {
           )}
           {base.layout === 'perimeter' && base.roof !== 'hip' && !['visor'].includes(base.kind) && num('midRows', 'Промежуточных рядов столбов', 'шт', '0 — один пролёт; 1 и больше — многопролётный навес (стоянки, склады)')}
           <div className="grid2">{base.kind !== 'visor' && num('postStep', 'Шаг столбов, до', 'м')}{num('overhang', 'Свес кровли', 'м')}</div>
+          {res.info.posts > 0 && <Field label={res.info.wood ? 'Сечение столба (брус)' : 'Сечение столба (профтруба)'}><PostSize a={base.postA} b={base.postB} t={base.postT} wood={res.info.wood} auto={(res.info as any).postRec || res.info.postProf} onChange={(x) => setB(x)} /></Field>}
           {base.roof !== 'arch' && <Field label="Каркас"><Chips value={base.frame} onChange={(v) => setB({ frame: v })} options={[{ value: 'steel', label: 'Металл (профтруба)' }, { value: 'wood', label: 'Дерево (брус)' }]} /></Field>}
           <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'tile', label: 'Металлочерепица' }, { value: 'soft', label: 'Гибкая черепица' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'sandwich', label: 'Сэндвич' }, { value: 'slats', label: 'Ламели (пергола)' }, { value: 'none', label: 'Без кровли' }]} /></Field>
           {base.cover === 'prof' && base.roof !== 'arch' && <Field label="Марка профнастила" hint="С-8 — дешевле, нужна частая обрешётка и уклон от 10°; НС-35 — для больших пролётов и малых уклонов"><Chips value={base.profGrade} onChange={(v) => setB({ profGrade: v })} options={[{ value: 'C8', label: 'С-8' }, { value: 'C20', label: 'С-20' }, { value: 'HC35', label: 'НС-35' }]} /></Field>}
-          <Field label="Цвет (RAL)">
+          <Field label="Цвет (RAL)" hint={base.color === 'none' ? 'Без покраски: металл — оцинковка или с антикором по швам, листы — оцинкованные. Краска и покраска убраны из сметы.' : undefined}>
             <div className="row wrap" style={{ gap: 6 }}>
+              <button className={`dz-ral ${base.color === 'none' ? 'on' : ''}`} onClick={() => setB({ color: 'none' })} aria-label="Без покраски"><i style={{ background: 'repeating-linear-gradient(45deg,#C9CED4 0 4px,#A9AFB6 4px 8px)' }} />Без покраски</button>
               {Object.entries(RAL).map(([code, hex]) => (
                 <button key={code} className={`dz-ral ${base.color === code ? 'on' : ''}`} onClick={() => setB({ color: code })} title={code} aria-label={code}><i style={{ background: hex }} />{code.replace('RAL ', '')}</button>
               ))}

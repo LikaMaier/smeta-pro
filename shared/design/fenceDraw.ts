@@ -12,7 +12,7 @@ const PANEL_FILL: Record<string, { fill?: string; hatch?: 'prof' | 'mesh' | 'con
 
 export function fenceDrawings(r: FenceResult): Sheet[] {
   const p = r.params, L = p.L, W = p.W, h = p.h;
-  const col = RAL[p.color] || '#474A51';
+  const col = p.color === 'none' ? '#A9AFB6' : RAL[p.color] || '#474A51';
   const sheets: Sheet[] = [];
   const gate = r.openings.find((o) => o.kind === 'gate');
   const wicket = r.openings.find((o) => o.kind === 'wicket');
