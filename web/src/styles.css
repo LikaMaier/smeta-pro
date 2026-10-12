@@ -406,6 +406,8 @@ select.cinput option { color: #000; }
 .dz-sum b { font-size: 15px; } .dz-sum small { font-weight: 400; color: var(--muted); }
 .dz-warn { font-size: var(--fs-xs); color: var(--muted); border-left: 3px solid var(--amber); padding: 4px 8px; margin: 8px 0; }
 .dz-warn.bad { color: var(--bad); border-color: var(--bad); }
+.dz-warn.info { border-color: var(--muted); }
+button.dz-warn { display: block; background: none; border-top: 0; border-right: 0; border-bottom: 0; font: inherit; font-size: var(--fs-s, 14px); color: var(--text); cursor: pointer; }
 .dz-ral { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); border-radius: 999px; background: none; font-size: 12px; cursor: pointer; }
 .dz-ral i { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); }
 .dz-ral.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }

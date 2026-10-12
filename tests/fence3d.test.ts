@@ -98,3 +98,43 @@ test('плита — отдельная группа 32 А кабелем 3×6, 
   assert.ok(r.groups.filter((g) => /Ванн|Санузел/.test(g.name)).every((g) => g.rcd));
   assert.ok(r.pipeLen.s110 > 0); // от унитаза — Ø110
 });
+
+import { lineFor, inputFor, bathZone, panelLayout } from '../shared/design/mepNorms';
+import { elDefaults } from '../shared/design/mep';
+test('нормы электрики: автомат и сечение, потери, ввод, зоны ванной', () => {
+  assert.deepEqual([lineFor({ watt: 7000, lmax: 10, minS: 6 }).amp, lineFor({ watt: 7000, lmax: 10, minS: 6 }).s], [32, 6]);
+  assert.equal(lineFor({ watt: 1000, lmax: 10, fixedAmp: 10 }).s, 1.5);
+  const far = lineFor({ watt: 3500, lmax: 60, fixedAmp: 16 }); // 16 А на 60 м — потери > 4%, сечение растёт
+  assert.ok(far.upsized && far.s >= 4 && far.du <= 4);
+  assert.equal(inputFor(15, 3).amp, 25);
+  assert.equal(inputFor(7, 1).amp, 32);
+  assert.equal(bathZone(0.5, 0.5, 1, [{ x0: 0, y0: 0, x1: 1, y1: 1 }]), 1);
+  assert.equal(bathZone(1.3, 0.5, 1, [{ x0: 0, y0: 0, x1: 1, y1: 1 }]), 2);
+  assert.equal(bathZone(1.7, 0.5, 1, [{ x0: 0, y0: 0, x1: 1, y1: 1 }]), 3);
+  assert.equal(bathZone(0.5, 0.5, 2.4, [{ x0: 0, y0: 0, x1: 1, y1: 1 }]), 3);
+  const sh = panelLayout({ phases: 1, inAmp: 50, spd: true, house: false, protect: 'diff', groups: [{ amp: 16, rcd: true, name: 'a' }, { amp: 10, rcd: false, name: 'b' }] });
+  assert.ok(sh.size >= sh.used * 1.2);
+});
+test('расстановка по нормам: без нарушений, розеток по норме, мокрые зоны через УЗО', () => {
+  for (const pr of MEP_PRESETS) for (const gas of [false, true]) {
+    const base: any = { kind: 'mep', h: 2.7, rooms: pr.rooms, points: [], walls: 'concrete', wiring: 'hidden', pipes: 'ppr', scheme: 'tee', object: pr.object, ...elDefaults(pr.object, gas) };
+    base.points = autoPlace(base);
+    const r = buildMep(base);
+    const bad = r.checks.filter((c) => c.lvl === 'err' || c.lvl === 'warn');
+    assert.deepEqual(bad.map((c) => c.text), [], `${pr.id} gas=${gas}`);
+    assert.ok(r.groups.filter((g) => g.kind === 'wireS').every((g) => g.rcd && g.amp === 16 && g.s >= 2.5));
+    assert.ok(r.groups.every((g) => !g.amp || g.du <= 4));
+    if (gas) assert.ok(!r.groups.some((g) => /плита/i.test(g.name)));
+    assert.ok(drawings(r).length >= 3, pr.id);
+  }
+});
+test('проверка ловит розетку у ванны и у газа', () => {
+  const pr = MEP_PRESETS.find((x) => x.id === 'bathroom')!;
+  const base: any = { kind: 'mep', h: 2.7, rooms: pr.rooms, points: [], walls: 'concrete', wiring: 'hidden', pipes: 'ppr', scheme: 'tee', object: 'flat' };
+  base.points = autoPlace(base);
+  const bath = base.points.find((x: any) => x.type === 'bath' || x.type === 'shower');
+  base.points.push({ id: 'bad1', type: 'socketWet', x: bath.x, y: bath.y + 0.1, z: 1 }, { id: 'g', type: 'gasPipe', x: 2, y: 2 }, { id: 'bad2', type: 'socket', x: 2.2, y: 2 });
+  const r = buildMep(base);
+  assert.ok(r.checks.some((c) => c.lvl === 'err' && c.ids?.includes('bad1')));
+  assert.ok(r.checks.some((c) => c.lvl === 'err' && c.ids?.includes('bad2')));
+});
