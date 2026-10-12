@@ -5,6 +5,7 @@ import { Chips, Field, NumInput, Sheet, useDebounced, useLoad, useToast } from '
 import { normName } from '../../../shared/names';
 import { makeVariants } from '../../../shared/design/variants';
 import CalcResult from '../components/CalcResult';
+import OpeningsEditor from '../components/OpeningsEditor';
 import { Viewer, Drawings } from '../components/Design3D';
 import { n, rub0, parseNum } from '../format';
 import { haptic, confirmDialog, tg } from '../tg';
@@ -20,7 +21,7 @@ import { PRESETS } from '../../../shared/design/presets';
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
 // пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
-const BLANK: Partial<CanopyParams> = { block: 0, blockAt: 'left', blockWall: 'prof_full', ties: 'auto', curb: false, bumpers: false, entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const BLANK: Partial<CanopyParams> = { block: 0, blockAt: 'left', blockWall: 'prof_full', ties: 'auto', curb: false, bumpers: false, entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, ops: null, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
 const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
 const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows', 'containers', 'block'] as const;
 type NumKey = (typeof NUMS)[number];
@@ -281,10 +282,9 @@ export default function Designer() {
             </Field>
           )}
 
-          <div className="csection">Ворота и дверь</div>
-          <Field label="Ворота в передней стене"><Chips value={base.gate} onChange={(v) => setB({ gate: v })} options={[{ value: 'none', label: 'Нет' }, { value: 'swing', label: 'Распашные' }, { value: 'sectional', label: 'Секционные' }]} /></Field>
-          {base.gate !== 'none' && <div className="grid2">{num('gateW', 'Ширина ворот', 'м')}{num('gateH', 'Высота ворот', 'м')}</div>}
-          <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.door} onChange={(e) => setB({ door: e.target.checked })} />Дверь 0,9×2,05 м (место подберётся между столбами)</label>
+          <div className="csection">Ворота, двери и окна</div>
+          <OpeningsEditor p={params} res={res} onChange={(patch) => setB(patch)} />
+          {base.gate !== 'none' && !Array.isArray(base.ops) && <div className="grid2">{num('gateW', 'Ширина ворот', 'м')}{num('gateH', 'Высота ворот', 'м')}</div>}
           {Object.values(base.walls).some((w) => w === 'prof_full' || w === 'prof' || w === 'wood') && (
             <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.insulate} onChange={(e) => setB({ insulate: e.target.checked })} />Утеплить стены и кровлю (минвата 100 мм)</label>
           )}

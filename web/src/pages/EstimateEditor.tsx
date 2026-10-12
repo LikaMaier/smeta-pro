@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ShopLink from '../components/ShopLink';
 import { useNavigate, useParams } from 'react-router-dom';
 import { get, post, put, del } from '../api';
 import { calcEstimate } from '../../../shared/estimate';
@@ -516,6 +517,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         {current && (
           <div className="stack">
             <Field label="Название"><input className="input" value={current.name} list="own-items" onChange={(e) => setName(current, e.target.value)} readOnly={readOnly} /></Field>
+            {(current.type === 'material' || current.matPrice !== '') && current.name.trim() && <ShopLink name={current.name} block label="🛒 Найти в «Петровиче» — цена и наличие" />}
             <div className="grid2">
               <Field label="Тип"><select className="select" value={current.type} onChange={(e) => setLine(current.k, { type: e.target.value })} disabled={readOnly}>{Object.entries(TYPE_LABEL).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></Field>
               <Field label="Раздел"><input className="input" value={current.category} onChange={(e) => setLine(current.k, { category: e.target.value })} readOnly={readOnly} placeholder="Напр. Фундамент" list="sections" /></Field>

@@ -452,3 +452,4 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
 .land-card { display: flex; gap: 12px; align-items: center; padding: 14px; }
 .land-card .ic { font-size: 30px; width: 44px; text-align: center; flex: none; }
 .soon { color: var(--amber); font-weight: 600; }
+.shop-link { font-size: var(--fs-xs); margin-left: 6px; white-space: nowrap; }

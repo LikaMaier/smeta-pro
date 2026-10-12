@@ -31,7 +31,8 @@ export function paramRows(r0: CanopyResult | FenceResult | SiteResult | MepResul
     [i.wood ? 'Обрешётка' : 'Прогоны', `${i.purlins} рядов, ${i.purProf}`],
   ];
   for (const s of ['front', 'back', 'left', 'right'] as const) {
-    const ops = r.openings.filter((o) => o.side === s).map((o) => (o.kind === 'gate' ? `ворота ${p.gate === 'sectional' ? 'секционные' : 'распашные'} ${Math.round((o.a1 - o.a0) * 100) / 100}×${Math.round(o.h * 100) / 100} м` : 'дверь'));
+    const m2 = (v: number) => Math.round(v * 100) / 100;
+    const ops = r.openings.filter((o) => o.side === s).map((o) => (o.kind === 'gate' ? `ворота ${p.gate === 'sectional' ? 'секционные' : 'распашные'} ${m2(o.a1 - o.a0)}×${m2(o.h)} м` : o.kind === 'window' ? `окно ${m2(o.a1 - o.a0)}×${m2(o.h - (o.z0 || 0))} м` : `дверь ${m2(o.a1 - o.a0)}×${m2(o.h)} м`));
     rows.push([SIDE_LABEL[s], (p.attach && s === p.highSide ? 'стена дома' : WALL_LABEL[p.walls[s]] + (p.walls[s] === 'prof' || p.walls[s] === 'prof_mesh' ? ` ${p.profH} м` : '')) + (ops.length ? `, ${ops.join(', ')}` : '')]);
   }
   if (p.insulate) rows.push(['Утепление', 'минвата 100 мм, стены и кровля']);

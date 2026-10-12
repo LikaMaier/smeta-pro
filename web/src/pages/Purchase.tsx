@@ -4,6 +4,8 @@ import { get, patch } from '../api';
 import { Icon, Load, State, useLoad, useToast } from '../components/ui';
 import { rub, n } from '../format';
 import { haptic, tg } from '../tg';
+import ShopLink, { shopCity, setShopCity } from '../components/ShopLink';
+import { PETROVICH_CITIES, type PetrovichCity } from '../../../shared/petrovich';
 
 type Item = { key: string; name: string; qty?: number; unit?: string; amount?: number; sub?: { key: string; name: string }[] };
 
@@ -83,6 +85,7 @@ function PurchaseList({ e }: { e: any }) {
       )}
       <button className="btn primary block" style={{ marginTop: 12 }} onClick={share}>Отправить поставщику в Telegram</button>
       <button className="btn block" style={{ marginTop: 8 }} onClick={copy}>Скопировать список</button>
+      <ShopCity />
       <div className="list" style={{ marginTop: 12 }}>
         {items.map((i) => (
           <div key={i.key} className="list-item" style={{ display: 'block' }}>
@@ -90,12 +93,16 @@ function PurchaseList({ e }: { e: any }) {
               <span className="box-ch">{done.has(i.key) ? '✓' : ''}</span>
               <span className="grow"><span className="title">{i.name}</span><br /><span className="xs muted">{n(i.qty)} {i.unit}{i.amount ? ` · ${rub(i.amount)}` : ''}</span></span>
             </button>
+            {i.key.startsWith('m|') && <div style={{ paddingLeft: 32 }}><ShopLink name={i.name} /></div>}
             {(i.sub || []).length > 0 && (
               <div style={{ marginTop: 8, paddingLeft: 32, display: 'grid', gap: 6 }}>
                 {i.sub!.map((s) => (
-                  <button key={s.key} className={`check-row ${done.has(s.key) || done.has(i.key) ? 'on' : ''}`} onClick={() => toggle(s.key)}>
-                    <span className="box-ch" style={{ width: 18, height: 18 }}>{done.has(s.key) || done.has(i.key) ? '✓' : ''}</span><span className="grow small">{s.name}</span>
-                  </button>
+                  <div key={s.key} className="row" style={{ gap: 6 }}>
+                    <button className={`check-row grow ${done.has(s.key) || done.has(i.key) ? 'on' : ''}`} onClick={() => toggle(s.key)}>
+                      <span className="box-ch" style={{ width: 18, height: 18 }}>{done.has(s.key) || done.has(i.key) ? '✓' : ''}</span><span className="grow small">{s.name}</span>
+                    </button>
+                    <ShopLink name={s.name} label="🛒" />
+                  </div>
                 ))}
               </div>
             )}
@@ -103,5 +110,17 @@ function PurchaseList({ e }: { e: any }) {
         ))}
       </div>
     </>
+  );
+}
+
+/** Город магазина «Петрович» для ссылок на материалы */
+function ShopCity() {
+  const [c, setC] = useState<PetrovichCity>(shopCity());
+  return (
+    <div className="row wrap" style={{ gap: 6, marginTop: 12 }}>
+      <span className="xs muted">🛒 «Петрович»:</span>
+      {(Object.keys(PETROVICH_CITIES) as PetrovichCity[]).map((k) => <button key={k} className={`chip ${c === k ? 'on' : ''}`} onClick={() => { setShopCity(k); setC(k); }}>{PETROVICH_CITIES[k].label}</button>)}
+      <span className="xs muted" style={{ width: '100%' }}>Нажмите «Петрович» у материала — откроется поиск на сайте магазина с ценой и наличием.</span>
+    </div>
   );
 }

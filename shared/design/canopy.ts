@@ -12,7 +12,7 @@ import { mergePrices, type DesignPrices } from './prices';
 export type V3 = [number, number, number];
 export type MemberKind = 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster' | 'brace' | 'tie' | 'bollard' | 'bumper' | 'pillar' | 'cpillar' | 'trunk' | 'wireL' | 'wireS' | 'wireP' | 'wireN' | 'pipeC' | 'pipeH' | 'pipeS';
 export interface Member { kind: MemberKind; profile: string; a: V3; b: V3 }
-export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip' | 'container' | 'curb' | 'plank' | 'concrete' | 'block' | 'stone' | 'tree' | 'grass' | 'gravel' | 'wall' | 'lid' | 'soil' | 'floor' | 'tile' | 'fixture' | 'pointE' | 'pointL' | 'pipeBox' | 'cut'; pts: V3[] }
+export interface Panel { kind: 'window' | 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip' | 'container' | 'curb' | 'plank' | 'concrete' | 'block' | 'stone' | 'tree' | 'grass' | 'gravel' | 'wall' | 'lid' | 'soil' | 'floor' | 'tile' | 'fixture' | 'pointE' | 'pointL' | 'pipeBox' | 'cut'; pts: V3[] }
 export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh' | 'rail' | 'poly' | 'sandwich' | 'wood' | 'wood_low';
 export type Side = 'front' | 'back' | 'left' | 'right';
 export type ObjKind = 'canopy' | 'tko' | 'lean' | 'visor' | 'gazebo' | 'garage' | 'greenhouse' | 'woodshed';
@@ -48,6 +48,8 @@ export interface CanopyParams {
   gate: 'none' | 'swing' | 'sectional'; // ворота в передней стене
   gateW: number; gateH: number;
   door: boolean;        // дверь / калитка 0,9×2,05
+  /** Проёмы вручную: если задан список — ворота, двери и окна берутся из него (положение, размер), иначе расставляются сами */
+  ops?: OpeningSpec[] | null;
   insulate: boolean;    // утепление стен и кровли (гараж, мастерская)
   base: 'slab' | 'ushp' | 'strip' | 'piles' | 'screw' | 'deck' | 'paving' | 'none';
   stripW: number; stripD: number; // ленточный: ширина и высота ленты, м
@@ -99,7 +101,12 @@ const area3 = (pts: V3[]) => {
   return s;
 };
 const SIDES: Side[] = ['front', 'back', 'left', 'right'];
-interface Opening { side: Side; a0: number; a1: number; h: number; kind: 'gate' | 'door' }
+/** Проём, заданный вручную: at — центр проёма от начала стороны (спереди и сзади — от левого угла, слева и справа — от переднего), м */
+export interface OpeningSpec { id: string; kind: 'door' | 'window' | 'gate'; side: Side; at: number; w: number; h: number; sill?: number }
+export interface Opening { id?: string; side: Side; a0: number; a1: number; h: number; z0?: number; kind: 'gate' | 'door' | 'window' }
+export const OPENING_DEFAULT: Record<OpeningSpec['kind'], { w: number; h: number; sill?: number; label: string }> = {
+  door: { w: 0.9, h: 2.05, label: 'Дверь' }, window: { w: 1.0, h: 1.0, sill: 0.9, label: 'Окно' }, gate: { w: 3, h: 2.5, label: 'Ворота' },
+};
 
 export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<DesignPrices> | null) {
   const PR = mergePrices(ownPrices);
@@ -217,9 +224,43 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     if (entrySpans > 1) warnings.push(`Въезд ${r2(o1 - o0, 1)} м разделён столбом на ${entrySpans} проёма по ${r2((o1 - o0) / entrySpans, 1)} м`);
   }
 
-  // ---------- проёмы: ворота и дверь ----------
+  // ---------- проёмы: ворота, двери, окна ----------
   const openings: Opening[] = [];
-  if (p.gate !== 'none') {
+  const manual = Array.isArray(p.ops) && !center;
+  if (manual) {
+    const SL: Record<Side, string> = { front: 'спереди', back: 'сзади', left: 'слева', right: 'справа' };
+    for (const o of p.ops!) {
+      const d = sideDefs[o.side];
+      if (!d) continue;
+      const name = `${OPENING_DEFAULT[o.kind]?.label || 'Проём'} ${SL[o.side]}`;
+      if (p.attach && o.side === p.highSide) { warnings.push(`${name}: с этой стороны стена дома — проём не построен`); continue; }
+      const w = clamp(Number(o.w) || 0.9, 0.4, Math.max(0.4, d.len - 0.2));
+      const a0 = clamp((Number.isFinite(Number(o.at)) ? Number(o.at) : d.len / 2) - w / 2, 0.1, Math.max(0.1, d.len - 0.1 - w)), a1 = a0 + w;
+      const room = Math.min(topAt(...d.pt(a0)), topAt(...d.pt(a1)), topAt(...d.pt((a0 + a1) / 2))) - 0.1;
+      let z0 = 0.05, h: number;
+      if (o.kind === 'window') {
+        const sill = Number.isFinite(Number(o.sill)) ? Number(o.sill) : 0.9;
+        z0 = clamp(sill, 0.2, Math.max(0.2, room - 0.3));
+        h = z0 + clamp(Number(o.h) || 1, 0.3, Math.max(0.3, room - z0));
+        if (h - z0 < (Number(o.h) || 1) - 0.01) warnings.push(`${name}: высота окна уменьшена до ${r2(h - z0, 2)} м — упирается в кровлю`);
+      } else {
+        h = clamp(Number(o.h) || 2, 1.5, Math.max(1.5, room));
+        if (h < (Number(o.h) || 2) - 0.01) warnings.push(`${name}: высота уменьшена до ${r2(h, 2)} м — по высоте стены`);
+      }
+      if (w < (Number(o.w) || 0) - 0.01) warnings.push(`${name}: ширина уменьшена до ${r2(w, 2)} м — по длине стены`);
+      const clash = openings.find((q) => q.side === o.side && a1 > q.a0 - 0.15 && a0 < q.a1 + 0.15);
+      if (clash) warnings.push(`${name} пересекается с соседним проёмом — сдвиньте его`);
+      openings.push({ id: o.id, side: o.side, a0: r2(a0, 3), a1: r2(a1, 3), h: r2(h, 2), z0: r2(z0, 2), kind: o.kind });
+      // промежуточные столбы внутри проёма убираем — по краям проёма стойки рамы
+      let removed = 0;
+      for (const [k, [x, y]] of postMap) {
+        const q = sideOf(x, y).find((z) => z.side === o.side);
+        if (q && q.t > a0 + 0.02 && q.t < a1 - 0.02 && q.t > 0.01 && q.t < d.len - 0.01) { postMap.delete(k); removed++; }
+      }
+      if (removed && o.kind !== 'gate') warnings.push(`${name} стоит на месте промежуточного столба — столб заменён стойками по краям проёма`);
+    }
+  }
+  if (!manual && p.gate !== 'none') {
     const fl = B > 0 ? B : sideDefs.front.len;
     const gw = clamp(p.gateW, 1.5, fl - 0.6);
     const minTop = Math.min(topAt(0, 0), topAt(L, 0), topAt(L / 2, 0));
@@ -231,7 +272,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     // столбы внутри проёма убираем — пролёт перекрывает обвязка, по краям — стойки рамы
     for (const [k, [x, y]] of postMap) if (Math.abs(y) < 1e-6 && x > a0 - 0.1 && x < a0 + gw + 0.1) postMap.delete(k);
   }
-  if (p.door) {
+  if (!manual && p.door) {
     const dw = 0.9, need = dw + 0.2;
     const order: Side[] = ['front', 'right', 'left', 'back'];
     let placed = false;
@@ -505,6 +546,14 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
       const op = ops.find((o) => tm > o.a0 && tm < o.a1);
       const zb = op ? op.h : 0.05;
       const c = (v: number) => () => v;
+      // под окном — стена до подоконника
+      if (op && op.kind === 'window' && (op.z0 || 0) > 0.1) {
+        const sill = op.z0!;
+        if (w === 'prof_full') profFullArea += quad(t0, t1, c(0.05), c(sill), 'prof');
+        else if (w === 'poly' || w === 'sandwich' || w === 'wood') { const a = quad(t0, t1, c(0.05), c(sill), w); if (w === 'poly') polyWall += a; else if (w === 'sandwich') sandWall += a; else woodWall += a; }
+        else if ((w === 'prof' || w === 'prof_mesh') && p.profH > 0.1) profFixedArea += quad(t0, t1, c(0.05), c(Math.min(sill, p.profH)), 'prof');
+        else if (w === 'wood_low') woodWall += quad(t0, t1, c(0.05), c(Math.min(1.0, sill)), 'wood');
+      }
       if (w === 'prof_full') {
         profFullArea += quad(t0, t1, c(zb), top, 'prof');
         for (let z = op ? op.h + 0.6 : 0.2; z < Math.max(top(t0), top(t1)); z += 1.2) railAt(t0, t1, z);
@@ -546,11 +595,13 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     // проёмы: полотна и рамы
     for (const o of ops) {
       const [x0, y0] = d.pt(o.a0), [x1, y1] = d.pt(o.a1);
-      panels.push({ kind: o.kind, pts: [[x0, y0, 0.05], [x1, y1, 0.05], [x1, y1, o.h], [x0, y0, o.h]] });
-      const fp = o.kind === 'gate' ? postProf : '60×40×2';
+      const z0 = o.z0 ?? 0.05;
+      panels.push({ kind: o.kind, pts: [[x0, y0, z0], [x1, y1, z0], [x1, y1, o.h], [x0, y0, o.h]] });
+      const fp = o.kind === 'gate' ? postProf : wood ? '100×50×0' : '60×40×2';
       add('frame', fp, [x0, y0, 0], [x0, y0, top(o.a0) + 0.05]);
       add('frame', fp, [x1, y1, 0], [x1, y1, top(o.a1) + 0.05]);
-      add('frame', o.kind === 'gate' ? '80×40×3' : '60×40×2', [x0, y0, o.h], [x1, y1, o.h]);
+      add('frame', o.kind === 'gate' ? '80×40×3' : wood ? '100×50×0' : '60×40×2', [x0, y0, o.h], [x1, y1, o.h]);
+      if (o.kind === 'window') add('frame', wood ? '100×50×0' : '60×40×2', [x0, y0, z0], [x1, y1, z0]);
     }
   }
   // перегородка между закрытым блоком и открытой частью + балка по ней
@@ -846,19 +897,34 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
       b.work('Установка распашных ворот', 1);
     }
   }
-  if (openings.some((o) => o.kind === 'door')) {
+  const doors = openings.filter((o) => o.kind === 'door');
+  if (doors.length) {
     if (!gate) b.sec('Ворота и двери');
-    if (light) {
-      b.mat('Дверь теплицы из профиля с поликарбонатом, петли, ручка', 1, 'шт', 4500);
-      b.mat('Форточка теплицы с ручкой', 2, 'шт', 1800);
-      b.work('Монтаж калитки', 1);
-    } else if (wood) {
-      b.mat('Дверь деревянная уличная с коробкой и фурнитурой', 1, 'шт', 12000);
-      b.work('Монтаж межкомнатной двери', 1);
-    } else {
-      b.mat('Дверь металлическая уличная 900×2050', 1, 'шт', 18000);
-      b.work('Монтаж входной металлической двери', 1);
+    for (const o of doors) {
+      const sz = `${Math.round((o.a1 - o.a0) * 1000)}×${Math.round(o.h * 1000)}`;
+      if (light) {
+        b.mat(`Дверь теплицы ${sz} из профиля с поликарбонатом, петли, ручка`, 1, 'шт', 4500);
+        b.mat('Форточка теплицы с ручкой', 2, 'шт', 1800);
+        b.work('Монтаж калитки', 1);
+      } else if (wood) {
+        b.mat(`Дверь деревянная уличная ${sz} с коробкой и фурнитурой`, 1, 'шт', Math.round(12000 * Math.max(1, ((o.a1 - o.a0) * o.h) / 1.85)));
+        b.work('Монтаж межкомнатной двери', 1);
+      } else {
+        b.mat(`Дверь металлическая уличная ${sz}`, 1, 'шт', Math.round(18000 * Math.max(1, ((o.a1 - o.a0) * o.h) / 1.85)));
+        b.work('Монтаж входной металлической двери', 1);
+      }
     }
+  }
+  const wins = openings.filter((o) => o.kind === 'window');
+  if (wins.length) {
+    b.sec('Окна');
+    for (const o of wins) {
+      const ww = o.a1 - o.a0, wh = o.h - (o.z0 ?? 0), a = ww * wh;
+      b.mat(`Окно ПВХ ${Math.round(ww * 1000)}×${Math.round(wh * 1000)}, двухкамерный стеклопакет, с открыванием`, 1, 'шт', Math.round(4500 + a * 6500));
+      b.work('Монтаж пластикового окна', r2(a, 2));
+      b.mat(`Отлив и подоконник ${Math.round(ww * 1000)} мм, пена, лента ПСУЛ`, 1, 'компл', Math.round(1200 + ww * 1300));
+    }
+    b.work('Монтаж подоконника', wins.length);
   }
 
   if (p.insulate) {
@@ -1049,7 +1115,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
 
   const profOf = (...ks: MemberKind[]) => members.find((m) => ks.includes(m.kind) && !girderSet.has(m))?.profile;
   return {
-    params: p, members, panels, steel, entry, girder, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings], openings, topAt,
+    params: p, members, panels, steel, entry, girder, manualOps: manual, lines: b.lines, summary: b.summary.filter((s) => s.value > 0), warnings: [...warnings, ...b.warnings], openings, topAt,
     info: { wood, woodVol: r2(woodVol, 2), arch, center, midRows, slats, span: hip ? hs : span, lenV: hip ? hl : lenV, alongX, truss, rafterProf: profOf('chord', 'rafter') || rafterProf, purProf: profOf('purlin') || purProf, beamProf: profOf('beam') || beamProf, postProf: profOf('post') || postProf, rafters: rafterCount, rafterSpacing: r2(rafterSpacing), purlins: purlinRows, roofArea: r2(roofArea, 1), slabArea: r2(slabArea, 1), posts: nPosts, hHigh, hLow, steelKg: r2(steelKg, 0) },
   };
 }

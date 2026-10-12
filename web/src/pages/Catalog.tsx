@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ShopLink from '../components/ShopLink';
 import { get, post, patch, del } from '../api';
 import { useMe } from '../App';
 import { Chips, Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
@@ -154,6 +155,7 @@ function ItemSheet({ item, onClose, onSaved, categories, readOnly }: { item: any
     <Sheet open onClose={onClose} title={f.id ? 'Позиция справочника' : 'Новая позиция'}>
       <div className="stack">
         <Field label="Название" error={err.name}><input className="input" value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Монтаж бордюра" readOnly={readOnly} /></Field>
+        {f.type === 'material' && f.name?.trim() && <ShopLink name={f.name} block label="🛒 Сверить цену в «Петровиче»" />}
         <div className="grid2">
           <Field label="Тип"><select className="select" value={f.type} onChange={(e) => set({ type: e.target.value })} disabled={readOnly}>{Object.entries(TYPE_LABEL).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></Field>
           <Field label="Единица" error={err.unit}>

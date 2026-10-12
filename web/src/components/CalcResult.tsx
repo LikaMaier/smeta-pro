@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ShopLink from './ShopLink';
 import { useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { NumInput, useLoad, useToast } from './ui';
@@ -133,6 +134,7 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
               </div>
               <div className="cr-meta xs">
                 {r.edited || r.qtyEdited ? <span className="src edited">изменено</span> : r.src === 'own' ? <span className="src own">мой прайс</span> : r.src === 'store' ? <span className="src store">{r.type === 'material' ? 'цена магазина' : 'примерная'}</span> : <span className="src none">нет цены</span>}
+                {r.type === 'material' && <ShopLink name={r.name} />}
                 {r.qtyEdited && <button className="linklike" onClick={() => set(r.key, { qty: undefined })}>вернуть расчётное: {n(r.baseQty)} {r.unit}</button>}
                 {r.edited && <button className="linklike" onClick={() => set(r.key, { price: undefined })}>вернуть цену</button>}
               </div>
