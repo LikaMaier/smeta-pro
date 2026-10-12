@@ -27,7 +27,9 @@ const upsertItem = z.object({
   name: z.string().trim().min(1).max(300), unit: z.string().trim().min(1).max(30),
   type: z.enum(['work', 'material', 'equipment', 'service', 'other']), category: z.string().max(100).nullable().optional(),
   price: z.coerce.number().min(0).max(1e11), composition: z.string().max(3000).nullable().optional(),
+  matPrice: z.coerce.number().min(0).max(1e11).nullable().optional(), // цена материала в строке «работа с материалом»
 });
+const matOf = (params: any) => { const v = Number(params?.matPrice); return Number.isFinite(v) && v > 0 ? v : null; };
 
 /** Обновить цены позиций с тем же названием, при addNew — добавить отсутствующие. История цен сохраняется. */
 async function upsertItems(userId: string, listId: string | null, items: z.infer<typeof upsertItem>[], addNew: boolean) {
@@ -36,29 +38,38 @@ async function upsertItems(userId: string, listId: string | null, items: z.infer
   const existing = await prisma.catalogItem.findMany({ where: { userId, priceListId: list.id, deletedAt: null } });
   const byName = new Map(existing.map((i) => [normName(i.name), i]));
   let updated = 0, created = 0, same = 0;
+  const ids: Record<string, string> = {};
   const now = new Date();
   for (const it of items) {
-    const ex = byName.get(normName(it.name));
+    const key = normName(it.name);
+    const ex = byName.get(key);
+    const mat = it.matPrice === undefined ? undefined : (it.matPrice && it.matPrice > 0 ? it.matPrice : null);
     if (ex) {
-      if (num(ex.price) === it.price) { same++; continue; }
+      ids[key] = ex.id;
+      const matSame = mat === undefined || matOf(ex.params) === mat;
+      if (num(ex.price) === it.price && matSame) { same++; continue; }
+      const base = ex.notes?.startsWith('Примерная цена') ? {} : ((ex.params as any) || {});
+      const params = mat === undefined ? (ex.notes?.startsWith('Примерная цена') ? {} : undefined) : { ...base, matPrice: mat };
       await prisma.catalogItem.update({
         where: { id: ex.id },
         data: { price: it.price, priceUpdatedAt: now, ...(it.type === 'material' ? { costPrice: it.price } : {}),
-          ...(ex.notes?.startsWith('Примерная цена') ? { notes: null, params: {} } : {}) },
+          ...(ex.notes?.startsWith('Примерная цена') ? { notes: null } : {}), ...(params !== undefined ? { params } : {}) },
       });
-      await prisma.priceHistory.create({ data: { itemId: ex.id, price: it.price } });
+      if (num(ex.price) !== it.price) await prisma.priceHistory.create({ data: { itemId: ex.id, price: it.price } });
       updated++;
     } else if (addNew) {
       const c = await prisma.catalogItem.create({
         data: { userId, priceListId: list.id, name: it.name.trim(), unit: it.unit, type: it.type, category: it.category || 'Прочее',
-          price: it.price, costPrice: it.type === 'material' ? it.price : null, description: it.composition || null, priceUpdatedAt: now },
+          price: it.price, costPrice: it.type === 'material' ? it.price : null, description: it.composition || null, priceUpdatedAt: now,
+          ...(mat ? { params: { matPrice: mat } } : {}) },
       });
       await prisma.priceHistory.create({ data: { itemId: c.id, price: it.price } });
-      byName.set(normName(it.name), c);
+      byName.set(key, c);
+      ids[key] = c.id;
       created++;
     }
   }
-  return { updated, created, same };
+  return { updated, created, same, ids };
 }
 
 export async function catalogRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {

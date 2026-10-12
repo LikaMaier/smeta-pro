@@ -1,13 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma, plain, notFound, accessOf, num } from '../util';
+import { prisma, plain, notFound, accessOf, num, HttpError } from '../util';
 import { digestDue, lastWeek, digestText } from '../../../shared/digest';
 import { summarize } from '../../../shared/calendar';
 import { projectFinance } from './projects';
 import { env } from '../env';
-import { nextRun } from '../../../shared/reminders';
+import { nextRun, preTime, REM_KINDS, kindOf, beforeText } from '../../../shared/reminders';
 
-const REPEATS = ['none', 'daily', 'weekly', 'monthly'] as const;
+const REPEATS = ['none', 'daily', 'weekdays', 'days', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'] as const;
+const KINDS = REM_KINDS.map((k) => k.id) as [string, ...string[]];
+const daysOf = (s?: string | null) => (s ? s.split(',').map(Number).filter((x) => Number.isInteger(x) && x >= 0 && x <= 6) : []);
 const CONTACT_CATS = ['customer', 'equipment', 'supplier', 'worker', 'other'] as const;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -23,7 +25,18 @@ export async function organizerRoutes(app: FastifyInstance) {
     repeat: z.enum(REPEATS).default('none'),
     projectId: z.string().nullable().optional(),
     active: z.boolean().optional(),
+    kind: z.enum(KINDS).optional(),
+    days: z.array(z.number().int().min(0).max(6)).max(7).nullable().optional(),
+    tz: z.number().int().min(-720).max(840).optional(),
+    before: z.number().int().min(0).max(43200).optional(),
   });
+  /** Привести время к ближайшему подходящему и посчитать предупреждение «заранее» */
+  const schedule = (at: Date, repeat: string, days: number[], tz: number, before: number) => {
+    const now = new Date();
+    // прошедшее время или неподходящий день недели — переносим на ближайший подходящий момент
+    const t = repeat === 'none' ? at : nextRun(at, repeat, now, { days, tz }) || at;
+    return { remindAt: t, preAt: preTime(t, before, now) };
+  };
   const ownRem = async (userId: string, id: string) => {
     const r = await prisma.reminder.findFirst({ where: { id, userId, deletedAt: null } });
     if (!r) throw notFound('Напоминание');
@@ -38,19 +51,25 @@ export async function organizerRoutes(app: FastifyInstance) {
   app.post('/api/reminders', async (req) => {
     const b = remSchema.parse(req.body);
     await ownProject(req.user.id, b.projectId);
+    const days = b.days || [];
+    if (b.repeat === 'days' && !days.length) throw new HttpError(400, 'Выберите дни недели');
+    const tz = b.tz ?? 180, before = b.before ?? 0;
     // время в прошлом для повторяющегося — сдвигаем на ближайшее будущее
-    const at = b.remindAt <= new Date() && b.repeat !== 'none' ? nextRun(b.remindAt, b.repeat)! : b.remindAt;
-    return plain(await prisma.reminder.create({ data: { ...b, remindAt: at, projectId: b.projectId || null, userId: req.user.id, active: true } }));
+    const sch = schedule(b.remindAt, b.repeat, days, tz, before);
+    return plain(await prisma.reminder.create({ data: { text: b.text, repeat: b.repeat, kind: b.kind || 'other', days: days.join(',') || null, tz, before, ...sch, projectId: b.projectId || null, userId: req.user.id, active: true } }));
   });
 
   app.patch('/api/reminders/:id', async (req) => {
     const { id } = req.params as any;
-    await ownRem(req.user.id, id);
+    const cur = await ownRem(req.user.id, id);
     const b = remSchema.partial().parse(req.body);
     await ownProject(req.user.id, b.projectId);
-    let at = b.remindAt;
-    if (at && at <= new Date() && b.repeat && b.repeat !== 'none') at = nextRun(at, b.repeat)!;
-    return plain(await prisma.reminder.update({ where: { id }, data: { ...b, ...(at ? { remindAt: at } : {}) } }));
+    const repeat = b.repeat ?? cur.repeat, tz = b.tz ?? cur.tz, before = b.before ?? cur.before;
+    const days = b.days !== undefined ? (b.days || []) : daysOf(cur.days);
+    if (repeat === 'days' && !days.length) throw new HttpError(400, 'Выберите дни недели');
+    const sch = schedule(b.remindAt ?? cur.remindAt, repeat, days, tz, before);
+    const { days: _d, ...rest } = b;
+    return plain(await prisma.reminder.update({ where: { id }, data: { ...rest, repeat, tz, before, days: days.join(',') || null, ...sch } }));
   });
 
   app.delete('/api/reminders/:id', async (req) => {
@@ -100,6 +119,31 @@ export async function organizerRoutes(app: FastifyInstance) {
   });
 }
 
+/** Кнопки под напоминанием: отложить, готово, открыть приложение */
+export function remKeyboard(id: string, appUrl?: string) {
+  return { inline_keyboard: [
+    [{ text: '⏳ 15 мин', callback_data: `rem:15:${id}` }, { text: '⏳ 1 час', callback_data: `rem:60:${id}` }, { text: '⏳ 3 часа', callback_data: `rem:180:${id}` }],
+    [{ text: '🌅 Завтра 9:00', callback_data: `rem:tom:${id}` }, { text: '✅ Готово', callback_data: `rem:ok:${id}` }],
+    ...(appUrl ? [[{ text: 'Открыть СМЕТА PRO', web_app: { url: `${appUrl}/reminders` } }]] : []),
+  ] };
+}
+
+/** Нажатие кнопки под напоминанием. Повторяющееся не сдвигаем — откладываем разовой копией. */
+export async function remAction(tgId: number, action: string, id: string): Promise<string> {
+  const r = await prisma.reminder.findFirst({ where: { id, deletedAt: null, user: { tgId: BigInt(tgId) } } });
+  if (!r) return 'Напоминание не найдено';
+  if (action === 'ok') return '✅ Отмечено';
+  let at: Date;
+  if (action === 'tom') {
+    const local = new Date(Date.now() + r.tz * 60000);
+    at = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, 9, 0) - r.tz * 60000);
+  } else at = new Date(Date.now() + Number(action) * 60000);
+  if (r.repeat === 'none') await prisma.reminder.update({ where: { id }, data: { remindAt: at, active: true, preAt: null } });
+  else await prisma.reminder.create({ data: { userId: r.userId, projectId: r.projectId, text: r.text, kind: r.kind, tz: r.tz, remindAt: at, repeat: 'none' } });
+  const local = new Date(at.getTime() + r.tz * 60000).toLocaleString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return `⏳ Напомню ${local}`;
+}
+
 /** Планировщик: раз в 30 секунд отправляет наступившие напоминания в бот */
 export function startReminderLoop(bot: any, log: { error: (o: any, m?: string) => void; info: (m: string) => void }, appUrl: string) {
   let running = false;
@@ -112,19 +156,35 @@ export function startReminderLoop(bot: any, log: { error: (o: any, m?: string) =
         include: { user: true, project: { select: { name: true } } }, take: 100,
       });
       for (const r of due) {
-        const next = nextRun(r.remindAt, r.repeat);
+        const next = nextRun(r.remindAt, r.repeat, new Date(), { days: daysOf(r.days), tz: r.tz });
         // «захват» записи: если другой процесс уже обработал — пропускаем
         const claimed = await prisma.reminder.updateMany({
           where: { id: r.id, remindAt: r.remindAt, active: true },
-          data: next ? { remindAt: next, lastSentAt: new Date() } : { active: false, lastSentAt: new Date() },
+          data: next ? { remindAt: next, lastSentAt: new Date(), preAt: preTime(next, r.before) } : { active: false, lastSentAt: new Date(), preAt: null },
         });
         if (!claimed.count) continue;
+        const k = kindOf(r.kind);
         try {
-          await bot.api.sendMessage(Number(r.user.tgId), `⏰ <b>Напоминание</b>\n${escapeHtml(r.text)}${r.project ? `\nОбъект: ${escapeHtml(r.project.name)}` : ''}`, {
-            parse_mode: 'HTML',
-            ...(appUrl ? { reply_markup: { inline_keyboard: [[{ text: 'Открыть СМЕТА PRO', web_app: { url: `${appUrl}/reminders` } }]] } } : {}),
+          await bot.api.sendMessage(Number(r.user.tgId), `${k.icon} <b>Напоминание</b>\n${escapeHtml(r.text)}${r.project ? `\nОбъект: ${escapeHtml(r.project.name)}` : ''}`, {
+            parse_mode: 'HTML', reply_markup: remKeyboard(r.id, appUrl),
           });
         } catch (e) { log.error({ err: e }, 'Не удалось отправить напоминание'); }
+      }
+      // предупреждения «заранее»
+      const pre = await prisma.reminder.findMany({
+        where: { active: true, deletedAt: null, preAt: { lte: new Date() } },
+        include: { user: true, project: { select: { name: true } } }, take: 100,
+      });
+      for (const r of pre) {
+        const claimed = await prisma.reminder.updateMany({ where: { id: r.id, preAt: r.preAt }, data: { preAt: null } });
+        if (!claimed.count || r.remindAt <= new Date()) continue;
+        const k = kindOf(r.kind);
+        const local = new Date(r.remindAt.getTime() + r.tz * 60000).toLocaleString('ru-RU', { timeZone: 'UTC', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        try {
+          await bot.api.sendMessage(Number(r.user.tgId), `🔔 <b>Заранее: ${beforeText(r.before)}</b> (${local})\n${k.icon} ${escapeHtml(r.text)}${r.project ? `\nОбъект: ${escapeHtml(r.project.name)}` : ''}`, {
+            parse_mode: 'HTML', ...(appUrl ? { reply_markup: { inline_keyboard: [[{ text: 'Открыть напоминания', web_app: { url: `${appUrl}/reminders` } }]] } } : {}),
+          });
+        } catch (e) { log.error({ err: e }, 'Не удалось отправить предупреждение'); }
       }
       await subscriptionNotices(bot, log, appUrl);
       await weeklyDigests(bot, log, appUrl);

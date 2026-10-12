@@ -17,6 +17,9 @@ export default function Home() {
   const nav = useNavigate();
   const cal = useLoad(() => get<any>('/calendar', { month: monthNow() }), []);
   const fin = useLoad(() => get<any>('/finance/summary'), []);
+  const rems = useLoad(() => get<any[]>('/reminders').catch(() => []), []);
+  const remNext = (rems.data || []).filter((r: any) => r.active).sort((a: any, b: any) => +new Date(a.remindAt) - +new Date(b.remindAt));
+  const remToday = remNext.filter((r: any) => new Date(r.remindAt).toDateString() === new Date().toDateString()).length;
   const [busy, setBusy] = useState(false);
 
   const createEstimate = async () => {
@@ -43,12 +46,13 @@ export default function Home() {
         </button>
         <Link className="tile" to="/estimates">Сметы</Link>
         <Link className="tile" to="/projects">Объекты{active ? <small>в работе: {active}</small> : <small>деньги и контакты</small>}</Link>
-        <Link className="tile" to="/calendar">Календарь<small>фото, деньги, напоминания</small></Link>
-        <Link className="tile" to="/catalog">Справочник цен</Link>
+        <Link className="tile" to="/calendar">Календарь<small>фото, деньги, журнал</small></Link>
+        <Link className="tile" to="/reminders">Напоминания<small>{remToday ? `сегодня: ${remToday}` : remNext.length ? `впереди: ${remNext.length}` : 'деньги, бетон, техника'}</small></Link>
+        <Link className="tile" to="/catalog">Справочник цен<small>мои расценки</small></Link>
         <Link className="tile" to="/assistant">ИИ-сметчик<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
-        <Link className="tile" to="/settings">Настройки<small>подписка, логотип, друзья</small></Link>
         <Link className="tile slim wide" to="/designer">📐 Проектировщик 3D · навесы, беседки, гаражи, теплицы</Link>
         <Link className="tile slim wide" to="/calculators">🧮 Расчёты · {MASTERS.length + 1} мастеров и калькуляторы</Link>
+        <Link className="tile slim wide" to="/settings">⚙️ Настройки · подписка, оформление, логотип</Link>
       </div>
 
     </>

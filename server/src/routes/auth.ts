@@ -8,6 +8,8 @@ import { verifyInitData, signSession } from '../auth';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { compositionFor } from '../../../shared/compositions';
 import { brandUrl } from './brand';
+
+const THEME_IDS = ['blueprint', 'brick', 'concrete', 'rebar', 'wood', 'topo', 'hazard', 'paving'];
 import { botLink } from '../botInfo';
 
 /** Кто пригласил: payload вида ref_<id пользователя> из /start или startapp */
@@ -49,7 +51,7 @@ export async function meView(user: any) {
   const free = await freeCtx(user.id);
   return plain({
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
-    companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen ? user.theme : 'steel',
+    companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
     aiAvailable: Boolean(env.AI_PROVIDER),
     access: { ...accessOf(user), freeEstimateLeft: free.estimateCount < FREE_ESTIMATES, freeLeft: Math.max(0, FREE_ESTIMATES - free.estimateCount), freeEstimateIds: free.freeEstimateIds, estimateCount: free.estimateCount },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
@@ -94,7 +96,7 @@ export async function authRoutes(app: FastifyInstance) {
       aiEnabled: z.boolean().optional(),
       weeklyDigest: z.boolean().optional(),
       docStyle: z.enum(['classic', 'modern']).optional(),
-      theme: z.enum(['steel', 'gold', 'carbon', 'blueprint', 'malachite']).optional(),
+      theme: z.enum(THEME_IDS as [string, ...string[]]).optional(),
       companyName: z.string().max(200).nullable().optional(),
       contacts: z.string().max(500).nullable().optional(),
       designPrices: z.record(z.string().max(40), z.number().positive().max(1e8)).nullable().optional(),

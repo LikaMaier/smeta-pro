@@ -102,6 +102,7 @@ async function priceTemplateLines(userId: string, lines: { name: string; qty: nu
     return {
       position: i, name: l.name, qty: l.qty, unit: own?.unit || l.unit, type: l.type, category: l.category,
       price: own ? own.price : st ? st.price : l.price ?? 0, costPrice: own?.costPrice ?? null, catalogItemId: own?.id ?? null,
+      matPrice: Number((own?.params as any)?.matPrice) > 0 ? Number((own?.params as any).matPrice) : null,
       composition: own?.description || l.composition || compositionFor(l.name)?.join('\n') || null,
       note: note ? `${note}; количество типовое — уточните` : 'Количество типовое — уточните', unconfirmed: true,
     };

@@ -8,6 +8,7 @@ import { useMe } from '../App';
 import { Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog, haptic, tg } from '../tg';
+import { normName } from '../../../shared/names';
 
 type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; matPrice: string; coef: string; composition: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
 type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string; customerDetails: string; workStart: string; workEnd: string; warrantyMonths: string;
@@ -47,7 +48,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [lines, setLines] = useState<L[]>(() => initial.lines.map(toL));
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
-  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract' | 'pay' | 'check'>(null);
+  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract' | 'pay' | 'check' | 'prices'>(null);
   const [share, setShare] = useState<any>(() => ({ url: null, sharedAt: initial.sharedAt, viewedAt: initial.viewedAt, approvedAt: initial.approvedAt, customerComment: initial.customerComment }));
   const [editLine, setEditLine] = useState<string | null>(null);
   const [secEdit, setSecEdit] = useState<string | null>(null);
@@ -71,6 +72,49 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const change = useCallback(() => setDirty(true), []);
   const setHead = (patch: Partial<H>) => { setH((x) => ({ ...x, ...patch })); change(); };
   const setLine = (k: string, patch: Partial<L>) => { setLines((ls) => ls.map((l) => (l.k === k ? { ...l, ...patch } : l))); change(); };
+
+  // ---- Мои расценки: справочник для подстановки и «запомнить цены из сметы»
+  const cat = useLoad(() => get<any[]>('/items').catch(() => []), []);
+  const catMap = useMemo(() => new Map((cat.data || []).map((i: any) => [normName(i.name), i])), [cat.data]);
+  const itemMat = (i: any) => (Number(i?.params?.matPrice) > 0 ? Number(i.params.matPrice) : null);
+  /** Ввели название, которое есть в справочнике, — подставляем свою цену (если цена ещё не указана) */
+  const setName = (l: L, name: string) => {
+    const it: any = catMap.get(normName(name));
+    if (it && (!l.price || parseNum(l.price) === 0)) {
+      const m = itemMat(it);
+      setLine(l.k, { name, unit: it.unit, price: String(it.price), matPrice: m ? String(m) : l.matPrice, type: it.type, category: l.category || it.category,
+        costPrice: it.costPrice == null ? '' : String(it.costPrice), composition: l.composition || it.description || '', catalogItemId: it.id });
+      haptic('light');
+    } else setLine(l.k, { name });
+  };
+  /** Позиции, цены которых отличаются от справочника или которых в нём нет */
+  const fresh = useMemo(() => {
+    if (!cat.data) return [];
+    const seen = new Set<string>();
+    return lines.filter((l) => {
+      const key = normName(l.name);
+      if (!l.name.trim() || seen.has(key) || (parseNum(l.price) <= 0 && parseNum(l.matPrice) <= 0)) return false;
+      seen.add(key);
+      const it: any = catMap.get(key);
+      const mat = l.matPrice === '' || parseNum(l.matPrice) <= 0 ? null : parseNum(l.matPrice);
+      return !it || Number(it.price) !== parseNum(l.price) || itemMat(it) !== mat;
+    }).map((l) => ({ l, it: catMap.get(normName(l.name)) as any }));
+  }, [lines, catMap, cat.data]);
+  const [skip, setSkip] = useState<Set<string>>(new Set());
+  const savePrices = async () => {
+    const pick = fresh.filter((x) => !skip.has(x.l.k));
+    if (!pick.length) return toast('Ничего не выбрано', true);
+    try {
+      const r = await post<any>('/items/bulk-upsert', { items: pick.map(({ l }) => ({
+        name: l.name.trim(), unit: l.unit || 'шт', type: l.type, category: l.category || null, price: parseNum(l.price),
+        composition: l.composition.trim() || null, matPrice: l.matPrice === '' ? null : parseNum(l.matPrice),
+      })) });
+      // связываем строки со справочником — потом их можно обновлять кнопкой «Обновить цены»
+      setLines((ls) => ls.map((l) => { const id = r.ids?.[normName(l.name)]; return id && !l.catalogItemId ? { ...l, catalogItemId: id } : l; }));
+      change(); cat.reload(); setSkip(new Set()); setSheet(null); haptic('success');
+      toast(`Запомнено: ${[r.created ? `новых ${r.created}` : '', r.updated ? `обновлено ${r.updated}` : ''].filter(Boolean).join(', ') || 'без изменений'}. Цены подставятся в новые сметы`);
+    } catch (e: any) { toast(e.message, true); }
+  };
 
   // Локальная копия на случай закрытия приложения
   useEffect(() => {
@@ -222,7 +266,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
               {g.items.map((l) => (
                 <div key={l.k} className={`line ${l.unconfirmed ? 'unconfirmed' : ''}`}>
                   <div className="line-top">
-                    <input className="line-name" value={l.name} placeholder="Название позиции" onChange={(e) => setLine(l.k, { name: e.target.value })} readOnly={readOnly} aria-label="Название" />
+                    <input className="line-name" value={l.name} placeholder="Название позиции" list="own-items" onChange={(e) => setName(l, e.target.value)} readOnly={readOnly} aria-label="Название" />
                     <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Подробнее" onClick={() => { setEditLine(l.k); setSheet('line'); }}><Icon.more /></button>
                   </div>
                   {l.composition.trim() && (
@@ -258,6 +302,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <button className="btn primary" onClick={() => setSheet('add')}><Icon.book width={18} />Из справочника</button>
           <button className="btn" onClick={() => addLines([{}])}><Icon.plus width={18} />Пустая строка</button>
         </div>
+      )}
+      <datalist id="own-items">{(cat.data || []).slice(0, 400).map((i: any) => <option key={i.id} value={i.name}>{`${i.price} ₽/${i.unit}`}</option>)}</datalist>
+      {!readOnly && fresh.length > 0 && (
+        <button className="btn block save-prices" style={{ marginTop: 8 }} onClick={() => { setSkip(new Set(fresh.filter((x) => /Примерная цена/.test(x.l.note)).map((x) => x.l.k))); setSheet('prices'); }}>
+          💾 Запомнить мои расценки · {fresh.length}<small>новые и изменённые цены → в справочник, для следующих смет</small>
+        </button>
       )}
       {!readOnly && (
         <div className="grid2" style={{ marginTop: 8 }}>
@@ -465,7 +515,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <Sheet open={sheet === 'line' && !!current} onClose={() => setSheet(null)} title="Позиция">
         {current && (
           <div className="stack">
-            <Field label="Название"><input className="input" value={current.name} onChange={(e) => setLine(current.k, { name: e.target.value })} readOnly={readOnly} /></Field>
+            <Field label="Название"><input className="input" value={current.name} list="own-items" onChange={(e) => setName(current, e.target.value)} readOnly={readOnly} /></Field>
             <div className="grid2">
               <Field label="Тип"><select className="select" value={current.type} onChange={(e) => setLine(current.k, { type: e.target.value })} disabled={readOnly}>{Object.entries(TYPE_LABEL).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></Field>
               <Field label="Раздел"><input className="input" value={current.category} onChange={(e) => setLine(current.k, { category: e.target.value })} readOnly={readOnly} placeholder="Напр. Фундамент" list="sections" /></Field>
@@ -496,7 +546,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
 
       {/* ---- Добавить из справочника ---- */}
       <Sheet open={sheet === 'add'} onClose={() => setSheet(null)} title="Добавить из справочника">
-        {sheet === 'add' && <CatalogPicker onPick={(it) => addLines([{ name: it.name, unit: it.unit, price: String(it.price), composition: it.description || '', costPrice: it.costPrice == null ? '' : String(it.costPrice), type: it.type, category: it.category, catalogItemId: it.id }])} />}
+        {sheet === 'add' && <CatalogPicker onPick={(it) => addLines([{ name: it.name, unit: it.unit, price: String(it.price), matPrice: Number(it.params?.matPrice) > 0 ? String(it.params.matPrice) : '', composition: it.description || '', costPrice: it.costPrice == null ? '' : String(it.costPrice), type: it.type, category: it.category, catalogItemId: it.id }])} />}
       </Sheet>
 
       {/* ---- Действия ---- */}
@@ -521,6 +571,35 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           }}><div className="grow title" style={{ color: 'var(--bad)' }}>Удалить смету</div></button>
         </div>
 
+      </Sheet>
+
+      {/* ---- Запомнить расценки ---- */}
+      <Sheet open={sheet === 'prices'} onClose={() => setSheet(null)} title="Запомнить мои расценки">
+        {sheet === 'prices' && (
+          <div className="stack">
+            <p className="small muted" style={{ margin: 0 }}>Отмеченные цены сохранятся в «Справочник цен». Примерные цены из шаблонов не отмечены — проверьте их сначала. В новых сметах, шаблонах, мастерах и при вводе названия они подставятся сами.</p>
+            <div className="list">
+              {fresh.map(({ l, it }) => {
+                const on = !skip.has(l.k);
+                const mat = l.matPrice !== '' && parseNum(l.matPrice) > 0 ? ` + мат. ${rub(parseNum(l.matPrice))}` : '';
+                return (
+                  <label key={l.k} className="list-item" style={{ gap: 10, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={on} onChange={() => setSkip((x) => { const c = new Set(x); if (on) c.add(l.k); else c.delete(l.k); return c; })} />
+                    <div className="grow">
+                      <div className="title">{l.name}</div>
+                      <div className="xs muted">{TYPE_LABEL[l.type]} · {it ? <>было {rub(Number(it.price))}{itemMat(it) ? ` + мат. ${rub(itemMat(it)!)}` : ''} → <b style={{ color: 'var(--amber)' }}>{rub(parseNum(l.price))}{mat}</b></> : <><b style={{ color: 'var(--ok)' }}>новая</b> · {rub(parseNum(l.price))}{mat} за {l.unit}</>}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="row">
+              <button className="btn sm" onClick={() => setSkip(new Set())}>Выбрать все</button>
+              <button className="btn sm" onClick={() => setSkip(new Set(fresh.map((x) => x.l.k)))}>Снять все</button>
+            </div>
+            <button className="btn primary block lg" onClick={savePrices}>💾 Сохранить в справочник · {fresh.length - fresh.filter((x) => skip.has(x.l.k)).length}</button>
+          </div>
+        )}
       </Sheet>
 
       <Sheet open={sheet === 'history'} onClose={() => setSheet(null)} title="История изменений">

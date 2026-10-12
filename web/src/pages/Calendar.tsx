@@ -10,7 +10,6 @@ import { confirmDialog, haptic } from '../tg';
 import { OpSheet } from './ProjectPage';
 import Finance from './Finance';
 import { Chips } from '../components/ui';
-import { ReminderSheet, remDayKey } from './Reminders';
 
 const todayKey = () => {
   const d = new Date();
@@ -47,10 +46,6 @@ export default function Calendar() {
 }
 
 function CalendarMonth({ month, go, projectId, setProjectId, projects, data, today, nav }: any) {
-  const rems = useLoad(() => get<any[]>('/reminders').catch(() => []), []);
-  const remByDay: Record<string, number> = {};
-  (rems.data || []).filter((r: any) => r.active && (!projectId || r.projectId === projectId)).forEach((r: any) => { const k = remDayKey(r.remindAt); remByDay[k] = (remByDay[k] || 0) + 1; });
-  const upcoming = (rems.data || []).filter((r: any) => r.active && new Date(r.remindAt) > new Date()).length;
   return (
     <>
       <div className="cal-head">
@@ -76,22 +71,17 @@ function CalendarMonth({ month, go, projectId, setProjectId, projects, data, tod
             {monthGrid(Number(month.slice(0, 4)), Number(month.slice(5, 7))).flat().map((day, i) => {
               if (!day) return <div key={i} className="cal-day empty" />;
               const info = d.days[day];
-              const rc = remByDay[day] || 0;
-              const has = (info && (info.photos || info.logs || info.received || info.spent)) || rc;
+              const has = info && (info.photos || info.logs || info.received || info.spent);
               return (
                 <button key={day} className={`cal-day ${day === today ? 'today' : ''} ${has ? 'has' : ''}`} onClick={() => nav(`/calendar/${day}${projectId ? `?p=${projectId}` : ''}`)}>
                   <span className="d">{Number(day.slice(8))}</span>
                   {info?.received || info?.spent ? <span className={`m ${info.earned < 0 ? 'neg' : 'pos'}`}>{info.earned > 0 ? '+' : ''}{short(info.earned)}</span> : null}
-                  <span className="marks">{info?.photos ? <span>📷{info.photos}</span> : null}{info?.logs ? <span>✎{info.logs}</span> : null}{rc ? <span>⏰{rc > 1 ? rc : ''}</span> : null}</span>
+                  <span className="marks">{info?.photos ? <span>📷{info.photos}</span> : null}{info?.logs ? <span>✎{info.logs}</span> : null}</span>
                 </button>
               );
             })}
           </div>
-          <p className="xs muted">Нажмите на день, чтобы добавить фото, запись о работе, деньги или напоминание.</p>
-          <Link to="/reminders" className="list-item" style={{ marginBottom: 4 }}>
-            <div className="grow"><div className="title">⏰ Напоминания</div><div className="xs muted">{upcoming ? `впереди: ${upcoming}` : 'бот напишет в нужное время'}</div></div>
-            <Icon.chevron />
-          </Link>
+          <p className="xs muted">Нажмите на день, чтобы добавить фото, запись о работе или деньги.</p>
 
           {d.projects.length > 0 && (
             <>
@@ -151,9 +141,6 @@ export function CalendarDay() {
   const [viewer, setViewer] = useState<any>(null);
   const [logOpen, setLogOpen] = useState<any>(null);
   const [op, setOp] = useState<any>(null);
-  const [rem, setRem] = useState<any>(null);
-  const rems = useLoad(() => get<any[]>('/reminders').catch(() => []), [date]);
-  const dayRems = (rems.data || []).filter((r: any) => r.active && remDayKey(r.remindAt) === date);
   const camRef = useRef<HTMLInputElement>(null);
   const galRef = useRef<HTMLInputElement>(null);
 
@@ -196,8 +183,7 @@ export function CalendarDay() {
           <button className="tile" style={{ minHeight: 78 }} onClick={() => galRef.current?.click()} disabled={!!uploading}>Из галереи</button>
           <button className="tile" style={{ minHeight: 78 }} onClick={() => setLogOpen({})}>Запись о работе</button>
           <button className="tile" style={{ minHeight: 78 }} onClick={() => needProject('income')}>+ Получил деньги</button>
-          <button className="tile" style={{ minHeight: 70 }} onClick={() => needProject('expense')}>− Потратил</button>
-          <button className="tile" style={{ minHeight: 70 }} onClick={() => setRem({ date, projectId: projectId || null })}>⏰ Напомнить</button>
+          <button className="tile wide" style={{ minHeight: 64 }} onClick={() => needProject('expense')}>− Потратил</button>
         </div>
       )}
       <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => upload(e.target.files)} />
@@ -210,19 +196,6 @@ export function CalendarDay() {
             <div className={`big num ${d.total.earned < 0 ? 'neg' : ''}`}>За день: {rub(d.total.earned)}</div>
             <div className="sub num">Получено {rub(d.total.received)} · потрачено {rub(d.total.spent)}</div>
           </div>
-
-          {dayRems.length > 0 && (
-            <>
-              <h2 className="section-title">Напоминания</h2>
-              <div className="list">
-                {dayRems.map((r: any) => (
-                  <button key={r.id} className="list-item" onClick={() => setRem(r)}>
-                    <div className="grow"><div className="title">⏰ {new Date(r.remindAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · {r.text}</div>{r.project && <div className="xs muted">{r.project.name}</div>}</div>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
 
           <h2 className="section-title">Фото{d.photos.length ? ` (${d.photos.length})` : ''}</h2>
           {d.photos.length ? (
@@ -259,7 +232,6 @@ export function CalendarDay() {
       {viewer && <PhotoViewer photo={viewer} projects={projects.data || []} readOnly={ro} onClose={() => setViewer(null)} onChanged={() => { setViewer(null); day.reload(); }} />}
       <LogSheet log={logOpen} date={date!} projectId={projectId} readOnly={ro} onClose={() => setLogOpen(null)} onSaved={() => { setLogOpen(null); day.reload(); }} />
       <OpSheet op={op} projectId={op?.projectId || projectId} readOnly={ro} onClose={() => setOp(null)} onSaved={() => { setOp(null); day.reload(); }} />
-      <ReminderSheet r={rem} onClose={() => setRem(null)} onSaved={() => { setRem(null); rems.reload(); }} readOnly={ro} />
     </>
   );
 }

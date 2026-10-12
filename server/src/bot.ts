@@ -6,6 +6,7 @@ import { upsertUser } from './routes/auth';
 import { botInfo } from './botInfo';
 import { handleMessage } from './ai/assistant';
 import { transcribe } from './ai/openai';
+import { remAction } from './routes/organizer';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -22,7 +23,8 @@ export function createBot() {
       '📐 Смета за 5 минут: ваш прайс, 34 калькулятора, готовые шаблоны\n' +
       '📄 PDF для заказчика в один тап\n' +
       '💰 Расходы, оплаты и реальная прибыль по каждому объекту\n' +
-      '📷 Календарь с фото и напоминаниями\n' +
+      '📷 Календарь с фото и журналом работ\n' +
+      '⏰ Напоминания: деньги, бетон, техника, налоги — с кнопкой «отложить»\n' +
       '🤝 Ссылка для заказчика, договор и акт\n\n' +
       '<b>Первые 3 сметы — бесплатно.</b> Дальше — по подписке.',
       { parse_mode: 'HTML', reply_markup: appKb() },
@@ -31,6 +33,17 @@ export function createBot() {
 
   // ID для настройки администратора
   bot.command('id', (ctx) => ctx.reply(`Ваш Telegram ID: <code>${ctx.from?.id}</code>`, { parse_mode: 'HTML' }));
+
+  // Кнопки под напоминанием: отложить / готово
+  bot.callbackQuery(/^rem:(15|60|180|tom|ok):([\w-]{10,40})$/, async (ctx) => {
+    const [, action, id] = ctx.match as RegExpMatchArray;
+    const text = await remAction(ctx.from.id, action, id).catch(() => 'Не получилось, попробуйте в приложении');
+    await ctx.answerCallbackQuery({ text }).catch(() => {});
+    try {
+      const msg = ctx.callbackQuery.message as any;
+      if (msg?.text) await ctx.editMessageText(`${esc(msg.text)}\n\n<i>${esc(text)}</i>`, { parse_mode: 'HTML' });
+    } catch { /* сообщение уже изменено */ }
+  });
 
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
 
@@ -101,7 +114,7 @@ export const BOT_DESCRIPTION =
   '• PDF для заказчика в один тап\n' +
   '• Расходы, оплаты и реальная прибыль по каждому объекту\n' +
   '• Ссылка для заказчика с кнопкой «Согласовать», договор и акт\n' +
-  '• Календарь с фото и напоминаниями\n\n' +
+  '• Календарь с фото и журналом работ\n• Напоминания с кнопкой «отложить»\n\n' +
   'Первые 3 сметы — бесплатно. Дальше — по подписке.';
 export const BOT_SHORT = 'Сметы, расчёты и прибыль по объектам для строителей. Первые 3 сметы — бесплатно.';
 

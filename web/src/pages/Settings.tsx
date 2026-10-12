@@ -5,7 +5,7 @@ import { useMe } from '../App';
 import { Field, Load, Switch, useLoad, useToast } from '../components/ui';
 import { date } from '../format';
 import { openInvoice, haptic, tg } from '../tg';
-import { THEMES, applyTheme } from '../theme';
+import { THEMES, DEFAULT_THEME, applyTheme } from '../theme';
 
 export default function Settings() {
   const { me, setMe, refreshMe } = useMe();
@@ -120,13 +120,16 @@ export default function Settings() {
 
       <h2 className="section-title">Оформление</h2>
       <div className="themes">
-        {THEMES.map((t) => (
-          <button key={t.id} className={`theme-card ${(me.theme || 'steel') === t.id ? 'on' : ''}`} aria-pressed={(me.theme || 'steel') === t.id}
-            onClick={async () => { applyTheme(t.id); try { setMe(await patch('/me', { theme: t.id })); } catch (e: any) { toast(e.message, true); } }}>
-            <div className="sw" style={{ background: t.bg, color: t.fg }}>СМЕТА</div>
-            <div className="nm">{t.name}</div>
-          </button>
-        ))}
+        {THEMES.map((t) => {
+          const on = (THEMES.some((x) => x.id === me.theme) ? me.theme : DEFAULT_THEME) === t.id;
+          return (
+            <button key={t.id} className={`theme-card ${on ? 'on' : ''}`} aria-pressed={on}
+              onClick={async () => { applyTheme(t.id); try { setMe(await patch('/me', { theme: t.id })); } catch (e: any) { toast(e.message, true); } }}>
+              <div className={`sw th-${t.id}`}>СМЕТА</div>
+              <div className="nm">{t.name}<div className="xs muted">{t.note}</div></div>
+            </button>
+          );
+        })}
       </div>
     </>
   );
