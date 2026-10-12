@@ -51,7 +51,9 @@ export interface CanopyParams {
   /** Проёмы вручную: если задан список — ворота, двери и окна берутся из него (положение, размер), иначе расставляются сами */
   ops?: OpeningSpec[] | null;
   insulate: boolean;    // утепление стен и кровли (гараж, мастерская)
-  base: 'slab' | 'ushp' | 'strip' | 'piles' | 'screw' | 'deck' | 'paving' | 'none';
+  base: 'slab' | 'ushp' | 'strip' | 'piles' | 'screw' | 'deck' | 'paving' | 'floor' | 'none';
+  floorOn?: 'screw' | 'blocks'; // утеплённый пол на опорах: винтовые сваи или бетонные блоки
+  lining?: 'none' | 'osb' | 'vagonka'; // внутренняя обшивка при утеплении
   stripW: number; stripD: number; // ленточный: ширина и высота ленты, м
   eps: number;          // УШП: толщина ЭППС, м
   city: string;         // город — для снегового района
@@ -258,7 +260,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
         const q = sideOf(x, y).find((z) => z.side === o.side);
         if (q && q.t > a0 + 0.02 && q.t < a1 - 0.02 && q.t > 0.01 && q.t < d.len - 0.01) { postMap.delete(k); removed++; }
       }
-      if (removed && o.kind !== 'gate') warnings.push(`${name} стоит на месте промежуточного столба — столб заменён стойками по краям проёма`);
+      if (removed && o.kind !== 'gate' && !(wood && p.postStep <= 0.8)) warnings.push(`${name} стоит на месте промежуточного столба — столб заменён стойками по краям проёма`);
     }
   }
   if (!manual && p.gate !== 'none') {
@@ -644,6 +646,22 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   }
   if (p.base === 'slab' || p.base === 'ushp') panels.push({ kind: 'slab', pts: [[-p.slabOver, -p.slabOver, 0], [L + p.slabOver, -p.slabOver, 0], [L + p.slabOver, W + p.slabOver, 0], [-p.slabOver, W + p.slabOver, 0]] });
   if (p.base === 'deck') panels.push({ kind: 'deck', pts: [[0, 0, 0], [L, 0, 0], [L, W, 0], [0, W, 0]] });
+  if (p.base === 'floor') {
+    // ростверк из бруса по периметру, под ним опоры; пол — плита OSB поверх
+    const t = 0.15, z0 = -0.15;
+    const beamBox = (x0: number, y0: number, x1: number, y1: number) => {
+      panels.push({ kind: 'plank', pts: [[x0, y0, z0], [x1, y0, z0], [x1, y0, 0], [x0, y0, 0]] }, { kind: 'plank', pts: [[x1, y0, z0], [x1, y1, z0], [x1, y1, 0], [x1, y0, 0]] },
+        { kind: 'plank', pts: [[x1, y1, z0], [x0, y1, z0], [x0, y1, 0], [x1, y1, 0]] }, { kind: 'plank', pts: [[x0, y1, z0], [x0, y0, z0], [x0, y0, 0], [x0, y1, 0]] });
+    };
+    beamBox(-t / 2, -t / 2, L + t / 2, t / 2); beamBox(-t / 2, W - t / 2, L + t / 2, W + t / 2);
+    panels.push({ kind: 'floor', pts: [[0, 0, 0.02], [L, 0, 0.02], [L, W, 0.02], [0, W, 0.02]] });
+    const n = Math.ceil(L / 2 - 1e-9) + 1;
+    for (let i = 0; i < n; i++) for (const y of W > 3.2 ? [0, W / 2, W] : [0, W]) {
+      const x = (L * i) / (n - 1), s2 = 0.1, zb = z0 - (p.floorOn === 'blocks' ? 0.2 : 0.3);
+      for (const [a, b2] of [[[x - s2, y - s2], [x + s2, y - s2]], [[x + s2, y - s2], [x + s2, y + s2]], [[x + s2, y + s2], [x - s2, y + s2]], [[x - s2, y + s2], [x - s2, y - s2]]] as [number, number][][])
+        panels.push({ kind: p.floorOn === 'blocks' ? 'concrete' : 'block', pts: [[a[0], a[1], zb], [b2[0], b2[1], zb], [b2[0], b2[1], z0], [a[0], a[1], z0]] });
+    }
+  }
   if (p.base === 'paving') panels.push({ kind: 'paving', pts: [[-p.slabOver, -p.slabOver, 0], [L + p.slabOver, -p.slabOver, 0], [L + p.slabOver, W + p.slabOver, 0], [-p.slabOver, W + p.slabOver, 0]] });
 
   // ---------- площадка ТКО: контейнеры в макете и проезд мусоровоза ----------
@@ -723,11 +741,13 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   // ---------- деревянный каркас: сечения бруса и доски вместо профтрубы ----------
   if (wood) {
     const postH = Math.max(hLow, ...members.filter((m) => m.kind === 'post').map((m) => m.b[2]));
+    const studs = p.postStep <= 0.8;
     if (postH > 4.5) warnings.push('Деревянные столбы выше 4,5 м — лучше металлический каркас или клеёный брус');
     for (const m of members) {
       const len = dist(m.a, m.b);
       m.profile = ({
-        post: postH <= 3.2 ? '150×150' : '200×200', beam: P(m.profile).a >= 120 ? '200×100' : '150×100',
+        // шаг до 0,8 м — каркасная стена: стойки из доски, обвязка — двойная доска
+        post: studs ? (postH <= 3.0 ? '50×100' : '50×150') : postH <= 3.2 ? '150×150' : '200×200', beam: studs ? '100×100' : P(m.profile).a >= 120 ? '200×100' : '150×100',
         rafter: len <= 3.2 ? '50×150' : len <= 4.5 ? '50×200' : '100×200', hip: '100×200', chord: '50×200', web: '50×100',
         purlin: slats ? '50×150' : rafterSpacing > 1.0 ? '50×100' : '25×100', rail: '50×100', frame: '100×100', handrail: '50×100', baluster: '50×50', brace: '100×100', tie: '50×100', bollard: m.profile, bumper: m.profile,
       } as Record<MemberKind, string>)[m.kind];
@@ -794,7 +814,8 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   const b = new Builder(wood ? 'Деревянный каркас' : 'Металлокаркас');
   if (wood) {
     for (const s of steel) b.mat(`${s.isBoard ? 'Доска' : 'Брус'} ${s.profile} мм, хвоя (${s.use}), 6 м`, s.bars, 'шт', s.pricePerM * 6);
-    if (nPosts) b.mat('Опора столба П-образная с анкерами', nPosts, 'шт', 900);
+    if (nPosts && p.postStep > 0.8) b.mat('Опора столба П-образная с анкерами', nPosts, 'шт', 900);
+    if (p.postStep <= 0.8) b.mat('Уголки и пластины для каркасных стен (стойка–обвязка)', Math.ceil(nPosts / 2), 'компл', 120);
     b.mat('Крепёж каркаса: уголки, пластины, шпильки, саморезы', Math.ceil(woodVol * 4) + 1, 'компл', 1500);
     b.mat('Антисептик для древесины', Math.ceil(paintM2 * 0.3 * k), 'л', 180);
     if (!noPaint) b.mat('Масло-лазурь для дерева (2 слоя)', Math.ceil(paintM2 * 0.2 * k), 'л', 1300);
@@ -953,15 +974,34 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   if (p.insulate) {
     b.sec('Утепление');
     const wallIns = profFullArea + profFixedArea + woodWall;
-    const roofIns = p.cover === 'sandwich' || p.cover === 'poly' ? 0 : roofArea;
+    // утепляем только над помещением — без свесов
+    const roofIns = p.cover === 'sandwich' || p.cover === 'poly' ? 0 : r2(roofArea * (L * W) / ((L + 2 * ov) * (W + 2 * ov)), 2);
     if (wallIns + roofIns > 0) {
       b.mat('Минвата 100 мм (плиты)', (wallIns + roofIns) * 1.05 * k, 'м²', 380);
       b.mat('Пароизоляция', (wallIns + roofIns) * 1.15, 'м²', 25);
+      b.mat('Скотч для пароизоляции', Math.ceil((wallIns + roofIns) / 40), 'рулон', 350);
       b.work('Утепление стен изнутри', wallIns);
       b.work('Утепление кровли', roofIns);
       b.work('Монтаж пароизоляции', wallIns + roofIns);
     }
-    b.warn('Утепление посчитано без внутренней обшивки (ОСБ, вагонка или профлист) — добавьте её отдельно');
+    // снаружи утеплителя — ветрозащита и вентзазор: у стен из доски — контррейка, у кровли из листа — контробрешётка
+    if (woodWall > 0) {
+      b.mat('Ветро-влагозащитная мембрана (стены)', woodWall * 1.15, 'м²', 45);
+      b.mat('Брусок 25×50 контррейка (вентзазор стен)', woodWall * 1.7 * 1.1, 'пог. м', 30);
+      b.work('Монтаж гидро-ветрозащиты', woodWall);
+    }
+    if (roofIns > 0 && (p.cover === 'prof' || p.cover === 'tile')) {
+      b.mat('Гидро-ветрозащитная мембрана кровли', roofArea * 1.15, 'м²', 55);
+      b.mat('Брусок 30×50 контробрешётки', roofArea * 1.7 * 1.1, 'пог. м', 35);
+      b.work('Монтаж гидро-ветрозащиты', roofArea);
+      b.work('Монтаж контробрешётки', roofArea);
+    }
+    const lin = p.lining || 'none';
+    const linArea = wallIns + (roofIns > 0 ? L * W : 0);
+    if (lin !== 'none' && linArea > 0) {
+      if (lin === 'osb') { b.mat('Плита OSB-3 12 мм (внутренняя обшивка стен и потолка)', linArea * 1.1 * k, 'м²', 560); b.work('Обшивка стен ГКЛ на каркасе', linArea, { note: 'обшивка OSB по каркасу' }); }
+      else { b.mat('Вагонка хвоя 12,5×96, сорт B (стены и потолок)', linArea * 1.12 * k, 'м²', 650); b.work('Монтаж вагонки', linArea); }
+    } else b.warn('Утепление посчитано без внутренней обшивки — выберите OSB или вагонку в параметрах');
   }
 
   if (p.base === 'slab') {
@@ -1046,6 +1086,44 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     if (nPosts) b.work('Монтаж закладных и гильз', nPosts);
     b.warn('Ленточный фундамент: пол внутри (плита или стяжка) в смету не включён');
     b.sum('Лента', per, 'пог. м').sum('Бетон', vol, 'м³');
+  }
+  if (p.base === 'floor') {
+    b.sec('Основание и утеплённый пол');
+    const nx = Math.ceil(L / 2 - 1e-9) + 1, rows = W > 3.2 ? 3 : 2, n = nx * rows;
+    const per = 2 * (L + W);
+    if (p.floorOn === 'blocks') {
+      b.work('Разработка грунта вручную', n * 0.5 * 0.5 * 0.35);
+      b.mat('Песчано-гравийная смесь под блоки', Math.max(0.5, n * 0.5 * 0.5 * 0.2 * 1.2), 'м³', 1600);
+      b.mat('Блок бетонный 200×200×400', n * 2, 'шт', 160);
+      b.mat('Раствор / клей для блоков', Math.ceil(n / 4), 'меш', 450);
+    } else {
+      b.mat('Свая винтовая 89×2000 с оголовком', n, 'шт', 2900);
+      b.work('Монтаж винтовых свай', n);
+    }
+    const lags = Math.ceil(L / 0.5 - 1e-9) + 1;
+    const area = L * W;
+    b.mat('Рубероид / гидроизол под брус (2 слоя)', per * 0.15 * 2 * 1.15, 'м²', 60);
+    b.mat('Брус 150×150 для ростверка, антисептированный', per * 0.15 * 0.15 * 1.1 * k, 'м³', 24000);
+    b.work('Свайно-ростверковый фундамент (работа)', per);
+    b.mat(`Доска 50×150 для лаг пола (${lags} шт по ${String(W).replace('.', ',')} м, шаг 0,5 м)`, lags * W * 0.05 * 0.15 * 1.1 * k, 'м³', 22000);
+    b.work('Монтаж лаг', lags * W);
+    b.mat('Брусок 50×50 черепной (под черновой пол)', 2 * lags * W * 0.05 * 0.05 * 1.1 * k, 'м³', 22000);
+    b.mat('Доска обрезная 25×100 на черновой пол', area * 0.025 * 1.1 * k, 'м³', 17000);
+    b.mat('Ветро-влагозащитная мембрана (пол)', area * 1.15, 'м²', 45);
+    b.work('Монтаж гидро-ветрозащиты', area);
+    if (p.insulate) {
+      b.mat('Минвата 150 мм в пол (между лаг)', area * 1.05 * k, 'м²', 520);
+      b.work('Утепление перекрытия минватой', area);
+    }
+    b.mat('Пароизоляция пола', area * 1.15, 'м²', 25);
+    b.work('Монтаж пароизоляции', area);
+    b.mat('Плита OSB-3 18 мм (чистовой пол)', area * 1.08 * k, 'м²', 760);
+    b.work('Укладка фанеры на лаги', area);
+    b.mat('Антисептик для ростверка и лаг', Math.ceil((per * 0.6 + lags * W * 0.4) * 0.3), 'л', 180);
+    b.work('Антисептирование древесины', per * 0.6 + lags * W * 0.4);
+    b.mat('Уголки, опоры лаг, саморезы, гвозди', Math.ceil(area / 6), 'компл', 1200);
+    b.warn('Опоры — с подушкой и выше грунта на 150–200 мм, подполье проветривается: в цоколе оставьте продухи');
+    b.sum('Пол', area, 'м²').sum(p.floorOn === 'blocks' ? 'Опор (блоков)' : 'Свай', n, 'шт');
   }
   if (p.base === 'screw') {
     b.sec('Фундамент (винтовые сваи)');

@@ -34,3 +34,17 @@ test('свой столб: размер в модели, металле и см�
   assert.ok(f.members.filter((m) => m.kind === 'post').some((m) => m.profile === '80×80×3'));
   assert.ok(f.lines.some((l: any) => /Труба профильная 80×80×3 \(столб\)/.test(l.name)));
 });
+
+test('бытовка 6×2,4: утеплённый пол, каркас из стоек 50×100 через 0,6 м, мембраны и вентзазоры', () => {
+  const pr = PRESETS.find((x) => x.id === 'bytovka')!;
+  const r = buildCanopy(pr.p as any);
+  const has = (re: RegExp) => r.lines.some((l) => re.test(l.name));
+  assert.equal(r.info.postProf, '50×100');
+  assert.ok(has(/Блок бетонный 200×200×400/) && has(/Рубероид/) && has(/Брус 150×150 для ростверка/) && has(/черепной/) && has(/Минвата 150 мм в пол/) && has(/OSB-3 18 мм/));
+  assert.ok(has(/контррейка/) && has(/контробрешётки/) && has(/мембрана кровли/) && has(/Вагонка/));
+  const ins = r.lines.find((l) => l.name === 'Утепление кровли')!;
+  assert.ok(ins.qty < 17 && ins.qty > 14); // только над помещением, без свесов
+  assert.ok(!r.warnings.some((w) => /месте промежуточного столба/.test(w)));
+  assert.ok(!r.lines.some((l) => /П-образная/.test(l.name)));
+  assert.ok(designPdfData(r, { title: 't' }).params.some(([k, v]: any) => k === 'Основание' && /утеплённый пол/.test(v)));
+});

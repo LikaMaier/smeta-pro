@@ -22,7 +22,7 @@ import { PRESETS } from '../../../shared/design/presets';
  * раскрой металла и смета с работами и материалами. ИИ только заполняет параметры, геометрию считает программа.
  */
 // пресет задаёт только своё — остальное из типовых значений (ворота, утепление и т. п. выключены)
-const BLANK: Partial<CanopyParams> = { block: 0, blockAt: 'left', blockWall: 'prof_full', ties: 'auto', curb: false, bumpers: false, entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, ops: null, postA: undefined, postB: undefined, postT: undefined, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
+const BLANK: Partial<CanopyParams> = { block: 0, blockAt: 'left', blockWall: 'prof_full', ties: 'auto', curb: false, bumpers: false, entry: 'none', containers: 0, contType: '1.1', profGrade: 'C8', layout: 'perimeter', midRows: 0, stripW: 0.4, stripD: 0.7, eps: 0.1, attach: false, frame: 'steel', gate: 'none', door: false, ops: null, lining: undefined, floorOn: undefined, postA: undefined, postB: undefined, postT: undefined, insulate: false, gutter: false, snowGuard: false, lights: 0, snow: 3, waste: 5, profH: 2, slabT: 0.15, sand: 0.2, gravel: 0.2, slabOver: 0, rebar: 'composite' };
 const full = (p: Partial<CanopyParams>): CanopyParams => ({ ...CANOPY_DEFAULT, ...BLANK, ...p, walls: { ...CANOPY_DEFAULT.walls, ...(p.walls || {}) } });
 const NUMS = ['L', 'W', 'hHigh', 'hLow', 'postStep', 'overhang', 'profH', 'gateW', 'gateH', 'slabT', 'sand', 'gravel', 'slabOver', 'snow', 'waste', 'lights', 'stripW', 'stripD', 'eps', 'midRows', 'containers', 'block'] as const;
 type NumKey = (typeof NUMS)[number];
@@ -81,7 +81,7 @@ export default function Designer() {
     if (params.midRows < 0 || params.midRows > 6) e.push('Промежуточных рядов столбов — от 0 до 6');
     if (params.snow < 1 || params.snow > 8) e.push('Снеговой район — от 1 до 8');
     if (params.base === 'strip' && (params.stripW < 0.2 || params.stripW > 1 || params.stripD < 0.3 || params.stripD > 2)) e.push('Лента: ширина 200–1000 мм, высота 300–2000 мм');
-    if (params.postStep < 1.5 || params.postStep > 6) e.push('Шаг столбов — от 1,5 до 6 м');
+    if (params.frame === 'wood' ? params.postStep < 0.4 || params.postStep > 6 : params.postStep < 1.5 || params.postStep > 6) e.push(params.frame === 'wood' ? 'Шаг стоек — от 0,4 до 6 м' : 'Шаг столбов — от 1,5 до 6 м');
     return e;
   }, [params]);
 
@@ -247,7 +247,7 @@ export default function Designer() {
             </>
           )}
           {base.layout === 'perimeter' && base.roof !== 'hip' && !['visor'].includes(base.kind) && num('midRows', 'Промежуточных рядов столбов', 'шт', '0 — один пролёт; 1 и больше — многопролётный навес (стоянки, склады)')}
-          <div className="grid2">{base.kind !== 'visor' && num('postStep', 'Шаг столбов, до', 'м')}{num('overhang', 'Свес кровли', 'м')}</div>
+          <div className="grid2">{base.kind !== 'visor' && num('postStep', base.frame === 'wood' && params.postStep <= 0.8 ? 'Шаг стоек каркаса' : 'Шаг столбов, до', 'м', base.frame === 'wood' ? '0,6 м — каркасная стена из доски 50×100 (бытовка, хозблок)' : undefined)}{num('overhang', 'Свес кровли', 'м')}</div>
           {res.info.posts > 0 && <Field label={res.info.wood ? 'Сечение столба (брус)' : 'Сечение столба (профтруба)'}><PostSize a={base.postA} b={base.postB} t={base.postT} wood={res.info.wood} auto={(res.info as any).postRec || res.info.postProf} onChange={(x) => setB(x)} /></Field>}
           {base.roof !== 'arch' && <Field label="Каркас"><Chips value={base.frame} onChange={(v) => setB({ frame: v })} options={[{ value: 'steel', label: 'Металл (профтруба)' }, { value: 'wood', label: 'Дерево (брус)' }]} /></Field>}
           <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'tile', label: 'Металлочерепица' }, { value: 'soft', label: 'Гибкая черепица' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'sandwich', label: 'Сэндвич' }, { value: 'slats', label: 'Ламели (пергола)' }, { value: 'none', label: 'Без кровли' }]} /></Field>
@@ -291,9 +291,11 @@ export default function Designer() {
           {Object.values(base.walls).some((w) => w === 'prof_full' || w === 'prof' || w === 'wood') && (
             <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.insulate} onChange={(e) => setB({ insulate: e.target.checked })} />Утеплить стены и кровлю (минвата 100 мм)</label>
           )}
+          {base.insulate && <Field label="Внутренняя обшивка"><Chips value={base.lining || 'none'} onChange={(v) => setB({ lining: v })} options={[{ value: 'none', label: 'Без обшивки' }, { value: 'vagonka', label: 'Вагонка' }, { value: 'osb', label: 'OSB 12 мм' }]} /></Field>}
 
           <div className="csection">Основание</div>
-          <Chips value={base.base} onChange={(v) => setB({ base: v })} options={[{ value: 'slab', label: 'Бетонная плита' }, { value: 'ushp', label: 'УШП (тёплая плита)' }, { value: 'strip', label: 'Ленточный' }, { value: 'piles', label: 'Буронабивные сваи' }, { value: 'screw', label: 'Винтовые сваи' }, { value: 'deck', label: 'Настил на винтовых сваях' }, { value: 'paving', label: 'Тротуарная плитка' }, { value: 'none', label: 'Нет' }]} />
+          <Chips value={base.base} onChange={(v) => setB({ base: v })} options={[{ value: 'slab', label: 'Бетонная плита' }, { value: 'ushp', label: 'УШП (тёплая плита)' }, { value: 'strip', label: 'Ленточный' }, { value: 'piles', label: 'Буронабивные сваи' }, { value: 'screw', label: 'Винтовые сваи' }, { value: 'deck', label: 'Настил на винтовых сваях' }, { value: 'paving', label: 'Тротуарная плитка' }, { value: 'floor', label: 'Утеплённый пол на опорах' }, { value: 'none', label: 'Нет' }]} />
+          {base.base === 'floor' && <Field label="Опоры под ростверк" hint="Ростверк — брус 150×150, лаги 50×150 через 0,5 м, черновой пол, мембрана, утеплитель, пароизоляция, OSB 18 мм"><Chips value={base.floorOn || 'screw'} onChange={(v) => setB({ floorOn: v })} options={[{ value: 'screw', label: 'Винтовые сваи' }, { value: 'blocks', label: 'Бетонные блоки' }]} /></Field>}
           {base.base === 'strip' && <div className="grid2">{num('stripW', 'Ширина ленты', 'мм')}{num('stripD', 'Высота ленты', 'мм', 'из них 200 мм над землёй')}</div>}
           {base.base === 'ushp' && <div className="grid3">{num('slabT', 'Плита', 'мм')}{num('eps', 'ЭППС', 'мм')}{num('sand', 'Песок', 'мм')}</div>}
           {base.base === 'paving' && num('slabOver', 'Плитка шире навеса на', 'м', 'с каждой стороны')}

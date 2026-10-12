@@ -22,7 +22,7 @@ export const CANOPY_AI_SCHEMA = {
       gate: { type: ['string', 'null'], enum: ['none', 'swing', 'sectional', null] },
       highSide: { type: ['string', 'null'], enum: ['front', 'back', 'left', 'right', null] },
       cover: { type: ['string', 'null'], enum: ['prof', 'tile', 'soft', 'poly', 'sandwich', 'slats', 'none', null] },
-      base: { type: ['string', 'null'], enum: ['slab', 'ushp', 'strip', 'piles', 'screw', 'deck', 'paving', 'none', null] },
+      base: { type: ['string', 'null'], enum: ['slab', 'ushp', 'strip', 'piles', 'screw', 'deck', 'paving', 'floor', 'none', null] },
       rebar: { type: ['string', 'null'], enum: ['steel', 'composite', null] },
       color: { type: ['string', 'null'] },
       walls: { type: 'object', additionalProperties: false, required: ['front', 'back', 'left', 'right'], properties: { front: wall, back: wall, left: wall, right: wall } },
