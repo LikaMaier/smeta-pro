@@ -51,10 +51,11 @@ export async function upsertUser(tgId: number, firstName?: string, username?: st
 export async function meView(user: any) {
   const free = await freeCtx(user.id, user.extraEstimates);
   const acc = accessOf(user);
+  const aiWish = Boolean(await prisma.auditLog.findFirst({ where: { userId: user.id, entity: 'ai', action: { in: ['wish', 'wish_notified'] } }, select: { id: true } }));
   return plain({
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
     companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
-    aiAvailable: Boolean(env.AI_PROVIDER),
+    aiAvailable: Boolean(env.AI_PROVIDER), aiWish,
     access: { ...acc, freeEstimateLeft: free.estimateCount < free.limit, freeLeft: Math.max(0, free.limit - free.estimateCount), freeLimit: free.limit, freeEstimateIds: free.freeEstimateIds, estimateCount: free.estimateCount },
     plan: {
       tier: acc.tier, label: TIERS[acc.tier].label, aiLimit: TIERS[acc.tier].ai, aiUsed: user.aiMonth === monthKey() ? user.aiUsed : 0,

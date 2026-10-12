@@ -154,6 +154,9 @@ export default function Designer() {
 
   return (
     <>
+      {!me.aiAvailable ? (
+        <div className="dz-warn" style={{ borderColor: 'var(--gold)' }}>🤖 Скоро: опишете объект словами — ИИ сам заполнит параметры. Пока выберите тип и типовой вариант ниже.</div>
+      ) : (
       <div className="panel" style={{ padding: 12 }}>
         <div className="row between" style={{ marginBottom: 6 }}>
           <b>Опишите словами</b>
@@ -164,6 +167,7 @@ export default function Designer() {
         <button className="btn primary block" style={{ marginTop: 8 }} disabled={busy === 'ai'} onClick={parse}>{busy === 'ai' ? 'Разбираю…' : '✨ Заполнить параметры по описанию'}</button>
         {questions.length > 0 && <div className="xs" style={{ marginTop: 8 }}><b>Уточните:</b>{questions.map((q, i) => <div key={i}>• {q}</div>)}</div>}
       </div>
+      )}
 
       <div className="dz-kinds">
         {(Object.keys(OBJ_LABEL) as ObjKind[]).map((k) => (

@@ -8,7 +8,7 @@ const ITEMS = [
   { to: '/finance', icon: Icon.money, title: 'Финансы', text: 'Прибыль и долги по всем объектам' },
   { to: '/contacts', icon: Icon.book, title: 'Записная книжка', text: 'Все телефоны: заказчики, техника, рабочие' },
   { to: '/reminders', icon: Icon.history, title: 'Напоминания', text: 'Бот напишет в нужное время' },
-  { to: '/assistant', icon: Icon.mic, title: 'ИИ-помощник', text: 'Сметы по голосу и тексту' },
+  { to: '/assistant', icon: Icon.mic, title: 'ИИ-помощник', text: 'Скоро: сметы по голосу и тексту' },
   { to: '/settings', icon: Icon.gear, title: 'Настройки и подписка', text: 'Тариф, ИИ, реквизиты' },
 ];
 

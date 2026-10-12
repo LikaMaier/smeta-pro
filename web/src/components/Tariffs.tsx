@@ -76,7 +76,7 @@ export default function Tariffs() {
                     {on && <span className="badge ok">ваш тариф</span>}
                   </div>
                   <div className="tariff-price"><b className="num">{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</b><span className="muted"> в месяц{year ? ` · ${rub(p.rubPrice)} за год` : ''}</span></div>
-                  <ul className="tariff-perks">{TIERS[t].perks.map((x) => <li key={x}>{x}</li>)}</ul>
+                  <ul className="tariff-perks">{TIERS[t].perks.map((x) => <li key={x}>{!me.aiAvailable && /^ИИ/.test(x) ? <>{x.replace(/^ИИ-сметчик: /, 'ИИ-сметчик (').replace(/^ИИ: /, 'ИИ (')}) — <b className="soon">скоро, без доплаты</b></> : x}</li>)}</ul>
                   <Buy p={p} label={on ? 'Продлить' : undefined} />
                 </div>
               );

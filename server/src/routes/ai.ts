@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { HttpError } from '../util';
+import { HttpError, prisma, audit, accessOf } from '../util';
+import { env } from '../env';
 import { assertAiAllowed, handleMessage, getSession, resetSession, createEstimateFromDraft } from '../ai/assistant';
-import { transcribe } from '../ai/openai';
+import { transcribe, aiConfigured } from '../ai/openai';
 
 export { assertAiAllowed };
 
@@ -10,8 +11,35 @@ export { assertAiAllowed };
  * ИИ-сметчик. Сервер проверяет переключатель aiEnabled на каждом запросе:
  * при выключенном ИИ запросы к OpenAI не отправляются.
  */
+/** ИИ подключили — один раз сообщаем всем, кто нажал «Жду ИИ» */
+export async function notifyAiWishers(bot: any, appUrl: string, log: { error: (o: any, m?: string) => void }) {
+  if (!aiConfigured()) return;
+  const wishes = await prisma.auditLog.findMany({ where: { entity: 'ai', action: 'wish' }, include: { user: true } });
+  for (const w of wishes) {
+    const claimed = await prisma.auditLog.updateMany({ where: { id: w.id, action: 'wish' }, data: { action: 'wish_notified' } });
+    if (!claimed.count) continue;
+    await bot.api.sendMessage(Number(w.user.tgId), '🤖 ИИ-сметчик заработал! Перескажите заказ голосом или текстом — соберу черновик сметы по вашим ценам. Доступно в тарифах «Про» и «Бригада».',
+      appUrl ? { reply_markup: { inline_keyboard: [[{ text: 'Открыть ИИ-сметчик', web_app: { url: `${appUrl}/assistant` } }]] } } : {}).catch((e: any) => log.error({ err: e }, 'ai wish notify'));
+  }
+}
+
 export async function aiRoutes(app: FastifyInstance) {
   app.get('/api/ai/session', async (req) => getSession(req.user.id));
+
+  // «Жду ИИ»: копим желающих, чтобы решить, когда подключать платный ИИ
+  app.post('/api/ai/wish', async (req) => {
+    const had = await prisma.auditLog.findFirst({ where: { userId: req.user.id, entity: 'ai', action: { in: ['wish', 'wish_notified'] } } });
+    if (!had) await audit(req.user.id, 'ai', '-', 'wish', { tier: accessOf(req.user).tier });
+    return { ok: true };
+  });
+  // сколько ждут ИИ (только для владельца приложения)
+  app.get('/api/ai/wishes', async (req) => {
+    if (!env.ADMIN_TG_IDS.includes(String(req.user.tgId))) throw new HttpError(403, 'Только для администратора');
+    const rows = await prisma.auditLog.findMany({ where: { entity: 'ai', action: { in: ['wish', 'wish_notified'] } }, select: { userId: true, user: { select: { plan: true, subscriptionUntil: true } } } });
+    const users = new Map(rows.map((r) => [r.userId, r.user]));
+    const paying = [...users.values()].filter((u) => u.subscriptionUntil && u.subscriptionUntil > new Date()).length;
+    return { total: users.size, paying };
+  });
 
   app.post('/api/ai/message', async (req) => {
     const { text } = z.object({ text: z.string().trim().min(1, 'напишите сообщение').max(4000) }).parse(req.body);

@@ -4,6 +4,7 @@ import { createBot, setupBot } from './bot';
 import { seedPlans } from './routes/billing';
 import { prisma } from './util';
 import { startReminderLoop } from './routes/organizer';
+import { notifyAiWishers } from './routes/ai';
 import { COMPOSITIONS, compositionFor } from '../../shared/compositions';
 import { STARTER_PRICES } from '../../shared/starterPrices';
 
@@ -44,6 +45,7 @@ async function main() {
     // Ошибка настройки бота не должна ронять приложение
     setupBot(bot).catch((e) => app.log.error({ err: e }, 'Не удалось настроить бота'));
     startReminderLoop(bot, app.log, env.PUBLIC_URL);
+    notifyAiWishers(bot, env.PUBLIC_URL, app.log).catch((e) => app.log.error({ err: e }, 'ai wish notify'));
   } else {
     app.log.warn('BOT_TOKEN не задан — бот и оплата отключены');
   }

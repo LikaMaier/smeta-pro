@@ -30,7 +30,7 @@ import { applyTheme } from './theme';
 
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
-  aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean; theme?: string; designPrices?: Record<string, number> | null; pay?: { yookassa: boolean; receipt: boolean };
+  aiEnabled: boolean; aiAvailable: boolean; aiWish?: boolean; isAdmin: boolean; theme?: string; designPrices?: Record<string, number> | null; pay?: { yookassa: boolean; receipt: boolean };
   access: { active: boolean; mode: 'trial' | 'subscription' | 'team' | 'expired' | 'free' | 'admin'; tier?: 'free' | 'lite' | 'pro' | 'team'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeLimit?: number; freeEstimateIds?: string[]; estimateCount?: number };
   plan?: { tier: 'free' | 'lite' | 'pro' | 'team'; label: string; aiLimit: number; aiUsed: number; extraDesigns: number; team: 'owner' | 'member' | null };
 }

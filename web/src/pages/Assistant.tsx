@@ -5,6 +5,7 @@ import { useMe } from '../App';
 import { Load, State, Switch, useLoad, useToast } from '../components/ui';
 import { rub, n, TYPE_LABEL } from '../format';
 import { haptic } from '../tg';
+import AiSoon from '../components/AiSoon';
 
 const blobToDataUrl = (b: Blob) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(b); });
 const pickMime = () => ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) || '';
@@ -12,6 +13,7 @@ const pickMime = () => ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'au
 export default function Assistant() {
   const { me, setMe } = useMe();
   const toast = useToast();
+  if (!me.aiAvailable) return <AiSoon />;
   const toggle = async (v: boolean) => { try { setMe(await patch('/me', { aiEnabled: v })); toast(v ? 'ИИ-сметчик включён' : 'ИИ-сметчик выключен'); } catch (e: any) { toast(e.message, true); } };
   return (
     <>

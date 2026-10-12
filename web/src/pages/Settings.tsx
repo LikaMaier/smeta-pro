@@ -7,6 +7,7 @@ import { date } from '../format';
 import { openInvoice, haptic, tg } from '../tg';
 import { THEMES, DEFAULT_THEME, applyTheme } from '../theme';
 import Tariffs from '../components/Tariffs';
+import AiSoon from '../components/AiSoon';
 
 export default function Settings() {
   const { me, setMe, refreshMe } = useMe();
@@ -35,13 +36,13 @@ export default function Settings() {
       <Tariffs />
 
       <h2 className="section-title">ИИ-сметчик</h2>
-      <div className="panel">
+      {!me.aiAvailable ? <AiSoon compact /> : <div className="panel">
         <div className="row between">
           <div className="grow"><div style={{ fontWeight: 600 }}>{me.aiEnabled ? 'Включён' : 'Выключен'}</div>
             <div className="xs muted">{me.aiEnabled ? (me.aiAvailable ? 'Можно создавать сметы голосом и текстом.' : 'Голосовой сметчик ещё не подключён на сервере.') : 'Запросы к ИИ не отправляются. Сметы, калькуляторы, справочник и финансы работают вручную.'}</div></div>
           <Switch checked={me.aiEnabled} label="ИИ-помощник" onChange={async (v) => { try { setMe(await patch('/me', { aiEnabled: v })); } catch (e: any) { toast(e.message, true); } }} />
         </div>
-      </div>
+      </div>}
 
       <h2 className="section-title">Документы: реквизиты, логотип, подпись</h2>
       <div className="panel stack">

@@ -63,9 +63,9 @@ export function createBot() {
     if (ctx.message.text?.startsWith('/')) return next();
     const user = await prisma.user.findUnique({ where: { tgId: BigInt(ctx.from.id) } });
     if (!user) return ctx.reply('Сначала откройте приложение командой /start');
+    if (!aiConfigured()) return ctx.reply('🤖 ИИ-сметчик скоро появится: смета по голосовому и тексту. Нажмите «Жду ИИ» в приложении — подключим, как только наберётся достаточно желающих. А пока смета собирается вручную за пару минут.', { reply_markup: appKb() });
     if (!can(accessOf(user).tier, 'ai')) return ctx.reply('ИИ-сметчик входит в тарифы «Про» и «Бригада». Смету можно составить и вручную в приложении.', { reply_markup: appKb() });
     if (!user.aiEnabled) return ctx.reply('ИИ-сметчик выключен. Включите его в Настройках приложения, если нужен — или составьте смету вручную.', { reply_markup: appKb() });
-    if (!aiConfigured()) return ctx.reply('ИИ-сметчик ещё не подключён на сервере. Пока составьте смету вручную.', { reply_markup: appKb() });
     if (ctx.message.voice && !sttConfigured()) return ctx.reply('Голос пока не распознаётся — напишите текстом.', { reply_markup: appKb() });
     try {
       await ctx.replyWithChatAction('typing');

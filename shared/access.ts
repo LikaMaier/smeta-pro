@@ -8,7 +8,7 @@
 export const FREE_ESTIMATES = 3;
 export interface FreeCtx { estimateCount: number; freeEstimateIds: string[]; limit?: number }
 
-const ALWAYS = [/^\/api\/auth\//, /^\/api\/me$/, /^\/api\/me\/brand\/(logo|sign)$/, /^\/api\/pay\//, /^\/api\/team\/join$/];
+const ALWAYS = [/^\/api\/auth\//, /^\/api\/me$/, /^\/api\/me\/brand\/(logo|sign)$/, /^\/api\/pay\//, /^\/api\/team\/join$/, /^\/api\/ai\/wish$/];
 // календарь (фото, журнал) и напоминания — бесплатно
 const ORGANIZER = [/^\/api\/reminders(\/|$)/, /^\/api\/photos(\/|$)/, /^\/api\/worklogs(\/|$)/];
 const CATALOG = [/^\/api\/items(\/|$)/, /^\/api\/pricelists(\/|$)/];
