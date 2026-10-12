@@ -72,3 +72,29 @@ test('участок: смета по инженерке и мощению, 3D �
   assert.equal(buildDesign({ kind: 'site', ...SITE_PRESETS[0].p }).site, true);
   assert.equal((buildDesign({ kind: 'fence' }) as any).fence, true);
 });
+
+import { buildMep, autoPlace, MEP_PRESETS } from '../shared/design/mep';
+test('электрика и сантехника: все планировки — точки, группы, трубы, чертежи', () => {
+  for (const pr of MEP_PRESETS) {
+    const base: any = { kind: 'mep', h: 2.7, rooms: pr.rooms, points: [], walls: 'concrete', wiring: 'hidden', pipes: 'ppr', scheme: 'tee', object: pr.object };
+    base.points = autoPlace(base);
+    const r = buildMep(base);
+    assert.ok(r.groups.length >= 2, pr.id);
+    assert.ok(r.lines.length > 10, pr.id);
+    assert.ok(r.pipeLen.cold > 0, pr.id);
+    assert.ok(drawings(r).length >= 2, pr.id);
+    assert.ok(designPdfData(r, { title: 't' }).params.length > 4);
+    // все работы — из справочника (Builder иначе бросил бы ошибку), кабель и автоматы посчитаны
+    assert.ok(r.lines.some((l) => /ВВГнг/.test(l.name)));
+  }
+});
+test('плита — отдельная группа 32 А кабелем 3×6, мокрые зоны — через дифавтомат', () => {
+  const pr = MEP_PRESETS.find((x) => x.id === 'flat1')!;
+  const base: any = { kind: 'mep', h: 2.7, rooms: pr.rooms, points: [], walls: 'concrete', wiring: 'hidden', pipes: 'ppr', scheme: 'tee', object: 'flat' };
+  base.points = autoPlace(base);
+  const r = buildMep(base);
+  const stove = r.groups.find((g) => /плита/i.test(g.name))!;
+  assert.equal(stove.amp, 32); assert.equal(stove.cable, '3×6');
+  assert.ok(r.groups.filter((g) => /Ванн|Санузел/.test(g.name)).every((g) => g.rcd));
+  assert.ok(r.pipeLen.s110 > 0); // от унитаза — Ø110
+});

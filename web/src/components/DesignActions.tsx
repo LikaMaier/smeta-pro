@@ -8,7 +8,7 @@ import { rub0 } from '../format';
  * Общие действия проекта (забор, план участка): сохранить, мои проекты, PDF эскизного проекта, 3D-ссылка заказчику.
  * persist() — сохранить и вернуть id (нужно, чтобы привязать проект к смете).
  */
-export function useDesignStore(kind: 'fence' | 'site', title: string, params: any, id0: string | null) {
+export function useDesignStore(kind: 'fence' | 'site' | 'mep', title: string, params: any, id0: string | null) {
   const [designId, setDesignId] = useState<string | null>(id0);
   const persist = async (): Promise<string> => {
     const body = { title, params };
@@ -24,7 +24,7 @@ export function useDesignStore(kind: 'fence' | 'site', title: string, params: an
 }
 
 export function DesignActions({ kind, title, params, errors, total, persist, designId, setDesignId, onOpen, onEstimate }: {
-  kind: 'fence' | 'site'; title: string; params: any; errors: string[]; total: number;
+  kind: 'fence' | 'site' | 'mep'; title: string; params: any; errors: string[]; total: number;
   persist: () => Promise<string>; designId: string | null; setDesignId: (v: string | null) => void;
   onOpen: (d: any) => void; onEstimate: () => void;
 }) {

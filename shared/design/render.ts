@@ -9,6 +9,8 @@ import type { FenceResult } from './fence3d';
 import type { SiteResult } from './site';
 import { fenceDrawings } from './fenceDraw';
 import { siteDrawings } from './siteDraw';
+import type { MepResult } from './mep';
+import { mepDrawings } from './mepDraw';
 
 export const RAL: Record<string, string> = {
   'RAL 7024': '#474A51', 'RAL 8017': '#45322E', 'RAL 6005': '#114232', 'RAL 3005': '#5E2129', 'RAL 5005': '#1E4E8C',
@@ -80,8 +82,8 @@ export function render3d(res: RenderRes, yawDeg = -35, pitchDeg = 28, width = 80
       const [a, b2, , d2] = top; const n = Math.round(Math.hypot(...sub(d2, a)) / 0.145);
       for (let i = 1; i < n; i++) { const t = i / n; lines3.push({ a: addv(a, mul(sub(d2, a), t)), b: addv(b2, mul(sub(d2, a), t)), stroke: '#7a5232', sw: 0.4, opacity: 0.7, ground: true }); }
     }
-    if (p.kind === 'grass' || p.kind === 'gravel') {
-      faces.push({ pts: p.pts, fill: p.kind === 'grass' ? '#A9C98A' : '#CFC8B8', stroke: p.kind === 'grass' ? '#97b878' : '#b3ab99', opacity: 1, d: 0, sw: 0.6, ground: true });
+    if (p.kind === 'grass' || p.kind === 'gravel' || p.kind === 'floor' || p.kind === 'tile') {
+      faces.push({ pts: p.pts, fill: ({ grass: '#A9C98A', gravel: '#CFC8B8', floor: '#E4D3B6', tile: '#D7E3E8' } as any)[p.kind], stroke: ({ grass: '#97b878', gravel: '#b3ab99', floor: '#c9b48f', tile: '#b7c8cf' } as any)[p.kind], opacity: 1, d: 0, sw: 0.6, ground: true });
     }
     if (p.kind === 'paving') {
       const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], q[2] - 0.08] as V3);
@@ -118,7 +120,8 @@ export function render3d(res: RenderRes, yawDeg = -35, pitchDeg = 28, width = 80
       ...(m.c0 ? [[[A[0], A[3], A[2], A[1]], mul(d, -1)] as [V3[], V3]] : []), ...(m.c1 ? [[[B[0], B[1], B[2], B[3]], d] as [V3[], V3]] : []),
     ];
     const pillarCol = res.params.type === 'blocks' ? '#B5AB9B' : res.params.type === 'gabion' ? '#8E8A80' : '#9C4A32';
-    const base = m.kind === 'trunk' ? '#6B4A2B' : m.kind === 'pillar' ? pillarCol : m.kind === 'cpillar' ? '#ABA79F' : m.kind === 'bollard' || m.kind === 'bumper' ? (m.kind === 'bollard' && Math.floor(((m.a[2] + m.b[2]) / 2) / 0.2) % 2 ? '#2b2b2b' : '#E3B505')
+    const WIRE: Record<string, string> = { wireL: '#E6B800', wireS: '#E8772E', wireP: '#D32F2F', wireN: '#2E9C8F', pipeC: '#2F6FD6', pipeH: '#E04040', pipeS: '#7A7F87' };
+    const base = WIRE[m.kind] ? WIRE[m.kind] : m.kind === 'trunk' ? '#6B4A2B' : m.kind === 'pillar' ? pillarCol : m.kind === 'cpillar' ? '#ABA79F' : m.kind === 'bollard' || m.kind === 'bumper' ? (m.kind === 'bollard' && Math.floor(((m.a[2] + m.b[2]) / 2) / 0.2) % 2 ? '#2b2b2b' : '#E3B505')
       : m.kind === 'tie' ? shade(frame, 0.85) : m.kind === 'rail' || m.kind === 'web' || m.kind === 'purlin' || m.kind === 'baluster' ? shade(frame, 1.1) : frame;
     for (const [q, n] of quads) {
       if (camN(n) > 0.02) continue; // невидимая грань
@@ -130,7 +133,7 @@ export function render3d(res: RenderRes, yawDeg = -35, pitchDeg = 28, width = 80
   const col = colorOf(res.params.color);
   const roofCol = res.params.roofColor ? colorOf(res.params.roofColor) : col;
   for (const p of res.panels) {
-    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip' || p.kind === 'curb' || p.kind === 'grass' || p.kind === 'gravel') continue;
+    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip' || p.kind === 'curb' || p.kind === 'grass' || p.kind === 'gravel' || p.kind === 'floor' || p.kind === 'tile') continue;
     if (p.kind === 'container') {
       // евроконтейнер: корпус и крышка
       const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], 0.12] as V3);
@@ -158,6 +161,7 @@ export function render3d(res: RenderRes, yawDeg = -35, pitchDeg = 28, width = 80
     const fill = p.kind === 'roof' ? (cov === 'poly' ? '#9fc4d9' : cov === 'soft' ? shade(roofCol, k * 0.85) : shade(roofCol, k * 0.95)) : p.kind === 'door' ? shade('#3a3d42', k) : p.kind === 'gate' ? shade(col, k * 0.82)
       : p.kind === 'poly' ? '#a9cde0' : p.kind === 'wood' || p.kind === 'plank' ? shade('#B07D4F', k) : p.kind === 'concrete' ? shade('#B3AFA6', k)
       : p.kind === 'block' ? shade('#B5AB9B', k) : p.kind === 'stone' ? shade('#8E8A80', k) : p.kind === 'wall' ? shade('#E6D8C2', k)
+      : p.kind === 'fixture' ? shade('#F4F4F1', k) : p.kind === 'pointE' ? shade('#FFFFFF', k) : p.kind === 'pointL' ? shade('#FFD54A', k) : p.kind === 'pipeBox' ? shade('#7FA7D9', k) : p.kind === 'cut' ? '#4A4A4A'
       : p.kind === 'lid' ? shade('#3F5E3B', k) : p.kind === 'soil' ? shade('#7A5A3A', k) : p.kind === 'tree' ? shade('#4E8B3A', k) : shade(col, k);
     const opacity = (p.kind === 'roof' && cov === 'poly') ? 0.55 : p.kind === 'poly' ? 0.42 : 1;
     // большие плоскости дробим на ячейки ~0,7 м — так сортировка по глубине не путает их с каркасом
@@ -222,7 +226,8 @@ export type Prim =
 export interface Sheet { title: string; x0: number; y0: number; x1: number; y1: number; prims: Prim[] }
 const f2 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function drawings(res0: CanopyResult | FenceResult | SiteResult): Sheet[] {
+export function drawings(res0: CanopyResult | FenceResult | SiteResult | MepResult): Sheet[] {
+  if ((res0 as any).mep) return mepDrawings(res0 as MepResult);
   if ((res0 as any).fence) return fenceDrawings(res0 as FenceResult);
   if ((res0 as any).site) return siteDrawings(res0 as SiteResult);
   const res = res0 as CanopyResult;

@@ -61,7 +61,7 @@ const lineSchema = z.object({ name: z.string().max(300), qty: z.coerce.number().
 
 export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
   app.get('/api/designs', async (req) => {
-    const { kind } = z.object({ kind: z.enum(['canopy', 'fence', 'site']).optional() }).parse(req.query);
+    const { kind } = z.object({ kind: z.enum(['canopy', 'fence', 'site', 'mep']).optional() }).parse(req.query);
     return plain(await prisma.design.findMany({ where: { userId: req.user.id, deletedAt: null, ...(kind ? { kind } : {}) }, orderBy: { updatedAt: 'desc' }, take: 100 }));
   });
 
@@ -131,7 +131,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
       if (e?.shareToken) estimateUrl = `/s/${e.shareToken}`;
     }
     const data = {
-      title: d.title, kind: (d.params as any)?.kind === 'fence' ? 'Забор и ворота' : (d.params as any)?.kind === 'site' ? 'План участка' : OBJ_LABEL[(d.params as any)?.kind as keyof typeof OBJ_LABEL] || 'Проект', params: d.params,
+      title: d.title, kind: (d.params as any)?.kind === 'fence' ? 'Забор и ворота' : (d.params as any)?.kind === 'site' ? 'План участка' : (d.params as any)?.kind === 'mep' ? 'Электрика и сантехника' : OBJ_LABEL[(d.params as any)?.kind as keyof typeof OBJ_LABEL] || 'Проект', params: d.params,
       company: u.companyName || u.firstName || '', contacts: u.contacts || null,
       username: u.username || null, logo: brandPath(u.logoFile) ? `/v/${d.shareToken}/logo` : null,
       estimateUrl, botUrl: botLink('view3d'), date: d.updatedAt, hideBrand: can(accessOf(u).tier, 'whiteLabel'),
@@ -170,7 +170,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     const pdf = await renderDesign(data);
     const { InputFile } = await import('grammy');
     await opts.bot.api.sendDocument(Number(u.tgId), new InputFile(pdf, fileName(`Эскизный проект — ${b.title}`, 'pdf')), {
-      caption: `Эскизный проект «${b.title}»: ${designKindOf(b.params) === 'site' ? '3D участка, генплан с расстояниями по нормам, схема сетей' : designKindOf(b.params) === 'fence' ? '3D, фасад, план участка, узлы, раскрой металла' : '3D, план, фасады, разрез основания, раскрой металла'} и ведомость. Всего ≈ ${data.total.toLocaleString('ru-RU')} ₽.`,
+      caption: `Эскизный проект «${b.title}»: ${designKindOf(b.params) === 'site' ? '3D участка, генплан с расстояниями по нормам, схема сетей' : designKindOf(b.params) === 'mep' ? '3D в разрезе, план электрики, схема щита, план сантехники' : designKindOf(b.params) === 'fence' ? '3D, фасад, план участка, узлы, раскрой металла' : '3D, план, фасады, разрез основания, раскрой металла'} и ведомость. Всего ≈ ${data.total.toLocaleString('ru-RU')} ₽.`,
     });
     await audit(u.id, 'design', '-', useCredit ? 'pdf_sent_credit' : 'pdf_sent', { title: b.title });
     if (useCredit) await prisma.user.updateMany({ where: { id: u.id, extraDesigns: { gt: 0 } }, data: { extraDesigns: { decrement: 1 } } });

@@ -26,6 +26,12 @@ export default function Masters() {
   return (
     <>
       <SearchBox value={q} onChange={setQ} placeholder="Найти: плитка, бетон, забор, септик…" />
+      {!s && (
+        <Link to="/mep" className="list-item" style={{ marginBottom: 8 }}>
+          <span style={{ fontSize: 30, width: 40, textAlign: 'center', flex: 'none' }} aria-hidden="true">⚡</span>
+          <div className="grow"><div className="title">Электрика и сантехника 3D</div><div className="xs muted">Комнаты → точки по нормам → трассы, щит, трубы, 3D и смета</div></div>
+        </Link>
+      )}
       {masters.length > 0 && <div className="tile-group">Мастера под ключ — смета с работами и материалами</div>}
       <div className="list">
         {masters.map((m) => (
