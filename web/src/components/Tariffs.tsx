@@ -148,7 +148,7 @@ function TeamPanel() {
           <button className="btn primary block" disabled={busy} onClick={() => act(async () => { const r = d.inviteUrl ? { url: d.inviteUrl } : await post('/team/invite'); share(r.url); })}>📨 Пригласить в бригаду</button>
         )}
         {d.role === 'owner' && d.members.length > 0 && (
-          <button className="btn block" disabled={busy} onClick={() => act(async () => { const r = await post('/team/push-prices'); toast(`Справочник (${r.items} позиций) отправлен: ${r.members} чел.`); })}>🔄 Отправить мой справочник цен бригаде</button>
+          <button className="btn block" disabled={busy} onClick={() => act(async () => { const r = await post('/team/push-prices'); toast(`Справочник (${r.items} позиций) отправлен: ${r.members} чел.`); })}>🔄 Разослать справочник бригаде</button>
         )}
         {d.role === 'owner' && d.inviteUrl && <button className="btn sm" disabled={busy} onClick={() => act(() => post('/team/invite/reset'), 'Старая ссылка больше не работает')}>Сделать новую ссылку</button>}
         {d.role !== 'owner' && <p className="xs muted">Тариф «Бригада» закончился — участники пока без доступа.</p>}

@@ -1,13 +1,13 @@
 import React, { useMemo, useRef, useState } from 'react';
-import type { buildCanopy } from '../../../shared/design/canopy';
+import type { DesignResult } from '../../../shared/design/build';
 import { render3d, drawings, view3dToSvg, sheetToSvg } from '../../../shared/design/render';
 
 /** 3D-просмотр и чертежи проекта — общие для проектировщика и страницы заказчика */
 /** 3D: вращение пальцем/мышью */
-export function Viewer({ res }: { res: ReturnType<typeof buildCanopy> }) {
-  const [ang, setAng] = useState({ yaw: -35, pitch: 24 });
+export function Viewer({ res, pitch = 24, h = 440 }: { res: DesignResult; pitch?: number; h?: number }) {
+  const [ang, setAng] = useState({ yaw: -35, pitch });
   const drag = useRef<{ x: number; y: number; yaw: number; pitch: number } | null>(null);
-  const svg = useMemo(() => view3dToSvg(render3d(res, ang.yaw, ang.pitch, 640, 440)), [res, ang]);
+  const svg = useMemo(() => view3dToSvg(render3d(res, ang.yaw, ang.pitch, 640, h)), [res, ang, h]);
   return (
     <div className="dz-3d" style={{ touchAction: 'none' }}
       onPointerDown={(e) => { (e.target as Element).setPointerCapture?.(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, ...ang }; }}
@@ -16,13 +16,13 @@ export function Viewer({ res }: { res: ReturnType<typeof buildCanopy> }) {
       <div dangerouslySetInnerHTML={{ __html: svg }} />
       <div className="dz-3d-bar">
         <span className="xs muted">↔ вращайте пальцем</span>
-        {[['Спереди', -35, 24], ['Сзади', 145, 24], ['Сверху', -35, 68]].map(([l, y, p]) => <button key={l as string} className="chip" onClick={() => setAng({ yaw: y as number, pitch: p as number })}>{l}</button>)}
+        {[['Спереди', -35, pitch], ['Сзади', 145, pitch], ['Сверху', -35, 68]].map(([l, y, p]) => <button key={l as string} className="chip" onClick={() => setAng({ yaw: y as number, pitch: p as number })}>{l}</button>)}
       </div>
     </div>
   );
 }
 
-export function Drawings({ res, note = true }: { res: ReturnType<typeof buildCanopy>; note?: boolean }) {
+export function Drawings({ res, note = true }: { res: DesignResult; note?: boolean }) {
   const sheets = useMemo(() => drawings(res), [res]);
   return (
     <div className="stack">

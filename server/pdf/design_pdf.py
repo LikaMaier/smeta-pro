@@ -436,52 +436,60 @@ def build(d):
     sect = next((s for s in sheets if s["title"].startswith("Разрез")), None)
     elev = [s for s in sheets if s["title"].startswith("Вид")]
 
-    # --- 2. План и разрез
-    frame(c, d, page, "План и основание")
-    if plan:
-        draw_sheet(c, plan, CL, CB, W1 * 0.58, CT - CB)
-    if sect:
-        draw_sheet(c, sect, CL + W1 * 0.62, CB + (CT - CB) * 0.35, W1 * 0.38, (CT - CB) * 0.65)
-    c.showPage(); page += 1
+    if d.get("layout") == "sheets":
+        # забор, план участка: каждый чертёж — на свой лист
+        for s in sheets:
+            frame(c, d, page, s["title"])
+            draw_sheet(c, s, CL, CB, W1, CT - CB)
+            c.showPage(); page += 1
+    else:
+        # --- 2. План и разрез
+        frame(c, d, page, "План и основание")
+        if plan:
+            draw_sheet(c, plan, CL, CB, W1 * 0.58, CT - CB)
+        if sect:
+            draw_sheet(c, sect, CL + W1 * 0.62, CB + (CT - CB) * 0.35, W1 * 0.38, (CT - CB) * 0.65)
+        c.showPage(); page += 1
 
-    # --- 3. Фасады
-    frame(c, d, page, "Фасады")
-    gap = 7 * mm
-    cw, ch = (W1 - gap) / 2, (CT - CB - gap) / 2
-    for i, s in enumerate(elev[:4]):
-        cx = CL + (i % 2) * (cw + gap)
-        cy = CB + (1 - i // 2) * (ch + gap)
-        draw_sheet(c, s, cx, cy, cw, ch)
-    c.showPage(); page += 1
-
-    # --- 3а. Узлы
-    nodes = [s for s in sheets if s["title"].startswith("Узел")]
-    if nodes:
-        frame(c, d, page, "Узлы (типовые, масштаб условный)")
-        for i, s in enumerate(nodes[:4]):
+        # --- 3. Фасады
+        frame(c, d, page, "Фасады")
+        gap = 7 * mm
+        cw, ch = (W1 - gap) / 2, (CT - CB - gap) / 2
+        for i, s in enumerate(elev[:4]):
             cx = CL + (i % 2) * (cw + gap)
             cy = CB + (1 - i // 2) * (ch + gap)
             draw_sheet(c, s, cx, cy, cw, ch)
         c.showPage(); page += 1
 
+        # --- 3а. Узлы
+        nodes = [s for s in sheets if s["title"].startswith("Узел")]
+        if nodes:
+            frame(c, d, page, "Узлы (типовые, масштаб условный)")
+            for i, s in enumerate(nodes[:4]):
+                cx = CL + (i % 2) * (cw + gap)
+                cy = CB + (1 - i // 2) * (ch + gap)
+                draw_sheet(c, s, cx, cy, cw, ch)
+            c.showPage(); page += 1
+
     # --- 4. Металл: раскрой
     wood = bool(d.get("wood"))
-    frame(c, d, page, "Спецификация пиломатериалов и раскрой" if wood else "Спецификация металла и раскрой")
-    mk, unit_t = ("volNet", "Объём, м³") if wood else ("kgNet", "Масса, кг")
-    head = [P_(x, "h") for x in ["Сечение, мм" if wood else "Профиль, мм", "Назначение", "Кусков", "Длина, м", "Доска/брус" if wood else "Хлыст", "Штук" if wood else "Хлыстов", "Обрезь", unit_t]]
-    rows = [head] + [[P_(s["profile"], "tb"), P_(s["use"]), P_(str(s["pieces"]), "tc"), P_(qty(s["length"]), "tr"),
-                      P_(f"{s['stock']} м", "tc"), Paragraph(f"<b>{s['bars']}</b>", ST["tc"]), P_(f"{qty(s['wastePct'])}%", "tc"), P_(qty(s[mk]), "tr")] for s in d["steel"]]
-    rows.append([P_("Итого", "tb"), "", "", P_(qty(sum(s["length"] for s in d["steel"])), "tr"), "", Paragraph(f"<b>{sum(s['bars'] for s in d['steel'])}</b>", ST["tc"]), "",
-                 Paragraph(f"<b>{qty(sum(s[mk] for s in d['steel']))}</b>", ST["tr"])])
-    widths = [26 * mm, 52 * mm, 15 * mm, 18 * mm, 16 * mm, 17 * mm, 15 * mm, 19 * mm]
-    table(c, rows, widths, CL, CT, total_row=True)
-    if len(d["view3d"]) > 1:
-        vx = CL + sum(widths) + 8 * mm
-        c.setStrokeColor(colors.HexColor("#C8CCD2")); c.setLineWidth(0.5); c.rect(vx, CT - 70 * mm, CR - vx, 70 * mm)
-        draw_view3d(c, d["view3d"][1], vx + 1, CT - 70 * mm + 1, CR - vx - 2, 70 * mm - 2, bg="#EEF3F7")
-    c.setFillColor(MUT)
-    draw_text(c, CL, CB + 2 * mm, "Доски и брус по 6 м — с учётом раскроя. Объём — по фактической длине без обрези." if wood else "Хлысты — с учётом раскроя (пропил 3 мм). Масса — по фактической длине без обрези.", FN, 7.5)
-    c.showPage(); page += 1
+    if d["steel"]:
+        frame(c, d, page, "Спецификация пиломатериалов и раскрой" if wood else "Спецификация металла и раскрой")
+        mk, unit_t = ("volNet", "Объём, м³") if wood else ("kgNet", "Масса, кг")
+        head = [P_(x, "h") for x in ["Сечение, мм" if wood else "Профиль, мм", "Назначение", "Кусков", "Длина, м", "Доска/брус" if wood else "Хлыст", "Штук" if wood else "Хлыстов", "Обрезь", unit_t]]
+        rows = [head] + [[P_(s["profile"], "tb"), P_(s["use"]), P_(str(s["pieces"]), "tc"), P_(qty(s["length"]), "tr"),
+                          P_(f"{s['stock']} м", "tc"), Paragraph(f"<b>{s['bars']}</b>", ST["tc"]), P_(f"{qty(s['wastePct'])}%", "tc"), P_(qty(s[mk]), "tr")] for s in d["steel"]]
+        rows.append([P_("Итого", "tb"), "", "", P_(qty(sum(s["length"] for s in d["steel"])), "tr"), "", Paragraph(f"<b>{sum(s['bars'] for s in d['steel'])}</b>", ST["tc"]), "",
+                     Paragraph(f"<b>{qty(sum(s[mk] for s in d['steel']))}</b>", ST["tr"])])
+        widths = [26 * mm, 52 * mm, 15 * mm, 18 * mm, 16 * mm, 17 * mm, 15 * mm, 19 * mm]
+        table(c, rows, widths, CL, CT, total_row=True)
+        if len(d["view3d"]) > 1:
+            vx = CL + sum(widths) + 8 * mm
+            c.setStrokeColor(colors.HexColor("#C8CCD2")); c.setLineWidth(0.5); c.rect(vx, CT - 70 * mm, CR - vx, 70 * mm)
+            draw_view3d(c, d["view3d"][1], vx + 1, CT - 70 * mm + 1, CR - vx - 2, 70 * mm - 2, bg="#EEF3F7")
+        c.setFillColor(MUT)
+        draw_text(c, CL, CB + 2 * mm, "Доски и брус по 6 м — с учётом раскроя. Объём — по фактической длине без обрези." if wood else "Хлысты — с учётом раскроя (пропил 3 мм). Масса — по фактической длине без обрези.", FN, 7.5)
+        c.showPage(); page += 1
 
     # --- 5. Ведомость материалов и работ
     lines = d["lines"]

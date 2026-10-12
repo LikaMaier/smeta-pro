@@ -10,9 +10,9 @@ import { Builder } from '../masters';
 import { mergePrices, type DesignPrices } from './prices';
 
 export type V3 = [number, number, number];
-export type MemberKind = 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster' | 'brace' | 'tie' | 'bollard' | 'bumper';
+export type MemberKind = 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster' | 'brace' | 'tie' | 'bollard' | 'bumper' | 'pillar' | 'cpillar' | 'trunk';
 export interface Member { kind: MemberKind; profile: string; a: V3; b: V3 }
-export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip' | 'container' | 'curb'; pts: V3[] }
+export interface Panel { kind: 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip' | 'container' | 'curb' | 'plank' | 'concrete' | 'block' | 'stone' | 'tree' | 'grass' | 'gravel' | 'wall' | 'lid' | 'soil'; pts: V3[] }
 export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh' | 'rail' | 'poly' | 'sandwich' | 'wood' | 'wood_low';
 export type Side = 'front' | 'back' | 'left' | 'right';
 export type ObjKind = 'canopy' | 'tko' | 'lean' | 'visor' | 'gazebo' | 'garage' | 'greenhouse' | 'woodshed';

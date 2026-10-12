@@ -51,6 +51,7 @@ export default function Home() {
         <Link className="tile" to="/catalog">Справочник цен<small>мои расценки</small></Link>
         <Link className="tile" to="/assistant">ИИ-сметчик<small>{me.aiEnabled ? 'включён' : 'выключен'}</small></Link>
         <Link className="tile slim wide" to="/designer">📐 Проектировщик 3D · навесы, беседки, гаражи, теплицы</Link>
+        <Link className="tile slim wide" to="/landscape">🏡 Благоустройство · план участка, септик, газгольдер, заборы 3D</Link>
         <Link className="tile slim wide" to="/calculators">🧮 Расчёты · {MASTERS.length + 1} мастеров и калькуляторы</Link>
         <Link className="tile slim wide" to="/settings">⚙️ Настройки · подписка, оформление, логотип</Link>
       </div>

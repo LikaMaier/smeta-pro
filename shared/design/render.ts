@@ -5,6 +5,10 @@
  * Один и тот же результат рисуется в приложении (SVG) и в PDF (reportlab).
  */
 import type { CanopyResult, V3, Side, Member } from './canopy';
+import type { FenceResult } from './fence3d';
+import type { SiteResult } from './site';
+import { fenceDrawings } from './fenceDraw';
+import { siteDrawings } from './siteDraw';
 
 export const RAL: Record<string, string> = {
   'RAL 7024': '#474A51', 'RAL 8017': '#45322E', 'RAL 6005': '#114232', 'RAL 3005': '#5E2129', 'RAL 5005': '#1E4E8C',
@@ -31,7 +35,10 @@ function shade(hex: string, k: number) {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
-export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width = 800, height = 560): View3D {
+/** Всё, что умеет рисовать 3D: навес, забор, план участка */
+export type RenderRes = Pick<CanopyResult, 'members' | 'panels'> & { params: any; info: any };
+
+export function render3d(res: RenderRes, yawDeg = -35, pitchDeg = 28, width = 800, height = 560): View3D {
   const { L, W } = res.params;
   const center: V3 = [L / 2, W / 2, (res.info.hHigh) / 2];
   const yaw = (yawDeg * Math.PI) / 180, pitch = (pitchDeg * Math.PI) / 180;
@@ -73,6 +80,9 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
       const [a, b2, , d2] = top; const n = Math.round(Math.hypot(...sub(d2, a)) / 0.145);
       for (let i = 1; i < n; i++) { const t = i / n; lines3.push({ a: addv(a, mul(sub(d2, a), t)), b: addv(b2, mul(sub(d2, a), t)), stroke: '#7a5232', sw: 0.4, opacity: 0.7, ground: true }); }
     }
+    if (p.kind === 'grass' || p.kind === 'gravel') {
+      faces.push({ pts: p.pts, fill: p.kind === 'grass' ? '#A9C98A' : '#CFC8B8', stroke: p.kind === 'grass' ? '#97b878' : '#b3ab99', opacity: 1, d: 0, sw: 0.6, ground: true });
+    }
     if (p.kind === 'paving') {
       const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], q[2] - 0.08] as V3);
       faces.push({ pts: top, fill: '#BDB8AE', stroke: '#8f8a80', opacity: 1, d: 0, sw: 0.6, ground: true });
@@ -107,7 +117,8 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
       [[A[0], A[1], B[1], B[0]], mul(e2, -1)], [[A[1], A[2], B[2], B[1]], e1], [[A[2], A[3], B[3], B[2]], e2], [[A[3], A[0], B[0], B[3]], mul(e1, -1)],
       ...(m.c0 ? [[[A[0], A[3], A[2], A[1]], mul(d, -1)] as [V3[], V3]] : []), ...(m.c1 ? [[[B[0], B[1], B[2], B[3]], d] as [V3[], V3]] : []),
     ];
-    const base = m.kind === 'bollard' || m.kind === 'bumper' ? (m.kind === 'bollard' && Math.floor(((m.a[2] + m.b[2]) / 2) / 0.2) % 2 ? '#2b2b2b' : '#E3B505')
+    const pillarCol = res.params.type === 'blocks' ? '#B5AB9B' : res.params.type === 'gabion' ? '#8E8A80' : '#9C4A32';
+    const base = m.kind === 'trunk' ? '#6B4A2B' : m.kind === 'pillar' ? pillarCol : m.kind === 'cpillar' ? '#ABA79F' : m.kind === 'bollard' || m.kind === 'bumper' ? (m.kind === 'bollard' && Math.floor(((m.a[2] + m.b[2]) / 2) / 0.2) % 2 ? '#2b2b2b' : '#E3B505')
       : m.kind === 'tie' ? shade(frame, 0.85) : m.kind === 'rail' || m.kind === 'web' || m.kind === 'purlin' || m.kind === 'baluster' ? shade(frame, 1.1) : frame;
     for (const [q, n] of quads) {
       if (camN(n) > 0.02) continue; // невидимая грань
@@ -117,8 +128,9 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
   }
   // панели: кровля, профлист, сетка
   const col = colorOf(res.params.color);
+  const roofCol = res.params.roofColor ? colorOf(res.params.roofColor) : col;
   for (const p of res.panels) {
-    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip' || p.kind === 'curb') continue;
+    if (p.kind === 'slab' || p.kind === 'deck' || p.kind === 'house' || p.kind === 'paving' || p.kind === 'strip' || p.kind === 'curb' || p.kind === 'grass' || p.kind === 'gravel') continue;
     if (p.kind === 'container') {
       // евроконтейнер: корпус и крышка
       const top = p.pts, bot = p.pts.map((q) => [q[0], q[1], 0.12] as V3);
@@ -143,8 +155,10 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
     const n = norm(cross(sub(p.pts[1], p.pts[0]), sub(p.pts[3], p.pts[0])));
     const k = 0.6 + 0.45 * Math.abs(dot(n, light));
     const cov = res.params.cover;
-    const fill = p.kind === 'roof' ? (cov === 'poly' ? '#9fc4d9' : cov === 'soft' ? shade(col, k * 0.85) : shade(col, k * 0.95)) : p.kind === 'door' ? shade('#3a3d42', k) : p.kind === 'gate' ? shade(col, k * 0.82)
-      : p.kind === 'poly' ? '#a9cde0' : p.kind === 'wood' ? shade('#B07D4F', k) : shade(col, k);
+    const fill = p.kind === 'roof' ? (cov === 'poly' ? '#9fc4d9' : cov === 'soft' ? shade(roofCol, k * 0.85) : shade(roofCol, k * 0.95)) : p.kind === 'door' ? shade('#3a3d42', k) : p.kind === 'gate' ? shade(col, k * 0.82)
+      : p.kind === 'poly' ? '#a9cde0' : p.kind === 'wood' || p.kind === 'plank' ? shade('#B07D4F', k) : p.kind === 'concrete' ? shade('#B3AFA6', k)
+      : p.kind === 'block' ? shade('#B5AB9B', k) : p.kind === 'stone' ? shade('#8E8A80', k) : p.kind === 'wall' ? shade('#E6D8C2', k)
+      : p.kind === 'lid' ? shade('#3F5E3B', k) : p.kind === 'soil' ? shade('#7A5A3A', k) : p.kind === 'tree' ? shade('#4E8B3A', k) : shade(col, k);
     const opacity = (p.kind === 'roof' && cov === 'poly') ? 0.55 : p.kind === 'poly' ? 0.42 : 1;
     // большие плоскости дробим на ячейки ~0,7 м — так сортировка по глубине не путает их с каркасом
     {
@@ -152,8 +166,9 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
       const nu = Math.max(1, Math.round(Math.max(Math.hypot(...sub(b2, a)), Math.hypot(...sub(c2, d2))) / 0.7));
       const nv = Math.max(1, Math.round(Math.max(Math.hypot(...sub(d2, a)), Math.hypot(...sub(c2, b2))) / 0.7));
       const at = (u: number, v: number): V3 => { const p0 = addv(a, mul(sub(b2, a), u)), p1 = addv(d2, mul(sub(c2, d2), u)); return addv(p0, mul(sub(p1, p0), v)); };
+      const flat = p.pts.every((q) => q[2] <= 0.05); // лежит на земле — рисуем вместе с землёй
       for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++)
-        faces.push({ pts: [at(i / nu, j / nv), at((i + 1) / nu, j / nv), at((i + 1) / nu, (j + 1) / nv), at(i / nu, (j + 1) / nv)], fill, stroke: fill, opacity, d: 0, sw: opacity < 1 ? 0 : 0.8, bias: p.kind === 'roof' ? 0.45 : 0.15 });
+        faces.push({ pts: [at(i / nu, j / nv), at((i + 1) / nu, j / nv), at((i + 1) / nu, (j + 1) / nv), at(i / nu, (j + 1) / nv)], fill, stroke: fill, opacity, d: 0, sw: opacity < 1 ? 0 : 0.8, bias: p.kind === 'roof' ? 0.45 : 0.15, ground: flat || undefined });
       const edge = shade(col, 0.6);
       [[a, b2], [b2, c2], [c2, d2], [d2, a]].forEach(([q0, q1]) => { if (Math.hypot(...sub(q1, q0)) > 0.01) lines3.push({ a: q0, b: q1, stroke: edge, sw: 0.8, opacity: 1 }); });
     }
@@ -168,9 +183,12 @@ export function render3d(res: CanopyResult, yawDeg = -35, pitchDeg = 28, width =
       if (p.kind === 'sandwich') ad(1.0, shade(col, 0.7), 0.9);
       if (p.kind === 'wood') ad(0.16, shade('#B07D4F', 0.7), 0.8);
       if (p.kind === 'poly') ab(1.05, '#7fa6bb', 0.7);
+      if (p.kind === 'concrete') ad(0.5, '#8f8b83', 0.8);
+      if (p.kind === 'block') { ad(0.19, '#8f8678', 0.7); ab(0.39, '#8f8678', 0.5); }
+      if (p.kind === 'stone') { ad(0.12, '#6f6b63', 0.6); ab(0.17, '#6f6b63', 0.45); }
       if (p.kind === 'roof') {
-        if (cov === 'prof' || cov === 'tile') ad(0.2, shade(col, 0.75), 0.6);
-        if (cov === 'tile') ab(0.35, shade(col, 0.7), 0.5);
+        if (cov === 'prof' || cov === 'tile') ad(0.2, shade(roofCol, 0.75), 0.6);
+        if (cov === 'tile') ab(0.35, shade(roofCol, 0.7), 0.5);
         if (cov === 'soft') ab(0.22, shade(col, 0.65), 0.55);
         if (cov === 'sandwich') ad(1.0, shade(col, 0.7), 0.7);
       }
@@ -204,7 +222,10 @@ export type Prim =
 export interface Sheet { title: string; x0: number; y0: number; x1: number; y1: number; prims: Prim[] }
 const f2 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function drawings(res: CanopyResult): Sheet[] {
+export function drawings(res0: CanopyResult | FenceResult | SiteResult): Sheet[] {
+  if ((res0 as any).fence) return fenceDrawings(res0 as FenceResult);
+  if ((res0 as any).site) return siteDrawings(res0 as SiteResult);
+  const res = res0 as CanopyResult;
   const { L, W, overhang: ov, walls } = res.params;
   const col = colorOf(res.params.color);
   const sheets: Sheet[] = [];

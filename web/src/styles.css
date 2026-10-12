@@ -446,3 +446,6 @@ select.cinput option { color: #000; }
 .tariff-price { margin: 4px 0 6px; } .tariff-price b { font-size: 24px; color: var(--accent); }
 .tariff-perks { margin: 0; padding-left: 18px; font-size: 14px; color: var(--text); }
 .tariff-perks li { margin: 2px 0; }
+.site-plan { border: 1px solid var(--line); border-radius: 4px; background: #F6F3EC; margin: 8px 0; overflow: hidden; user-select: none; }
+.land-card { display: flex; gap: 12px; align-items: center; padding: 14px; }
+.land-card .ic { font-size: 30px; width: 44px; text-align: center; flex: none; }

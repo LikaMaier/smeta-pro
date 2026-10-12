@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { buildCanopy } from '../../shared/design/canopy';
+import { buildDesign as buildCanopy } from '../../shared/design/build';
 import { paramRows } from '../../shared/design/report';
 import { Viewer, Drawings } from './components/Design3D';
 import './viewer.css';
@@ -39,7 +39,7 @@ function Page() {
             ))}
           </div>
         )}
-        <Viewer res={res} />
+        <Viewer res={res} pitch={(res as any).site ? 40 : 24} />
         {cur && <ul className="small muted" style={{ margin: '8px 0 0', paddingLeft: 18 }}>{cur.changes.map((c) => <li key={c}>{c}</li>)}</ul>}
         <div className="tiles">{tiles.map((s) => <div key={s.label}><small>{s.label}</small><b>{nf(s.value)} <small>{s.unit}</small></b></div>)}</div>
       </div>

@@ -2,11 +2,19 @@
 import { OBJ_LABEL, type CanopyResult, type Wall } from './canopy';
 import { snowLabel } from './snow';
 import { render3d, drawings } from './render';
+import { fenceParamRows, buildFence, type FenceResult } from './fence3d';
+
+/** Крупный вид забора: только сторона улицы с воротами и калиткой */
+export const fenceCloseup = (r: FenceResult) => (r.params.sides.front ? buildFence({ ...r.params, kind: 'fence', W: 2.5, sides: { front: true, back: false, left: false, right: false } } as any) : r);
+import { siteParamRows, type SiteResult } from './site';
 
 export const WALL_LABEL: Record<Wall, string> = { open: 'открыто', prof: 'профлист', prof_full: 'профлист на всю высоту', mesh: 'сетка', prof_mesh: 'профлист + сетка до кровли', rail: 'перила 1,0 м', poly: 'поликарбонат', sandwich: 'сэндвич-панели 100 мм', wood: 'обшивка доской', wood_low: 'доска снизу до 1,0 м' };
 const SIDE_LABEL = { front: 'Спереди (въезд)', back: 'Сзади', left: 'Слева', right: 'Справа' } as const;
 
-export function paramRows(r: CanopyResult): [string, string][] {
+export function paramRows(r0: CanopyResult | FenceResult | SiteResult): [string, string][] {
+  if ((r0 as any).fence) return fenceParamRows(r0 as FenceResult);
+  if ((r0 as any).site) return siteParamRows(r0 as SiteResult);
+  const r = r0 as CanopyResult;
   const p = r.params, i = r.info;
   const pitch = Math.round((Math.atan((i.hHigh - i.hLow) / (p.roof === 'single' ? i.span : i.span / 2)) * 180) / Math.PI);
   const rows: [string, string][] = [
@@ -32,11 +40,12 @@ export function paramRows(r: CanopyResult): [string, string][] {
   return rows;
 }
 
-export function designPdfData(r: CanopyResult, extra: { title: string; company?: string; logoPath?: string | null; freeMark?: boolean; lines?: { name: string; qty: number; unit: string; price: number; type: string }[] }) {
+export function designPdfData(r: CanopyResult | FenceResult | SiteResult, extra: { title: string; company?: string; logoPath?: string | null; freeMark?: boolean; lines?: { name: string; qty: number; unit: string; price: number; type: string }[] }) {
   const lines = extra.lines || r.lines;
   return {
     title: extra.title, company: extra.company || '', logoPath: extra.logoPath || null, freeMark: !!extra.freeMark,
-    view3d: [render3d(r, -35, 24, 900, 620), render3d(r, 140, 30, 700, 500)],
+    view3d: (r as any).fence ? [render3d(fenceCloseup(r as FenceResult), -30, 14, 900, 620), render3d(r, -35, 30, 700, 500)] : (r as any).site ? [render3d(r, -35, 38, 900, 620), render3d(r, 145, 45, 700, 500)] : [render3d(r, -35, 24, 900, 620), render3d(r, 140, 30, 700, 500)],
+    layout: (r as any).fence || (r as any).site ? 'sheets' : 'canopy',
     sheets: drawings(r), params: paramRows(r), wood: r.info.wood, summary: r.summary, warnings: r.warnings, steel: r.steel,
     lines: lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, price: l.price, type: l.type })),
     total: Math.round(lines.reduce((a, l) => a + l.qty * l.price, 0)),

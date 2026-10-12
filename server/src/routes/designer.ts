@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { env } from '../env';
 import { prisma, plain, notFound, HttpError, accessOf, audit, useAi, requireFeature } from '../util';
-import { buildCanopy, CANOPY_DEFAULT } from '../../../shared/design/canopy';
+import { CANOPY_DEFAULT } from '../../../shared/design/canopy';
+import { buildDesign, designKindOf } from '../../../shared/design/build';
 import { designPdfData } from '../../../shared/design/report';
 import { CANOPY_AI_SCHEMA, CANOPY_AI_PROMPT, mergeAiParams } from '../../../shared/design/ai';
 import { chatJson, aiConfigured } from '../ai/openai';
@@ -59,11 +60,14 @@ const paramsSchema = z.record(z.string(), z.any());
 const lineSchema = z.object({ name: z.string().max(300), qty: z.coerce.number().min(0), unit: z.string().max(30), price: z.coerce.number().min(0), type: z.string().max(20) });
 
 export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
-  app.get('/api/designs', async (req) => plain(await prisma.design.findMany({ where: { userId: req.user.id, deletedAt: null }, orderBy: { updatedAt: 'desc' }, take: 100 })));
+  app.get('/api/designs', async (req) => {
+    const { kind } = z.object({ kind: z.enum(['canopy', 'fence', 'site']).optional() }).parse(req.query);
+    return plain(await prisma.design.findMany({ where: { userId: req.user.id, deletedAt: null, ...(kind ? { kind } : {}) }, orderBy: { updatedAt: 'desc' }, take: 100 }));
+  });
 
   app.post('/api/designs', async (req) => {
     const b = z.object({ title: z.string().trim().min(1).max(200), params: paramsSchema, kind: z.string().default('canopy') }).parse(req.body);
-    const d = await prisma.design.create({ data: { userId: req.user.id, title: b.title, params: b.params, kind: b.kind } });
+    const d = await prisma.design.create({ data: { userId: req.user.id, title: b.title, params: b.params, kind: designKindOf(b.params) } });
     await audit(req.user.id, 'design', d.id, 'create');
     return plain(d);
   });
@@ -127,7 +131,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
       if (e?.shareToken) estimateUrl = `/s/${e.shareToken}`;
     }
     const data = {
-      title: d.title, kind: OBJ_LABEL[(d.params as any)?.kind as keyof typeof OBJ_LABEL] || 'Проект', params: d.params,
+      title: d.title, kind: (d.params as any)?.kind === 'fence' ? 'Забор и ворота' : (d.params as any)?.kind === 'site' ? 'План участка' : OBJ_LABEL[(d.params as any)?.kind as keyof typeof OBJ_LABEL] || 'Проект', params: d.params,
       company: u.companyName || u.firstName || '', contacts: u.contacts || null,
       username: u.username || null, logo: brandPath(u.logoFile) ? `/v/${d.shareToken}/logo` : null,
       estimateUrl, botUrl: botLink('view3d'), date: d.updatedAt, hideBrand: can(accessOf(u).tier, 'whiteLabel'),
@@ -157,7 +161,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     const b = z.object({ title: z.string().trim().min(1).max(200), params: paramsSchema, lines: z.array(lineSchema).max(500).optional() }).parse(req.body);
     if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
     const useCredit = await designPdfQuota(req.user);
-    const r = buildCanopy(b.params as any, (req.user as any).designPrices || null);
+    const r = buildDesign(b.params as any, (req.user as any).designPrices || null);
     const u: any = req.user;
     const data = designPdfData(r, {
       title: b.title, company: u.companyName || [u.firstName, u.username ? `@${u.username}` : ''].filter(Boolean).join(' '),
@@ -166,7 +170,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     const pdf = await renderDesign(data);
     const { InputFile } = await import('grammy');
     await opts.bot.api.sendDocument(Number(u.tgId), new InputFile(pdf, fileName(`Эскизный проект — ${b.title}`, 'pdf')), {
-      caption: `Эскизный проект «${b.title}»: 3D, план, фасады, разрез основания, раскрой металла и ведомость материалов. Всего ≈ ${data.total.toLocaleString('ru-RU')} ₽.`,
+      caption: `Эскизный проект «${b.title}»: ${designKindOf(b.params) === 'site' ? '3D участка, генплан с расстояниями по нормам, схема сетей' : designKindOf(b.params) === 'fence' ? '3D, фасад, план участка, узлы, раскрой металла' : '3D, план, фасады, разрез основания, раскрой металла'} и ведомость. Всего ≈ ${data.total.toLocaleString('ru-RU')} ₽.`,
     });
     await audit(u.id, 'design', '-', useCredit ? 'pdf_sent_credit' : 'pdf_sent', { title: b.title });
     if (useCredit) await prisma.user.updateMany({ where: { id: u.id, extraDesigns: { gt: 0 } }, data: { extraDesigns: { decrement: 1 } } });

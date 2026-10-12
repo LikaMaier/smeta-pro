@@ -146,7 +146,7 @@ export default function Designer() {
     try { await post('/designer/pdf/send', { title, params }); haptic('success'); toast('PDF эскизного проекта отправлен в чат с ботом'); }
     catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
   };
-  const openList = async () => { setListOpen(true); setList(null); try { setList(await get('/designs')); } catch (e: any) { toast(e.message, true); setList([]); } };
+  const openList = async () => { setListOpen(true); setList(null); try { setList(await get('/designs', { kind: 'canopy' })); } catch (e: any) { toast(e.message, true); setList([]); } };
   const remove = async (d: any) => {
     if (!(await confirmDialog(`Удалить проект «${d.title}»?`))) return;
     await del(`/designs/${d.id}`); setList((l) => (l || []).filter((x) => x.id !== d.id)); if (d.id === designId) setDesignId(null);
