@@ -24,6 +24,14 @@ model User {
   themeChosen       Boolean   @default(false)
   trialEndsAt       DateTime
   subscriptionUntil DateTime?
+  plan              String    @default("pro") // уровень текущей подписки: lite | pro | team (старые подписки — pro)
+  teamOwnerId       String? // участник бригады: id владельца
+  teamUntil         DateTime? // доступ через бригаду владельца (синхронизируется при оплате)
+  teamToken         String? // ссылка-приглашение в бригаду
+  extraEstimates    Int       @default(0) // купленные пакеты смет (без подписки)
+  extraDesigns      Int       @default(0) // купленные эскизные проекты
+  aiMonth           String? // месяц счётчика ИИ, «2026-10»
+  aiUsed            Int       @default(0)
   subNotice3At      DateTime? // когда отправлено «подписка заканчивается через 3 дня»
   subNoticeEndAt    DateTime? // когда отправлено «подписка закончилась»
   logoFile          String? // логотип для документов (файл в PHOTO_DIR/brand)
@@ -50,6 +58,9 @@ model User {
   aiSessions AiSession[]
   workActs   WorkAct[]
   designs    Design[]
+
+  @@index([teamOwnerId])
+  @@index([teamToken])
 }
 
 // Проект ИИ-проектировщика (навес и др.): параметры модели, из которых строятся чертежи, 3D и спецификация
@@ -375,7 +386,10 @@ model Plan {
   title      String
   months     Int
   starsPrice Int
-  rubPrice   Int     @default(0) // ориентировочная цена в рублях для показа
+  rubPrice   Int     @default(0) // цена в рублях (ЮKassa и показ)
+  tier       String  @default("pro") // lite | pro | team | pack
+  estimates  Int     @default(0) // пакет: сколько смет добавить
+  designs    Int     @default(0) // пакет: сколько эскизных проектов добавить
   aiLimit    Int     @default(0)
   active     Boolean @default(true)
   sort       Int     @default(0)

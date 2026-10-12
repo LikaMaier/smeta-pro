@@ -3,17 +3,26 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma, plain, HttpError } from '../util';
 import { env } from '../env';
+import { TIERS, convertDays, type Tier } from '../../../shared/plans';
 
 /**
- * Тарифы. Оплата цифровых услуг внутри Telegram — только в Telegram Stars.
- * 1 звезда стоит пользователю ≈ 2–3 ₽ (зависит от способа покупки), поэтому 490 ₽ ≈ 199 ⭐.
- * Год = 12 месяцев со скидкой 30%: 199 × 12 × 0,7 ≈ 1670 ⭐.
+ * Тарифы: Лайт / Про / Бригада (месяц и год −30%) и разовые пакеты без подписки.
+ * Оплата цифровых услуг внутри Telegram — Telegram Stars; картой и СБП — через ЮKassa.
+ * 1 звезда ≈ 2,46 ₽ для пользователя, звёзды округлены.
  * Цены синхронизируются с базой при каждом запуске; старые тарифы отключаются (оплаты по ним сохраняются).
  */
 export const DEFAULT_PLANS = [
-  { code: 'month', title: 'Подписка на 1 месяц', months: 1, starsPrice: 199, rubPrice: 490, aiLimit: 300, sort: 1, active: true },
-  { code: 'year', title: 'Подписка на 12 месяцев (−30%)', months: 12, starsPrice: 1670, rubPrice: 4116, aiLimit: 300, sort: 2, active: true },
+  { code: 'lite_m', title: 'Лайт на 1 месяц', tier: 'lite', months: 1, starsPrice: 159, rubPrice: 390, aiLimit: 0, sort: 1, active: true, estimates: 0, designs: 0 },
+  { code: 'lite_y', title: 'Лайт на 12 месяцев (−30%)', tier: 'lite', months: 12, starsPrice: 1336, rubPrice: 3276, aiLimit: 0, sort: 2, active: true, estimates: 0, designs: 0 },
+  { code: 'pro_m', title: 'Про на 1 месяц', tier: 'pro', months: 1, starsPrice: 319, rubPrice: 790, aiLimit: 300, sort: 3, active: true, estimates: 0, designs: 0 },
+  { code: 'pro_y', title: 'Про на 12 месяцев (−30%)', tier: 'pro', months: 12, starsPrice: 2680, rubPrice: 6636, aiLimit: 300, sort: 4, active: true, estimates: 0, designs: 0 },
+  { code: 'team_m', title: 'Бригада на 1 месяц', tier: 'team', months: 1, starsPrice: 689, rubPrice: 1690, aiLimit: 1000, sort: 5, active: true, estimates: 0, designs: 0 },
+  { code: 'team_y', title: 'Бригада на 12 месяцев (−30%)', tier: 'team', months: 12, starsPrice: 5788, rubPrice: 14196, aiLimit: 1000, sort: 6, active: true, estimates: 0, designs: 0 },
+  { code: 'est10', title: '10 смет без подписки', tier: 'pack', months: 0, starsPrice: 119, rubPrice: 290, aiLimit: 0, sort: 10, active: true, estimates: 10, designs: 0 },
+  { code: 'design1', title: 'Эскизный проект 3D (1 PDF)', tier: 'pack', months: 0, starsPrice: 61, rubPrice: 149, aiLimit: 0, sort: 11, active: true, estimates: 0, designs: 1 },
 ];
+/** Цена месяца уровня — для пересчёта остатка при смене тарифа */
+export const TIER_MONTH_RUB: Record<string, number> = { lite: 390, pro: 790, team: 1690 };
 
 export async function seedPlans() {
   for (const p of DEFAULT_PLANS) {
@@ -22,21 +31,45 @@ export async function seedPlans() {
   await prisma.plan.updateMany({ where: { code: { notIn: DEFAULT_PLANS.map((p) => p.code) } }, data: { active: false } });
 }
 
-/** Продление подписки после ПОДТВЕРЖДЁННОЙ оплаты (вызывается только из обработчика successful_payment бота) */
-export async function applyPayment(userId: string, planCode: string, stars: number, chargeId: string, extra: { provider?: string; amountRub?: number } = {}): Promise<{ referrer?: { tgId: bigint; until: Date } } | void> {
+/** Доступ участников бригады идёт за подпиской владельца */
+export async function syncTeam(ownerId: string) {
+  const o = await prisma.user.findUnique({ where: { id: ownerId } });
+  if (!o) return;
+  const teamActive = o.plan === 'team' && o.subscriptionUntil && o.subscriptionUntil > new Date();
+  await prisma.user.updateMany({ where: { teamOwnerId: ownerId }, data: { teamUntil: teamActive ? o.subscriptionUntil : null } });
+}
+
+/** Начисление после ПОДТВЕРЖДЁННОЙ оплаты (Stars — successful_payment, ЮKassa — проверка через API).
+ *  Подписка: продление; при смене уровня остаток пересчитывается по цене (дни × старая цена / новая).
+ *  Пакет: добавляет сметы или эскизные проекты. Возвращает текст для пользователя; повтор — undefined. */
+export async function applyPayment(userId: string, planCode: string, stars: number, chargeId: string, extra: { provider?: string; amountRub?: number } = {}): Promise<{ text: string; referrer?: { tgId: bigint; until: Date } } | void> {
   const exists = await prisma.payment.findUnique({ where: { telegramChargeId: chargeId } });
   if (exists) return; // идемпотентность: повторное уведомление не продлевает дважды
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
   if (!plan) throw new Error(`Неизвестный тариф ${planCode}`);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  const base = user.subscriptionUntil && user.subscriptionUntil > new Date() ? user.subscriptionUntil : new Date();
+  const pay = prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId, provider: extra.provider || 'stars', amountRub: extra.amountRub ?? null } });
+  if (plan.months === 0) {
+    await prisma.$transaction([pay, prisma.user.update({ where: { id: userId }, data: { extraEstimates: { increment: plan.estimates }, extraDesigns: { increment: plan.designs } } })]);
+    return { text: plan.estimates ? `Оплата прошла: добавлено смет — ${plan.estimates}.` : `Оплата прошла: добавлен эскизный проект 3D (${plan.designs} PDF).` };
+  }
+  const now = new Date();
+  const active = user.subscriptionUntil && user.subscriptionUntil > now;
+  const oldTier = user.plan || 'pro';
+  let base = active ? new Date(user.subscriptionUntil!) : now;
+  if (active && oldTier !== plan.tier) {
+    const left = (user.subscriptionUntil!.getTime() - now.getTime()) / 864e5;
+    base = new Date(now.getTime() + convertDays(left, TIER_MONTH_RUB[oldTier] || 490, TIER_MONTH_RUB[plan.tier] || 790) * 864e5);
+  }
   const until = new Date(base);
   until.setMonth(until.getMonth() + plan.months);
   await prisma.$transaction([
-    prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId, provider: extra.provider || 'stars', amountRub: extra.amountRub ?? null } }),
-    prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until, subNotice3At: null, subNoticeEndAt: null } }),
+    pay,
+    prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until, plan: plan.tier, subNotice3At: null, subNoticeEndAt: null } }),
   ]);
-  return { referrer: (await rewardReferrer(user)) ?? undefined };
+  await syncTeam(userId);
+  const label = TIERS[plan.tier as Tier]?.label || 'Подписка';
+  return { text: `Оплата прошла. Тариф «${label}» активен до ${until.toLocaleDateString('ru-RU')}.`, referrer: (await rewardReferrer(user)) ?? undefined };
 }
 
 /** «Приведи друга»: за первую оплату приглашённого пригласившему +1 месяц (один раз на друга) */
@@ -65,7 +98,7 @@ export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
     if (!plan) throw new HttpError(404, 'Тариф не найден');
     if (!opts.bot) throw new HttpError(503, 'Оплата не настроена: бот не подключён', 'payments_unavailable');
     const url = await opts.bot.api.createInvoiceLink(
-      plan.title, 'Подписка СМЕТА PRO: сметы, справочники, калькуляторы, финансы объектов',
+      plan.title, plan.months ? `СМЕТА PRO, тариф «${TIERS[plan.tier as Tier]?.label || ''}»: ${(TIERS[plan.tier as Tier]?.perks || []).slice(0, 3).join(', ')}`.slice(0, 255) : 'СМЕТА PRO: разовая покупка без подписки',
       `${req.user.id}:${plan.code}`, '', 'XTR', [{ label: plan.title, amount: plan.starsPrice }],
     );
     return { url };
@@ -108,9 +141,8 @@ export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
     const user = await prisma.user.findUnique({ where: { id: p.metadata.userId } });
     if (!user) return { status: 'unknown_user' };
     const res = await applyPayment(user.id, p.metadata.plan, 0, `yk:${p.id}`, { provider: 'yookassa', amountRub: Math.round(Number(p.amount?.value || 0)) });
-    if (res !== undefined && opts.bot) {
-      const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
-      await opts.bot.api.sendMessage(Number(user.tgId), `Оплата прошла. Подписка активна до ${new Date(fresh.subscriptionUntil!).toLocaleDateString('ru-RU')}.`).catch(() => {});
+    if (res && opts.bot) {
+      await opts.bot.api.sendMessage(Number(user.tgId), res.text).catch(() => {});
       if (res && res.referrer) await opts.bot.api.sendMessage(Number(res.referrer.tgId), `🎁 Ваш друг оформил подписку СМЕТА PRO — дарим вам месяц бесплатно!\nПодписка продлена до ${res.referrer.until.toLocaleDateString('ru-RU')}.`).catch(() => {});
     }
     return { status: 'succeeded' };

@@ -32,7 +32,7 @@ const upsertItem = z.object({
 const matOf = (params: any) => { const v = Number(params?.matPrice); return Number.isFinite(v) && v > 0 ? v : null; };
 
 /** Обновить цены позиций с тем же названием, при addNew — добавить отсутствующие. История цен сохраняется. */
-async function upsertItems(userId: string, listId: string | null, items: z.infer<typeof upsertItem>[], addNew: boolean) {
+export async function upsertItems(userId: string, listId: string | null, items: z.infer<typeof upsertItem>[], addNew: boolean) {
   const list = listId ? { id: listId } : await prisma.priceList.findFirst({ where: { userId, isDefault: true } }) || await prisma.priceList.findFirst({ where: { userId } });
   if (!list) throw new HttpError(400, 'Нет прайс-листа');
   const existing = await prisma.catalogItem.findMany({ where: { userId, priceListId: list.id, deletedAt: null } });

@@ -10,6 +10,7 @@ const qty = (v: number) => String(Math.round((v || 0) * 1000) / 1000).replace('.
 export interface PageMeta {
   token: string; number: number; hasLogo: boolean; approvedAt: Date | null; title: string; customer?: string | null; address?: string | null;
   date: Date; validDays: number; paymentTerms?: string | null; notes?: string | null; botUrl: string; designUrl?: string | null;
+  hideBrand?: boolean; company?: string | null; // тариф «Бригада»: без упоминания СМЕТА PRO
 }
 
 /** Страница сметы для заказчика. d — данные как для PDF (без себестоимости и прибыли) */
@@ -72,7 +73,7 @@ export function estimatePage(d: any, m: PageMeta) {
     <a class="btn" href="/s/${token}/pdf" target="_blank" rel="noopener">Скачать PDF</a>
     <div id="msg" class="msg" role="status"></div>
   </div>
-  <div class="foot">Смета подготовлена в ${bot ? `<a href="${bot}">СМЕТА PRO</a>` : 'СМЕТА PRO'} — сметы и учёт объектов для строителей в Telegram</div>
+  ${m.hideBrand ? (m.company ? `<div class="foot">${esc(m.company)}</div>` : '') : `<div class="foot">Смета подготовлена в ${bot ? `<a href="${bot}">СМЕТА PRO</a>` : 'СМЕТА PRO'} — сметы и учёт объектов для строителей в Telegram</div>`}
   <script>
     const msg = (t, bad) => { const m = document.getElementById('msg'); m.textContent = t; m.className = 'msg ' + (bad ? 'bad' : 'good'); };
     const call = async (path, body) => {

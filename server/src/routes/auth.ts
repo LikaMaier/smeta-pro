@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { env } from '../env';
 import { prisma, plain, accessOf, HttpError, freeCtx } from '../util';
+import { TIERS, monthKey } from '../../../shared/plans';
 import { verifyInitData, signSession } from '../auth';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { compositionFor } from '../../../shared/compositions';
@@ -28,7 +29,7 @@ export async function upsertUser(tgId: number, firstName?: string, username?: st
   const user = await prisma.user.create({
     data: {
       tgId: BigInt(tgId), firstName, username, referredById: await referrerId(startPayload),
-      trialEndsAt: new Date(Date.now() + env.TRIAL_DAYS * 86400000),
+      trialEndsAt: new Date(Date.now() + env.PRO_TRIAL_DAYS * 86400000),
       priceLists: { create: { name: 'Основной прайс', isDefault: true } },
     },
     include: { priceLists: true },
@@ -48,12 +49,17 @@ export async function upsertUser(tgId: number, firstName?: string, username?: st
 }
 
 export async function meView(user: any) {
-  const free = await freeCtx(user.id);
+  const free = await freeCtx(user.id, user.extraEstimates);
+  const acc = accessOf(user);
   return plain({
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
     companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
     aiAvailable: Boolean(env.AI_PROVIDER),
-    access: { ...accessOf(user), freeEstimateLeft: free.estimateCount < FREE_ESTIMATES, freeLeft: Math.max(0, FREE_ESTIMATES - free.estimateCount), freeEstimateIds: free.freeEstimateIds, estimateCount: free.estimateCount },
+    access: { ...acc, freeEstimateLeft: free.estimateCount < free.limit, freeLeft: Math.max(0, free.limit - free.estimateCount), freeLimit: free.limit, freeEstimateIds: free.freeEstimateIds, estimateCount: free.estimateCount },
+    plan: {
+      tier: acc.tier, label: TIERS[acc.tier].label, aiLimit: TIERS[acc.tier].ai, aiUsed: user.aiMonth === monthKey() ? user.aiUsed : 0,
+      extraDesigns: user.extraDesigns || 0, team: user.teamOwnerId ? 'member' : user.plan === 'team' && acc.mode === 'subscription' ? 'owner' : null,
+    },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
     logoUrl: brandUrl(user.logoFile), signUrl: brandUrl(user.signFile),
     weeklyDigest: user.weeklyDigest ?? true, docStyle: user.docStyle || 'classic', designPrices: user.designPrices || null,

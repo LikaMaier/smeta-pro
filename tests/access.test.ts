@@ -25,13 +25,14 @@ test('копировать смету, сохранять шаблон и пра
   assert.equal(freeWriteAllowed('PUT', '/api/estimates/e2', used), false);
 });
 
-test('справочник цен и настройки — бесплатно; объекты, календарь, ИИ — по подписке', () => {
+test('справочник, календарь и напоминания — бесплатно; объекты и ИИ — по подписке', () => {
   assert.equal(freeWriteAllowed('POST', '/api/items', used), true);
   assert.equal(freeWriteAllowed('POST', '/api/items/import-starter', used), true);
   assert.equal(freeWriteAllowed('PATCH', '/api/me', used), true);
   assert.equal(freeWriteAllowed('POST', '/api/projects', used), false);
-  assert.equal(freeWriteAllowed('POST', '/api/photos', used), false);
-  assert.equal(freeWriteAllowed('POST', '/api/reminders', used), false);
+  assert.equal(freeWriteAllowed('POST', '/api/photos', used), true);
+  assert.equal(freeWriteAllowed('POST', '/api/reminders', used), true);
+  assert.equal(freeWriteAllowed('POST', '/api/team/join', used), true);
   assert.equal(freeWriteAllowed('POST', '/api/ai/message', used), false);
 });
 
@@ -47,4 +48,9 @@ test('импорт из Excel — как создание первой смет�
   assert.equal(freeWriteAllowed('POST', '/api/estimates/import', used), false);
   assert.equal(freeWriteAllowed('POST', '/api/estimates/e1/acts', used), false);
   assert.equal(freeWriteAllowed('PATCH', '/api/estimates/e1/purchased', used), true);
+});
+
+test('купленный пакет смет увеличивает лимит', () => {
+  assert.equal(freeWriteAllowed('POST', '/api/estimates', { estimateCount: 5, freeEstimateIds: [], limit: 13 }), true);
+  assert.equal(freeWriteAllowed('POST', '/api/estimates', { estimateCount: 13, freeEstimateIds: [], limit: 13 }), false);
 });

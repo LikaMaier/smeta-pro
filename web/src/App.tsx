@@ -28,7 +28,8 @@ import { applyTheme } from './theme';
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
   aiEnabled: boolean; aiAvailable: boolean; isAdmin: boolean; theme?: string; designPrices?: Record<string, number> | null; pay?: { yookassa: boolean; receipt: boolean };
-  access: { active: boolean; mode: 'trial' | 'subscription' | 'expired' | 'free' | 'admin'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeEstimateIds?: string[]; estimateCount?: number };
+  access: { active: boolean; mode: 'trial' | 'subscription' | 'team' | 'expired' | 'free' | 'admin'; tier?: 'free' | 'lite' | 'pro' | 'team'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeLimit?: number; freeEstimateIds?: string[]; estimateCount?: number };
+  plan?: { tier: 'free' | 'lite' | 'pro' | 'team'; label: string; aiLimit: number; aiUsed: number; extraDesigns: number; team: 'owner' | 'member' | null };
 }
 const MeCtx = createContext<{ me: Me; setMe: (m: Me) => void; refreshMe: () => Promise<void> }>(null as any);
 export const useMe = () => useContext(MeCtx);
@@ -95,13 +96,13 @@ function TgBack() {
 }
 
 function Paywall() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<false | string>(false);
   const nav = useNavigate();
-  useEffect(() => onApiError((e) => { if (e.code === 'subscription_required') setOpen(true); }), []);
+  useEffect(() => onApiError((e) => { if (e.code === 'subscription_required') setOpen(''); if (e.code === 'plan_required') setOpen(e.message || ''); }), []);
   return (
-    <Sheet open={open} onClose={() => setOpen(false)} title="Нужна подписка">
+    <Sheet open={open !== false} onClose={() => setOpen(false)} title={open ? 'Нужен тариф выше' : 'Нужна подписка'}>
       <div className="stack">
-        <p style={{ margin: 0 }}>Первые 3 сметы — бесплатно. Чтобы создавать больше смет, вести объекты, деньги, календарь с фото, делать договоры и акты, выгружать в Excel, оформите подписку.</p>
+        <p style={{ margin: 0 }}>{open || 'Бесплатно — 3 сметы, справочник, калькуляторы, календарь и напоминания. Чтобы создавать больше смет, вести объекты и деньги, делать договоры и акты — тариф «Лайт» от 390 ₽ в месяц. ИИ и 3D для заказчика — в «Про».'}</p>
         <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
         <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
       </div>

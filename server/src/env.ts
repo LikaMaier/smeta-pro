@@ -8,14 +8,20 @@ export const env = {
   SESSION_SECRET: process.env.SESSION_SECRET || '',
   WEBHOOK_SECRET: process.env.WEBHOOK_SECRET || '',
   ADMIN_TG_IDS: (process.env.ADMIN_TG_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
-  TRIAL_DAYS: Number(process.env.TRIAL_DAYS || 0), // 0 — без пробного периода: бесплатна только первая смета
+  // пробный период тарифа «Про» для новых пользователей, дней
+  PRO_TRIAL_DAYS: Number(process.env.PRO_TRIAL_DAYS ?? 7),
   // Только для локальной разработки вне Telegram. На проде не включать.
   DEV_AUTH: process.env.DEV_AUTH === '1',
-  // ИИ-сметчик (OpenAI). Без ключа ИИ честно отключён.
+  // ИИ. Любой OpenAI-совместимый сервис: OpenAI, YandexGPT (AI Studio), DeepSeek, OpenRouter.
+  // Без ключа ИИ честно отключён. Распознавание голоса — только через OpenAI (OPENAI_API_KEY).
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
   OPENAI_STT_MODEL: process.env.OPENAI_STT_MODEL || 'gpt-4o-mini-transcribe',
-  AI_PROVIDER: process.env.OPENAI_API_KEY ? 'openai' : '',
+  AI_BASE_URL: (process.env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, ''),
+  AI_API_KEY: process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '',
+  AI_MODEL: process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+  AI_FOLDER: process.env.AI_FOLDER || '', // Yandex AI Studio: ID каталога (заголовок OpenAI-Project)
+  AI_PROVIDER: process.env.AI_API_KEY || process.env.OPENAI_API_KEY ? 'on' : '',
   // ЮKassa: оплата картой и СБП. Без ключей кнопка оплаты через ЮKassa скрыта.
   YOOKASSA_SHOP_ID: process.env.YOOKASSA_SHOP_ID || '',
   YOOKASSA_SECRET_KEY: process.env.YOOKASSA_SECRET_KEY || '',

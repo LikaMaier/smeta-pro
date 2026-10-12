@@ -6,47 +6,14 @@ import { Field, Load, Switch, useLoad, useToast } from '../components/ui';
 import { date } from '../format';
 import { openInvoice, haptic, tg } from '../tg';
 import { THEMES, DEFAULT_THEME, applyTheme } from '../theme';
+import Tariffs from '../components/Tariffs';
 
 export default function Settings() {
   const { me, setMe, refreshMe } = useMe();
   const toast = useToast();
-  const plans = useLoad(() => get<any[]>('/plans'), []);
   const [company, setCompany] = useState(me.companyName || '');
   const [contacts, setContacts] = useState(me.contacts || '');
-  const [paying, setPaying] = useState('');
   useEffect(() => { setCompany(me.companyName || ''); setContacts(me.contacts || ''); }, [me.companyName, me.contacts]);
-
-  const [email, setEmail] = useState(() => { try { return localStorage.getItem('smeta_pay_email') || ''; } catch { return ''; } });
-  const [ykId, setYkId] = useState<string | null>(null);
-  const payYk = async (code: string) => {
-    if (me.pay?.receipt && !/^\S+@\S+\.\S+$/.test(email)) return toast('Укажите email — на него придёт чек', true);
-    setPaying(code);
-    try {
-      try { localStorage.setItem('smeta_pay_email', email); } catch { /* */ }
-      const { url, id } = await post(`/pay/${code}/yookassa`, me.pay?.receipt ? { email } : {});
-      setYkId(id);
-      if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank');
-      toast('Оплатите на странице ЮKassa и вернитесь — доступ продлится сам');
-    } catch (e: any) { toast(e.message, true); } finally { setPaying(''); }
-  };
-  const checkYk = async () => {
-    if (!ykId) return;
-    try { const r = await post(`/pay/yookassa/${ykId}/check`); await refreshMe(); toast(r.status === 'succeeded' ? 'Оплата получена, подписка продлена' : 'Оплата ещё не поступила — попробуйте через минуту', r.status !== 'succeeded'); }
-    catch (e: any) { toast(e.message, true); }
-  };
-  const pay = async (code: string) => {
-    setPaying(code);
-    try {
-      const { url } = await post(`/pay/${code}`);
-      const status = await openInvoice(url);
-      if (status === 'paid') {
-        haptic('success');
-        toast('Оплата прошла, обновляю доступ…');
-        // Подтверждение приходит на сервер от Telegram — проверяем статус
-        for (let i = 0; i < 5; i++) { await new Promise((r) => setTimeout(r, 1500)); await refreshMe(); }
-      } else if (status === 'failed') toast('Оплата не прошла. Попробуйте ещё раз.', true);
-    } catch (e: any) { toast(e.message, true); } finally { setPaying(''); }
-  };
 
   return (
     <>
@@ -55,8 +22,9 @@ export default function Settings() {
       <div className="panel">
         <div className="row between">
           <div>
-            <div className="title" style={{ fontWeight: 700 }}>{({ subscription: 'Подписка активна', trial: 'Пробный период', admin: 'Полный доступ (владелец)', expired: 'Подписка закончилась', free: 'Бесплатный доступ' } as any)[me.access.mode]}</div>
-            <div className="small muted">{me.access.mode === 'subscription' || me.access.mode === 'trial' ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Без ограничений' : me.access.freeEstimateLeft ? `Бесплатно: 3 сметы, осталось ${me.access.freeLeft ?? 3}. Дальше — по подписке.` : 'Бесплатные сметы использованы. Данные сохранены и доступны для просмотра.'}</div>
+            <div className="title" style={{ fontWeight: 700 }}>{({ subscription: `Тариф «${me.plan?.label || 'Про'}»`, team: 'Тариф «Бригада» (через бригадира)', trial: 'Пробный период «Про»', admin: 'Полный доступ (владелец)', expired: 'Подписка закончилась', free: 'Бесплатный доступ' } as any)[me.access.mode]}</div>
+            <div className="small muted">{['subscription', 'trial', 'team'].includes(me.access.mode) ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Без ограничений' : me.access.freeEstimateLeft ? `Бесплатно: ${me.access.freeLimit ?? 3} сметы, осталось ${me.access.freeLeft ?? 3}.` : 'Бесплатные сметы использованы. Данные сохранены и доступны для просмотра.'}</div>
+            {me.plan?.aiLimit > 0 && <div className="xs muted">ИИ в этом месяце: {me.plan.aiUsed} из {me.plan.aiLimit}</div>}
           </div>
           <span className={`badge ${me.access.active ? 'ok' : 'bad'}`}>{me.access.active ? 'Доступ есть' : 'Нет доступа'}</span>
         </div>
@@ -64,25 +32,9 @@ export default function Settings() {
 
       <Referral />
 
-      <h2 className="section-title">Тарифы</h2>
-      <Load state={plans}>{(list) => (
-        <div className="list">
-          {list.map((p) => (
-            <div key={p.code} className="list-item" style={{ cursor: 'default', display: 'block' }}>
-              <div><div className="title">{p.title}</div><div className="xs muted">{p.starsPrice} ⭐{p.rubPrice ? ` · ≈ ${p.rubPrice.toLocaleString('ru-RU')} ₽` : ''}{p.months === 12 ? ` · ${Math.round(p.rubPrice / 12)} ₽ в месяц` : ''}</div></div>
-              <div className={me.pay?.yookassa ? 'grid2' : ''} style={{ marginTop: 8 }}>
-                {me.pay?.yookassa && <button className="btn primary sm block" disabled={!!paying} onClick={() => payYk(p.code)}>{paying === p.code ? 'Открываю…' : `Картой / СБП · ${(p.rubPrice || 0).toLocaleString('ru-RU')} ₽`}</button>}
-                <button className={`btn sm block ${me.pay?.yookassa ? '' : 'primary'}`} disabled={!!paying} onClick={() => pay(p.code)}>{me.pay?.yookassa ? `Звёздами · ${p.starsPrice} ⭐` : paying === p.code ? 'Открываю…' : me.access.mode === 'subscription' ? 'Продлить' : 'Оформить'}</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}</Load>
-      {me.pay?.yookassa && me.pay.receipt && <Field label="Email для чека"><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@mail.ru" /></Field>}
-      {ykId && <button className="btn block" onClick={checkYk}>Я оплатил(а) — проверить оплату</button>}
-      <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa, чек придёт на email. Или в Telegram Stars.' : 'Оплата в Telegram Stars. Сумма в рублях примерная: зависит от того, где покупать звёзды.'} Доступ продлевается сразу после подтверждения платежа.</p>
+      <Tariffs />
 
-      <h2 className="section-title">ИИ-сметчик (OpenAI)</h2>
+      <h2 className="section-title">ИИ-сметчик</h2>
       <div className="panel">
         <div className="row between">
           <div className="grow"><div style={{ fontWeight: 600 }}>{me.aiEnabled ? 'Включён' : 'Выключен'}</div>

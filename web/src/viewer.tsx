@@ -54,7 +54,7 @@ function Page() {
         {showDraw ? <Drawings res={res} note={false} /> : <button className="btn" style={{ marginTop: 0 }} onClick={() => setShowDraw(true)}>Показать план, фасады и разрез</button>}
       </div>
       <p className="muted xs" style={{ padding: '0 4px' }}>Эскизный проект: внешний вид, размеры и материалы. Не является расчётом конструкций.{VARS.length ? ' Цены вариантов ориентировочные — точная стоимость в смете исполнителя.' : ''}</p>
-      <div className="foot">Сделано в <a href={D.botUrl}>СМЕТА PRO</a> — сметы и проекты для строителей</div>
+      {D.hideBrand ? (D.company ? <div className="foot">{D.company}</div> : null) : <div className="foot">Сделано в <a href={D.botUrl}>СМЕТА PRO</a> — сметы и проекты для строителей</div>}
     </>
   );
 }

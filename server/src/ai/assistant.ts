@@ -1,6 +1,6 @@
-import { prisma, num, HttpError, audit } from '../util';
+import { prisma, num, HttpError, audit, requireFeature, useAi } from '../util';
 import { env } from '../env';
-import { chatJson } from './openai';
+import { chatJson, aiConfigured } from './openai';
 import { AI_SCHEMA, AiReply, buildDraft, calculatorsForPrompt } from '../../../shared/aiDraft';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 
@@ -33,9 +33,10 @@ ${catalogNames.length ? catalogNames.join('; ') : 'пока пуст'}
 ${STARTER_PRICES.map((p) => `${p.name} (${p.unit})`).join('; ')}`;
 }
 
-export function assertAiAllowed(user: { aiEnabled: boolean }) {
+export function assertAiAllowed(user: any) {
   if (!user.aiEnabled) throw new HttpError(403, 'ИИ-сметчик выключен. Включите его в Настройках.', 'ai_disabled');
-  if (!env.OPENAI_API_KEY) throw new HttpError(503, 'ИИ-сметчик ещё не подключён на сервере (нет ключа OpenAI).', 'ai_not_configured');
+  if (!aiConfigured()) throw new HttpError(503, 'ИИ-сметчик ещё не подключён на сервере.', 'ai_not_configured');
+  requireFeature(user, 'ai');
 }
 
 async function activeSession(userId: string) {
@@ -58,6 +59,7 @@ export async function getSession(userId: string) {
 
 export async function handleMessage(user: any, text: string, voice = false) {
   assertAiAllowed(user);
+  await useAi(user);
   const s = await activeSession(user.id);
   const items = await prisma.catalogItem.findMany({ where: { userId: user.id, deletedAt: null, active: true }, orderBy: { priceUpdatedAt: 'desc' }, take: 300 });
   const history = (s.messages as any[]).slice(-16).map((m) => ({ role: m.role, content: m.content }));

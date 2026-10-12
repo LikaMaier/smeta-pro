@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import { z } from 'zod';
 import { env } from '../env';
 import { prisma, plain, audit, accessOf, HttpError } from '../util';
+import { can } from '../../../shared/plans';
 import { loadEstimate, estimateTotals, estimateNumber, estimatePaid, docData } from './estimates';
 import { pdfData, renderPdf, fileName } from '../pdf';
 import { brandPath } from '../brand';
@@ -79,6 +80,7 @@ export async function shareRoutes(app: FastifyInstance, opts: { bot?: any } = {}
       token: (req.params as any).token, number, hasLogo: Boolean(brandPath(e.user.logoFile)), approvedAt: e.approvedAt,
       title: e.title, customer: e.customer, address: e.address, date: e.date, validDays: e.validDays ?? 14,
       paymentTerms: e.paymentTerms, notes: e.notes, botUrl: botLink('site'), designUrl: await designForEstimate(e.id),
+      hideBrand: can(accessOf(e.user).tier, 'whiteLabel'), company: e.user.companyName || null,
     }));
   });
 

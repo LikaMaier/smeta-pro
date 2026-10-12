@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { env } from '../env';
-import { prisma, plain, notFound, HttpError, accessOf, audit } from '../util';
+import { prisma, plain, notFound, HttpError, accessOf, audit, useAi, requireFeature } from '../util';
 import { buildCanopy, CANOPY_DEFAULT } from '../../../shared/design/canopy';
 import { designPdfData } from '../../../shared/design/report';
 import { CANOPY_AI_SCHEMA, CANOPY_AI_PROMPT, mergeAiParams } from '../../../shared/design/ai';
-import { chatJson } from '../ai/openai';
+import { chatJson, aiConfigured } from '../ai/openai';
 import { renderDesign, fileName } from '../pdf';
 import { brandPath } from '../brand';
 import { botLink } from '../botInfo';
@@ -16,6 +16,22 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OBJ_LABEL } from '../../../shared/design/canopy';
+import { TIERS, can, monthKey } from '../../../shared/plans';
+
+/** Лимит PDF «Эскизный проект»: бесплатно — 1 всего, Лайт — 3 в месяц, Про и Бригада — без ограничений.
+ *  Сверх лимита тратится купленный эскизный проект. Возвращает true, если тратим покупку. */
+export async function designPdfQuota(u: any): Promise<boolean> {
+  const tier = accessOf(u).tier;
+  const limit = TIERS[tier].designPdf;
+  if (limit === Infinity) return false;
+  const since = tier === 'free' ? new Date(0) : new Date(`${monthKey()}-01T00:00:00+03:00`);
+  const used = await prisma.auditLog.count({ where: { userId: u.id, entity: 'design', action: 'pdf_sent', createdAt: { gte: since } } });
+  if (used < limit) return false;
+  if ((u.extraDesigns || 0) > 0) return true;
+  throw new HttpError(402, tier === 'free'
+    ? 'Бесплатный эскизный проект уже использован. Купите разовый проект за 149 ₽ или оформите «Лайт» (3 в месяц) / «Про» (без ограничений).'
+    : 'В тарифе «Лайт» — 3 эскизных проекта в месяц, они закончились. Купите разовый проект за 149 ₽ или перейдите на «Про» (без ограничений).', 'plan_required');
+}
 
 const viewUrl = (token: string) => `${env.PUBLIC_URL || ''}/v/${token}`;
 const newToken = () => crypto.randomBytes(18).toString('base64url');
@@ -75,6 +91,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
   const shareInfo = (d: any) => ({ url: d.shareToken ? viewUrl(d.shareToken) : null, sharedAt: d.sharedAt, viewedAt: d.viewedAt, estimateId: d.estimateId });
 
   app.post('/api/designs/:id/share', async (req) => {
+    requireFeature(req.user, 'share3d');
     const d = await own(req.user.id, (req.params as any).id);
     const upd = d.shareToken ? d : await prisma.design.update({ where: { id: d.id }, data: { shareToken: newToken(), sharedAt: new Date(), viewedAt: null } });
     await audit(req.user.id, 'design', d.id, 'share');
@@ -89,7 +106,8 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     const d = await own(req.user.id, (req.params as any).id);
     const { estimateId } = z.object({ estimateId: z.string().min(1).max(64) }).parse(req.body);
     await loadEstimate(req.user.id, estimateId);
-    const upd = await prisma.design.update({ where: { id: d.id }, data: { estimateId, ...(d.shareToken ? {} : { shareToken: newToken(), sharedAt: new Date() }) } });
+    const share = can(accessOf(req.user).tier, 'share3d'); // 3D-кнопка в смете для заказчика — с тарифа «Про»
+    const upd = await prisma.design.update({ where: { id: d.id }, data: { estimateId, ...(d.shareToken || !share ? {} : { shareToken: newToken(), sharedAt: new Date() }) } });
     return shareInfo(upd);
   });
 
@@ -112,7 +130,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
       title: d.title, kind: OBJ_LABEL[(d.params as any)?.kind as keyof typeof OBJ_LABEL] || 'Проект', params: d.params,
       company: u.companyName || u.firstName || '', contacts: u.contacts || null,
       username: u.username || null, logo: brandPath(u.logoFile) ? `/v/${d.shareToken}/logo` : null,
-      estimateUrl, botUrl: botLink('view3d'), date: d.updatedAt,
+      estimateUrl, botUrl: botLink('view3d'), date: d.updatedAt, hideBrand: can(accessOf(u).tier, 'whiteLabel'),
     };
     const html = tpl.replace('<!--DESIGN_DATA-->', () => `<script>window.__DESIGN__=${escJson(data)}</script>`).replace(/<title>[^<]*<\/title>/, () => `<title>${escHtml(d.title)} — 3D-проект</title>`);
     return reply.send(html);
@@ -127,7 +145,8 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
   // Описание словами → параметры (ИИ только заполняет параметры; чертежи и материалы считает программа)
   app.post('/api/designer/parse', async (req) => {
     const { text, params } = z.object({ text: z.string().trim().min(3).max(3000), params: paramsSchema.optional() }).parse(req.body);
-    if (!env.OPENAI_API_KEY) throw new HttpError(503, 'ИИ ещё не подключён на сервере — заполните параметры вручную, чертежи и расчёт работают и без ИИ.', 'ai_unavailable');
+    if (!aiConfigured()) throw new HttpError(503, 'ИИ ещё не подключён на сервере — заполните параметры вручную, чертежи и расчёт работают и без ИИ.', 'ai_unavailable');
+    await useAi(req.user);
     const ai: any = await chatJson([{ role: 'system', content: CANOPY_AI_PROMPT }, { role: 'user', content: text }], CANOPY_AI_SCHEMA);
     const merged = mergeAiParams({ ...CANOPY_DEFAULT, ...(params || {}) } as any, ai);
     return { params: merged, title: ai.title || 'Навес', questions: Array.isArray(ai.questions) ? ai.questions.slice(0, 3) : [] };
@@ -137,6 +156,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
   app.post('/api/designer/pdf/send', { bodyLimit: 4 * 1024 * 1024 }, async (req) => {
     const b = z.object({ title: z.string().trim().min(1).max(200), params: paramsSchema, lines: z.array(lineSchema).max(500).optional() }).parse(req.body);
     if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
+    const useCredit = await designPdfQuota(req.user);
     const r = buildCanopy(b.params as any, (req.user as any).designPrices || null);
     const u: any = req.user;
     const data = designPdfData(r, {
@@ -148,7 +168,8 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     await opts.bot.api.sendDocument(Number(u.tgId), new InputFile(pdf, fileName(`Эскизный проект — ${b.title}`, 'pdf')), {
       caption: `Эскизный проект «${b.title}»: 3D, план, фасады, разрез основания, раскрой металла и ведомость материалов. Всего ≈ ${data.total.toLocaleString('ru-RU')} ₽.`,
     });
-    await audit(u.id, 'design', '-', 'pdf_sent', { title: b.title });
+    await audit(u.id, 'design', '-', useCredit ? 'pdf_sent_credit' : 'pdf_sent', { title: b.title });
+    if (useCredit) await prisma.user.updateMany({ where: { id: u.id, extraDesigns: { gt: 0 } }, data: { extraDesigns: { decrement: 1 } } });
     return { ok: true };
   });
 }

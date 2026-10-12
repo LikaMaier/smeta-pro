@@ -34,7 +34,7 @@ export default function Home() {
       <Link to="/calendar" style={{ display: 'block' }}>
         <Hero
           title={<>Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span></>}
-          sub={me.access.mode === 'subscription' ? `Подписка до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный период: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? `Бесплатных смет осталось: ${me.access.freeLeft ?? 3} из 3` : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатные сметы использованы — оформите подписку'}
+          sub={me.access.mode === 'subscription' || me.access.mode === 'team' ? `Тариф «${me.plan?.label || 'Про'}» до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный «Про»: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? `Бесплатных смет осталось: ${me.access.freeLeft ?? 3} из ${me.access.freeLimit ?? 3}` : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатные сметы использованы — оформите подписку'}
         />
       </Link>
 
@@ -42,7 +42,7 @@ export default function Home() {
 
       <div className="tiles">
         <button className="tile wide" onClick={() => (me.access.active || me.access.freeEstimateLeft ? createEstimate() : nav('/settings'))} disabled={busy}>
-          + Новая смета{!me.access.active && me.access.freeEstimateLeft ? <small>бесплатно: осталось {me.access.freeLeft ?? 3} из 3</small> : null}
+          + Новая смета{!me.access.active && me.access.freeEstimateLeft ? <small>бесплатно: осталось {me.access.freeLeft ?? 3} из {me.access.freeLimit ?? 3}</small> : null}
         </button>
         <Link className="tile" to="/estimates">Сметы</Link>
         <Link className="tile" to="/projects">Объекты{active ? <small>в работе: {active}</small> : <small>деньги и контакты</small>}</Link>

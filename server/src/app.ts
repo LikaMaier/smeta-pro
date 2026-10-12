@@ -21,6 +21,7 @@ import { shareRoutes } from './routes/share';
 import { brandRoutes } from './routes/brand';
 import { actRoutes } from './routes/acts';
 import { designerRoutes } from './routes/designer';
+import { teamRoutes } from './routes/team';
 
 declare module 'fastify' {
   interface FastifyRequest { user: User }
@@ -46,9 +47,9 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
     req.user = user;
     const isWrite = req.method !== 'GET';
     if (isWrite && !OPEN_WRITE.some((r) => r.test(url)) && !accessOf(user).active) {
-      const ctx = needsEstimateCtx(url) ? await freeCtx(user.id) : { estimateCount: 99, freeEstimateIds: [] };
+      const ctx = needsEstimateCtx(url) ? await freeCtx(user.id, user.extraEstimates) : { estimateCount: 99, freeEstimateIds: [] };
       if (!freeWriteAllowed(req.method, url, ctx)) {
-        return reply.status(402).send({ error: 'Это доступно по подписке. Первые 3 сметы — бесплатно, дальше — по подписке.', code: 'subscription_required' });
+        return reply.status(402).send({ error: 'Это доступно по подписке (от «Лайт» — 390 ₽ в месяц). Бесплатно: 3 сметы, справочник, калькуляторы, календарь и напоминания.', code: 'subscription_required' });
       }
     }
   });
@@ -67,6 +68,7 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
   await app.register(brandRoutes);
   await app.register(actRoutes, { bot: opts.bot });
   await app.register(designerRoutes, { bot: opts.bot });
+  await app.register(teamRoutes, { bot: opts.bot });
 
   // Telegram webhook
   if (opts.bot && env.PUBLIC_URL) {

@@ -1,12 +1,15 @@
 import { Bot, InlineKeyboard } from 'grammy';
 import { env } from './env';
 import { prisma, accessOf } from './util';
+import { can } from '../../shared/plans';
+import { aiConfigured, sttConfigured } from './ai/openai';
 import { applyPayment } from './routes/billing';
 import { upsertUser } from './routes/auth';
 import { botInfo } from './botInfo';
 import { handleMessage } from './ai/assistant';
 import { transcribe } from './ai/openai';
 import { remAction } from './routes/organizer';
+import { joinTeam } from './routes/team';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -17,7 +20,15 @@ export function createBot() {
 
   bot.command('start', async (ctx) => {
     // Регистрируем сразу: так запоминаем, кто пригласил (ссылка t.me/бот?start=ref_…)
-    if (ctx.from) await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username, String(ctx.match || '')).catch((e) => console.error('upsertUser', e));
+    const payload = String(ctx.match || '');
+    const u = ctx.from ? await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username, payload).catch((e) => { console.error('upsertUser', e); return null; }) : null;
+    // приглашение в бригаду: t.me/бот?start=team_<токен>
+    if (u && payload.startsWith('team_')) {
+      try {
+        const r = await joinTeam(u.id, payload.slice(5));
+        return ctx.reply(r.already ? `Вы уже в бригаде «${esc(r.owner)}».` : `👷 Вы в бригаде «${esc(r.owner)}». Доступ уровня «Бригада» и общий справочник цен уже у вас.`, { parse_mode: 'HTML', reply_markup: appKb() });
+      } catch (e: any) { await ctx.reply(`Не получилось вступить в бригаду: ${e.message}`); }
+    }
     await ctx.reply(
       '<b>СМЕТА PRO</b> — сметы и прибыль по объектам прямо в Telegram.\n\n' +
       '📐 Смета за 5 минут: ваш прайс, 34 калькулятора, готовые шаблоны\n' +
@@ -26,7 +37,7 @@ export function createBot() {
       '📷 Календарь с фото и журналом работ\n' +
       '⏰ Напоминания: деньги, бетон, техника, налоги — с кнопкой «отложить»\n' +
       '🤝 Ссылка для заказчика, договор и акт\n\n' +
-      '<b>Первые 3 сметы — бесплатно.</b> Дальше — по подписке.',
+      '<b>Первые 3 сметы — бесплатно</b>, новичкам — 7 дней тарифа «Про». Дальше — от 390 ₽ в месяц.',
       { parse_mode: 'HTML', reply_markup: appKb() },
     );
   });
@@ -52,9 +63,10 @@ export function createBot() {
     if (ctx.message.text?.startsWith('/')) return next();
     const user = await prisma.user.findUnique({ where: { tgId: BigInt(ctx.from.id) } });
     if (!user) return ctx.reply('Сначала откройте приложение командой /start');
-    if (!accessOf(user).active) return ctx.reply('ИИ-сметчик доступен по подписке. Первые 3 сметы — бесплатно, их можно составить вручную в приложении.', { reply_markup: appKb() });
+    if (!can(accessOf(user).tier, 'ai')) return ctx.reply('ИИ-сметчик входит в тарифы «Про» и «Бригада». Смету можно составить и вручную в приложении.', { reply_markup: appKb() });
     if (!user.aiEnabled) return ctx.reply('ИИ-сметчик выключен. Включите его в Настройках приложения, если нужен — или составьте смету вручную.', { reply_markup: appKb() });
-    if (!env.OPENAI_API_KEY) return ctx.reply('ИИ-сметчик ещё не подключён на сервере. Пока составьте смету вручную.', { reply_markup: appKb() });
+    if (!aiConfigured()) return ctx.reply('ИИ-сметчик ещё не подключён на сервере. Пока составьте смету вручную.', { reply_markup: appKb() });
+    if (ctx.message.voice && !sttConfigured()) return ctx.reply('Голос пока не распознаётся — напишите текстом.', { reply_markup: appKb() });
     try {
       await ctx.replyWithChatAction('typing');
       let text = ctx.message.text || '';
@@ -100,8 +112,7 @@ export function createBot() {
         `🎁 Ваш друг оформил подписку СМЕТА PRO — дарим вам месяц бесплатно!\nПодписка продлена до ${res.referrer.until.toLocaleDateString('ru-RU')}.`,
         { reply_markup: appKb() }).catch(() => {});
     }
-    const fresh = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    await ctx.reply(`Оплата прошла. Подписка активна до ${new Date(fresh.subscriptionUntil!).toLocaleDateString('ru-RU')}.`, { reply_markup: appKb() });
+    if (res) await ctx.reply(res.text, { reply_markup: appKb() });
   });
 
   bot.catch((err) => console.error('Ошибка бота:', err.error));
@@ -129,10 +140,10 @@ export async function setupBot(bot: Bot) {
     await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'СМЕТА PRO', web_app: { url: env.PUBLIC_URL } } });
     await bot.api.setWebhook(`${env.PUBLIC_URL}/bot/webhook`, {
       secret_token: env.WEBHOOK_SECRET || undefined,
-      allowed_updates: ['message', 'pre_checkout_query'],
+      allowed_updates: ['message', 'pre_checkout_query', 'callback_query'],
     });
   } else {
     await bot.api.deleteWebhook();
-    bot.start({ allowed_updates: ['message', 'pre_checkout_query'] });
+    bot.start({ allowed_updates: ['message', 'pre_checkout_query', 'callback_query'] });
   }
 }
