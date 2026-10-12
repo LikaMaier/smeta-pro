@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { env } from '../env';
 import { prisma, plain, accessOf, HttpError, freeCtx } from '../util';
 import { TIERS, monthKey } from '../../../shared/plans';
+import { applyPromo, findPromo } from './promo';
 import { verifyInitData, signSession } from '../auth';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { compositionFor } from '../../../shared/compositions';
@@ -23,7 +24,10 @@ async function referrerId(payload?: string | null) {
 
 export async function upsertUser(tgId: number, firstName?: string, username?: string, startPayload?: string | null) {
   const existing = await prisma.user.findUnique({ where: { tgId: BigInt(tgId) } });
+  const promo = /^p_([A-Za-zА-Яа-яЁё0-9_-]{3,24})$/.exec(startPayload || '')?.[1];
   if (existing) {
+    // старый пользователь пришёл по ссылке блогера — привязываем код, если подписки ещё не было
+    if (promo && !existing.promoCode) await applyPromo(existing.id, promo).catch(() => {});
     return prisma.user.update({ where: { id: existing.id }, data: { firstName, username } });
   }
   const user = await prisma.user.create({
@@ -34,6 +38,10 @@ export async function upsertUser(tgId: number, firstName?: string, username?: st
     },
     include: { priceLists: true },
   });
+  if (promo) {
+    await applyPromo(user.id, promo, true).catch(() => {});
+    Object.assign(user, await prisma.user.findUniqueOrThrow({ where: { id: user.id } }));
+  }
   // Новый пользователь сразу получает справочник работ с примерными ценами — первую смету можно собрать за минуты
   try {
     await prisma.catalogItem.createMany({
@@ -56,6 +64,7 @@ export async function meView(user: any) {
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
     companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
     aiAvailable: Boolean(env.AI_PROVIDER), aiWish,
+    promo: user.promoCode ? await findPromo(user.promoCode).then((p) => (p ? { code: p.code, discountPct: p.discountPct } : null)) : null,
     access: { ...acc, freeEstimateLeft: free.estimateCount < free.limit, freeLeft: Math.max(0, free.limit - free.estimateCount), freeLimit: free.limit, freeEstimateIds: free.freeEstimateIds, estimateCount: free.estimateCount },
     plan: {
       tier: acc.tier, label: TIERS[acc.tier].label, aiLimit: TIERS[acc.tier].ai, aiUsed: user.aiMonth === monthKey() ? user.aiUsed : 0,

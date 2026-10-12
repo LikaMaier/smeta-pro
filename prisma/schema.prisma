@@ -32,6 +32,8 @@ model User {
   extraDesigns      Int       @default(0) // купленные эскизные проекты
   aiMonth           String? // месяц счётчика ИИ, «2026-10»
   aiUsed            Int       @default(0)
+  promoCode         String? // промокод блогера, по которому пришёл
+  promoAt           DateTime?
   subNotice3At      DateTime? // когда отправлено «подписка заканчивается через 3 дня»
   subNoticeEndAt    DateTime? // когда отправлено «подписка закончилась»
   logoFile          String? // логотип для документов (файл в PHOTO_DIR/brand)
@@ -61,6 +63,7 @@ model User {
 
   @@index([teamOwnerId])
   @@index([teamToken])
+  @@index([promoCode])
 }
 
 // Проект ИИ-проектировщика (навес и др.): параметры модели, из которых строятся чертежи, 3D и спецификация
@@ -404,6 +407,8 @@ model Payment {
   provider        String   @default("stars") // stars | yookassa
   amountRub       Int?
   telegramChargeId String  @unique
+  promoCode       String? // промокод покупателя — для расчёта с блогером
+  discountPct     Int? // применённая скидка, %
   status          String   @default("paid") // paid | refunded
   createdAt       DateTime @default(now())
 }
@@ -419,4 +424,17 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([userId, entity, entityId])
+}
+
+// Промокоды блогеров: скидка на первую оплату, длинный пробный период, процент блогеру с оплат
+model PromoCode {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String // блогер или канал
+  contact       String?
+  discountPct   Int      @default(20)
+  commissionPct Int      @default(30)
+  trialDays     Int      @default(14)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
 }

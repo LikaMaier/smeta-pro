@@ -12,7 +12,7 @@ const TIER_ICON: Record<string, string> = { lite: '🔹', pro: '⭐', team: '�
 export default function Tariffs() {
   const { me, refreshMe } = useMe();
   const toast = useToast();
-  const plans = useLoad(() => get<any[]>('/plans'), []);
+  const plans = useLoad(() => get<any[]>('/plans'), [me.promo?.code]);
   const [year, setYear] = useState(false);
   const [paying, setPaying] = useState('');
   const [email, setEmail] = useState(() => { try { return localStorage.getItem('smeta_pay_email') || ''; } catch { return ''; } });
@@ -49,8 +49,8 @@ export default function Tariffs() {
   };
   const Buy = ({ p, label }: { p: any; label?: string }) => (
     <div className={me.pay?.yookassa ? 'grid2' : ''} style={{ marginTop: 8 }}>
-      {me.pay?.yookassa && <button className="btn primary sm block" disabled={!!paying} onClick={() => payYk(p.code)}>{paying === p.code ? 'Открываю…' : `Картой / СБП · ${rub(p.rubPrice)}`}</button>}
-      <button className={`btn sm block ${me.pay?.yookassa ? '' : 'primary'}`} disabled={!!paying} onClick={() => pay(p.code)}>{paying === p.code && !me.pay?.yookassa ? 'Открываю…' : `${label ? `${label} · ` : ''}${p.starsPrice} ⭐`}</button>
+      {me.pay?.yookassa && <button className="btn primary sm block" disabled={!!paying} onClick={() => payYk(p.code)}>{paying === p.code ? 'Открываю…' : `Картой / СБП · ${rub(p.price?.rub ?? p.rubPrice)}`}</button>}
+      <button className={`btn sm block ${me.pay?.yookassa ? '' : 'primary'}`} disabled={!!paying} onClick={() => pay(p.code)}>{paying === p.code && !me.pay?.yookassa ? 'Открываю…' : `${label ? `${label} · ` : ''}${p.price?.stars ?? p.starsPrice} ⭐`}</button>
     </div>
   );
 
@@ -75,7 +75,11 @@ export default function Tariffs() {
                     {t === 'pro' && !on && <span className="badge ok">выбирают чаще</span>}
                     {on && <span className="badge ok">ваш тариф</span>}
                   </div>
-                  <div className="tariff-price"><b className="num">{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</b><span className="muted"> в месяц{year ? ` · ${rub(p.rubPrice)} за год` : ''}</span></div>
+                  <div className="tariff-price">
+                    {p.price?.discountPct > 0 && <s className="muted" style={{ marginRight: 6 }}>{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</s>}
+                    <b className="num">{rub(year ? Math.round((p.price?.rub ?? p.rubPrice) / 12) : (p.price?.rub ?? p.rubPrice))}</b><span className="muted"> в месяц{year ? ` · ${rub(p.price?.rub ?? p.rubPrice)} за год` : ''}</span>
+                    {p.price?.discountPct > 0 && <span className="badge ok" style={{ marginLeft: 6 }}>−{p.price.discountPct}% по промокоду</span>}
+                  </div>
                   <ul className="tariff-perks">{TIERS[t].perks.map((x) => <li key={x}>{!me.aiAvailable && /^ИИ/.test(x) ? <>{x.replace(/^ИИ-сметчик: /, 'ИИ-сметчик (').replace(/^ИИ: /, 'ИИ (')}) — <b className="soon">скоро, без доплаты</b></> : x}</li>)}</ul>
                   <Buy p={p} label={on ? 'Продлить' : undefined} />
                 </div>
@@ -99,9 +103,31 @@ export default function Tariffs() {
       {me.pay?.yookassa && me.pay.receipt && <Field label="Email для чека"><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@mail.ru" /></Field>}
       {ykId && <button className="btn block" onClick={checkYk}>Я оплатил(а) — проверить оплату</button>}
       <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa, чек придёт на email. Или в Telegram Stars.' : 'Оплата в Telegram Stars; сумма в рублях примерная — зависит от того, где покупать звёзды.'} Доступ включается сразу после подтверждения платежа.</p>
+      <PromoField />
       <TeamPanel />
     </>
   );
+}
+
+/** Промокод блогера: скидка на первую оплату подписки */
+function PromoField() {
+  const { me, refreshMe } = useMe();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (me.promo) return <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Промокод <b>{me.promo.code}</b>: скидка {me.promo.discountPct}% на первую оплату подписки — уже учтена в ценах выше.</div>;
+  if (me.access.mode === 'subscription') return null;
+  return open ? (
+    <div className="row" style={{ gap: 8, margin: '8px 0' }}>
+      <input className="input grow" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Промокод" maxLength={24} aria-label="Промокод" />
+      <button className="btn primary" disabled={busy || code.trim().length < 3} onClick={async () => {
+        setBusy(true);
+        try { const r = await post('/pay/promo', { code }); await refreshMe(); haptic('success'); toast(`Промокод применён: −${r.discountPct}% на первую оплату`); }
+        catch (e: any) { toast(e.message, true); } finally { setBusy(false); }
+      }}>Применить</button>
+    </div>
+  ) : <button className="btn sm" style={{ margin: '6px 0' }} onClick={() => setOpen(true)}>🎁 Есть промокод?</button>;
 }
 
 /** Бригада: приглашение по ссылке, участники, общий справочник */

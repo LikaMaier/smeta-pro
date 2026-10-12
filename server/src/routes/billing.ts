@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { prisma, plain, HttpError } from '../util';
 import { env } from '../env';
 import { TIERS, convertDays, type Tier } from '../../../shared/plans';
+import { priceFor } from './promo';
 
 /**
  * Тарифы: Лайт / Про / Бригада (месяц и год −30%) и разовые пакеты без подписки.
@@ -48,7 +49,9 @@ export async function applyPayment(userId: string, planCode: string, stars: numb
   const plan = await prisma.plan.findUnique({ where: { code: planCode } });
   if (!plan) throw new Error(`Неизвестный тариф ${planCode}`);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  const pay = prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId, provider: extra.provider || 'stars', amountRub: extra.amountRub ?? null } });
+  // промокод: скидка была, если это первая оплата подписки (до создания платежа)
+  const disc = user.promoCode ? await priceFor(user, plan) : null;
+  const pay = prisma.payment.create({ data: { userId, planCode, stars, telegramChargeId: chargeId, provider: extra.provider || 'stars', amountRub: extra.amountRub ?? null, promoCode: user.promoCode, discountPct: disc?.discountPct || null } });
   if (plan.months === 0) {
     await prisma.$transaction([pay, prisma.user.update({ where: { id: userId }, data: { extraEstimates: { increment: plan.estimates }, extraDesigns: { increment: plan.designs } } })]);
     return { text: plan.estimates ? `Оплата прошла: добавлено смет — ${plan.estimates}.` : `Оплата прошла: добавлен эскизный проект 3D (${plan.designs} PDF).` };
@@ -87,7 +90,11 @@ export async function rewardReferrer(friend: { id: string; referredById: string 
 }
 
 export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
-  app.get('/api/plans', async () => plain(await prisma.plan.findMany({ where: { active: true }, orderBy: { sort: 'asc' } })));
+  app.get('/api/plans', async (req) => {
+    const plans = await prisma.plan.findMany({ where: { active: true }, orderBy: { sort: 'asc' } });
+    // цена для этого пользователя: со скидкой по промокоду на первую оплату подписки
+    return plain(await Promise.all(plans.map(async (p) => ({ ...p, price: await priceFor(req.user, p) }))));
+  });
 
   app.get('/api/payments', async (req) => plain(await prisma.payment.findMany({ where: { userId: req.user.id }, orderBy: { createdAt: 'desc' } })));
 
@@ -97,9 +104,10 @@ export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
     const plan = await prisma.plan.findFirst({ where: { code, active: true } });
     if (!plan) throw new HttpError(404, 'Тариф не найден');
     if (!opts.bot) throw new HttpError(503, 'Оплата не настроена: бот не подключён', 'payments_unavailable');
+    const price = await priceFor(req.user, plan);
     const url = await opts.bot.api.createInvoiceLink(
       plan.title, plan.months ? `СМЕТА PRO, тариф «${TIERS[plan.tier as Tier]?.label || ''}»: ${(TIERS[plan.tier as Tier]?.perks || []).slice(0, 3).join(', ')}`.slice(0, 255) : 'СМЕТА PRO: разовая покупка без подписки',
-      `${req.user.id}:${plan.code}`, '', 'XTR', [{ label: plan.title, amount: plan.starsPrice }],
+      `${req.user.id}:${plan.code}`, '', 'XTR', [{ label: plan.title + (price.discountPct ? ` (−${price.discountPct}%)` : ''), amount: price.stars }],
     );
     return { url };
   });
@@ -115,12 +123,13 @@ export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
     const plan = await prisma.plan.findFirst({ where: { code, active: true } });
     if (!plan || !plan.rubPrice) throw new HttpError(404, 'Тариф не найден');
     if (env.YOOKASSA_RECEIPT && !email) throw new HttpError(400, 'Укажите email — на него придёт чек', 'email_required');
-    const value = `${plan.rubPrice}.00`;
+    const price = await priceFor(req.user, plan);
+    const value = `${price.rub}.00`;
     const body: any = {
       amount: { value, currency: 'RUB' }, capture: true,
       confirmation: { type: 'redirect', return_url: `${env.PUBLIC_URL || ''}/paid` },
       description: `${plan.title} — СМЕТА PRO`.slice(0, 128),
-      metadata: { userId: req.user.id, plan: plan.code },
+      metadata: { userId: req.user.id, plan: plan.code, ...(price.promo ? { promo: price.promo } : {}) },
     };
     if (env.YOOKASSA_RECEIPT) body.receipt = { customer: { email }, items: [{ description: plan.title.slice(0, 128), quantity: '1.00', amount: { value, currency: 'RUB' }, vat_code: env.YOOKASSA_VAT_CODE, payment_mode: 'full_payment', payment_subject: 'service' }] };
     const r = await fetch('https://api.yookassa.ru/v3/payments', {

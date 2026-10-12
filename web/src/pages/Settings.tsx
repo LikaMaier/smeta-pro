@@ -8,6 +8,7 @@ import { openInvoice, haptic, tg } from '../tg';
 import { THEMES, DEFAULT_THEME, applyTheme } from '../theme';
 import Tariffs from '../components/Tariffs';
 import AiSoon from '../components/AiSoon';
+import AdminPromos from '../components/AdminPromos';
 
 export default function Settings() {
   const { me, setMe, refreshMe } = useMe();
@@ -34,6 +35,7 @@ export default function Settings() {
       <Referral />
 
       <Tariffs />
+      {me.isAdmin && <AdminPromos />}
 
       <h2 className="section-title">ИИ-сметчик</h2>
       {!me.aiAvailable ? <AiSoon compact /> : <div className="panel">

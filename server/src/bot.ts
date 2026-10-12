@@ -10,6 +10,7 @@ import { handleMessage } from './ai/assistant';
 import { transcribe } from './ai/openai';
 import { remAction } from './routes/organizer';
 import { joinTeam } from './routes/team';
+import { priceFor } from './routes/promo';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -22,6 +23,11 @@ export function createBot() {
     // Регистрируем сразу: так запоминаем, кто пригласил (ссылка t.me/бот?start=ref_…)
     const payload = String(ctx.match || '');
     const u = ctx.from ? await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username, payload).catch((e) => { console.error('upsertUser', e); return null; }) : null;
+    // ссылка блогера: t.me/бот?start=p_<КОД>
+    if (u && payload.startsWith('p_') && u.promoCode) {
+      const pr = await prisma.promoCode.findFirst({ where: { code: u.promoCode } });
+      if (pr) await ctx.reply(`🎁 Промокод <b>${esc(pr.code)}</b> применён: скидка ${pr.discountPct}% на первую оплату подписки${pr.trialDays && u.trialEndsAt > new Date() ? `, «Про» бесплатно до ${u.trialEndsAt.toLocaleDateString('ru-RU')}` : ''}.`, { parse_mode: 'HTML' }).catch(() => {});
+    }
     // приглашение в бригаду: t.me/бот?start=team_<токен>
     if (u && payload.startsWith('team_')) {
       try {
@@ -95,7 +101,7 @@ export function createBot() {
       prisma.user.findFirst({ where: { id: userId, tgId: BigInt(ctx.from.id) } }),
       prisma.plan.findFirst({ where: { code: planCode, active: true } }),
     ]);
-    if (!user || !plan || plan.starsPrice !== ctx.preCheckoutQuery.total_amount) {
+    if (!user || !plan || (await priceFor(user, plan)).stars !== ctx.preCheckoutQuery.total_amount) {
       return ctx.answerPreCheckoutQuery(false, 'Тариф изменился или недоступен. Откройте оплату заново.');
     }
     return ctx.answerPreCheckoutQuery(true);
