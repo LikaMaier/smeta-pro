@@ -411,8 +411,8 @@ def build(d):
     prow = [[Pc("Параметры", "tb"), ""]] + [[Pc(a), Pc(b, "tb")] for a, b in d["params"]]
     summ = [s for s in d["summary"] if s["label"] not in ("Размер в плане", "Столбов", "Плита")]
     def irows(items):
-        r = [[Pc("Итоги", "tb"), ""]] + [[Pc(s["label"]), Paragraph(f"{qty(s['value'])} {para_text(s['unit'])}", SC["tr"])] for s in items]
-        r.append([Pc("Ориентировочная стоимость", "tb"), Paragraph(f"<b>{money(d['total'])}</b>", SC["tr"])])
+        r = [[Pc("Итоги", "tb"), ""]] + [[Pc(s["label"]), Paragraph(money(s['value']) if s['unit'] == '₽' else f"{qty(s['value'])} {para_text(s['unit'])}", SC["tr"])] for s in items]
+        r.append([Pc(d.get("totalLabel") or "Ориентировочная стоимость", "tb"), Paragraph(f"<b>{money(d['total'])}</b>", SC["tr"])])
         return r
     avail = CT - CB1
     # если не помещается — сокращаем итоги, оставляя главное
@@ -505,7 +505,9 @@ def build(d):
         return out
     widths = [9 * mm, W1 - 9 * mm - 22 * mm - 18 * mm - 26 * mm - 30 * mm, 22 * mm, 18 * mm, 26 * mm, 30 * mm]
     avail = CT - CB - 16 * mm  # снизу место под «Итого»
-    for title, sel in (("Ведомость материалов", lambda l: l["type"] == "material"), ("Работы и техника", lambda l: l["type"] != "material")):
+    sections = (("Ведомость материалов", lambda l: l["type"] == "material"), ("Работы и техника", lambda l: l["type"] != "material"))
+    # hideWorks: работы не расписываем — под материалами общая сумма работ и итог
+    for title, sel in (sections[:1] if d.get("hideWorks") else sections):
         rows = sec_rows(sel)
         frame(c, d, page, title)
         start = 1
@@ -520,8 +522,13 @@ def build(d):
                 c.showPage(); page += 1; frame(c, d, page, title + " (продолжение)")
         tot = sum(l["qty"] * l["price"] for l in lines if sel(l))
         c.setFillColor(INK)
-        draw_text(c, CR, CB + 9 * mm, f"Итого: {money(tot)}", FB, 10.5, "right")
-        if title == "Работы и техника":
+        if not d.get("hideWorks"):
+            draw_text(c, CR, CB + 9 * mm, f"Итого: {money(tot)}", FB, 10.5, "right")
+        if d.get("hideWorks"):
+            works = sum(l["qty"] * l["price"] for l in lines if l["type"] != "material")
+            draw_text(c, CR, CB + 9 * mm, f"Материалы: {money(tot)}   ·   Работы: {money(works)}", FB, 10.5, "right")
+            draw_text(c, CR, CB + 2 * mm, f"Всего по проекту: {money(d['total'])}", FB, 13, "right")
+        elif title == "Работы и техника":
             draw_text(c, CR, CB + 2 * mm, f"Всего по проекту: {money(d['total'])}", FB, 13, "right")
         c.showPage(); page += 1
 
