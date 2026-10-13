@@ -52,7 +52,8 @@ export interface CanopyParams {
   ops?: OpeningSpec[] | null;
   insulate: boolean;    // утепление стен и кровли (гараж, мастерская)
   base: 'slab' | 'ushp' | 'strip' | 'piles' | 'screw' | 'deck' | 'paving' | 'floor' | 'none';
-  floorOn?: 'screw' | 'blocks'; // утеплённый пол на опорах: винтовые сваи или бетонные блоки
+  floorOn?: 'screw' | 'blocks';
+  floorTop?: 'osb' | 'board'; // чистовой пол: OSB-3 18 мм или шпунтованная доска пола 36×136 // утеплённый пол на опорах: винтовые сваи или бетонные блоки
   lining?: 'none' | 'osb' | 'vagonka'; // внутренняя обшивка при утеплении
   stripW: number; stripD: number; // ленточный: ширина и высота ленты, м
   eps: number;          // УШП: толщина ЭППС, м
@@ -1117,8 +1118,16 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     }
     b.mat('Пароизоляция пола', area * 1.15, 'м²', 25);
     b.work('Монтаж пароизоляции', area);
-    b.mat('Плита OSB-3 18 мм (чистовой пол)', area * 1.08 * k, 'м²', 760);
-    b.work('Укладка фанеры на лаги', area);
+    if (p.floorTop === 'board') {
+      // доска пола 36×136 (рабочая ширина ≈128 мм) поперёк лаг, длина 6 м
+      const rowsB = Math.ceil(W / 0.128 - 1e-9), perRow = L / 6;
+      b.mat('Доска пола шпунтованная 36×136×6000, хвоя, сорт АВ', rowsB * perRow * 1.05 * k, 'шт', 1150);
+      b.mat('Саморезы для доски пола 4,5×70 (в шпунт)', Math.ceil(rowsB * L / 0.5 / 250), 'уп', 450);
+      b.work('Настил пола из шпунтованной доски', area);
+    } else {
+      b.mat('Плита OSB-3 18 мм (чистовой пол)', area * 1.08 * k, 'м²', 760);
+      b.work('Укладка фанеры на лаги', area);
+    }
     b.mat('Антисептик для ростверка и лаг', Math.ceil((per * 0.6 + lags * W * 0.4) * 0.3), 'л', 180);
     b.work('Антисептирование древесины', per * 0.6 + lags * W * 0.4);
     b.mat('Уголки, опоры лаг, саморезы, гвозди', Math.ceil(area / 6), 'компл', 1200);
