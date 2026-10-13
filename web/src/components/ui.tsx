@@ -160,3 +160,18 @@ export class Boundary extends React.Component<{ children: React.ReactNode }, { e
     return this.props.children;
   }
 }
+
+/**
+ * Сворачиваемый блок: заголовок с короткой сводкой справа, содержимое по нажатию.
+ * Открыт/закрыт — запоминается на устройстве (по id).
+ */
+export function Fold({ id, title, summary, defaultOpen = false, children }: { id: string; title: React.ReactNode; summary?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
+  const key = `fold_${id}`;
+  const [open, setOpen] = React.useState<boolean>(() => { try { const v = localStorage.getItem(key); return v == null ? defaultOpen : v === '1'; } catch { return defaultOpen; } });
+  return (
+    <details className="fold" open={open} onToggle={(e) => { const o = (e.currentTarget as HTMLDetailsElement).open; if (o !== open) { setOpen(o); try { localStorage.setItem(key, o ? '1' : '0'); } catch { /* */ } } }}>
+      <summary>{title}{summary != null && <span className="fold-sum">{summary}</span>}</summary>
+      <div className="fold-body">{open ? children : null}</div>
+    </details>
+  );
+}

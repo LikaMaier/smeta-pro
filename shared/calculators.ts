@@ -107,7 +107,9 @@ export function normalizeValues(calc: Calculator, values: Record<string, any>): 
 export function runCalc(calc: Calculator, values: Record<string, any>) {
   const errors = validateCalc(calc, values);
   if (Object.keys(errors).length) return { errors, output: null as CalcOutput | null };
-  return { errors, output: calc.compute(normalizeValues(calc, values)) };
+  const output = calc.compute(normalizeValues(calc, values));
+  // в смету — только позиции с количеством больше нуля
+  return { errors, output: { ...output, suggestions: output.suggestions.filter((s) => Number(s.qty) > 0) } };
 }
 
 /** "6x4; 3x2,5" -> [[6,4],[3,2.5]] */
@@ -388,7 +390,7 @@ export const CALCULATORS: Calculator[] = [
       { key: 'sheetL', label: 'Длина листа', unit: 'м', min: 0.1, default: 2.5 },
       { key: 'step', label: 'Шаг стоек', unit: 'м', min: 0.1, default: 0.6 },
       { key: 'profL', label: 'Длина профиля', unit: 'м', min: 0.5, default: 3 },
-      { key: 'screws', label: 'Саморезов на 1 м² листа', unit: 'шт', min: 0, default: 30, hint: 'Ваш расход или по техкарте производителя' },
+      { key: 'screws', label: 'Саморезов на 1 м² листа', unit: 'шт', min: 0, default: 17, hint: 'Техкарта Кнауф: ≈17 шт на 1 м² листа (шаг 250 мм по стойкам через 600 мм)' },
       RESERVE,
     ],
     compute: ({ len, h, open, sides, layers, sheetW, sheetL, step, profL, screws, reserve }) => {
@@ -438,7 +440,7 @@ export const CALCULATORS: Calculator[] = [
       { key: 'step', label: 'Шаг несущих профилей ПП', unit: 'м', min: 0.1, default: 0.6 },
       { key: 'hangStep', label: 'Шаг подвесов вдоль профиля', unit: 'м', min: 0.1, default: 0.8 },
       { key: 'profL', label: 'Длина профиля', unit: 'м', min: 0.5, default: 3 },
-      { key: 'screws', label: 'Саморезов на 1 м²', unit: 'шт', min: 0, default: 30 },
+      { key: 'screws', label: 'Саморезов на 1 м² листа', unit: 'шт', min: 0, default: 23, hint: 'Техкарта Кнауф для потолка: ≈23 шт на 1 м² (шаг 170 мм)' },
       RESERVE,
     ],
     compute: ({ a, b, sheetW, sheetL, step, hangStep, profL, screws, reserve }) => {
@@ -510,7 +512,7 @@ export const CALCULATORS: Calculator[] = [
     ],
     compute: ({ per, h, rw, rl, rap }) => {
       const strip = h + rap / 100;
-      const perRoll = Math.floor(rl / strip);
+      const perRoll = strip > 0 ? Math.floor(rl / strip) : 0;
       const strips = ceil(per / rw - 1e-9);
       const w = perRoll < 1 ? ['Рулон короче одной полосы — проверьте длину рулона и высоту'] : [];
       const rolls = perRoll >= 1 ? ceil(strips / perRoll - 1e-9) : 0;
@@ -630,15 +632,18 @@ export const CALCULATORS: Calculator[] = [
   },
   {
     id: 'logs', group: 'Древесина', title: 'Брёвна',
-    description: 'Объём по формуле цилиндра',
+    description: 'Объём кругляка по ГОСТ 2708 или по цилиндру',
     fields: [
       { key: 'd', label: 'Диаметр', unit: 'см', min: 1, default: 24 },
       { key: 'l', label: 'Длина', unit: 'м', min: 0.1, default: 6 },
       { key: 'n', label: 'Количество', unit: 'шт', min: 0, default: 10, integer: true },
       { key: 'pm3', label: 'Цена за 1 м³', unit: '₽', min: 0, default: 0, optional: true },
+      { key: 'method', label: 'Как считать', type: 'select', default: 'gost', options: [{ value: 'gost', label: 'Как на складе (ГОСТ 2708, со сбегом)' }, { value: 'cyl', label: 'Цилиндр по диаметру' }] },
     ],
-    compute: ({ d, l, n, pm3 }) => {
-      const one = Math.PI * (d / 200) ** 2 * l;
+    compute: ({ d, l, n, pm3, method }) => {
+      // ГОСТ 2708: диаметр в верхнем отрубе, у хвойных сбег ≈ 0,7 см на 1 м — считаем по среднему диаметру
+      const dm = method === 'cyl' ? d : d + 0.7 * l / 2;
+      const one = Math.PI * (dm / 200) ** 2 * l;
       const v = one * n;
       return {
         rows: [
@@ -646,8 +651,8 @@ export const CALCULATORS: Calculator[] = [
           { label: 'Одно бревно', value: r(one, 4), unit: 'м³' },
           ...(pm3 ? [{ label: 'Стоимость', value: r(v * pm3, 2), unit: '₽' }] : []),
         ],
-        formula: [`V₁ = π × (${d / 100}/2)² × ${l} = ${r(one, 4)} м³`, `V = ${r(one, 4)} × ${n} = ${r(v, 3)} м³`],
-        warnings: ['Расчёт по цилиндру. Торговый объём кругляка по таблицам ГОСТ может отличаться.'],
+        formula: [...(method === 'cyl' ? [] : [`Средний диаметр = ${d} + 0,7 × ${l} / 2 = ${r(dm, 1)} см (сбег)`]), `V₁ = π × (${r(dm / 100, 3)}/2)² × ${l} = ${r(one, 4)} м³`, `V = ${r(one, 4)} × ${n} = ${r(v, 3)} м³`],
+        warnings: method === 'cyl' ? ['Цилиндр по диаметру отруба — меньше складского объёма по ГОСТ 2708.'] : ['Приближение таблиц ГОСТ 2708 для хвойных (диаметр — в верхнем отрубе). Точный объём — по таблице поставщика.'],
         suggestions: [{ name: `Бревно Ø${d} см, ${l} м`, qty: r(v, 3), unit: 'м³', type: 'material' }],
       };
     },

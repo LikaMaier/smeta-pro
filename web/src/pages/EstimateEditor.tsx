@@ -6,7 +6,7 @@ import { calcEstimate } from '../../../shared/estimate';
 import { checkEstimate } from '../../../shared/estimateCheck';
 import { payStages, DEFAULT_SCHEDULE } from '../../../shared/payments';
 import { useMe } from '../App';
-import { Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
+import { Field, Fold, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog, haptic, tg } from '../tg';
 import { normName } from '../../../shared/names';
@@ -214,6 +214,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     try { if (dirty) await save(); await fn(); if (ok) toast(ok); } catch (e: any) { toast(e.message, true); }
   };
 
+  const [folded, setFolded] = useState<Set<string>>(() => new Set());
   const order = useMemo(() => {
     if (!grouped) return [{ cat: null as string | null, items: lines }];
     const m = new Map<string, L[]>();
@@ -259,12 +260,16 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           {order.map((g) => (
             <React.Fragment key={g.cat || 'all'}>
               {g.cat && (
-                <button className="cat-head" style={{ width: '100%', background: 'none', border: 0, cursor: readOnly ? 'default' : 'pointer', font: 'inherit' }} onClick={() => !readOnly && setSecEdit(g.cat)}>
-                  <span>{g.cat}{h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!] ? ` · ×${n(h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!])}` : ''}</span>
-                  <span className="num">{rub(g.items.reduce((a, l) => a + totals.lineAmounts[idx.get(l.k)!], 0))}</span>
-                </button>
+                <div className="cat-head" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'space-between', gap: 8, background: 'none', border: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', padding: 0, textAlign: 'left' }}
+                    onClick={() => setFolded((x) => { const c = new Set(x); c.has(g.cat!) ? c.delete(g.cat!) : c.add(g.cat!); return c; })} aria-expanded={!folded.has(g.cat)}>
+                    <span>{folded.has(g.cat) ? '▸' : '▾'} {g.cat}{h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!] ? ` · ×${n(h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!])}` : ''}<span className="muted" style={{ fontWeight: 400 }}> · {g.items.length}</span></span>
+                    <span className="num">{rub(g.items.reduce((a, l) => a + totals.lineAmounts[idx.get(l.k)!], 0))}</span>
+                  </button>
+                  {!readOnly && <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Настройки раздела" onClick={() => setSecEdit(g.cat)}><Icon.more /></button>}
+                </div>
               )}
-              {g.items.map((l) => (
+              {!(g.cat && folded.has(g.cat)) && g.items.map((l) => (
                 <div key={l.k} className={`line ${l.unconfirmed ? 'unconfirmed' : ''}`}>
                   <div className="line-top">
                     <input className="line-name" value={l.name} placeholder="Название позиции" list="own-items" onChange={(e) => setName(l, e.target.value)} readOnly={readOnly} aria-label="Название" />
@@ -312,15 +317,16 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       )}
       {!readOnly && (
         <div className="grid2" style={{ marginTop: 8 }}>
-          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/calculators'); }}>🧮 Расчёты и мастера</button>
-          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/designer'); }}>📐 Проектировщик</button>
+          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/masters'); }}>👷 Посчитать мастером</button>
+          <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/tools'); }}>📐 3D-проект</button>
         </div>
       )}
 
       <h2 className="section-title">Итог</h2>
       <div className="panel">
-        <div className="dim"><div className="dim-value num">{rub(totals.total)}</div><div className="dim-label">Итого заказчику</div></div>
-        <table className="breakdown" style={{ marginTop: 16 }}>
+        <div className="dim"><div className="dim-value num">{rub(totals.total)}</div><div className="dim-label">Итого заказчику · работы {rub(totals.worksSubtotal)} · материалы {rub(totals.materialsSubtotal)}</div></div>
+        <Fold id="est-total" title="Как получилась сумма" summary={[totals.markup > 0 && 'наценка', totals.discount > 0 && 'скидка', totals.tax > 0 && 'налог'].filter(Boolean).join(', ') || 'без наценок'}>
+        <table className="breakdown">
           <tbody>
             <tr><td>Работы</td><td>{rub(totals.worksSubtotal)}</td></tr>
             <tr><td>Материалы</td><td>{rub(totals.materialsSubtotal)}</td></tr>
@@ -335,7 +341,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             <tr className="total"><td>Итого</td><td>{rub(totals.total)}</td></tr>
           </tbody>
         </table>
-        <button className="btn block" style={{ marginTop: 12 }} onClick={() => setSheet('params')} disabled={readOnly}>Скидка, наценка, налог, доставка</button>
+        </Fold>
+        <button className="btn block" style={{ marginTop: 4 }} onClick={() => setSheet('params')} disabled={readOnly}>Скидка, наценка, налог, доставка</button>
       </div>
 
       <button className="list-item panel" style={{ marginTop: 12 }} onClick={() => setSheet('pay')}>
@@ -358,15 +365,16 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           {share.customerComment && /💬/.test(share.customerComment) ? ' · есть вопросы' : ''}
         </button>
       )}
-      <div className="grid3" style={{ marginTop: 8 }}>
-        <button className="btn" disabled={pdfBusy} onClick={() => setSheet('contract')}>📝 Договор</button>
-        <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт</button>
-        <button className="btn" disabled={pdfBusy} onClick={() => sendFile('xlsx')}>📊 Excel</button>
-      </div>
-      <p className="xs muted">В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!me.access.active && ' Договор, акт и Excel — по подписке.'}</p>
+      <Fold id="est-docs" title="📝 Договор, акт, Excel" summary="для заказчика">
+        <div className="grid3">
+          <button className="btn" disabled={pdfBusy} onClick={() => setSheet('contract')}>📝 Договор</button>
+          <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт</button>
+          <button className="btn" disabled={pdfBusy} onClick={() => sendFile('xlsx')}>📊 Excel</button>
+        </div>
+        <p className="xs muted" style={{ marginBottom: 0 }}>В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!me.access.active && ' Договор, акт и Excel — по подписке.'}</p>
+      </Fold>
 
-      <h2 className="section-title">Для себя</h2>
-      <div className="panel">
+      <Fold id="est-own" title="🔒 Для себя: прибыль" summary={<span className={totals.plannedProfit < 0 ? 'neg' : ''}>{rub(totals.plannedProfit)}</span>}>
         <table className="breakdown"><tbody>
           <tr><td>Себестоимость (прямые затраты)</td><td>{rub(totals.directCost)}</td></tr>
           <tr><td>Выручка без налога</td><td>{rub(totals.revenueExTax)}</td></tr>
@@ -375,7 +383,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </tbody></table>
         {totals.linesWithoutCost > 0 && <p className="xs muted" style={{ marginBottom: 0 }}>У {totals.linesWithoutCost} поз. не указана закупочная цена — они не входят в себестоимость, прибыль может быть завышена.</p>}
         <button className="btn block" style={{ marginTop: 12 }} disabled={pdfBusy} onClick={() => sendFile('xlsxown')}>📊 Excel для себя (с прибылью)</button>
-      </div>
+      </Fold>
 
       <div className="totalbar"><div className="in">
         <div className="grow"><div className="xs muted">Итого</div><div className="sum num">{rub(totals.total)}</div></div>

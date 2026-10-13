@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { get, post, put, del, patch } from '../api';
 import { DESIGN_PRICES, DESIGN_PRICE_LABELS } from '../../../shared/design/prices';
-import { Chips, Field, NumInput, Sheet, useDebounced, useLoad, useToast } from '../components/ui';
+import { Chips, Field, Fold, NumInput, Sheet, useDebounced, useLoad, useToast } from '../components/ui';
 import { normName } from '../../../shared/names';
 import { makeVariants } from '../../../shared/design/variants';
 import CalcResult from '../components/CalcResult';
@@ -197,7 +197,7 @@ export default function Designer() {
 
       {tab === 'params' && (
         <div className="stack">
-          <div className="csection" style={{ marginTop: 0 }}>Размеры</div>
+          <Fold id="dz-size" title="Размеры и форма крыши" summary={`${params.L}×${params.W} м, ${({single:'односкатная',gable:'двускатная',hip:'четырёхскатная',arch:'арка'} as any)[base.roof]}`} defaultOpen>
           <div className="grid2">{num('L', 'Длина (по фасаду)', 'м')}{num('W', 'Глубина', 'м')}</div>
           <Field label="Кровля"><Chips value={base.roof} onChange={(v) => setB({ roof: v, ...(v !== 'single' ? { attach: false } : {}), ...(v === 'arch' ? { frame: 'steel' } : {}) })} options={[{ value: 'single', label: 'Односкатная' }, { value: 'gable', label: 'Двускатная' }, { value: 'hip', label: 'Четырёхскатная' }, { value: 'arch', label: 'Арочная' }]} /></Field>
           <div className="grid2">
@@ -227,6 +227,7 @@ export default function Designer() {
             <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.attach} onChange={(e) => setB({ attach: e.target.checked })} />Крепится к стене дома высокой стороной ({SIDE_SHORT[base.highSide]}) — без столбов у стены</label>
           )}
           {base.kind === 'visor' && <p className="xs muted" style={{ margin: 0 }}>Козырёк крепится к стене на консолях (подкосах), без столбов</p>}
+          </Fold><Fold id="dz-posts" title="Столбы" summary={`${res.info.posts} шт, шаг ${params.postStep} м, ${res.info.postProf}`}>
           {!['visor', 'lean'].includes(base.kind) && base.roof !== 'hip' && !base.attach && (
             <Field label="Расстановка столбов">
               <Chips value={base.layout} onChange={(v) => setB({ layout: v })} options={[{ value: 'perimeter', label: 'По периметру' }, { value: 'center', label: 'Один ряд по центру (консольный)' }]} />
@@ -249,6 +250,7 @@ export default function Designer() {
           {base.layout === 'perimeter' && base.roof !== 'hip' && !['visor'].includes(base.kind) && num('midRows', 'Промежуточных рядов столбов', 'шт', '0 — один пролёт; 1 и больше — многопролётный навес (стоянки, склады)')}
           <div className="grid2">{base.kind !== 'visor' && num('postStep', base.frame === 'wood' && params.postStep <= 0.8 ? 'Шаг стоек каркаса' : 'Шаг столбов, до', 'м', base.frame === 'wood' ? '0,6 м — каркасная стена из доски 50×100 (бытовка, хозблок)' : undefined)}{num('overhang', 'Свес кровли', 'м')}</div>
           {res.info.posts > 0 && <Field label={res.info.wood ? 'Сечение столба (брус)' : 'Сечение столба (профтруба)'}><PostSize a={base.postA} b={base.postB} t={base.postT} wood={res.info.wood} auto={(res.info as any).postRec || res.info.postProf} onChange={(x) => setB(x)} /></Field>}
+          </Fold><Fold id="dz-cover" title="Каркас, кровля и цвет" summary={`${base.frame === 'wood' ? 'дерево' : 'металл'}, ${({ prof: 'профнастил', tile: 'металлочерепица', soft: 'гибкая черепица', poly: 'поликарбонат', sandwich: 'сэндвич', slats: 'ламели', none: 'без кровли' } as any)[base.cover]}, ${base.color === 'none' ? 'без покраски' : base.color}`}>
           {base.roof !== 'arch' && <Field label="Каркас"><Chips value={base.frame} onChange={(v) => setB({ frame: v })} options={[{ value: 'steel', label: 'Металл (профтруба)' }, { value: 'wood', label: 'Дерево (брус)' }]} /></Field>}
           <Field label="Покрытие кровли"><Chips value={base.cover} onChange={(v) => setB({ cover: v })} options={[{ value: 'prof', label: 'Профнастил' }, { value: 'tile', label: 'Металлочерепица' }, { value: 'soft', label: 'Гибкая черепица' }, { value: 'poly', label: 'Поликарбонат' }, { value: 'sandwich', label: 'Сэндвич' }, { value: 'slats', label: 'Ламели (пергола)' }, { value: 'none', label: 'Без кровли' }]} /></Field>
           {base.cover === 'prof' && base.roof !== 'arch' && <Field label="Марка профнастила" hint="С-8 — дешевле, нужна частая обрешётка и уклон от 10°; НС-35 — для больших пролётов и малых уклонов"><Chips value={base.profGrade} onChange={(v) => setB({ profGrade: v })} options={[{ value: 'C8', label: 'С-8' }, { value: 'C20', label: 'С-20' }, { value: 'HC35', label: 'НС-35' }]} /></Field>}
@@ -261,7 +263,7 @@ export default function Designer() {
             </div>
           </Field>
 
-          <div className="csection">Стены</div>
+          </Fold><Fold id="dz-walls" title="Стены" summary={[...new Set(Object.values(base.walls).map((w) => WALL_LABEL[w as Wall]))].join(', ')}>
           {SIDES.map(({ s, label }) => base.attach && s === base.highSide ? <Field key={s} label={label}><div className="small muted">стена дома</div></Field> : (
             <Field key={s} label={label}>
               <select className="select" value={base.walls[s]} onChange={(e) => setWall(s, e.target.value as Wall)}>
@@ -271,7 +273,7 @@ export default function Designer() {
           ))}
           {Object.values(base.walls).some((w) => w === 'prof' || w === 'prof_mesh') && num('profH', 'Высота профлиста', 'м')}
 
-          <div className="csection">Совмещённый объект</div>
+          </Fold><Fold id="dz-block" title="Совмещённый объект" summary={parseNum(nums.block) > 0 ? `блок ${nums.block} м` : 'нет'}>
           <p className="xs muted" style={{ margin: 0 }}>Часть по длине — закрытый блок (хозблок, гараж, кухня, подсобка, отсек КГМ), остальное — открытый навес под одной крышей. Ворота и дверь ставятся в блок.</p>
           <div className="grid2">
             {num('block', 'Длина закрытого блока', 'м', '0 — без блока')}
@@ -285,7 +287,7 @@ export default function Designer() {
             </Field>
           )}
 
-          <div className="csection">Ворота, двери и окна</div>
+          </Fold><Fold id="dz-ops" title="Ворота, двери и окна" summary={res.openings.length ? `${res.openings.length} шт` : 'нет'}>
           <OpeningsEditor p={params} res={res} onChange={(patch) => setB(patch)} />
           {base.gate !== 'none' && !Array.isArray(base.ops) && <div className="grid2">{num('gateW', 'Ширина ворот', 'м')}{num('gateH', 'Высота ворот', 'м')}</div>}
           {Object.values(base.walls).some((w) => w === 'prof_full' || w === 'prof' || w === 'wood') && (
@@ -293,7 +295,7 @@ export default function Designer() {
           )}
           {base.insulate && <Field label="Внутренняя обшивка"><Chips value={base.lining || 'none'} onChange={(v) => setB({ lining: v })} options={[{ value: 'none', label: 'Без обшивки' }, { value: 'vagonka', label: 'Вагонка' }, { value: 'osb', label: 'OSB 12 мм' }]} /></Field>}
 
-          <div className="csection">Основание</div>
+          </Fold><Fold id="dz-base" title="Основание" summary={({ slab: 'плита', ushp: 'УШП', strip: 'лента', piles: 'сваи ТИСЭ', screw: 'винтовые сваи', deck: 'настил', paving: 'плитка', floor: 'утеплённый пол', none: 'нет' } as any)[base.base]}>
           <Chips value={base.base} onChange={(v) => setB({ base: v })} options={[{ value: 'slab', label: 'Бетонная плита' }, { value: 'ushp', label: 'УШП (тёплая плита)' }, { value: 'strip', label: 'Ленточный' }, { value: 'piles', label: 'Буронабивные сваи' }, { value: 'screw', label: 'Винтовые сваи' }, { value: 'deck', label: 'Настил на винтовых сваях' }, { value: 'paving', label: 'Тротуарная плитка' }, { value: 'floor', label: 'Утеплённый пол на опорах' }, { value: 'none', label: 'Нет' }]} />
           {base.base === 'floor' && <Field label="Опоры под ростверк" hint="Ростверк — брус 150×150, лаги 50×150 через 0,5 м, черновой пол, мембрана, утеплитель, пароизоляция, OSB 18 мм"><Chips value={base.floorOn || 'screw'} onChange={(v) => setB({ floorOn: v })} options={[{ value: 'screw', label: 'Винтовые сваи' }, { value: 'blocks', label: 'Бетонные блоки' }]} /></Field>}
           {base.base === 'strip' && <div className="grid2">{num('stripW', 'Ширина ленты', 'мм')}{num('stripD', 'Высота ленты', 'мм', 'из них 200 мм над землёй')}</div>}
@@ -306,7 +308,7 @@ export default function Designer() {
               <Field label="Арматура"><Chips value={base.rebar} onChange={(v) => setB({ rebar: v })} options={[{ value: 'composite', label: 'Композитная' }, { value: 'steel', label: 'Стальная А500' }]} /></Field>
             </>
           )}
-          <div className="csection">Дополнительно</div>
+          </Fold><Fold id="dz-extra" title="Дополнительно" summary={[base.gutter && 'водосток', base.snowGuard && 'снегозадержатели', base.lights > 0 && `свет ${base.lights}`].filter(Boolean).join(', ') || `снег ${params.snow}`}>
           <Field label="Связи жёсткости" hint="Крестовые связи в крайних пролётах стен и по кровле. «Авто» — при высоте от 3,2 м или длине от 12 м"><Chips value={base.ties} onChange={(v) => setB({ ties: v })} options={[{ value: 'auto', label: 'авто' }, { value: 'yes', label: 'да' }, { value: 'no', label: 'нет' }]} /></Field>
           <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.curb} onChange={(e) => setB({ curb: e.target.checked })} />Бордюр по периметру (кроме въезда)</label>
           <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={base.bumpers} onChange={(e) => setB({ bumpers: e.target.checked })} />Колесоотбойники у столбов{base.kind === 'tko' ? ' и отбойник для контейнеров вдоль стен' : ''}</label>
@@ -319,6 +321,7 @@ export default function Designer() {
             <datalist id="dz-cities">{CITIES.map((c) => <option key={c.name} value={c.name} />)}</datalist>
           </Field>
           <div className="grid2">{num('snow', 'Снеговой район', '1–8')}{num('waste', 'Запас материалов', '%')}</div>
+          </Fold>
         </div>
       )}
 
@@ -358,7 +361,7 @@ export default function Designer() {
         <CalcResult calcId="design-canopy" suggestions={res.lines as any} estimateTitle={title} onAdded={linkToEstimate} />
       )}
 
-      {res.warnings.map((w) => <div key={w} className="dz-warn">{w}</div>)}
+      {res.warnings.length > 0 && <Fold id="dz-warn" title="⚠️ Подсказки и замечания" summary={`${res.warnings.length}`}>{res.warnings.map((w) => <div key={w} className="dz-warn" style={{ margin: 0 }}>{w}</div>)}</Fold>}
 
       <div className="stack" style={{ marginTop: 12 }}>
         <button className="btn primary block lg" disabled={busy === 'share'} onClick={openShare}>{busy === 'share' ? 'Готовлю ссылку…' : '🧊 3D-ссылка для заказчика'}</button>

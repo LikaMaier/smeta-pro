@@ -10,6 +10,8 @@ import type { CalcField } from './calculators';
 const S = new Map(STARTER_PRICES.map((p) => [p.name, p]));
 const ceil = Math.ceil;
 const r2 = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
+/** Штучные единицы: количество всегда целое */
+export const COUNT_UNIT = /^(шт|лист|меш|банка|рулон|компл|баллон|ведро|упак|пачка|рейс|катушка)/;
 export const MAT_NOTE = 'Примерная цена материала — проверьте у поставщика';
 
 export interface MLine {
@@ -34,14 +36,22 @@ export class Builder {
     if (!(qty > 0)) return this;
     const type = s.category === 'Аренда техники' ? 'equipment' : s.category === 'Доставка' || name.startsWith('Вывоз') ? 'service' : 'work';
     const k = (opts.k || 1) * (type === 'work' ? this.k : 1);
-    this.lines.push({
+    return this.push({
       name, qty: r2(qty), unit: s.unit, type, price: Math.round(s.price * k), category: this.section,
       composition: COMPOSITIONS[name]?.join('\n'), note: [opts.note, type === 'work' && this.k !== 1 ? this.kNote : ''].filter(Boolean).join('; ') || undefined,
     });
-    return this;
   }
   mat(name: string, qty: number, unit: string, price: number, composition?: string) {
-    if (qty > 0) this.lines.push({ name, qty: r2(qty), unit, type: 'material', price, category: `${this.section}: материалы`, note: MAT_NOTE, composition });
+    // штучное (шт, лист, мешок, рулон…) — только целыми, с округлением вверх
+    const q = COUNT_UNIT.test(unit) ? Math.ceil(r2(qty) - 1e-9) : r2(qty);
+    if (q > 0) this.push({ name, qty: q, unit, type: 'material', price, category: `${this.section}: материалы`, note: MAT_NOTE, composition });
+    return this;
+  }
+  /** Одинаковые позиции (название, единица, цена, раздел) складываются в одну строку */
+  private push(l: MLine) {
+    const same = this.lines.find((x) => x.name === l.name && x.unit === l.unit && x.type === l.type && x.price === l.price && x.category === l.category);
+    if (same) { same.qty = r2(same.qty + l.qty); if (l.note && !String(same.note || '').includes(l.note)) same.note = [same.note, l.note].filter(Boolean).join('; '); }
+    else this.lines.push(l);
     return this;
   }
   sum(label: string, value: number, unit: string) { this.summary.push({ label, value: r2(value, 1), unit }); return this; }

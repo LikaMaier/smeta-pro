@@ -3,19 +3,18 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../components/ui';
 
 const ITEMS = [
-  { to: '/calculators', icon: Icon.calc, title: 'Расчёты', text: 'Мастера под ключ и быстрые калькуляторы' },
-  { to: '/landscape', icon: Icon.calc, title: 'Благоустройство', text: 'План участка, септик, газгольдер, заборы в 3D' },
+  { to: '/catalog', icon: Icon.book, title: 'Справочник цен', text: 'Мои расценки на работы и материалы' },
   { to: '/finance', icon: Icon.money, title: 'Финансы', text: 'Прибыль и долги по всем объектам' },
   { to: '/contacts', icon: Icon.book, title: 'Записная книжка', text: 'Все телефоны: заказчики, техника, рабочие' },
   { to: '/reminders', icon: Icon.history, title: 'Напоминания', text: 'Бот напишет в нужное время' },
-  { to: '/assistant', icon: Icon.mic, title: 'ИИ-помощник', text: 'Скоро: сметы по голосу и тексту' },
-  { to: '/settings', icon: Icon.gear, title: 'Настройки и подписка', text: 'Тариф, ИИ, реквизиты' },
+  { to: '/tools', icon: Icon.calc, title: '3D и расчёты', text: 'Постройки, заборы, электрика, мастера, калькуляторы' },
+  { to: '/settings', icon: Icon.gear, title: 'Настройки и подписка', text: 'Тариф, оформление, логотип, реквизиты' },
 ];
 
 export default function More() {
   return (
     <>
-      <h1 className="page-title">Ещё</h1>
+      <h1 className="page-title">Справочник и ещё</h1>
       <div className="list">
         {ITEMS.map((i) => (
           <Link key={i.to} to={i.to} className="list-item">

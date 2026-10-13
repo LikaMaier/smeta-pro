@@ -64,6 +64,7 @@ export default function Estimates() {
       <Sheet open={newOpen} onClose={() => setNewOpen(false)} title="Новая смета">
         <button className="btn primary block lg" onClick={() => create()}>Пустая смета</button>
         <button className="btn block" style={{ marginTop: 10 }} onClick={() => nav('/masters')}>👷 Мастера: забор, плитка, кровля, электрика…</button>
+        <button className="btn block" style={{ marginTop: 10 }} onClick={() => nav('/tools')}>📐 По 3D-проекту: навес, бытовка, забор, электрика</button>
         <ImportButton onDone={(id) => nav(`/estimates/${id}`)} />
         <h4 className="muted small" style={{ margin: '20px 0 8px' }}>Готовые шаблоны</h4>
         <div className="list">

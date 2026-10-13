@@ -78,7 +78,8 @@ export function fenceEstimate(i: FenceInput): { lines: FenceLine[]; summary: { l
   const lines: FenceLine[] = [];
   const warnings: string[] = [];
   const mat = (name: string, qty: number, unit: string, price: number, composition?: string) => {
-    if (qty > 0) lines.push({ name, qty: r(qty), unit, type: 'material', price, category: C, note: NOTE, composition });
+    const q = /^(шт|лист|меш|банка|рулон|компл|ведро|упак)/.test(unit) ? Math.ceil(r(qty) - 1e-9) : r(qty);
+    if (q > 0) lines.push({ name, qty: q, unit, type: 'material', price, category: C, note: NOTE, composition });
   };
   const work = (name: string, qty: number, unit: string, price: number, composition?: string) => {
     if (qty > 0) lines.push({ name, qty: r(qty), unit, type: 'work', price, category: C, composition });
