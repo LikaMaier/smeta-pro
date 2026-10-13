@@ -38,7 +38,13 @@ type Tab = 'params' | 'draw' | 'steel' | 'var' | 'est';
 export default function Designer() {
   const toast = useToast();
   const { me, refreshMe } = useMe();
-  const saved0 = useMemo(() => { try { return JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch { return null; } }, []);
+  const saved0 = useMemo(() => {
+    // ?preset=bytovka — из мастера «Новая смета»: открываем выбранную постройку
+    const pid = new URLSearchParams(location.search).get('preset');
+    const pr = pid ? PRESETS.find((x) => x.id === pid) : null;
+    if (pr) return { p: pr.p, title: pr.title, id: null };
+    try { return JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch { return null; }
+  }, []);
   const [base, setBase] = useState<CanopyParams>(() => full(saved0?.p || CANOPY_DEFAULT));
   const [nums, setNums] = useState<Record<NumKey, string>>(() => toStr(full(saved0?.p || CANOPY_DEFAULT)));
   const [title, setTitle] = useState<string>(saved0?.title || PRESETS.find((x) => x.id === 'tko')!.title);

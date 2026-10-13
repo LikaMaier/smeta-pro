@@ -6,6 +6,7 @@ import { useMe } from '../App';
 import { Field, Icon, NumInput, Sheet, State, useLoad, useToast } from '../components/ui';
 import { n, rub, parseNum, TYPE_LABEL } from '../format';
 import CalcResult from '../components/CalcResult';
+import { parseSet } from '../../../shared/directions';
 
 export { default } from './Masters';
 import { COVERED_BY_MASTER } from './Masters';
@@ -20,7 +21,9 @@ export function CalculatorPage() {
   const [values, setValues] = useState<Record<string, any>>(() => {
     const d: Record<string, any> = {};
     calc?.fields.forEach((f) => (d[f.key] = f.default ?? ''));
-    return { ...d, ...(saved.values || saved) };
+    // ?set=obj:bath — вид работы выбран в мастере «Новая смета»
+    const preset = parseSet(new URLSearchParams(location.search).get('set'));
+    return { ...d, ...(saved.values || saved), ...preset };
   });
   const [price, setPrice] = useState<string>(saved.price ?? '');
   const [touched, setTouched] = useState(false);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ShopLink from '../components/ShopLink';
+import { materialVariants, currentTier } from '../../../shared/materialTiers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { get, post, put, del } from '../api';
 import { calcEstimate } from '../../../shared/estimate';
@@ -58,6 +59,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [grouped, setGrouped] = useState(() => initial.lines.some((l: any) => l.category));
   const [restore, setRestore] = useState<any>(null);
   const saving = useRef(false);
+  // из «Новой сметы → Другое»: сразу поиск по справочнику
+  useEffect(() => { if (new URLSearchParams(location.search).get('add') === '1' && !initial.lines.length) setSheet('add'); }, []); // eslint-disable-line
 
   // Восстановление незавершённого ввода
   useEffect(() => {
@@ -244,6 +247,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
         <Icon.chevron className="chev" width={20} />
       </button>
+      {lines.length > 0 && (
+        <div className="grid2 quick-acts">
+          <button className="btn sm" disabled={pdfBusy} onClick={() => sendPdf()}>📄 {pdfBusy ? 'Готовлю…' : 'PDF клиенту'}</button>
+          <button className="btn sm" onClick={() => setSheet('head')}>📁 {initial.project ? 'Объект' : 'В объект'}</button>
+        </div>
+      )}
 
       <div className="row between" style={{ marginBottom: 8 }}>
         <span className="xs muted">{readOnly ? 'Только просмотр' : saveState === 'saving' ? 'Сохраняю…' : saveState === 'error' ? 'Не сохранено' : dirty ? 'Есть изменения' : 'Сохранено'}</span>
@@ -525,6 +534,19 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         {current && (
           <div className="stack">
             <Field label="Название"><input className="input" value={current.name} list="own-items" onChange={(e) => setName(current, e.target.value)} readOnly={readOnly} /></Field>
+            {current.type === 'material' && !readOnly && (() => {
+              const vs = materialVariants(current.name, parseNum(current.price));
+              if (!vs.length) return null;
+              const t = currentTier(current.name);
+              return (
+                <div>
+                  <div className="xs muted" style={{ marginBottom: 4 }}>Вариант материала</div>
+                  <div className="tier-row" role="radiogroup" aria-label="Вариант материала">
+                    {vs.map((v) => <button key={v.tier} role="radio" aria-checked={t === v.tier} className={t === v.tier ? 'on' : ''} onClick={() => setLine(current.k, { name: v.name, price: String(v.price), costPrice: current.costPrice ? String(v.price) : current.costPrice })}>{v.label}<b className="num">{rub(v.price)}</b></button>)}
+                  </div>
+                </div>
+              );
+            })()}
             {(current.type === 'material' || current.matPrice !== '') && current.name.trim() && <ShopLink name={current.name} block label="🛒 Найти в «Петровиче» — цена и наличие" />}
             <div className="grid2">
               <Field label="Тип"><select className="select" value={current.type} onChange={(e) => setLine(current.k, { type: e.target.value })} disabled={readOnly}>{Object.entries(TYPE_LABEL).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></Field>

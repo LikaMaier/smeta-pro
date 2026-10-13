@@ -5,7 +5,6 @@ import { useMe } from '../App';
 import { useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import Hero from '../components/Hero';
-import Onboarding from '../components/Onboarding';
 
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const MONTH_NAME = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString('ru-RU', { month: 'long' });
@@ -31,20 +30,19 @@ export default function Home() {
 
   return (
     <>
-      <Link to="/calendar" style={{ display: 'block' }}>
+      {(me.access.estimateCount ?? 0) > 0 && <Link to="/calendar" style={{ display: 'block' }}>
         <Hero
           title={<>Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span></>}
           sub={me.access.mode === 'subscription' || me.access.mode === 'team' ? `Тариф «${me.plan?.label || 'Про'}» до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный «Про»: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? `Бесплатных смет осталось: ${me.access.freeLeft ?? 3} из ${me.access.freeLimit ?? 3}` : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатные сметы использованы — оформите подписку'}
         />
-      </Link>
+      </Link>}
 
-      <button className="tile wide home-new" onClick={() => nav(canCreate ? '/estimates?new=1' : '/settings')}>
+      <button className="tile wide home-new" onClick={() => nav(canCreate ? '/new' : '/settings')}>
         <span className="home-new-plus" aria-hidden="true">+</span>
         Новая смета
-        <small>{!me.access.active && me.access.freeEstimateLeft ? `бесплатно: осталось ${me.access.freeLeft ?? 3} из ${me.access.freeLimit ?? 3}` : 'пустая, по шаблону, мастером или по 3D-проекту'}</small>
+        <small>{!me.access.active && me.access.freeEstimateLeft ? `бесплатно: осталось ${me.access.freeLeft ?? 3} из ${me.access.freeLimit ?? 3}` : 'выберите направление — смета соберётся сама'}</small>
       </button>
 
-      {(me.access.estimateCount ?? 0) === 0 && <div style={{ marginTop: 10 }}><Onboarding onTemplate={() => nav('/estimates?new=1')} /></div>}
 
       {last.length > 0 && (
         <>

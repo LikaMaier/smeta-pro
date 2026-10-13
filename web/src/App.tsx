@@ -27,6 +27,7 @@ import FenceDesigner from './pages/FenceDesigner';
 import SitePlan from './pages/SitePlan';
 import MepDesigner from './pages/MepDesigner';
 import Tools from './pages/Tools';
+import NewEstimate from './pages/NewEstimate';
 import Contacts from './pages/Contacts';
 import { applyTheme } from './theme';
 
@@ -47,7 +48,7 @@ function titleOf(path: string): string {
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
     estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', new: 'Новая смета', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[2] === 'acts') return 'Акты';
@@ -156,6 +157,7 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/settings" element={<Settings />} />
               <Route path="/more" element={<More />} />
               <Route path="/tools" element={<Tools />} />
+              <Route path="/new" element={<NewEstimate />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/reminders" element={<Reminders />} />
               <Route path="/contacts" element={<Contacts />} />

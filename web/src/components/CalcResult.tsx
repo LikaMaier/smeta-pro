@@ -6,6 +6,7 @@ import { NumInput, useLoad, useToast } from './ui';
 import { n, rub, parseNum, TYPE_LABEL } from '../format';
 import { haptic } from '../tg';
 import { normName } from '../../../shared/names';
+import { materialVariants, TIER_LABEL, type Tier } from '../../../shared/materialTiers';
 
 /**
  * Редактируемый результат мастера / калькулятора.
@@ -30,6 +31,9 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // класс материалов: эконом / стандарт / премиум — для всех строк сразу и для каждой отдельно
+  const [tier, setTierAll] = useState<Tier>(() => { try { return (localStorage.getItem('smeta_tier') as Tier) || 'std'; } catch { return 'std'; } });
+  const [rowTier, setRowTier] = useState<Record<string, Tier>>({});
 
   // ключ строки: название + номер повтора (одинаковые названия в разных разделах)
   const keyed = useMemo(() => {
@@ -52,7 +56,11 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
 
   const cat = useMemo(() => new Map((items.data || []).map((i: any) => [normName(i.name), i])), [items.data]);
 
-  const rows = keyed.map((s) => {
+  const rows = keyed.map((s0) => {
+    const variants = s0.type === 'material' && s0.price ? materialVariants(s0.name, s0.price) : [];
+    const t = rowTier[s0.key] ?? tier;
+    const v = variants.find((x) => x.tier === t);
+    const s = v ? { ...s0, name: v.name, price: v.price } : s0;
     const o = ovr[s.key] || {};
     const mine = cat.get(normName(s.name));
     const remembered = myPrices[s.name];
@@ -62,9 +70,11 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
     const qty = o.qty ?? String(s.qty);
     const on = !o.off;
     const sum = on ? Math.round(parseNum(qty) * parseNum(price) * 100) / 100 : 0;
-    return { ...s, baseQty: s.qty, o, mine, price, qty, on, sum, src, edited: o.price != null && o.price !== defPrice, qtyEdited: o.qty != null && parseNum(o.qty) !== s.qty };
+    return { ...s, variants, tier: t, baseQty: s.qty, o, mine, price, qty, on, sum, src, edited: o.price != null && o.price !== defPrice, qtyEdited: o.qty != null && parseNum(o.qty) !== s.qty };
   });
 
+  const chooseAll = (t: Tier) => { setTierAll(t); setRowTier({}); setOvr((x) => Object.fromEntries(Object.entries(x).map(([k, o]) => [k, { ...o, price: undefined }]))); try { localStorage.setItem('smeta_tier', t); } catch { /* */ } };
+  const chooseRow = (key: string, t: Tier) => { setRowTier((x) => ({ ...x, [key]: t })); setOvr((x) => ({ ...x, [key]: { ...x[key], price: undefined } })); };
   const set = (key: string, patch: Partial<Ovr>, baseQty?: number) => setOvr((x) => ({ ...x, [key]: { ...x[key], ...patch, ...(baseQty != null ? { base: baseQty } : {}) } }));
   const total = rows.reduce((a, r) => a + r.sum, 0);
   const mats = rows.filter((r) => r.type === 'material').reduce((a, r) => a + r.sum, 0);
@@ -109,6 +119,14 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
     <div className="calc-result">
       <div className="csection">Работы и материалы — можно менять</div>
       <p className="xs muted" style={{ margin: '4px 0 8px' }}>Цена: <span className="src own">мой прайс</span> — из вашего справочника, <span className="src store">цена магазина</span> / <span className="src store">примерная</span> — ориентировочно по рынку. Меняйте количество и цену — итог пересчитается.</p>
+      {rows.some((r) => r.variants.length) && (
+        <div className="tier-all">
+          <span className="small">Материалы:</span>
+          <div className="seg" role="radiogroup" aria-label="Класс материалов">
+            {(['eco', 'std', 'prem'] as Tier[]).map((t) => <button key={t} role="radio" aria-checked={tier === t} className={tier === t ? 'on' : ''} onClick={() => chooseAll(t)}>{TIER_LABEL[t]}</button>)}
+          </div>
+        </div>
+      )}
       <div className="row wrap" style={{ gap: 6, marginBottom: 8 }}>
         <button className="btn sm" onClick={() => setOvr((x) => Object.fromEntries(rows.map((r) => [r.key, { ...x[r.key], off: false }])))}>Все</button>
         <button className="btn sm" onClick={() => setOvr((x) => Object.fromEntries(rows.map((r) => [r.key, { ...x[r.key], off: r.type === 'material' }])))}>Только работы</button>
@@ -127,6 +145,11 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
                 </button>
                 <b className="num cr-sum">{rub(r.sum)}</b>
               </div>
+              {r.variants.length > 0 && r.on && (
+                <div className="tier-row" role="radiogroup" aria-label={`Вариант: ${r.name}`}>
+                  {r.variants.map((v) => <button key={v.tier} role="radio" aria-checked={r.tier === v.tier} className={r.tier === v.tier ? 'on' : ''} onClick={() => chooseRow(r.key, v.tier)}>{v.label}<b className="num">{rub(v.price)}</b></button>)}
+                </div>
+              )}
               {open[r.key] && r.composition && <div className="xs muted" style={{ padding: '2px 0 4px 30px', whiteSpace: 'pre-wrap' }}>в составе: {r.composition.split('\n').join('; ')}</div>}
               <div className="cr-grid">
                 <NumInput value={r.qty} onChange={(v) => set(r.key, { qty: v }, r.baseQty)} unit={r.unit} aria-label={`Количество: ${r.name}`} />

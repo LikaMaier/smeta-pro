@@ -471,3 +471,28 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
 .proj-kpi b { font-size: 15px; overflow-wrap: anywhere; }
 .fold > summary:not(:has(.fold-sum))::after { margin-left: auto; }
 .save-prices small { white-space: normal; }
+
+/* ---- Новая смета: направления ---- */
+.dir-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.dir-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; min-height: 96px; padding: 12px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--tile-border); color: var(--text); font: inherit; cursor: pointer; }
+.dir-tile:active { transform: scale(.98); }
+.dir-tile .dir-ico { font-size: 26px; line-height: 1; margin-bottom: 4px; }
+.dir-tile .dir-t { font-weight: 700; font-size: 16px; }
+.dir-tile small { color: var(--muted); font-size: 12px; line-height: 1.25; }
+.dir-tile.other { border-style: dashed; }
+.quick-acts { margin: -4px 0 10px; }
+
+/* ---- Варианты материала: эконом / стандарт / премиум ---- */
+.tier-all { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { background: none; border: 0; color: var(--text); font: inherit; font-size: 14px; padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.tier-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 2px 0 6px 30px; }
+.sheet .tier-row, .stack .tier-row { margin-left: 0; }
+.tier-row button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 4px; border-radius: 8px; border: 1px solid var(--line);
+  background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.tier-row button b { color: var(--text); font-size: 13px; font-weight: 600; }
+.tier-row button.on { border-color: var(--accent); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.dir-head { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 800; margin: 2px 0 4px; }
