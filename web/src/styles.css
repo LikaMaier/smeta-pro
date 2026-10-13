@@ -282,11 +282,11 @@ h1.page-title { display: none; }
 .box .line2 { display: block; }
 
 /* Строка калькулятора: подпись — крупное жёлтое поле — единица */
-.crow { display: grid; grid-template-columns: 1fr minmax(110px, 1.05fr) 44px; align-items: end; gap: 10px; padding: 10px 0; }
+.crow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, 1.05fr) 44px; align-items: end; gap: 10px; padding: 10px 0; }
 .crow > .lbl { font-size: 19px; font-weight: 700; font-style: italic; color: var(--text); line-height: 1.15; padding-bottom: 6px; }
 .crow > .lbl.boxed { border: 1.5px solid var(--tile-border); border-radius: 4px; padding: 10px 6px; text-align: center; color: var(--accent); font-size: 17px; }
 .crow > .unit { font-size: 18px; font-weight: 700; font-style: italic; color: var(--text); padding-bottom: 8px; }
-.cinput { width: 100%; background: transparent; border: 0; border-bottom: 1.5px solid var(--muted); color: var(--accent); font-size: 28px; font-weight: 700;
+.cinput { width: 100%; min-width: 0; text-overflow: ellipsis; background: transparent; border: 0; border-bottom: 1.5px solid var(--muted); color: var(--accent); font-size: 28px; font-weight: 700;
   text-align: center; padding: 4px 0 6px; outline: none; border-radius: 0; font-variant-numeric: tabular-nums; }
 .cinput:focus { border-bottom-color: var(--accent); }
 .cinput.invalid { border-bottom-color: var(--bad); }

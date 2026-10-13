@@ -38,7 +38,7 @@ export default function AdminPromos() {
                   <div><span className="xs muted">Выручка</span><b className="num">{rub(p.revenue.rub)}{p.revenue.stars ? ` + ${p.revenue.stars} ⭐` : ''}</b></div>
                 </div>
                 <div className="small">Блогеру за всё время: <b>{rub(p.commission.rub)}{p.commission.stars ? ` + ${p.commission.stars} ⭐` : ''}</b> · в этом месяце: {rub(p.commissionMonth.rub)}{p.commissionMonth.stars ? ` + ${p.commissionMonth.stars} ⭐` : ''}</div>
-                {p.link && <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                {p.link && <div className="row wrap" style={{ gap: 6, marginTop: 8 }}>
                   <button className="btn sm" onClick={() => copy(p.link)}>Скопировать ссылку</button>
                   <button className="btn sm" onClick={() => { const u = `https://t.me/share/url?url=${encodeURIComponent(p.link)}&text=${encodeURIComponent(`Ваша ссылка и промокод ${p.code} для подписчиков СМЕТА PRO`)}`; if (tg?.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank'); }}>Отправить блогеру</button>
                 </div>}

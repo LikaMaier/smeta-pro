@@ -247,7 +247,10 @@ export function render3d(res: RenderRes, yawDeg = -35, pitchDeg = 28, width = 80
   const ls = lines3.map((l) => { const a = cam(l.a), b = cam(l.b); return { ...l, ca: a, cb: b, d: l.ground ? 1e9 - 0.5 : (a.d + b.d) / 2 }; });
   const xs = [...all.flatMap((f) => f.cs.map((c) => c.sx)), ...ls.flatMap((l) => [l.ca.sx, l.cb.sx])];
   const ys = [...all.flatMap((f) => f.cs.map((c) => c.sy)), ...ls.flatMap((l) => [l.ca.sy, l.cb.sy])];
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  // без Math.min(...arr): у длинных заборов десятки тысяч точек — переполнение стека
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const v of xs) { if (v < minX) minX = v; if (v > maxX) maxX = v; }
+  for (const v of ys) { if (v < minY) minY = v; if (v > maxY) maxY = v; }
   const scale = Math.min((width * 0.92) / (maxX - minX || 1), (height * 0.92) / (maxY - minY || 1));
   const ox = (width - (maxX - minX) * scale) / 2, oy = (height - (maxY - minY) * scale) / 2;
   const S = (c: { sx: number; sy: number }): [number, number] => [Math.round((ox + (c.sx - minX) * scale) * 10) / 10, Math.round((height - oy - (c.sy - minY) * scale) * 10) / 10];

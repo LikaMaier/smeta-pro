@@ -168,6 +168,7 @@ function TeamPanel() {
       <h2 className="section-title">Бригада · {1 + d.members.length} из {d.seats}</h2>
       <div className="panel stack">
         <p className="small muted" style={{ margin: 0 }}>Пригласите до {d.seats - 1} человек: у них будут все возможности тарифа и ваш справочник цен.</p>
+        {1 + d.members.length > d.seats && <div className="dz-warn">В бригаде {1 + d.members.length} чел., а тариф — на {d.seats}. Выберите тариф на больше человек или уберите лишних.</div>}
         {d.members.length > 0 && (
           <div className="list">
             {d.members.map((m: any) => (

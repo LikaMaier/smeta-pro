@@ -577,7 +577,7 @@ export function buildMep(p0: Partial<MepParams>) {
 
   const area = p.rooms.reduce((a, r) => a + r.w * r.d, 0);
   const xs = p.rooms.flatMap((r) => [r.x, r.x + r.w]), ys = p.rooms.flatMap((r) => [r.y, r.y + r.d]);
-  const L = Math.max(1, Math.max(...xs, 1) - Math.min(...xs, 0)), Wd = Math.max(1, Math.max(...ys, 1) - Math.min(...ys, 0));
+  const L = Math.max(1, xs.reduce((a: number, v: number) => Math.max(a, v), 1) - xs.reduce((a: number, v: number) => Math.min(a, v), 0)), Wd = Math.max(1, ys.reduce((a: number, v: number) => Math.max(a, v), 1) - ys.reduce((a: number, v: number) => Math.min(a, v), 0));
   const summary = [
     { label: 'Площадь', value: Math.round(area * 10) / 10, unit: 'м²' },
     { label: 'Электроточек', value: elPts.length, unit: 'шт' },

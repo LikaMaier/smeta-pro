@@ -1,6 +1,7 @@
 import { roundTo } from './money';
 import { fenceEstimate, FENCE_TYPES, MOUNTS } from './fence';
 import { MASTERS } from './masters';
+import { guessPrice } from './priceGuess';
 
 /**
  * Реестр строительных калькуляторов.
@@ -109,7 +110,13 @@ export function runCalc(calc: Calculator, values: Record<string, any>) {
   if (Object.keys(errors).length) return { errors, output: null as CalcOutput | null };
   const output = calc.compute(normalizeValues(calc, values));
   // в смету — только позиции с количеством больше нуля
-  return { errors, output: { ...output, suggestions: output.suggestions.filter((s) => Number(s.qty) > 0) } };
+  // без цены — подставляем ориентировочную (справочник работ / средняя розница), с пометкой
+  const suggestions = output.suggestions.filter((s) => Number(s.qty) > 0).map((s) => {
+    if (s.price != null) return s;
+    const g = guessPrice(s.name, s.unit, s.type);
+    return g == null ? s : { ...s, price: g, note: s.note || 'Примерная цена — проверьте у поставщика' };
+  });
+  return { errors, output: { ...output, suggestions } };
 }
 
 /** "6x4; 3x2,5" -> [[6,4],[3,2.5]] */
@@ -626,7 +633,7 @@ export const CALCULATORS: Calculator[] = [
         ],
         formula: [`V₁ = ${t / 1000} × ${w / 1000} × ${l} = ${r(one, 4)} м³`, `V = ${r(one, 4)} × ${n} = ${r(v, 3)} м³`],
         warnings: [],
-        suggestions: [{ name: `Пиломатериал ${t}×${w}×${l * 1000}`, qty: r(v, 3), unit: 'м³', type: 'material' }],
+        suggestions: [{ name: `Пиломатериал ${t}×${w}×${Math.round(l * 1000)}`, qty: r(v, 3), unit: 'м³', type: 'material' }],
       };
     },
   },

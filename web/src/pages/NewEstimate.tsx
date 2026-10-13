@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { useMe } from '../App';
-import { Fold, Icon, useLoad, useToast } from '../components/ui';
+import { Fold, Icon, SearchBox, useLoad, useToast } from '../components/ui';
 import { rub0 } from '../format';
 import { DIRECTIONS, getDirection, type WorkKind } from '../../../shared/directions';
 import { TEMPLATES } from '../../../shared/templates';
@@ -22,7 +22,10 @@ export default function NewEstimate() {
   const { me } = useMe();
   const [dirId, setDirId] = useState<string | null>(() => (new URLSearchParams(location.search).get('pick') ? null : readDir()));
   const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState('');
   const dir = getDirection(dirId);
+  const qs = q.trim().toLowerCase();
+  const found = qs.length < 2 ? [] : DIRECTIONS.flatMap((d) => d.kinds.filter((k) => `${k.title} ${k.text || ''} ${d.title}`.toLowerCase().includes(qs)).map((k) => ({ d, k }))).slice(0, 12);
   const recent = useLoad(() => get<any[]>('/estimates').catch(() => []), []);
   const mine = useLoad(() => get<any[]>('/estimates', { template: '1' }).catch(() => []), []);
   const last = (recent.data || []).find((e: any) => !e.isTemplate);
@@ -48,6 +51,19 @@ export default function NewEstimate() {
     return (
       <>
         <p className="muted" style={{ marginTop: 0 }}>Чем занимаетесь? Выберите направление — дальше вид работы и готовая смета с ценами.</p>
+        <SearchBox value={q} onChange={setQ} placeholder="Или найдите: септик, стяжка, кровля…" />
+        {qs.length >= 2 && (
+          <div className="list" style={{ marginBottom: 12 }}>
+            {found.map(({ d, k }) => (
+              <button key={k.id} className="list-item" disabled={busy} onClick={() => { try { localStorage.setItem(DIR_KEY, d.id); } catch { /* */ } openKind(k); }}>
+                <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">{k.icon || d.icon}</span>
+                <div className="grow"><div className="title">{k.title}</div><div className="xs muted">{d.title}</div></div>
+                <Icon.chevron className="chev" width={18} />
+              </button>
+            ))}
+            {!found.length && <button className="list-item" onClick={own}><div className="grow"><div className="title">Не нашли? Составьте сами</div><div className="xs muted">Пустая смета с поиском по справочнику</div></div><Icon.chevron className="chev" width={18} /></button>}
+          </div>
+        )}
         <div className="dir-grid">
           {DIRECTIONS.map((d) => (
             <button key={d.id} className="dir-tile" onClick={() => choose(d.id)}>

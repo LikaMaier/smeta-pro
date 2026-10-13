@@ -8,7 +8,7 @@ const ngon = (x: number, y: number, r: number, n = 10): [number, number][] => Ar
 export function mepDrawings(r: MepResult): Sheet[] {
   const p = r.params;
   const xs = p.rooms.flatMap((q) => [q.x, q.x + q.w]), ys = p.rooms.flatMap((q) => [q.y, q.y + q.d]);
-  const X0 = Math.min(...xs, 0), X1 = Math.max(...xs, 1), Y0 = Math.min(...ys, 0), Y1 = Math.max(...ys, 1);
+  const X0 = xs.reduce((a, v) => Math.min(a, v), 0), X1 = xs.reduce((a, v) => Math.max(a, v), 1), Y0 = ys.reduce((a, v) => Math.min(a, v), 0), Y1 = ys.reduce((a, v) => Math.max(a, v), 1);
   const k = Math.max(X1 - X0, Y1 - Y0) / 14; // крупность подписей
   const base = (): Prim[] => {
     const pr: Prim[] = [];
