@@ -5,6 +5,7 @@ import { can, TIERS } from '../../shared/plans';
 import { aiConfigured, sttConfigured } from './ai/openai';
 import { applyPayment } from './routes/billing';
 import { upsertUser } from './routes/auth';
+import { buildReport, reportTo, mskDay } from './stats';
 import { botInfo } from './botInfo';
 import { handleMessage } from './ai/assistant';
 import { transcribe } from './ai/openai';
@@ -39,6 +40,14 @@ export function createBot() {
   });
 
   // ID для настройки администратора
+  // Сводка для администратора: /stats — за сегодня, /stats 7 — за 7 дней
+  bot.command('stats', async (ctx) => {
+    if (!ctx.from || !reportTo().includes(String(ctx.from.id))) return;
+    const days = Math.min(90, Math.max(0, Number(String(ctx.match || '').trim()) || 0));
+    const now = new Date();
+    const from = days ? new Date(now.getTime() - days * 864e5) : new Date(Date.parse(mskDay(now) + 'T00:00:00Z') - 3 * 3600e3);
+    await ctx.reply(await buildReport(from, now), { parse_mode: 'HTML' });
+  });
   bot.command('id', (ctx) => ctx.reply(`Ваш Telegram ID: <code>${ctx.from?.id}</code>`, { parse_mode: 'HTML' }));
 
   // Кнопки под напоминанием: отложить / готово

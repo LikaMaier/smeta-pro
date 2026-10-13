@@ -48,6 +48,7 @@ model User {
   createdAt         DateTime  @default(now())
 
   priceLists PriceList[]
+  days       UserDay[]
   items      CatalogItem[]
   estimates  Estimate[]
   projects   Project[]
@@ -440,4 +441,24 @@ model PromoCode {
   trialDays     Int      @default(14)
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
+}
+
+// Заходы в приложение по дням (для сводки администратору)
+model UserDay {
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day     String // «2026-10-13» по Москве
+  opens   Int      @default(1)
+  firstAt DateTime @default(now())
+  lastAt  DateTime @default(now())
+
+  @@id([userId, day])
+  @@index([day])
+  @@index([lastAt])
+}
+
+// Служебные значения (когда отправлена последняя сводка и т. п.)
+model AppKV {
+  key   String @id
+  value String
 }

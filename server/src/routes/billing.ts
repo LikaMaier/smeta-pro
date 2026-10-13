@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import crypto from 'node:crypto';
-import { prisma, plain, HttpError } from '../util';
+import { prisma, plain, HttpError, audit } from '../util';
 import { env } from '../env';
 import { TIERS, convertDays, teamMonthRub, TEAM_BASE_RUB, teamSeatHolders, seatsOf, type Tier } from '../../../shared/plans';
 import { priceFor } from './promo';
@@ -121,6 +121,7 @@ export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
       plan.title, plan.months ? `СМЕТА PRO, тариф «${TIERS[plan.tier as Tier]?.label || ''}»: ${(TIERS[plan.tier as Tier]?.perks || []).slice(0, 3).join(', ')}`.slice(0, 255) : 'СМЕТА PRO: разовая покупка без подписки',
       `${req.user.id}:${plan.code}`, '', 'XTR', [{ label: plan.title + (price.discountPct ? ` (−${price.discountPct}%)` : ''), amount: price.stars }],
     );
+    await audit(req.user.id, 'checkout', plan.code, 'start', { provider: 'stars', stars: price.stars });
     return { url };
   });
 
@@ -149,6 +150,7 @@ export async function billingRoutes(app: FastifyInstance, opts: { bot?: any }) {
     });
     const j: any = await r.json().catch(() => ({}));
     if (!r.ok || !j.confirmation?.confirmation_url) { req.log.error({ yk: j }, 'yookassa create failed'); throw new HttpError(502, 'ЮKassa не приняла платёж: ' + (j.description || r.status)); }
+    await audit(req.user.id, 'checkout', plan.code, 'start', { provider: 'yookassa', rub: price.rub });
     return { url: j.confirmation.confirmation_url, id: j.id };
   });
 

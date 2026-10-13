@@ -13,6 +13,7 @@ import { brandUrl } from './brand';
 
 const THEME_IDS = ['blueprint', 'brick', 'concrete', 'rebar', 'wood', 'topo', 'hazard', 'paving'];
 import { botLink } from '../botInfo';
+import { mskDay } from '../stats';
 
 /** Кто пригласил: payload вида ref_<id пользователя> из /start или startapp */
 async function referrerId(payload?: string | null) {
@@ -78,6 +79,12 @@ export async function meView(user: any) {
   });
 }
 
+/** Заход в приложение — для сводки администратору */
+async function trackOpen(userId: string) {
+  const day = mskDay(new Date());
+  await prisma.userDay.upsert({ where: { userId_day: { userId, day } }, create: { userId, day }, update: { opens: { increment: 1 }, lastAt: new Date() } });
+}
+
 export async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/telegram', async (req) => {
     const { initData } = z.object({ initData: z.string().min(1) }).parse(req.body);
@@ -85,6 +92,7 @@ export async function authRoutes(app: FastifyInstance) {
     let tg;
     try { tg = verifyInitData(initData, env.BOT_TOKEN); } catch (e: any) { throw new HttpError(401, e.message, 'bad_init_data'); }
     const user = await upsertUser(tg.id, tg.first_name, tg.username, new URLSearchParams(initData).get('start_param'));
+    trackOpen(user.id).catch(() => {});
     return { token: signSession(user.id, env.SESSION_SECRET), user: await meView(user) };
   });
 
