@@ -25,7 +25,7 @@ export default function Settings() {
         <div className="row between">
           <div>
             <div className="title" style={{ fontWeight: 700 }}>{({ subscription: `Тариф «${me.plan?.label || 'Про'}»`, team: 'Тариф «Бригада» (через бригадира)', trial: 'Пробный период «Про»', admin: 'Полный доступ (владелец)', expired: 'Подписка закончилась', free: 'Бесплатный доступ' } as any)[me.access.mode]}</div>
-            <div className="small muted">{['subscription', 'trial', 'team'].includes(me.access.mode) ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Без ограничений' : me.access.freeEstimateLeft ? `Бесплатно: ${me.access.freeLimit ?? 3} сметы, осталось ${me.access.freeLeft ?? 3}.` : 'Бесплатные сметы использованы. Данные сохранены и доступны для просмотра.'}</div>
+            <div className="small muted">{['subscription', 'trial', 'team'].includes(me.access.mode) ? `до ${date(me.access.until)} · осталось ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Без ограничений' : me.access.freeEstimateLeft ? `Бесплатно: 3 сметы в месяц, в этом месяце осталось ${me.access.freeLeft ?? 3}.` : 'Бесплатные сметы этого месяца использованы — новые появятся 1-го числа. Все данные сохранены.'}</div>
             {me.plan?.aiLimit > 0 && <div className="xs muted">ИИ в этом месяце: {me.plan.aiUsed} из {me.plan.aiLimit}</div>}
           </div>
           <span className={`badge ${me.access.active ? 'ok' : 'bad'}`}>{me.access.active ? 'Доступ есть' : 'Нет доступа'}</span>
@@ -118,7 +118,7 @@ function Referral() {
   const toast = useToast();
   const r = useLoad(() => get<any>('/referrals'), []);
   const d = r.data;
-  const text = 'Делаю сметы и считаю прибыль по объектам в СМЕТА PRO прямо в Telegram. Первые 3 сметы — бесплатно:';
+  const text = 'Делаю сметы и считаю прибыль по объектам в СМЕТА PRO прямо в Telegram. 3 сметы каждый месяц — бесплатно:';
   const share = () => {
     if (!d?.link) return toast('Ссылка появится после запуска бота', true);
     const u = `https://t.me/share/url?url=${encodeURIComponent(d.link)}&text=${encodeURIComponent(text)}`;

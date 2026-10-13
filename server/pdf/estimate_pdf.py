@@ -554,7 +554,9 @@ def build(d):
         canvas.drawRightString(A4[0] - 16 * mm, 9 * mm, f"Стр. {doc_.page}")
         if d.get("freeMark"):
             canvas.setFillColor(GOLD)
-            canvas.drawCentredString(A4[0] / 2, 5 * mm, "Составлено в СМЕТА PRO — сметы для строителей в Telegram")
+            canvas.setFont("DV-B", 8)
+            bot = d.get("bot")
+            canvas.drawCentredString(A4[0] / 2, 4.5 * mm, "Сделано в СМЕТА PRO — сметы для строителей в Telegram" + (f": @{bot}" if bot else ""))
         canvas.restoreState()
 
     doc.build(els, onFirstPage=footer, onLaterPages=footer)

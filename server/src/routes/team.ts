@@ -2,17 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma, plain, HttpError, accessOf, num } from '../util';
-import { TIERS } from '../../../shared/plans';
+import { seatsOf } from '../../../shared/plans';
 import { botLink } from '../botInfo';
 import { syncTeam } from './billing';
 import { upsertItems } from './catalog';
 
 /**
- * Бригада (тариф «Бригада»): владелец приглашает до 4 человек по ссылке.
+ * Бригада (тариф «Бригада» на 3, 5 или 10 человек): владелец приглашает участников по ссылке.
  * Участники получают доступ уровня «Бригада», пока у владельца активна подписка,
  * и общий справочник цен: владелец рассылает свой прайс, участникам он добавляется/обновляется по названиям.
  */
-const SEATS = TIERS.team.seats;
 const name = (u: any) => [u.firstName, u.username ? `@${u.username}` : ''].filter(Boolean).join(' ') || 'Без имени';
 
 /** Своя (не через бригаду) подписка «Бригада» */
@@ -45,7 +44,8 @@ export async function joinTeam(userId: string, token: string) {
   if (me.teamOwnerId === owner.id) return { owner: name(owner), already: true };
   if (await prisma.user.count({ where: { teamOwnerId: userId } })) throw new HttpError(400, 'У вас своя бригада — сначала распустите её');
   const count = await prisma.user.count({ where: { teamOwnerId: owner.id } });
-  if (count >= SEATS - 1) throw new HttpError(400, `В бригаде уже ${SEATS} человек — это максимум тарифа`);
+  const seats = seatsOf(owner);
+  if (count >= seats - 1) throw new HttpError(400, `В бригаде уже ${seats} человек — это максимум тарифа. Бригадир может выбрать тариф на больше человек.`);
   await prisma.user.update({ where: { id: userId }, data: { teamOwnerId: owner.id, teamUntil: owner.subscriptionUntil } });
   await pushPrices(owner.id, [userId]).catch(() => {});
   return { owner: owner.companyName || name(owner), already: false };
@@ -60,7 +60,7 @@ export async function teamRoutes(app: FastifyInstance, opts: { bot?: any } = {})
     }
     const members = await prisma.user.findMany({ where: { teamOwnerId: u.id }, orderBy: { createdAt: 'asc' } });
     return plain({
-      role: ownsTeam(u) ? 'owner' : 'none', seats: SEATS, until: u.subscriptionUntil,
+      role: ownsTeam(u) ? 'owner' : 'none', seats: seatsOf(u), until: u.subscriptionUntil,
       inviteUrl: u.teamToken && ownsTeam(u) ? botLink(`team_${u.teamToken}`) : null,
       members: members.map((m) => ({ id: m.id, name: name(m), since: m.createdAt })),
     });

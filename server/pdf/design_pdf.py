@@ -375,7 +375,15 @@ def frame(c, d, page, title):
         c.setLineWidth(1.2); c.rect(sx, sy, STAMP_W, H)
     if d.get("freeMark"):
         c.setFillColor(colors.HexColor("#B8862B"))
-        draw_text(c, FL, 2.8 * mm, "Составлено в СМЕТА PRO — сметы и проекты для строителей в Telegram", FN, 7)
+        bot = d.get("bot")
+        draw_text(c, FL, 2.8 * mm, "Сделано в СМЕТА PRO — сметы и проекты для строителей в Telegram" + (f": @{bot}" if bot else ""), FNB, 7.5)
+        # водяной знак бесплатной версии: по диагонали листа, полупрозрачный
+        c.saveState()
+        c.setFillColor(colors.HexColor("#1F5FAE"), alpha=0.07)
+        c.translate(PW / 2, PH / 2); c.rotate(28)
+        for dy in (-55 * mm, 0, 55 * mm):
+            draw_text(c, 0, dy, "СМЕТА PRO · бесплатная версия", FB, 42, "center")
+        c.restoreState()
 
 
 def table(c, rows, widths, x, y_top, head=True, max_h=None, total_row=False, pad=2.2):

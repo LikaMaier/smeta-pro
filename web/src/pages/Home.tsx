@@ -33,14 +33,14 @@ export default function Home() {
       {(me.access.estimateCount ?? 0) > 0 && <Link to="/calendar" style={{ display: 'block' }}>
         <Hero
           title={<>Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span></>}
-          sub={me.access.mode === 'subscription' || me.access.mode === 'team' ? `Тариф «${me.plan?.label || 'Про'}» до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный «Про»: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? `Бесплатных смет осталось: ${me.access.freeLeft ?? 3} из ${me.access.freeLimit ?? 3}` : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатные сметы использованы — оформите подписку'}
+          sub={me.access.mode === 'subscription' || me.access.mode === 'team' ? `Тариф «${me.plan?.label || 'Про'}» до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный «Про»: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? `Бесплатных смет в этом месяце: ${me.access.freeLeft ?? 3}` : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатные сметы месяца использованы — новые 1-го числа'}
         />
       </Link>}
 
       <button className="tile wide home-new" onClick={() => nav(canCreate ? '/new' : '/settings')}>
         <span className="home-new-plus" aria-hidden="true">+</span>
         Новая смета
-        <small>{!me.access.active && me.access.freeEstimateLeft ? `бесплатно: осталось ${me.access.freeLeft ?? 3} из ${me.access.freeLimit ?? 3}` : 'выберите направление — смета соберётся сама'}</small>
+        <small>{!me.access.active && me.access.freeEstimateLeft ? `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}` : 'выберите направление — смета соберётся сама'}</small>
       </button>
 
 

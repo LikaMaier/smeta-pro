@@ -122,7 +122,7 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
       {rows.some((r) => r.variants.length) && (
         <div className="tier-all">
           <span className="small">Материалы:</span>
-          <div className="seg" role="radiogroup" aria-label="Класс материалов">
+          <div className="segc" role="radiogroup" aria-label="Класс материалов">
             {(['eco', 'std', 'prem'] as Tier[]).map((t) => <button key={t} role="radio" aria-checked={tier === t} className={tier === t ? 'on' : ''} onClick={() => chooseAll(t)}>{TIER_LABEL[t]}</button>)}
           </div>
         </div>

@@ -9,7 +9,7 @@ import { CANOPY_AI_SCHEMA, CANOPY_AI_PROMPT, mergeAiParams } from '../../../shar
 import { chatJson, aiConfigured } from '../ai/openai';
 import { renderDesign, fileName } from '../pdf';
 import { brandPath } from '../brand';
-import { botLink } from '../botInfo';
+import { botLink, botInfo } from '../botInfo';
 import { loadEstimate } from './estimates';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { OBJ_LABEL } from '../../../shared/design/canopy';
 import { TIERS, can, monthKey } from '../../../shared/plans';
 
-/** Лимит PDF «Эскизный проект»: бесплатно — 1 всего, Лайт — 3 в месяц, Про и Бригада — без ограничений.
+/** Лимит PDF «Эскизный проект»: бесплатно — 1 всего (с водяным знаком), Про — 5 в месяц, Бригада — без ограничений.
  *  Сверх лимита тратится купленный эскизный проект. Возвращает true, если тратим покупку. */
 export async function designPdfQuota(u: any): Promise<boolean> {
   const tier = accessOf(u).tier;
@@ -30,8 +30,8 @@ export async function designPdfQuota(u: any): Promise<boolean> {
   if (used < limit) return false;
   if ((u.extraDesigns || 0) > 0) return true;
   throw new HttpError(402, tier === 'free'
-    ? 'Бесплатный эскизный проект уже использован. Купите разовый проект за 149 ₽ или оформите «Лайт» (3 в месяц) / «Про» (без ограничений).'
-    : 'В тарифе «Лайт» — 3 эскизных проекта в месяц, они закончились. Купите разовый проект за 149 ₽ или перейдите на «Про» (без ограничений).', 'plan_required');
+    ? 'Бесплатный эскизный проект уже использован. Купите разовый проект за 390 ₽ (без водяного знака) или оформите «Про» — 5 проектов в месяц.'
+    : `В тарифе «${TIERS[tier].label}» — ${limit} эскизных проектов в месяц, они закончились. Купите разовый проект за 390 ₽ или перейдите на «Бригаду» — без ограничений.`, 'plan_required');
 }
 
 const viewUrl = (token: string) => `${env.PUBLIC_URL || ''}/v/${token}`;
@@ -165,8 +165,9 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     const u: any = req.user;
     const data = designPdfData(r, {
       title: b.title, company: u.companyName || [u.firstName, u.username ? `@${u.username}` : ''].filter(Boolean).join(' '),
-      logoPath: brandPath(u.logoFile), freeMark: !accessOf(u).active, lines: b.lines,
+      logoPath: brandPath(u.logoFile), freeMark: !accessOf(u).active && !useCredit, lines: b.lines,
     });
+    if (data.freeMark) (data as any).bot = botInfo.username;
     const pdf = await renderDesign(data);
     const { InputFile } = await import('grammy');
     await opts.bot.api.sendDocument(Number(u.tgId), new InputFile(pdf, fileName(`Эскизный проект — ${b.title}`, 'pdf')), {

@@ -1,3 +1,4 @@
+import { botInfo } from './botInfo';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -27,7 +28,7 @@ export function pdfData(e: any, user: any, number: number, free = false, paid: n
     sections: t.sections,
     company: user.companyName || [user.firstName, user.username ? `@${user.username}` : ''].filter(Boolean).join(' ') || 'Смета',
     contacts: user.contacts || '',
-    freeMark: free, title: e.title, number: String(number), customer: e.customer, address: e.address,
+    freeMark: free, bot: free ? botInfo.username : '', title: e.title, number: String(number), customer: e.customer, address: e.address,
     date: new Date(e.date).toISOString().slice(0, 10), validDays: e.validDays ?? 14,
     paymentTerms: e.paymentTerms, notes: e.notes,
     logoPath: brandPath(user.logoFile), signPath: brandPath(user.signFile),

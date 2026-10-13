@@ -3,17 +3,18 @@ import { get, post, del } from '../api';
 import { useMe } from '../App';
 import { Field, Load, useLoad, useToast } from './ui';
 import { openInvoice, haptic, tg, confirmDialog } from '../tg';
-import { TIERS, type Tier } from '../../../shared/plans';
+import { TIERS, SEAT_RUB, type Tier } from '../../../shared/plans';
 
 const rub = (v: number) => `${(v || 0).toLocaleString('ru-RU')} ₽`;
 const TIER_ICON: Record<string, string> = { lite: '🔹', pro: '⭐', team: '👷' };
 
-/** Тарифы Лайт / Про / Бригада, разовые покупки и оплата (ЮKassa — картой и СБП, Telegram Stars) */
+/** Тарифы Про / Бригада (3, 5 или 10 человек), разовый эскизный проект и оплата (ЮKassa — картой и СБП, Telegram Stars) */
 export default function Tariffs() {
   const { me, refreshMe } = useMe();
   const toast = useToast();
   const plans = useLoad(() => get<any[]>('/plans'), [me.promo?.code]);
   const [year, setYear] = useState(false);
+  const [seats, setSeats] = useState(5);
   const [paying, setPaying] = useState('');
   const [email, setEmail] = useState(() => { try { return localStorage.getItem('smeta_pay_email') || ''; } catch { return ''; } });
   const [ykId, setYkId] = useState<string | null>(null);
@@ -64,8 +65,9 @@ export default function Tariffs() {
       <Load state={plans}>{(list) => (
         <>
           <div className="tariffs">
-            {(['lite', 'pro', 'team'] as const).map((t) => {
-              const p = list.find((x) => x.tier === t && x.months === (year ? 12 : 1));
+            {cur === 'lite' && paid && <div className="dz-warn">У вас тариф «Лайт» — он работает до {new Date(me.access.until).toLocaleDateString('ru-RU')}. Новых подписок «Лайт» больше нет: при переходе на «Про» оставшиеся дни пересчитаются.</div>}
+            {(['pro', 'team'] as const).map((t) => {
+              const p = list.find((x) => x.tier === t && x.months === (year ? 12 : 1) && (t !== 'team' || (x.seats || 3) === seats));
               if (!p) return null;
               const on = cur === t && paid;
               return (
@@ -80,20 +82,26 @@ export default function Tariffs() {
                     <b className="num">{rub(year ? Math.round((p.price?.rub ?? p.rubPrice) / 12) : (p.price?.rub ?? p.rubPrice))}</b><span className="muted"> в месяц{year ? ` · ${rub(p.price?.rub ?? p.rubPrice)} за год` : ''}</span>
                     {p.price?.discountPct > 0 && <span className="badge ok" style={{ marginLeft: 6 }}>−{p.price.discountPct}% по промокоду</span>}
                   </div>
-                  <ul className="tariff-perks">{TIERS[t].perks.map((x) => <li key={x}>{!me.aiAvailable && /^ИИ/.test(x) ? <>{x.replace(/^ИИ-сметчик: /, 'ИИ-сметчик (').replace(/^ИИ: /, 'ИИ (')}) — <b className="soon">скоро, без доплаты</b></> : x}</li>)}</ul>
+                  {t === 'team' && (
+                    <div className="segc" role="radiogroup" aria-label="Человек в бригаде" style={{ margin: '6px 0 2px' }}>
+                      {[3, 5, 10].map((n) => <button key={n} role="radio" aria-checked={seats === n} className={seats === n ? 'on' : ''} onClick={() => setSeats(n)}>до {n} чел.</button>)}
+                    </div>
+                  )}
+                  {t === 'team' && <div className="xs muted">3 человека в базовой цене, каждый следующий — +{SEAT_RUB} ₽ в месяц</div>}
+                  <ul className="tariff-perks">{TIERS[t].perks.map((x) => (t === 'team' && /^от 3 человек/.test(x) ? `до ${seats} человек, общий справочник цен` : x)).map((x) => <li key={x}>{!me.aiAvailable && /^ИИ/.test(x) ? <>{x.replace(/^ИИ-сметчик: /, 'ИИ-сметчик (').replace(/^ИИ: /, 'ИИ (')}) — <b className="soon">скоро, без доплаты</b></> : x}</li>)}</ul>
                   <Buy p={p} label={on ? 'Продлить' : undefined} />
                 </div>
               );
             })}
           </div>
-          {paid && <p className="xs muted">При смене тарифа оставшиеся дни пересчитываются по цене: например, 10 дней «Лайт» станут 4 днями «Про».</p>}
+          {paid && <p className="xs muted">При смене тарифа или размера бригады оставшиеся дни пересчитываются по цене месяца: например, 10 дней «Про» станут 3 днями «Бригады» на 5 человек.</p>}
 
-          <h2 className="section-title">Без подписки</h2>
+          <h2 className="section-title">Разово, без подписки</h2>
           <div className="list">
             {list.filter((p) => p.tier === 'pack').map((p) => (
               <div key={p.code} className="list-item" style={{ display: 'block', cursor: 'default' }}>
                 <div className="title">{p.title}</div>
-                <div className="xs muted">{p.estimates ? 'Если строите редко: сметы не сгорают.' : `Полный PDF: 3D, чертежи, узлы, раскрой и ведомость.${me.plan?.extraDesigns ? ` Куплено и не использовано: ${me.plan.extraDesigns}.` : ''}`}</div>
+                <div className="xs muted">{`Полный PDF без водяного знака: 3D, план, разрез, фасады, узлы, раскрой и ведомость.${me.plan?.extraDesigns ? ` Куплено и не использовано: ${me.plan.extraDesigns}.` : ''}`}</div>
                 <Buy p={p} />
               </div>
             ))}

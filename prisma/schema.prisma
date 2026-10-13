@@ -30,6 +30,7 @@ model User {
   teamToken         String? // ссылка-приглашение в бригаду
   extraEstimates    Int       @default(0) // купленные пакеты смет (без подписки)
   extraDesigns      Int       @default(0) // купленные эскизные проекты
+  teamSeats         Int       @default(0) // мест в бригаде по оплаченному тарифу (0 — старая подписка, 5 мест)
   aiMonth           String? // месяц счётчика ИИ, «2026-10»
   aiUsed            Int       @default(0)
   promoCode         String? // промокод блогера, по которому пришёл
@@ -393,6 +394,7 @@ model Plan {
   tier       String  @default("pro") // lite | pro | team | pack
   estimates  Int     @default(0) // пакет: сколько смет добавить
   designs    Int     @default(0) // пакет: сколько эскизных проектов добавить
+  seats      Int     @default(0) // «Бригада»: сколько человек входит
   aiLimit    Int     @default(0)
   active     Boolean @default(true)
   sort       Int     @default(0)

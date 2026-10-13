@@ -3,27 +3,31 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma, plain, HttpError } from '../util';
 import { env } from '../env';
-import { TIERS, convertDays, type Tier } from '../../../shared/plans';
+import { TIERS, convertDays, teamMonthRub, TEAM_BASE_RUB, type Tier } from '../../../shared/plans';
 import { priceFor } from './promo';
 
 /**
- * Тарифы: Лайт / Про / Бригада (месяц и год −30%) и разовые пакеты без подписки.
+ * Тарифы: Про / Бригада на 3, 5 или 10 человек (месяц и год −30%) и разовый эскизный проект 3D.
+ * «Лайт» и «10 смет» больше не продаются (старые оплаты и подписки сохраняются).
  * Оплата цифровых услуг внутри Telegram — Telegram Stars; картой и СБП — через ЮKassa.
- * 1 звезда ≈ 2,46 ₽ для пользователя, звёзды округлены.
+ * 1 звезда ≈ 2,46 ₽ для пользователя, звёзды округлены (выплата Telegram за звезду меньше — выгоднее ЮKassa).
  * Цены синхронизируются с базой при каждом запуске; старые тарифы отключаются (оплаты по ним сохраняются).
  */
+const P = (code: string, title: string, tier: string, months: number, rubPrice: number, sort: number, extra: { aiLimit?: number; seats?: number; designs?: number } = {}) =>
+  ({ code, title, tier, months, rubPrice, starsPrice: Math.round(rubPrice / 2.46), aiLimit: extra.aiLimit ?? 0, sort, active: true, estimates: 0, designs: extra.designs ?? 0, seats: extra.seats ?? 0 });
+const year = (m: number) => Math.round((m * 12 * 0.7) / 10) * 10; // год — −30%
 export const DEFAULT_PLANS = [
-  { code: 'lite_m', title: 'Лайт на 1 месяц', tier: 'lite', months: 1, starsPrice: 159, rubPrice: 390, aiLimit: 0, sort: 1, active: true, estimates: 0, designs: 0 },
-  { code: 'lite_y', title: 'Лайт на 12 месяцев (−30%)', tier: 'lite', months: 12, starsPrice: 1336, rubPrice: 3276, aiLimit: 0, sort: 2, active: true, estimates: 0, designs: 0 },
-  { code: 'pro_m', title: 'Про на 1 месяц', tier: 'pro', months: 1, starsPrice: 319, rubPrice: 790, aiLimit: 300, sort: 3, active: true, estimates: 0, designs: 0 },
-  { code: 'pro_y', title: 'Про на 12 месяцев (−30%)', tier: 'pro', months: 12, starsPrice: 2680, rubPrice: 6636, aiLimit: 300, sort: 4, active: true, estimates: 0, designs: 0 },
-  { code: 'team_m', title: 'Бригада на 1 месяц', tier: 'team', months: 1, starsPrice: 689, rubPrice: 1690, aiLimit: 1000, sort: 5, active: true, estimates: 0, designs: 0 },
-  { code: 'team_y', title: 'Бригада на 12 месяцев (−30%)', tier: 'team', months: 12, starsPrice: 5788, rubPrice: 14196, aiLimit: 1000, sort: 6, active: true, estimates: 0, designs: 0 },
-  { code: 'est10', title: '10 смет без подписки', tier: 'pack', months: 0, starsPrice: 119, rubPrice: 290, aiLimit: 0, sort: 10, active: true, estimates: 10, designs: 0 },
-  { code: 'design1', title: 'Эскизный проект 3D (1 PDF)', tier: 'pack', months: 0, starsPrice: 61, rubPrice: 149, aiLimit: 0, sort: 11, active: true, estimates: 0, designs: 1 },
+  P('pro_m', 'Про на 1 месяц', 'pro', 1, 590, 3, { aiLimit: 300 }),
+  P('pro_y', 'Про на 12 месяцев (−30%)', 'pro', 12, 4900, 4, { aiLimit: 300 }),
+  ...[3, 5, 10].flatMap((n, i) => [
+    P(n === 3 ? 'team_m' : `team${n}_m`, `Бригада до ${n} чел. на 1 месяц`, 'team', 1, teamMonthRub(n), 5 + i * 2, { aiLimit: 1000, seats: n }),
+    P(n === 3 ? 'team_y' : `team${n}_y`, `Бригада до ${n} чел. на 12 месяцев (−30%)`, 'team', 12, year(teamMonthRub(n)), 6 + i * 2, { aiLimit: 1000, seats: n }),
+  ]),
+  P('design1', 'Эскизный проект 3D (1 PDF)', 'pack', 0, 390, 20, { designs: 1 }),
 ];
-/** Цена месяца уровня — для пересчёта остатка при смене тарифа */
-export const TIER_MONTH_RUB: Record<string, number> = { lite: 390, pro: 790, team: 1690 };
+/** Цена месяца уровня — для пересчёта остатка при смене тарифа (Бригада — по числу мест) */
+export const TIER_MONTH_RUB: Record<string, number> = { lite: 390, pro: 590, team: TEAM_BASE_RUB };
+const monthRub = (tier: string, seats?: number | null) => (tier === 'team' ? teamMonthRub(seats && seats > 0 ? seats : 5) : TIER_MONTH_RUB[tier] || 590);
 
 export async function seedPlans() {
   for (const p of DEFAULT_PLANS) {
@@ -60,19 +64,22 @@ export async function applyPayment(userId: string, planCode: string, stars: numb
   const active = user.subscriptionUntil && user.subscriptionUntil > now;
   const oldTier = user.plan || 'pro';
   let base = active ? new Date(user.subscriptionUntil!) : now;
-  if (active && oldTier !== plan.tier) {
+  const oldSeats = (user as any).teamSeats || 0;
+  const newSeats = plan.tier === 'team' ? (plan as any).seats || 3 : 0;
+  if (active && (oldTier !== plan.tier || (plan.tier === 'team' && (oldSeats || 5) !== newSeats))) {
+    // смена уровня или размера бригады: остаток дней пересчитываем по цене месяца
     const left = (user.subscriptionUntil!.getTime() - now.getTime()) / 864e5;
-    base = new Date(now.getTime() + convertDays(left, TIER_MONTH_RUB[oldTier] || 490, TIER_MONTH_RUB[plan.tier] || 790) * 864e5);
+    base = new Date(now.getTime() + convertDays(left, monthRub(oldTier, oldSeats), monthRub(plan.tier, newSeats)) * 864e5);
   }
   const until = new Date(base);
   until.setMonth(until.getMonth() + plan.months);
   await prisma.$transaction([
     pay,
-    prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until, plan: plan.tier, subNotice3At: null, subNoticeEndAt: null } }),
+    prisma.user.update({ where: { id: userId }, data: { subscriptionUntil: until, plan: plan.tier, ...(plan.tier === 'team' ? { teamSeats: newSeats } : {}), subNotice3At: null, subNoticeEndAt: null } }),
   ]);
   await syncTeam(userId);
   const label = TIERS[plan.tier as Tier]?.label || 'Подписка';
-  return { text: `Оплата прошла. Тариф «${label}» активен до ${until.toLocaleDateString('ru-RU')}.`, referrer: (await rewardReferrer(user)) ?? undefined };
+  return { text: `Оплата прошла. Тариф «${label}»${plan.tier === 'team' ? ` (до ${newSeats} чел.)` : ''} активен до ${until.toLocaleDateString('ru-RU')}.`, referrer: (await rewardReferrer(user)) ?? undefined };
 }
 
 /** «Приведи друга»: за первую оплату приглашённого пригласившему +1 месяц (один раз на друга) */
