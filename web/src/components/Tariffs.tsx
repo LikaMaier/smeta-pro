@@ -157,7 +157,7 @@ function TeamPanel() {
     <>
       <h2 className="section-title">Бригада</h2>
       <div className="panel stack">
-        <div>Вы в бригаде <b>«{d.owner}»</b>. {d.active ? 'Доступ уровня «Бригада» и общий справочник цен.' : 'У бригадира закончилась подписка.'}</div>
+        <div>Вы в бригаде <b>«{d.owner}»</b>. {d.active ? 'Доступ уровня «Бригада» и общий справочник цен.' : d.reason === 'seats' ? 'Для вас нет оплаченного места: попросите бригадира выбрать тариф на больше человек.' : 'У бригадира закончилась подписка.'}</div>
         <button className="btn sm danger" disabled={busy} onClick={async () => { if (await confirmDialog('Выйти из бригады? Ваши сметы и справочник останутся у вас.')) act(async () => { await post('/team/leave'); await refreshMe(); }, 'Вы вышли из бригады'); }}>Выйти из бригады</button>
       </div>
     </>
@@ -168,12 +168,12 @@ function TeamPanel() {
       <h2 className="section-title">Бригада · {1 + d.members.length} из {d.seats}</h2>
       <div className="panel stack">
         <p className="small muted" style={{ margin: 0 }}>Пригласите до {d.seats - 1} человек: у них будут все возможности тарифа и ваш справочник цен.</p>
-        {1 + d.members.length > d.seats && <div className="dz-warn">В бригаде {1 + d.members.length} чел., а тариф — на {d.seats}. Выберите тариф на больше человек или уберите лишних.</div>}
+        {1 + d.members.length > d.seats && <div className="dz-warn">В бригаде {1 + d.members.length} чел., а оплачено мест — {d.seats}. Участники без места работают без доступа к тарифу. Выберите тариф на больше человек или уберите лишних.</div>}
         {d.members.length > 0 && (
           <div className="list">
             {d.members.map((m: any) => (
               <div key={m.id} className="list-item">
-                <div className="grow title">👷 {m.name}</div>
+                <div className="grow"><div className="title">👷 {m.name}</div>{d.role === 'owner' && m.active === false && <div className="xs" style={{ color: 'var(--bad)' }}>нет оплаченного места</div>}</div>
                 <button className="btn sm" disabled={busy} onClick={async () => { if (await confirmDialog(`Убрать ${m.name} из бригады?`)) act(() => del(`/team/members/${m.id}`), 'Участник убран'); }}>Убрать</button>
               </div>
             ))}

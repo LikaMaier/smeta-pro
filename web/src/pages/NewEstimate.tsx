@@ -4,7 +4,7 @@ import { get, post } from '../api';
 import { useMe } from '../App';
 import { Fold, Icon, SearchBox, useLoad, useToast } from '../components/ui';
 import { rub0 } from '../format';
-import { DIRECTIONS, getDirection, type WorkKind } from '../../../shared/directions';
+import { DIRECTIONS, getDirection, searchKinds, type WorkKind } from '../../../shared/directions';
 import { TEMPLATES } from '../../../shared/templates';
 import { ImportButton } from './Estimates';
 
@@ -25,7 +25,7 @@ export default function NewEstimate() {
   const [q, setQ] = useState('');
   const dir = getDirection(dirId);
   const qs = q.trim().toLowerCase();
-  const found = qs.length < 2 ? [] : DIRECTIONS.flatMap((d) => d.kinds.filter((k) => `${k.title} ${k.text || ''} ${d.title}`.toLowerCase().includes(qs)).map((k) => ({ d, k }))).slice(0, 12);
+  const found = qs.length < 2 ? [] : searchKinds(qs);
   const recent = useLoad(() => get<any[]>('/estimates').catch(() => []), []);
   const mine = useLoad(() => get<any[]>('/estimates', { template: '1' }).catch(() => []), []);
   const last = (recent.data || []).find((e: any) => !e.isTemplate);

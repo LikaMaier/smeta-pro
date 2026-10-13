@@ -29,6 +29,10 @@ export const TEAM_BASE_SEATS = 3;
 export const TEAM_BASE_RUB = 1490;
 export const SEAT_RUB = 290;
 export const teamMonthRub = (seats: number) => TEAM_BASE_RUB + Math.max(0, seats - TEAM_BASE_SEATS) * SEAT_RUB;
+/** Кому из участников достаётся оплаченное место: первым вступившим (владелец занимает одно место) */
+export function teamSeatHolders<T extends { id: string; joined: number }>(members: T[], seats: number): Set<string> {
+  return new Set([...members].sort((a, b) => a.joined - b.joined).slice(0, Math.max(0, seats - 1)).map((m) => m.id));
+}
 /** Мест в бригаде у владельца: из оплаченного тарифа; старые подписки «Бригада» — 5 мест, как было */
 export const seatsOf = (u: { teamSeats?: number | null }) => (u.teamSeats && u.teamSeats > 0 ? u.teamSeats : 5);
 

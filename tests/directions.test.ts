@@ -53,3 +53,25 @@ test('варианты материала: эконом дешевле, прем
   assert.deepEqual(materialVariants('', 100), []);
   assert.deepEqual(materialVariants('Клей', 0), []);
 });
+
+import { searchKinds } from '../shared/directions';
+test('поиск видов работ по синонимам', () => {
+  const ids = (q: string) => searchKinds(q).map((x) => x.k.id);
+  assert.ok(ids('септик').includes('m-septic:bio'), 'станция биоочистки по слову «септик»');
+  assert.ok(ids('топас').includes('m-septic:bio'));
+  assert.ok(ids('ванная').includes('m-tile:bath'));
+  assert.ok(ids('ламинат').includes('m-floor:none'));
+  assert.ok(ids('гипсокартон потолок').includes('m-gkl:ceil1'));
+  assert.ok(ids('газоблок').includes('m-mason:gas'));
+  assert.ok(ids('крыша').length >= 4);
+  assert.ok(ids('сарай').includes('d-bytovka'));
+  assert.equal(ids('септика')[0]?.startsWith('m-septic'), true);
+  assert.deepEqual(ids('x'), []);
+});
+test('места в бригаде — первым вступившим', async () => {
+  const { teamSeatHolders } = await import('../shared/plans');
+  const m = [{ id: 'c', joined: 3 }, { id: 'a', joined: 1 }, { id: 'b', joined: 2 }];
+  assert.deepEqual([...teamSeatHolders(m, 3)].sort(), ['a', 'b']);
+  assert.deepEqual([...teamSeatHolders(m, 10)].sort(), ['a', 'b', 'c']);
+  assert.deepEqual([...teamSeatHolders(m, 1)], []);
+});

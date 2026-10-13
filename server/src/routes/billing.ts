@@ -3,7 +3,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { prisma, plain, HttpError } from '../util';
 import { env } from '../env';
-import { TIERS, convertDays, teamMonthRub, TEAM_BASE_RUB, type Tier } from '../../../shared/plans';
+import { TIERS, convertDays, teamMonthRub, TEAM_BASE_RUB, teamSeatHolders, seatsOf, type Tier } from '../../../shared/plans';
 import { priceFor } from './promo';
 
 /**
@@ -36,12 +36,17 @@ export async function seedPlans() {
   await prisma.plan.updateMany({ where: { code: { notIn: DEFAULT_PLANS.map((p) => p.code) } }, data: { active: false } });
 }
 
-/** Доступ участников бригады идёт за подпиской владельца */
+/** Доступ участников бригады идёт за подпиской владельца — и только в пределах оплаченных мест:
+ *  места получают первые вступившие, остальные остаются в бригаде без доступа, пока бригадир не доплатит. */
 export async function syncTeam(ownerId: string) {
   const o = await prisma.user.findUnique({ where: { id: ownerId } });
   if (!o) return;
   const teamActive = o.plan === 'team' && o.subscriptionUntil && o.subscriptionUntil > new Date();
-  await prisma.user.updateMany({ where: { teamOwnerId: ownerId }, data: { teamUntil: teamActive ? o.subscriptionUntil : null } });
+  const members = await prisma.user.findMany({ where: { teamOwnerId: ownerId }, select: { id: true, teamJoinedAt: true, createdAt: true } });
+  const holders = teamSeatHolders(members.map((m) => ({ id: m.id, joined: (m.teamJoinedAt || m.createdAt).getTime() })), seatsOf(o as any));
+  const on = members.filter((m) => holders.has(m.id)).map((m) => m.id), off = members.filter((m) => !holders.has(m.id)).map((m) => m.id);
+  if (on.length) await prisma.user.updateMany({ where: { id: { in: on } }, data: { teamUntil: teamActive ? o.subscriptionUntil : null } });
+  if (off.length) await prisma.user.updateMany({ where: { id: { in: off } }, data: { teamUntil: null } });
 }
 
 /** Начисление после ПОДТВЕРЖДЁННОЙ оплаты (Stars — successful_payment, ЮKassa — проверка через API).

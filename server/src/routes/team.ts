@@ -46,7 +46,8 @@ export async function joinTeam(userId: string, token: string) {
   const count = await prisma.user.count({ where: { teamOwnerId: owner.id } });
   const seats = seatsOf(owner);
   if (count >= seats - 1) throw new HttpError(400, `В бригаде уже ${seats} человек — это максимум тарифа. Бригадир может выбрать тариф на больше человек.`);
-  await prisma.user.update({ where: { id: userId }, data: { teamOwnerId: owner.id, teamUntil: owner.subscriptionUntil } });
+  await prisma.user.update({ where: { id: userId }, data: { teamOwnerId: owner.id, teamJoinedAt: new Date(), teamUntil: owner.subscriptionUntil } });
+  await syncTeam(owner.id);
   await pushPrices(owner.id, [userId]).catch(() => {});
   return { owner: owner.companyName || name(owner), already: false };
 }
@@ -56,13 +57,15 @@ export async function teamRoutes(app: FastifyInstance, opts: { bot?: any } = {})
     const u: any = req.user;
     if (u.teamOwnerId) {
       const owner = await prisma.user.findUnique({ where: { id: u.teamOwnerId } });
-      return plain({ role: 'member', owner: owner ? (owner.companyName || name(owner)) : '—', until: u.teamUntil, active: accessOf(u).mode === 'team' });
+      const ownerActive = owner ? ownsTeam(owner) : false;
+      return plain({ role: 'member', owner: owner ? (owner.companyName || name(owner)) : '—', until: u.teamUntil, active: accessOf(u).mode === 'team', reason: ownerActive && !(u.teamUntil && u.teamUntil > new Date()) ? 'seats' : ownerActive ? null : 'expired' });
     }
-    const members = await prisma.user.findMany({ where: { teamOwnerId: u.id }, orderBy: { createdAt: 'asc' } });
+    const members = (await prisma.user.findMany({ where: { teamOwnerId: u.id } })).sort((a, b) => (a.teamJoinedAt || a.createdAt).getTime() - (b.teamJoinedAt || b.createdAt).getTime());
+    const now = new Date();
     return plain({
       role: ownsTeam(u) ? 'owner' : 'none', seats: seatsOf(u), until: u.subscriptionUntil,
       inviteUrl: u.teamToken && ownsTeam(u) ? botLink(`team_${u.teamToken}`) : null,
-      members: members.map((m) => ({ id: m.id, name: name(m), since: m.createdAt })),
+      members: members.map((m) => ({ id: m.id, name: name(m), since: m.teamJoinedAt || m.createdAt, active: Boolean(m.teamUntil && m.teamUntil > now) })),
     });
   });
 
@@ -94,13 +97,16 @@ export async function teamRoutes(app: FastifyInstance, opts: { bot?: any } = {})
     const { id } = req.params as any;
     const m = await prisma.user.findFirst({ where: { id, teamOwnerId: req.user.id } });
     if (!m) throw new HttpError(404, 'Участник не найден');
-    await prisma.user.update({ where: { id }, data: { teamOwnerId: null, teamUntil: null } });
+    await prisma.user.update({ where: { id }, data: { teamOwnerId: null, teamUntil: null, teamJoinedAt: null } });
+    await syncTeam(req.user.id);
     if (opts.bot) await opts.bot.api.sendMessage(Number(m.tgId), 'Вас убрали из бригады. Сметы и справочник остались у вас.').catch(() => {});
     return { ok: true };
   });
 
   app.post('/api/team/leave', async (req) => {
-    await prisma.user.update({ where: { id: req.user.id }, data: { teamOwnerId: null, teamUntil: null } });
+    const ownerId = (req.user as any).teamOwnerId;
+    await prisma.user.update({ where: { id: req.user.id }, data: { teamOwnerId: null, teamUntil: null, teamJoinedAt: null } });
+    if (ownerId) await syncTeam(ownerId);
     return { ok: true };
   });
 

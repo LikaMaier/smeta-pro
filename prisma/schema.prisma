@@ -27,6 +27,7 @@ model User {
   plan              String    @default("pro") // уровень текущей подписки: lite | pro | team (старые подписки — pro)
   teamOwnerId       String? // участник бригады: id владельца
   teamUntil         DateTime? // доступ через бригаду владельца (синхронизируется при оплате)
+  teamJoinedAt      DateTime? // когда вступил в бригаду: места по оплате достаются первым вступившим
   teamToken         String? // ссылка-приглашение в бригаду
   extraEstimates    Int       @default(0) // купленные пакеты смет (без подписки)
   extraDesigns      Int       @default(0) // купленные эскизные проекты
