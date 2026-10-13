@@ -135,6 +135,35 @@ def draw_view3d(c, v, x, y, w, h, bg=None):
     c.setFillAlpha(1); c.setStrokeAlpha(1)
 
 
+def draw_render(c, path, x, y, w, h):
+    """Растровая визуализация: обрезка «cover» под рамку, без искажения пропорций."""
+    try:
+        from PIL import Image
+        from reportlab.lib.utils import ImageReader
+        im = Image.open(path).convert("RGB")
+        iw, ih = im.size
+        ra, rb = w / h, iw / ih
+        if rb > ra:  # картинка шире — режем бока
+            nw = int(ih * ra); x0 = (iw - nw) // 2; im = im.crop((x0, 0, x0 + nw, ih))
+        else:
+            nh = int(iw / ra); y0 = (ih - nh) // 2; im = im.crop((0, y0, iw, y0 + nh))
+        c.drawImage(ImageReader(im), x, y, w, h)
+        return True
+    except Exception:
+        return False
+
+
+def draw_visual(c, d, i, x, y, w, h):
+    """Вид i: растровый рендер, если есть, иначе векторный 3D."""
+    r = d.get("renders") or []
+    if i < len(r) and os.path.exists(r[i]) and draw_render(c, r[i], x, y, w, h):
+        return True
+    if i < len(d.get("view3d") or []):
+        draw_view3d(c, d["view3d"][i], x, y, w, h, bg="#EEF3F7")
+        return True
+    return False
+
+
 # ---------------------------------------------------------------- 2D
 def draw_sheet(c, sh, x, y, w, h, title=True):
     if title:
@@ -405,7 +434,7 @@ def build(d):
     vw = W1 * 0.6
     c.setStrokeColor(colors.HexColor("#C8CCD2")); c.setLineWidth(0.5)
     c.rect(CL, CB1, vw, CT - CB1)
-    draw_view3d(c, d["view3d"][0], CL + 1, CB1 + 1, vw - 2, CT - CB1 - 2, bg="#EEF3F7")
+    draw_visual(c, d, 0, CL + 1, CB1 + 1, vw - 2, CT - CB1 - 2)
     rx = CL + vw + 6 * mm
     rw = CR - rx
     prow = [[Pc("Параметры", "tb"), ""]] + [[Pc(a), Pc(b, "tb")] for a, b in d["params"]]
@@ -431,6 +460,18 @@ def build(d):
         p.drawOn(c, rx, yy - ph); yy -= ph + 2.5
     c.showPage(); page += 1
 
+    # --- 1а. Визуализация: ещё два больших ракурса (если есть растровые рендеры)
+    rnd = [r for r in (d.get("renders") or []) if os.path.exists(r)]
+    if len(rnd) >= 3:
+        frame(c, d, page, "Визуализация")
+        gap = 4 * mm
+        chh = (CT - CB - gap) / 2
+        for k in (1, 2):
+            cy = CT - k * chh - (k - 1) * gap
+            c.setStrokeColor(colors.HexColor("#C8CCD2")); c.setLineWidth(0.5); c.rect(CL, cy, W1, chh)
+            draw_render(c, rnd[k], CL + 0.5, cy + 0.5, W1 - 1, chh - 1)
+        c.showPage(); page += 1
+
     sheets = d["sheets"]
     plan = next((s for s in sheets if s["title"].startswith("План")), None)
     sect = next((s for s in sheets if s["title"].startswith("Разрез")), None)
@@ -444,12 +485,26 @@ def build(d):
             c.showPage(); page += 1
     else:
         # --- 2. План и разрез
-        frame(c, d, page, "План и основание")
-        if plan:
-            draw_sheet(c, plan, CL, CB, W1 * 0.58, CT - CB)
-        if sect:
-            draw_sheet(c, sect, CL + W1 * 0.62, CB + (CT - CB) * 0.35, W1 * 0.38, (CT - CB) * 0.65)
-        c.showPage(); page += 1
+        if not any(s["title"].startswith("Схема") for s in sheets):
+            frame(c, d, page, "План и основание")
+        scheme = next((s for s in sheets if s["title"].startswith("Схема")), None)
+        if scheme:
+            # план помещения крупно, справа — разрез 1-1 и схема кровли
+            frame(c, d, page, "План помещения")
+            if plan:
+                draw_sheet(c, plan, CL, CB, W1, CT - CB, title=False)
+            c.showPage(); page += 1
+            frame(c, d, page, "Разрез и схема каркаса")
+            if sect:
+                draw_sheet(c, sect, CL, CB, W1 * 0.66, CT - CB)
+            draw_sheet(c, scheme, CL + W1 * 0.69, CB + (CT - CB) * 0.4, W1 * 0.31, (CT - CB) * 0.6)
+            c.showPage(); page += 1
+        else:
+            if plan:
+                draw_sheet(c, plan, CL, CB, W1 * 0.58, CT - CB)
+            if sect:
+                draw_sheet(c, sect, CL + W1 * 0.62, CB + (CT - CB) * 0.35, W1 * 0.38, (CT - CB) * 0.65)
+            c.showPage(); page += 1
 
         # --- 3. Фасады
         frame(c, d, page, "Фасады")
@@ -463,12 +518,25 @@ def build(d):
 
         # --- 3а. Узлы
         nodes = [s for s in sheets if s["title"].startswith("Узел")]
-        if nodes:
+        if nodes and any("Карниз" in s["title"] for s in nodes):
+            # мало узлов — каждый на свой лист, крупно
+            for s in nodes:
+                frame(c, d, page, s["title"] + " (масштаб условный)")
+                draw_sheet(c, s, CL, CB, W1, CT - CB, title=False)
+                c.showPage(); page += 1
+        elif nodes:
             frame(c, d, page, "Узлы (типовые, масштаб условный)")
+            big = len(nodes) <= 2
             for i, s in enumerate(nodes[:4]):
                 cx = CL + (i % 2) * (cw + gap)
-                cy = CB + (1 - i // 2) * (ch + gap)
-                draw_sheet(c, s, cx, cy, cw, ch)
+                cy = CB if big else CB + (1 - i // 2) * (ch + gap)
+                draw_sheet(c, s, cx, cy, cw, CT - CB if big else ch)
+            c.showPage(); page += 1
+
+        # --- 3б. Состав конструкций (стена, пол, кровля) — отдельный лист
+        for s in [s for s in sheets if s["title"].startswith("Состав")]:
+            frame(c, d, page, s["title"])
+            draw_sheet(c, s, CL, CB, W1, CT - CB, title=False)
             c.showPage(); page += 1
 
     # --- 4. Металл: раскрой
@@ -483,10 +551,10 @@ def build(d):
                      Paragraph(f"<b>{qty(sum(s[mk] for s in d['steel']))}</b>", ST["tr"])])
         widths = [26 * mm, 52 * mm, 15 * mm, 18 * mm, 16 * mm, 17 * mm, 15 * mm, 19 * mm]
         table(c, rows, widths, CL, CT, total_row=True)
-        if len(d["view3d"]) > 1:
+        if len(d["view3d"]) > 1 or len(d.get("renders") or []) > 1:
             vx = CL + sum(widths) + 8 * mm
             c.setStrokeColor(colors.HexColor("#C8CCD2")); c.setLineWidth(0.5); c.rect(vx, CT - 70 * mm, CR - vx, 70 * mm)
-            draw_view3d(c, d["view3d"][1], vx + 1, CT - 70 * mm + 1, CR - vx - 2, 70 * mm - 2, bg="#EEF3F7")
+            draw_visual(c, d, 1, vx + 1, CT - 70 * mm + 1, CR - vx - 2, 70 * mm - 2)
         c.setFillColor(MUT)
         draw_text(c, CL, CB + 2 * mm, "Доски и брус по 6 м — с учётом раскроя. Объём — по фактической длине без обрези." if wood else "Хлысты — с учётом раскроя (пропил 3 мм). Масса — по фактической длине без обрези.", FN, 7.5)
         c.showPage(); page += 1

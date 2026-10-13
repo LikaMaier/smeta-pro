@@ -338,7 +338,9 @@ export function drawings(res0: CanopyResult | FenceResult | SiteResult | MepResu
     const sl = res.params.roof === 'single' ? `уклон кровли → ${res.params.highSide === 'left' ? 'вправо' : res.params.highSide === 'right' ? 'влево' : res.params.highSide === 'front' ? 'назад' : 'вперёд'}, ${Math.round(((res.info.hHigh - res.info.hLow) / res.info.span) * 100)}%` : res.params.roof === 'gable' ? 'двускатная кровля' : res.params.roof === 'arch' ? 'арочная кровля' : 'четырёхскатная кровля';
     pr.push({ t: 'text', x: L / 2, y: W / 2, s: sl, size: 0.3, anchor: 'middle', c: '#555' });
     pr.push({ t: 'text', x: L / 2, y: W / 2 - 0.45, s: `${res.info.posts ? `столбов ${res.info.posts}` : 'на консолях'}, ${res.info.truss ? 'ферм' : res.params.roof === 'arch' ? 'арок' : 'стропил'} ${res.info.rafters}${res.info.wood ? ', каркас из бруса' : ''}${res.params.base === 'deck' ? ', настил на винтовых сваях' : ''}`, size: 0.26, anchor: 'middle', c: '#777' });
-    sheets.push({ title: 'План (вид сверху)', x0: -ov - 2, y0: -ov - 2, x1: L + ov + 1, y1: W + ov + 1, prims: pr });
+    const room = roomSheets(res);
+    sheets.push(...room);
+    sheets.push({ title: room.length ? 'Схема кровли и каркаса' : 'План (вид сверху)', x0: -ov - 2, y0: -ov - 2, x1: L + ov + 1, y1: W + ov + 1, prims: pr });
   }
 
   // ---------- фасады ----------
@@ -375,17 +377,51 @@ export function drawings(res0: CanopyResult | FenceResult | SiteResult | MepResu
       void hs; void zMax;
     }
     // обшивка этой стороны
-    for (const p of res.panels.filter((q) => ['prof', 'mesh', 'gate', 'door', 'window', 'poly', 'sandwich', 'wood'].includes(q.kind) && q.pts.every(near))) {
+    const sidePanels = res.panels.filter((q) => ['prof', 'mesh', 'gate', 'door', 'window', 'poly', 'sandwich', 'wood'].includes(q.kind) && q.pts.every(near));
+    const cladded = sidePanels.some((q) => q.kind === 'wood' || q.kind === 'sandwich' || q.kind === 'prof');
+    for (const p of sidePanels) {
       const fill = p.kind === 'prof' || p.kind === 'sandwich' ? col : p.kind === 'gate' ? shade(col, 0.8) : p.kind === 'door' ? '#3a3d42' : p.kind === 'window' ? '#BFDCEB' : p.kind === 'poly' ? '#CFE3EE' : p.kind === 'wood' ? '#C49A6C' : undefined;
       pr.push({ t: 'poly', pts: p.pts.map((q) => [H(q), q[2]] as [number, number]), fill, c: '#333', w: p.kind === 'gate' || p.kind === 'door' || p.kind === 'window' ? 1.1 : 0.6, hatch: p.kind === 'prof' || p.kind === 'gate' ? 'prof' : p.kind === 'mesh' ? 'mesh' : undefined });
-      if (p.kind === 'window') { const xs = p.pts.map((q) => H(q)); const m = (Math.min(...xs) + Math.max(...xs)) / 2; pr.push({ t: 'line', x1: m, y1: p.pts[0][2], x2: m, y2: p.pts[2][2], w: 0.9, c: '#333' }); }
+      const xs0 = p.pts.map((q) => H(q)), x0 = Math.min(...xs0), x1 = Math.max(...xs0), z0 = Math.min(...p.pts.map((q) => q[2])), z1 = Math.max(...p.pts.map((q) => q[2]));
+      // имитация бруса / доска: горизонтальные доски 146 мм до нижней точки верха панели
+      if (p.kind === 'wood') { const zTopMin = Math.min(...p.pts.filter((q) => q[2] > z0 + 0.01).map((q) => q[2])); for (let z = z0 + 0.146; z < zTopMin - 0.02; z += 0.146) pr.push({ t: 'line', x1: x0, y1: z, x2: x1, y2: z, w: 0.35, c: '#8a6440' }); }
+      if (p.kind === 'window') {
+        const m = (x0 + x1) / 2, f = 0.06;
+        pr.push({ t: 'poly', pts: [[x0 - 0.07, z0 - 0.07], [x1 + 0.07, z0 - 0.07], [x1 + 0.07, z1 + 0.07], [x0 - 0.07, z1 + 0.07]], c: '#5a4128', w: 0.7 }); // наличник
+        pr.push({ t: 'poly', pts: [[x0 + f, z0 + f], [m - 0.025, z0 + f], [m - 0.025, z1 - f], [x0 + f, z1 - f]], c: '#333', w: 0.6 });
+        pr.push({ t: 'poly', pts: [[m + 0.025, z0 + f], [x1 - f, z0 + f], [x1 - f, z1 - f], [m + 0.025, z1 - f]], c: '#333', w: 0.6 });
+        pr.push({ t: 'line', x1: m + 0.025, y1: z1 - f, x2: x1 - f, y2: (z0 + z1) / 2, w: 0.4, c: '#777', dash: true }); // открывание
+        pr.push({ t: 'line', x1: x1 - f, y1: (z0 + z1) / 2, x2: m + 0.025, y2: z0 + f, w: 0.4, c: '#777', dash: true });
+        pr.push({ t: 'poly', pts: [[x0 - 0.1, z0 - 0.07], [x1 + 0.1, z0 - 0.07], [x1 + 0.1, z0 - 0.11], [x0 - 0.1, z0 - 0.11]], fill: '#9aa0a6', c: '#555', w: 0.5 }); // отлив
+      }
+      if (p.kind === 'door') {
+        pr.push({ t: 'poly', pts: [[x0 - 0.07, z0], [x1 + 0.07, z0], [x1 + 0.07, z1 + 0.07], [x0 - 0.07, z1 + 0.07]], c: '#5a4128', w: 0.7 }); // наличник
+        pr.push({ t: 'poly', pts: [[x0 + 0.1, z0 + 0.15], [x1 - 0.1, z0 + 0.15], [x1 - 0.1, (z0 + z1) / 2 - 0.05], [x0 + 0.1, (z0 + z1) / 2 - 0.05]], c: '#888', w: 0.5 });
+        pr.push({ t: 'poly', pts: [[x0 + 0.1, (z0 + z1) / 2 + 0.05], [x1 - 0.1, (z0 + z1) / 2 + 0.05], [x1 - 0.1, z1 - 0.12], [x0 + 0.1, z1 - 0.12]], c: '#888', w: 0.5 });
+        pr.push({ t: 'poly', pts: [[x1 - 0.13, 0.98], [x1 - 0.08, 0.98], [x1 - 0.08, 1.06], [x1 - 0.13, 1.06]], fill: '#ddd', c: '#ddd', w: 0.5 }); // ручка
+      }
       if (p.kind === 'gate' && res.params.gate === 'swing') { const xs = p.pts.map((q) => H(q)); const m = (Math.min(...xs) + Math.max(...xs)) / 2; pr.push({ t: 'line', x1: m, y1: 0.05, x2: m, y2: p.pts[2][2], w: 1, c: '#222' }); }
     }
-    // каркас этой стороны
-    for (const m of res.members.filter((q) => near(q.a) && near(q.b))) {
+    // каркас этой стороны (за сплошной обшивкой не показываем)
+    for (const m of res.members.filter((q) => near(q.a) && near(q.b) && !(cladded && ['post', 'rail', 'frame', 'tie', 'beam'].includes(q.kind)))) {
       const [w] = sizeOf(m.profile);
       if (m.kind === 'post') pr.push({ t: 'poly', pts: [[H(m.a) - w / 2, 0], [H(m.a) + w / 2, 0], [H(m.b) + w / 2, m.b[2]], [H(m.b) - w / 2, m.b[2]]], fill: res.info.wood ? '#9C6B40' : shade(col, 1.3), c: '#222', w: 0.6 });
       else pr.push({ t: 'line', x1: H(m.a), y1: m.a[2], x2: H(m.b), y2: m.b[2], w: m.kind === 'web' || m.kind === 'rail' ? 0.8 : 1.4, c: '#222' });
+    }
+    // проёмы: марки и цепочка размеров от угла
+    {
+      const ops = res.openings.filter((o) => o.side === side).map((o) => { const a = (side === 'back' || side === 'left') ? width - o.a1 : o.a0; return { ...o, x0: a, x1: a + (o.a1 - o.a0) }; }).sort((a, b) => a.x0 - b.x0);
+      let wn = 0, dn = 0;
+      for (const o of ops) {
+        const mark = o.kind === 'window' ? `ОК-${++wn}` : o.kind === 'door' ? `Д-${++dn}` : 'В-1';
+        const zt = o.h, zb = o.z0 ?? 0;
+        pr.push({ t: 'text', x: (o.x0 + o.x1) / 2, y: zt + 0.16, s: `${mark}  ${Math.round((o.x1 - o.x0) * 1000)}×${Math.round((zt - zb) * 1000)}`, size: 0.17, anchor: 'middle', c: '#1f5fae', bold: true });
+        if (o.kind === 'window') pr.push({ t: 'dim', x1: o.x1 + 0.25, y1: 0, x2: o.x1 + 0.25, y2: zb, off: 0, s: `${Math.round(zb * 1000)}` });
+      }
+      if (ops.length) {
+        const cuts = [0, ...ops.flatMap((o) => [o.x0, o.x1]), width];
+        for (let i = 0; i < cuts.length - 1; i++) if (cuts[i + 1] - cuts[i] > 0.05) pr.push({ t: 'dim', x1: cuts[i], y1: 0, x2: cuts[i + 1], y2: 0, off: -0.5, s: `${Math.round((cuts[i + 1] - cuts[i]) * 1000)}` });
+      }
     }
     // размеры: ширина и высоты по краям
     void posts;
@@ -458,7 +494,11 @@ export function drawings(res0: CanopyResult | FenceResult | SiteResult | MepResu
     z -= 0.6;
     sheets.push({ title: ushp ? 'Разрез УШП (толщины условно ×4)' : 'Разрез основания (толщины условно ×4)', x0: -1.1, y0: z - 0.2, x1: w + 6.2, y1: 0.4, prims: pr });
   }
-  sheets.push(...nodeSheets(res));
+  const pq: any = res.params;
+  sheets.push(...(pq.base === 'floor' && sheets.some((x) => x.title === 'Разрез 1-1') ? wallNodes(res) : nodeSheets(res)));
+  // ---------- состав стены, пола и кровли (утеплённая постройка) ----------
+  const pp: any = res.params;
+  if ((pp.insulate && Object.values(walls).some((w) => w === 'wood' || w === 'prof_full')) || pp.base === 'floor') sheets.push(compositionSheet(res));
   return sheets;
 }
 
@@ -519,6 +559,168 @@ export function sheetToSvg(sh: Sheet, pxWidth = 800, dark = false) {
 
 // ---------------------------------------------------------------- Узлы
 /** Типовые узлы в масштабе (×5): опора столба, столб — обвязка, стропило — обвязка, связь. Подписи — реальные сечения. */
+// ---------------------------------------------------------------- узлы каркасной утеплённой постройки (единица = 100 мм, М 1:5 условно)
+function wallNodes(res: CanopyResult): Sheet[] {
+  const p: any = res.params, i: any = res.info;
+  const ins = !!p.insulate;
+  const WOOD = '#DDBE8E', WOOD2 = '#C49A6C', INS = '#F3E39A', MEMB = '#2f6db5', VAP = '#C0392B', CONC = '#D2CFC8';
+  const lining = p.lining === 'osb' ? 'OSB-3 12 мм' : 'Вагонка 12,5 мм';
+  const rB = Number(String(i.rafterProf || '50×200').split('×')[1]) / 100 || 2;
+  const out: Sheet[] = [];
+  const mk = () => {
+    const pr: Prim[] = [];
+    const R = (x0: number, z0: number, x1: number, z1: number, fill: string, hatch?: any, c = '#333', w = 0.7) => pr.push({ t: 'poly', pts: [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], fill, c, w, hatch });
+    const Lq = (x1: number, y1: number, x2: number, y2: number, c = '#333', w = 0.7, dash = false) => pr.push({ t: 'line', x1, y1, x2, y2, c, w, dash });
+    const cross = (x0: number, z0: number, x1: number, z1: number) => { Lq(x0, z0, x1, z1, '#7a5232', 0.35); Lq(x0, z1, x1, z0, '#7a5232', 0.35); }; // брус в сечении
+    const grain = (x0: number, z0: number, x1: number, z1: number) => { for (let x = x0 + 0.35; x < x1 - 0.2; x += 0.9) Lq(x, (z0 + z1) / 2 + 0.03, x + 0.45, (z0 + z1) / 2 - 0.03, '#9b7a4c', 0.3); };
+    const notes: { x: number; z: number; s: string }[] = [];
+    const tag = (x: number, z: number, s: string) => notes.push({ x, z, s });
+    const finish = (title: string, tx: number, ztop: number, zbot: number, x0: number, extra?: string) => {
+      notes.sort((a, b) => b.z - a.z);
+      const n = notes.length, step = Math.min(0.95, (ztop - zbot) / Math.max(1, n - 1));
+      notes.forEach((nt, k) => {
+        const ty = ztop - k * step;
+        pr.push({ t: 'poly', pts: circle(nt.x, nt.z, 0.06, 10), fill: '#222', c: '#222', w: 0.3 });
+        pr.push({ t: 'line', x1: nt.x, y1: nt.z, x2: tx - 0.3, y2: ty, w: 0.35, c: '#333' });
+        pr.push({ t: 'line', x1: tx - 0.3, y1: ty, x2: tx, y2: ty, w: 0.35, c: '#333' });
+        pr.push({ t: 'text', x: tx + 0.1, y: ty - 0.1, s: `${k + 1}. ${nt.s}`, size: 0.28 });
+      });
+      if (extra) pr.push({ t: 'text', x: x0, y: zbot - 1.2, s: extra, size: 0.27, c: '#555' });
+      return { title, prims: pr };
+    };
+    return { pr, R, Lq, cross, grain, tag, finish };
+  };
+
+  // ---------- Узел 1: стена — ростверк — пол ----------
+  {
+    const { pr, R, Lq, cross, grain, tag, finish } = mk();
+    const blocks = p.floorOn === 'blocks';
+    // грунт, подсыпка, опора
+    R(-4, -6.2, 9, -5.5, '#E7D9A8', 'sand', '#776', 0.4);
+    R(-4, -7.2, 9, -6.2, '#A88F6C', 'soil', '#776', 0.4);
+    Lq(-4, -5.5, 9, -5.5, '#333', 1.2);
+    if (blocks) R(-0.75, -5.5, 2.25, -1.5, CONC, 'concrete'); else R(0.3, -7.2, 1.2, -1.5, '#9aa0a6');
+    R(-0.75, -1.56, 2.25, -1.5, '#222', undefined, '#222', 0.4); // рубероид
+    // ростверк 150×150
+    R(-0.25, -1.5, 1.25, 0, WOOD2, undefined, '#5a3d22', 0.9); cross(-0.25, -1.5, 1.25, 0);
+    R(-0.25, 0, 1.25, 0.06, '#222', undefined, '#222', 0.4); // отсечка
+    // нижняя обвязка 50×100 плашмя и стойка
+    R(0, 0.06, 1, 0.56, WOOD2, undefined, '#5a3d22', 0.9); cross(0, 0.06, 1, 0.56);
+    R(0, 0.56, 0.5, 6.5, WOOD, undefined, '#5a3d22', 0.8); grain(0, 0.56, 0.5, 6.5);
+    if (ins) R(0.5, 0.56, 1, 6.5, INS, 'sand', '#999', 0.4);
+    // снаружи: мембрана, контррейка, обшивка
+    Lq(-0.02, 0.06, -0.02, 6.5, MEMB, 1.2);
+    R(-0.27, 0.06, -0.02, 6.5, '#ffffff', undefined, '#999', 0.4);
+    R(-0.45, -0.6, -0.27, 6.5, WOOD, undefined, '#5a3d22', 0.8);
+    for (let z = -0.6 + 1.46; z < 6.4; z += 1.46) Lq(-0.45, z, -0.27, z, '#5a3d22', 0.4);
+    Lq(-0.27, -0.6, -0.02, -0.6, '#555', 0.6, true); // сетка от грызунов
+    // внутри: пароизоляция, вагонка, плинтус
+    Lq(1.02, 0.24, 1.02, 6.5, VAP, 1.2);
+    R(1.03, 0.24, 1.155, 6.5, WOOD, undefined, '#5a3d22', 0.6);
+    R(1.155, 0.24, 1.35, 0.74, WOOD2, undefined, '#5a3d22', 0.5);
+    // пол: лага 50×150, черновой пол на черепном бруске, утеплитель, мембрана, пароизоляция, OSB
+    R(1.25, -1.5, 1.75, 0, WOOD2, undefined, '#5a3d22', 0.8); cross(1.25, -1.5, 1.75, 0);
+    R(1.75, -1.5, 2.25, -1.0, WOOD2, undefined, '#5a3d22', 0.5); cross(1.75, -1.5, 2.25, -1.0);
+    R(1.75, -1.0, 8.5, -0.75, WOOD, undefined, '#5a3d22', 0.6); grain(2.25, -1.0, 8.5, -0.75);
+    Lq(1.75, -0.73, 8.5, -0.73, MEMB, 1.2);
+    if (ins) R(1.75, -0.72, 8.5, 0, INS, 'sand', '#999', 0.4);
+    Lq(1.0, 0.03, 8.5, 0.03, VAP, 1.2);
+    R(1.0, 0.06, 8.5, 0.24, '#E2C48F', undefined, '#5a3d22', 0.7);
+    Lq(8.5, -1.0, 8.5, 0.24, '#333', 0.5, true);
+    // продух
+    pr.push({ t: 'text', x: 4.5, y: -3.6, s: 'проветриваемое подполье (продухи)', size: 0.27, anchor: 'middle', c: '#555' });
+    // отметка пола
+    pr.push({ t: 'poly', pts: [[7.5, 0.24], [7.35, 0.5], [7.65, 0.5]], fill: '#fff', c: '#222', w: 0.5 });
+    pr.push({ t: 'line', x1: 7.35, y1: 0.5, x2: 8.9, y2: 0.5, w: 0.4 });
+    pr.push({ t: 'text', x: 7.6, y: 0.6, s: '±0,000', size: 0.27 });
+    pr.push({ t: 'dim', x1: -0.45, y1: 6.5, x2: 1.155, y2: 6.5, off: 0.5, s: '≈160' });
+    tag(-0.36, 4.5, 'Имитация бруса 18–20 мм, нижний край с напуском 50 мм на ростверк');
+    tag(-0.15, 3.6, 'Контррейка 25×50 — вентзазор 25 мм');
+    tag(-0.02, 2.7, 'Ветро-влагозащитная мембрана, нахлёст 100 мм');
+    tag(0.25, 4.0, `Стойка 50×100 шаг ${String(p.postStep).replace('.', ',')} м${ins ? ' + минвата 100 мм' : ''}`);
+    tag(1.02, 5.2, 'Пароизоляция, стыки на скотч');
+    tag(1.09, 5.8, lining);
+    tag(0.5, 0.3, 'Нижняя обвязка 50×100, антисептик');
+    tag(0.6, 0.03, 'Отсечная гидроизоляция (рубероид 2 слоя)');
+    tag(5, 0.15, 'OSB-3 18 мм — чистовой пол по пароизоляции');
+    tag(1.5, -0.5, 'Лага 50×150 шаг 0,5 м');
+    tag(5, -0.36, ins ? 'Утеплитель 150 мм между лагами' : 'Пространство между лагами');
+    tag(5, -0.73, 'Ветро-влагозащитная мембрана');
+    tag(5, -0.88, 'Черновой пол 25 мм на черепном бруске 50×50');
+    tag(0.5, -0.9, 'Ростверк — брус 150×150, антисептик');
+    tag(-0.14, -0.6, 'Сетка от грызунов в нижнем продухе');
+    tag(0.75, -3, blocks ? 'Блок 200×200×400 на подушке ПГС 100 мм' : 'Винтовая свая Ø89 с оголовком');
+    const { title, prims } = finish('Узел 1. Стена — ростверк — пол', 10, 6.3, -6.3, -4, 'Все деревянные элементы — антисептик. Мембрана снаружи утеплителя, пароизоляция — с тёплой стороны.');
+    out.push({ title, x0: -4.3, y0: -8.2, x1: 24, y1: 7.4, prims });
+  }
+
+  // ---------- Узел 2: карниз — стена, стропило, кровля ----------
+  {
+    const { pr, R, Lq, grain, tag, finish } = mk();
+    const s = Math.max(0.03, Math.min(0.25, (i.hHigh - i.hLow) / (i.span || 2.4)));
+    const ovr = (p.overhang ?? 0.3) * 10;
+    const zr = (x: number) => 0.6 + (x - 0.0) * s; // низ стропила
+    // стена (снизу обрыв)
+    R(0, -4, 0.5, 0.1, WOOD, undefined, '#5a3d22', 0.8); grain(0, -4, 0.5, 0.1);
+    if (ins) R(0.5, -4, 1, 0.1, INS, 'sand', '#999', 0.4);
+    R(0, 0.1, 1, 0.6, WOOD2, undefined, '#5a3d22', 0.9); // верхняя обвязка
+    Lq(0, 0.1, 1, 0.6, '#7a5232', 0.35); Lq(0, 0.6, 1, 0.1, '#7a5232', 0.35);
+    Lq(-0.02, -4, -0.02, 0.6, MEMB, 1.2);
+    R(-0.27, -4, -0.02, -0.5, '#ffffff', undefined, '#999', 0.4);
+    R(-0.45, -4, -0.27, -0.5, WOOD, undefined, '#5a3d22', 0.8);
+    for (let z = -4 + 1.46; z < -0.5; z += 1.46) Lq(-0.45, z, -0.27, z, '#5a3d22', 0.4);
+    Lq(1.02, -4, 1.02, zr(1.02), VAP, 1.2);
+    R(1.03, -4, 1.155, zr(1.03) - 0.02, WOOD, undefined, '#5a3d22', 0.6);
+    // стропило 50×rB, вынос ovr
+    const x0 = -ovr, x1 = 9;
+    pr.push({ t: 'poly', pts: [[x0, zr(x0)], [x1, zr(x1)], [x1, zr(x1) + rB], [x0, zr(x0) + rB]], fill: WOOD2, c: '#5a3d22', w: 0.9 });
+    grain(x0, zr(x0) + 0.4, 1.1, zr(x0) + rB * 0.7);
+    // потолок: утеплитель, пароизоляция, вагонка
+    if (ins) { // в пролёте между стропилами: утеплитель 100 мм снизу, стропило — пунктиром за плоскостью разреза
+      pr.push({ t: 'poly', pts: [[1.155, zr(1.155)], [x1, zr(x1)], [x1, zr(x1) + 1], [1.155, zr(1.155) + 1]], fill: INS, c: '#999', w: 0.4, hatch: 'sand' });
+      pr.push({ t: 'poly', pts: [[1.155, zr(1.155) + 1], [x1, zr(x1) + 1], [x1, zr(x1) + rB], [1.155, zr(1.155) + rB]], fill: '#ffffff', c: '#bbb', w: 0.3 });
+      Lq(1.155, zr(1.155) + rB * 0.98, x1, zr(x1) + rB * 0.98, '#5a3d22', 0.4, true); Lq(1.155, zr(1.155) + 0.02, x1, zr(x1) + 0.02, '#5a3d22', 0.4, true);
+    }
+    Lq(1.155, zr(1.155) - 0.03, x1, zr(x1) - 0.03, VAP, 1.2);
+    pr.push({ t: 'poly', pts: [[1.155, zr(1.155) - 0.05], [x1, zr(x1) - 0.05], [x1, zr(x1) - 0.175], [1.155, zr(1.155) - 0.175]], fill: WOOD, c: '#5a3d22', w: 0.6 });
+    // мембрана, контробрешётка, обрешётка, профнастил
+    const zt = (x: number) => zr(x) + rB;
+    Lq(x0, zt(x0) + 0.02, x1, zt(x1) + 0.02, MEMB, 1.2);
+    pr.push({ t: 'poly', pts: [[x0, zt(x0) + 0.03], [x1, zt(x1) + 0.03], [x1, zt(x1) + 0.33], [x0, zt(x0) + 0.33]], fill: '#ffffff', c: '#999', w: 0.4 });
+    for (let x = x0 + 0.3; x < x1 - 0.5; x += 3.5) pr.push({ t: 'poly', pts: [[x, zt(x) + 0.33], [x + 1, zt(x + 1) + 0.33], [x + 1, zt(x + 1) + 0.58], [x, zt(x) + 0.58]], fill: WOOD, c: '#5a3d22', w: 0.6 });
+    // профнастил С-20: трапеция
+    const pf: [number, number][] = [];
+    for (let x = x0 - 0.5; x <= x1; x += 0.6875) { const b = zt(x) + 0.6; pf.push([x, b], [x + 0.17, b + 0.2], [x + 0.52, b + 0.2], [x + 0.6875, b]); }
+    for (let k = 0; k < pf.length - 1; k++) pr.push({ t: 'line', x1: pf[k][0], y1: pf[k][1], x2: pf[k + 1][0], y2: pf[k + 1][1], w: 1.0, c: '#5a3a30' });
+    // лобовая доска, софит, капельник
+    const zf0 = zr(x0) - 0.2, zf1 = zt(x0) + 0.3;
+    R(x0 - 0.25, zf0, x0, zf1, WOOD, undefined, '#5a3d22', 0.8);
+    R(x0, zf0, -0.45, zf0 + 0.2, WOOD, undefined, '#5a3d22', 0.6); // подшивка карниза
+    for (let x = x0 + 0.4; x < -0.6; x += 0.6) Lq(x, zf0 + 0.04, x + 0.15, zf0 + 0.16, '#555', 0.4); // перфорация
+    pr.push({ t: 'line', x1: x0 - 0.5, y1: zt(x0 - 0.5) + 0.6, x2: x0 - 0.5, y2: zt(x0 - 0.5) + 0.25, w: 1.0, c: '#5a3a30' }); // капельник
+    // стрелки вентиляции
+    for (const [ax, az, bx, bz] of [[-0.15, -1.5, -0.15, 0.5], [-1.5, zf0 - 0.5, -1.5, zf0 + 0.6]] as number[][]) { Lq(ax, az, bx, bz, '#2a8a4a', 0.8); Lq(bx, bz, bx - 0.12, bz - 0.25, '#2a8a4a', 0.8); Lq(bx, bz, bx + 0.12, bz - 0.25, '#2a8a4a', 0.8); }
+    pr.push({ t: 'dim', x1: x0 - 0.25, y1: zf0, x2: -0.45, y2: zf0, off: -1.0, s: `${Math.round(ovr * 100)}` });
+    tag(x1 - 2, zt(x1 - 2) + 0.75, `${p.cover === 'tile' ? 'Металлочерепица' : 'Профнастил С-20'}, саморезы 4,8×35 через волну`);
+    tag(x1 - 4.3, zt(x1 - 4.3) + 0.45, 'Обрешётка 25×100 шаг 350 мм');
+    tag(x1 - 1, zt(x1 - 1) + 0.2, 'Контробрешётка 30×50 — вентзазор');
+    tag(x1 - 3, zt(x1 - 3) + 0.02, 'Гидро-ветрозащитная мембрана');
+    tag(5, zr(5) + rB * 0.5, `Стропило ${i.rafterProf || '50×200'} шаг 0,6 м${ins ? ' + минвата 100 мм' : ''}`);
+    tag(6, zr(6) - 0.03, 'Пароизоляция, стыки на скотч');
+    tag(7, zr(7) - 0.11, `Потолок: ${lining.toLowerCase()}`);
+    tag(0.5, 0.35, 'Верхняя обвязка 50×100, крепление стропила уголком / скобой');
+    tag(x0 - 0.12, zf1 - 0.3, 'Лобовая доска 25×150');
+    tag(x0 - 0.5, zt(x0 - 0.5) + 0.4, 'Капельник / карнизная планка');
+    tag(-1.2, zf0 + 0.1, 'Подшивка карниза (софит) с перфорацией');
+    tag(-0.15, -1.5, 'Выход вентзазора стены под карниз');
+    tag(-0.36, -3, 'Обшивка стены — имитация бруса');
+    tag(0.75, -2.5, ins ? 'Стойка + минвата 100 мм' : 'Стойка каркаса');
+    const { title, prims } = finish('Узел 2. Карниз: стена — стропило — кровля', 11.5, 5.0, -4.2, x0 - 0.8, 'Уклон и вынос — по проекту. Вентзазоры стены и кровли сообщаются с наружным воздухом.');
+    out.push({ title, x0: x0 - 1.0, y0: -5.8, x1: 27, y1: 5.6, prims });
+  }
+  return out;
+}
+
 function nodeSheets(res: CanopyResult): Sheet[] {
   const K = 5;
   const P = res.params, I = res.info;
@@ -642,4 +844,278 @@ function nodeSheets(res: CanopyResult): Sheet[] {
     out.push({ title: 'Узел 4. Крепление связи жёсткости', x0: -1.5, y0: -2.3, x1: 10, y1: 2.3, prims: pr });
   }
   return out;
+}
+
+
+/** Лист «Состав стены, пола и кровли»: слои с толщинами и выносками (толщины условно ×6) */
+// ---------------------------------------------------------------- план помещения и разрез 1-1 (замкнутая утеплённая постройка)
+const circle = (cx: number, cy: number, r: number, n = 28): [number, number][] => Array.from({ length: n }, (_, i) => [cx + r * Math.cos((2 * Math.PI * i) / n), cy + r * Math.sin((2 * Math.PI * i) / n)] as [number, number]);
+const mmS = (v: number) => String(Math.round(v * 1000));
+function roomSheets(res: CanopyResult): Sheet[] {
+  const p: any = res.params, i: any = res.info;
+  const { L, W, walls } = p;
+  const solid = (['front', 'back', 'left', 'right'] as Side[]).every((s) => ['wood', 'sandwich', 'prof_full'].includes(walls[s]));
+  if (!solid || p.attach) return [];
+  const [stA, stB] = String(i.postProf || '50×100').split('×').map((v) => Number(v) / 1000);
+  const ins = !!p.insulate;
+  const tIn = (stB || 0.1) / 2 + (ins ? 0.0125 : 0), tOut = (stB || 0.1) / 2 + (walls.front === 'wood' ? 0.043 : 0.02);
+  const WALL = ins ? '#F3E39A' : '#E8D9BC';
+  const out: Sheet[] = [];
+
+  // ---------- план помещения ----------
+  {
+    const pr: Prim[] = [];
+    const sideLen: Record<Side, number> = { front: L, back: L, left: W, right: W };
+    // точка на стороне s: a — вдоль стены (как в openings), n — по нормали наружу
+    const P = (s: Side, a: number, n: number): [number, number] => s === 'front' ? [a, -n] : s === 'back' ? [a, W + n] : s === 'left' ? [-n, a] : [L + n, a];
+    for (const s of ['front', 'back', 'left', 'right'] as Side[]) {
+      const ext = s === 'front' || s === 'back';
+      const a0 = ext ? -tOut : tIn, a1 = ext ? sideLen[s] + tOut : sideLen[s] - tIn;
+      const ops = res.openings.filter((o) => o.side === s).sort((x, y) => x.a0 - y.a0);
+      const cuts: [number, number][] = [];
+      let cur = a0;
+      for (const o of ops) { if (o.a0 > cur) cuts.push([cur, o.a0]); cur = Math.max(cur, o.a1); }
+      if (a1 > cur) cuts.push([cur, a1]);
+      for (const [u0, u1] of cuts) pr.push({ t: 'poly', pts: [P(s, u0, tOut), P(s, u1, tOut), P(s, u1, -tIn), P(s, u0, -tIn)], fill: WALL, c: '#222', w: 1.1, hatch: ins ? 'sand' : undefined });
+      // обшивка снаружи — тонкая линия
+      for (const [u0, u1] of cuts) { const [x1, y1] = P(s, u0, tOut - 0.02), [x2, y2] = P(s, u1, tOut - 0.02); pr.push({ t: 'line', x1, y1, x2, y2, w: 0.35, c: '#8a6440' }); }
+      for (const o of ops) {
+        const w = o.a1 - o.a0;
+        if (o.kind === 'window') {
+          for (const n of [tOut, -tIn]) { const [x1, y1] = P(s, o.a0, n), [x2, y2] = P(s, o.a1, n); pr.push({ t: 'line', x1, y1, x2, y2, w: 0.5, c: '#333' }); }
+          for (const n of [0.012, -0.012]) { const [x1, y1] = P(s, o.a0, n), [x2, y2] = P(s, o.a1, n); pr.push({ t: 'line', x1, y1, x2, y2, w: 0.7, c: '#2f6db5' }); }
+          const [x1, y1] = P(s, o.a0 - 0.05, -tIn - 0.06), [x2, y2] = P(s, o.a1 + 0.05, -tIn - 0.06); // подоконник
+          pr.push({ t: 'poly', pts: [P(s, o.a0 - 0.05, -tIn), P(s, o.a1 + 0.05, -tIn), [x2, y2], [x1, y1]], fill: '#ffffff', c: '#333', w: 0.5 });
+        } else if (o.kind === 'gate') {
+          for (const n of [tOut, -tIn]) { const [x1, y1] = P(s, o.a0, n), [x2, y2] = P(s, o.a1, n); pr.push({ t: 'line', x1, y1, x2, y2, w: 0.6, c: '#333', dash: true }); }
+        } else {
+          // полотно и дуга открывания внутрь, петли у a0
+          const h0 = P(s, o.a0, -tIn), e = P(s, o.a0, -tIn - w);
+          pr.push({ t: 'line', x1: h0[0], y1: h0[1], x2: e[0], y2: e[1], w: 1.4, c: '#222' });
+          const arc: [number, number][] = [];
+          for (let k = 0; k <= 16; k++) { const t = (Math.PI / 2) * (k / 16); arc.push(P(s, o.a0 + w * Math.sin(t), -tIn - w * Math.cos(t))); }
+          for (let k = 0; k < arc.length - 1; k++) pr.push({ t: 'line', x1: arc[k][0], y1: arc[k][1], x2: arc[k + 1][0], y2: arc[k + 1][1], w: 0.4, c: '#555' });
+          const [x1, y1] = P(s, o.a0, -tIn), [x2, y2] = P(s, o.a1, -tIn);
+          pr.push({ t: 'line', x1, y1, x2, y2, w: 0.4, c: '#555', dash: true }); // порог
+        }
+      }
+    }
+    // марки по всему плану: нумерация как на фасадах (ОК-1…, Д-1…)
+    {
+      let wn = 0, dn = 0;
+      for (const s of ['front', 'right', 'back', 'left'] as Side[]) for (const o of res.openings.filter((x) => x.side === s).sort((x, y) => x.a0 - y.a0)) {
+        const mark = o.kind === 'window' ? `ОК-${++wn}` : o.kind === 'door' ? `Д-${++dn}` : 'В-1';
+        const [x, y] = P(s, (o.a0 + o.a1) / 2, tOut + (s === 'back' || s === 'right' ? 0.85 : 0.28));
+        const rot = s === 'left' || s === 'right' ? 90 : 0;
+        pr.push({ t: 'text', x: x + (rot ? (s === 'left' ? 0.04 : 0.12) : 0), y: y - (rot ? 0 : 0.06), s: `${mark}  ${mmS(o.a1 - o.a0)}×${mmS(o.h - (o.z0 || 0))}`, size: 0.13, anchor: 'middle', rot, bold: true, c: '#1f5fae' });
+      }
+    }
+    // стойки каркаса в стене
+    for (const m of res.members.filter((x) => x.kind === 'post')) {
+      const [a, b] = sizeOf(m.profile); const onX = Math.abs(m.a[1]) < 0.01 || Math.abs(m.a[1] - W) < 0.01;
+      const hx = (onX ? a : b) / 2, hy = (onX ? b : a) / 2;
+      pr.push({ t: 'poly', pts: [[m.a[0] - hx, m.a[1] - hy], [m.a[0] + hx, m.a[1] - hy], [m.a[0] + hx, m.a[1] + hy], [m.a[0] - hx, m.a[1] + hy]], fill: '#B07A45', c: '#5a3d22', w: 0.4 });
+    }
+    // оси
+    const ax = (x1: number, y1: number, x2: number, y2: number, lab: string, cx: number, cy: number) => {
+      pr.push({ t: 'line', x1, y1, x2, y2, w: 0.35, c: '#888', dash: true });
+      pr.push({ t: 'poly', pts: circle(cx, cy, 0.17), fill: '#ffffff', c: '#444', w: 0.5 });
+      pr.push({ t: 'text', x: cx, y: cy - 0.055, s: lab, size: 0.16, anchor: 'middle', bold: true });
+    };
+    const D = 1.75;
+    ax(0, -D + 0.17, 0, W + 0.35, '1', 0, -D); ax(L, -D + 0.17, L, W + 0.35, '2', L, -D);
+    ax(-D + 0.17, 0, L + 0.35, 0, 'А', -D, 0); ax(-D + 0.17, W, L + 0.35, W, 'Б', -D, W);
+    // размерные цепочки: проёмы (1-я), между осями (2-я), габарит по обшивке (3-я)
+    for (const s of ['front', 'left'] as Side[]) {
+      const len = sideLen[s];
+      const ops = res.openings.filter((o) => o.side === s).sort((x, y) => x.a0 - y.a0);
+      const horiz = s === 'front';
+      const dim = (u0: number, u1: number, off: number, txt: string) => pr.push(horiz ? { t: 'dim', x1: u0, y1: -tOut, x2: u1, y2: -tOut, off, s: txt } : { t: 'dim', x1: -tOut, y1: u0, x2: -tOut, y2: u1, off, s: txt });
+      if (ops.length) { const c = [0, ...ops.flatMap((o) => [o.a0, o.a1]), len]; for (let k = 0; k < c.length - 1; k++) if (c[k + 1] - c[k] > 0.04) dim(c[k], c[k + 1], -0.45, mmS(c[k + 1] - c[k])); }
+      dim(0, len, -0.85, mmS(len));
+      dim(-tOut, len + tOut, -1.25, mmS(len + 2 * tOut));
+    }
+    for (const s of ['back', 'right'] as Side[]) {
+      const ops = res.openings.filter((o) => o.side === s).sort((x, y) => x.a0 - y.a0);
+      if (!ops.length) continue;
+      const len = sideLen[s], horiz = s === 'back';
+      const c = [0, ...ops.flatMap((o) => [o.a0, o.a1]), len];
+      for (let k = 0; k < c.length - 1; k++) if (c[k + 1] - c[k] > 0.04) pr.push(horiz ? { t: 'dim', x1: c[k], y1: W + tOut, x2: c[k + 1], y2: W + tOut, off: 0.45, s: mmS(c[k + 1] - c[k]) } : { t: 'dim', x1: L + tOut, y1: c[k], x2: L + tOut, y2: c[k + 1], off: 0.45, s: mmS(c[k + 1] - c[k]) });
+    }
+    // помещение: внутренние размеры и площадь
+    const iL = L - 2 * tIn, iW = W - 2 * tIn, area = Math.round(iL * iW * 10) / 10;
+    pr.push({ t: 'dim', x1: tIn, y1: W * 0.2, x2: L - tIn, y2: W * 0.2, off: 0, s: `${mmS(iL)} (в чистоте)` });
+    pr.push({ t: 'dim', x1: L * 0.86, y1: tIn, x2: L * 0.86, y2: W - tIn, off: 0, s: mmS(iW) });
+    pr.push({ t: 'poly', pts: circle(L * 0.45, W * 0.38, 0.36), fill: '#ffffff', c: '#333', w: 0.6 });
+    pr.push({ t: 'text', x: L * 0.45, y: W * 0.38 + 0.03, s: '1', size: 0.2, anchor: 'middle', bold: true });
+    pr.push({ t: 'text', x: L * 0.45, y: W * 0.38 - 0.2, s: `${String(area).replace('.', ',')} м²`, size: 0.13, anchor: 'middle' });
+    pr.push({ t: 'text', x: L * 0.45, y: W * 0.38 + 0.48, s: 'Помещение', size: 0.17, anchor: 'middle', c: '#444' });
+    // линия разреза 1-1 поперёк ската
+    const alongY = p.highSide === 'front' || p.highSide === 'back';
+    const cx = alongY ? L * 0.25 : L / 2, cy = alongY ? W / 2 : W * 0.25;
+    if (p.roof !== 'single') { /* разрез только для односкатной */ } else if (alongY) for (const [y, dy] of [[-tOut - 0.35, -0.3], [W + tOut + 0.35, 0.3]] as [number, number][]) {
+      pr.push({ t: 'line', x1: cx, y1: y, x2: cx, y2: y + dy, w: 2, c: '#222' });
+      pr.push({ t: 'line', x1: cx, y1: y + dy, x2: cx + 0.3, y2: y + dy, w: 2, c: '#222' });
+      pr.push({ t: 'text', x: cx + 0.42, y: y + dy - 0.07, s: '1', size: 0.2, bold: true });
+    } else for (const [x, dx] of [[-tOut - 0.35, -0.3], [L + tOut + 0.35, 0.3]] as [number, number][]) {
+      pr.push({ t: 'line', x1: x, y1: cy, x2: x + dx, y2: cy, w: 2, c: '#222' });
+      pr.push({ t: 'line', x1: x + dx, y1: cy, x2: x + dx, y2: cy + 0.3, w: 2, c: '#222' });
+      pr.push({ t: 'text', x: x + dx - 0.05, y: cy + 0.42, s: '1', size: 0.2, bold: true });
+    }
+    pr.push({ t: 'text', x: -D - 0.2, y: -D - 0.75, s: `Стены: каркас ${i.postProf || ''} шаг ${String(p.postStep).replace('.', ',')} м${ins ? ', утеплитель 100 мм' : ''}; толщина стены ≈ ${mmS(tIn + tOut)} мм. Размеры — в мм.`, size: 0.15, c: '#555' });
+    out.push({ title: 'План помещения', x0: -D - 0.4, y0: -D - 1.0, x1: L + 1.2, y1: W + tOut + 0.95, prims: pr });
+  }
+
+  // ---------- разрез 1-1 (односкатная кровля) ----------
+  if (p.roof === 'single') {
+    const pr: Prim[] = [];
+    const alongY = p.highSide === 'front' || p.highSide === 'back';
+    const S = alongY ? W : L, ovr = p.overhang ?? 0.3;
+    const xc = alongY ? L * 0.25 : L / 2, yc = alongY ? W / 2 : W * 0.25;
+    const hz = (u: number) => (alongY ? res.topAt(xc, u) : res.topAt(u, yc));
+    const hS = (u: number) => hz(0) + ((hz(S) - hz(0)) * u) / S; // линейно по пролёту (односкатная)
+    const rB = Number(String(i.rafterProf || '50×150').split('×')[1]) / 1000 || 0.15;
+    const zG = p.base === 'floor' ? (p.floorOn === 'blocks' ? -0.35 : -0.45) : 0;
+    // грунт
+    pr.push({ t: 'poly', pts: [[-ovr - 0.6, zG], [S + ovr + 0.6, zG], [S + ovr + 0.6, zG - 0.25], [-ovr - 0.6, zG - 0.25]], fill: '#A88F6C', c: '#776', w: 0.4, hatch: 'soil' });
+    pr.push({ t: 'line', x1: -ovr - 0.6, y1: zG, x2: S + ovr + 0.6, y2: zG, w: 1.2, c: '#333' });
+    if (p.base === 'floor') {
+      const sup = W > 3.2 && alongY ? [0, S / 2, S] : [0, S];
+      for (const u of sup) {
+        if (p.floorOn === 'blocks') pr.push({ t: 'poly', pts: [[u - 0.1, zG], [u + 0.1, zG], [u + 0.1, -0.15], [u - 0.1, -0.15]], fill: '#D2CFC8', c: '#444', w: 0.6, hatch: 'concrete' });
+        else { pr.push({ t: 'poly', pts: [[u - 0.045, zG - 0.22], [u + 0.045, zG - 0.22], [u + 0.045, -0.15], [u - 0.045, -0.15]], fill: '#9aa0a6', c: '#333', w: 0.6 }); }
+        pr.push({ t: 'poly', pts: [[u - 0.075, -0.15], [u + 0.075, -0.15], [u + 0.075, 0], [u - 0.075, 0]], fill: '#C49A6C', c: '#5a3d22', w: 0.7 });
+        pr.push({ t: 'line', x1: u - 0.075, y1: -0.15, x2: u + 0.075, y2: 0, w: 0.3, c: '#5a3d22' }); pr.push({ t: 'line', x1: u - 0.075, y1: 0, x2: u + 0.075, y2: -0.15, w: 0.3, c: '#5a3d22' });
+      }
+      // пол: утеплитель между лагами + OSB
+      pr.push({ t: 'poly', pts: [[0.075, -0.15], [S - 0.075, -0.15], [S - 0.075, 0], [0.075, 0]], fill: ins ? '#F3E39A' : '#ffffff', c: '#444', w: 0.5, hatch: ins ? 'sand' : undefined });
+      pr.push({ t: 'poly', pts: [[-tOut, 0], [S + tOut, 0], [S + tOut, 0.02], [-tOut, 0.02]], fill: '#E2C48F', c: '#5a3d22', w: 0.6 });
+    } else pr.push({ t: 'poly', pts: [[-tOut - 0.3, 0], [S + tOut + 0.3, 0], [S + tOut + 0.3, -0.15], [-tOut - 0.3, -0.15]], fill: '#D2CFC8', c: '#444', w: 0.6, hatch: 'concrete' });
+    // стены в разрезе
+    for (const [u, sgn] of [[0, -1], [S, 1]] as [number, number][]) {
+      const top = hS(u);
+      const xo = u + sgn * tOut, xi = u - sgn * tIn;
+      pr.push({ t: 'poly', pts: [[xo, 0.02], [xi, 0.02], [xi, top], [xo, top]], fill: WALL, c: '#222', w: 1.1, hatch: ins ? 'sand' : undefined });
+      pr.push({ t: 'line', x1: u + sgn * (tOut - 0.02), y1: 0.02, x2: u + sgn * (tOut - 0.02), y2: top, w: 0.35, c: '#8a6440' });
+      pr.push({ t: 'poly', pts: [[u - 0.05, top - 0.1], [u + 0.05, top - 0.1], [u + 0.05, top], [u - 0.05, top]], fill: '#C49A6C', c: '#5a3d22', w: 0.5 }); // верхняя обвязка
+    }
+    // стропило, утеплитель, потолок, обрешётка и кровля
+    const ru0 = -ovr, ru1 = S + ovr;
+    const rp = (u: number, dz: number): [number, number] => [u, hS(u) + dz];
+    pr.push({ t: 'poly', pts: [rp(ru0, 0), rp(ru1, 0), rp(ru1, rB), rp(ru0, rB)], fill: '#DDBE8E', c: '#5a3d22', w: 0.8 });
+    if (ins) pr.push({ t: 'poly', pts: [rp(0, 0.0), rp(S, 0.0), rp(S, 0.1), rp(0, 0.1)], fill: '#F3E39A', c: '#888', w: 0.4, hatch: 'sand' });
+    pr.push({ t: 'poly', pts: [rp(-tIn + 0.0, -0.0125), rp(S + tIn, -0.0125), rp(S + tIn, 0), rp(-tIn, 0)], fill: '#E2C48F', c: '#5a3d22', w: 0.4 });
+    pr.push({ t: 'line', x1: ru0, y1: hS(ru0) + rB + 0.05, x2: ru1, y2: hS(ru1) + rB + 0.05, w: 0.5, c: '#5B8FD6' }); // мембрана
+    pr.push({ t: 'poly', pts: [rp(ru0 - 0.05, rB + 0.08), rp(ru1 + 0.05, rB + 0.08), rp(ru1 + 0.05, rB + 0.1), rp(ru0 - 0.05, rB + 0.1)], fill: '#8a5a4a', c: '#5a3a30', w: 0.9 });
+    // ветровые/лобовые доски
+    for (const u of [ru0, ru1]) pr.push({ t: 'poly', pts: [[u - 0.012, hS(u) - 0.01], [u + 0.012, hS(u) - 0.01], [u + 0.012, hS(u) + rB + 0.08], [u - 0.012, hS(u) + rB + 0.08]], fill: '#C49A6C', c: '#5a3d22', w: 0.5 });
+    // отметки уровней
+    const lvl = (u: number, z: number, txt: string, right = true) => {
+      const d = right ? 1 : -1;
+      pr.push({ t: 'poly', pts: [[u, z], [u - 0.07, z + 0.1], [u + 0.07, z + 0.1]], fill: '#ffffff', c: '#222', w: 0.5 });
+      pr.push({ t: 'line', x1: u - 0.07, y1: z + 0.1, x2: u + d * 0.75, y2: z + 0.1, w: 0.4, c: '#222' });
+      pr.push({ t: 'text', x: u + d * 0.08, y: z + 0.14, s: txt, size: 0.13, anchor: right ? 'start' : 'end' });
+    };
+    const lv = (z: number) => (z >= 0 ? '+' : '−') + (Math.abs(z)).toFixed(3).replace('.', ',');
+    lvl(S + tOut + 0.5, 0.02, '±0,000 пол');
+    lvl(S + tOut + 0.5, zG, `${lv(zG - 0.02)} земля`);
+    lvl(-tOut - 0.5, hS(0), lv(hS(0) - 0.02), false);
+    lvl(S + tOut + 0.5, hS(S), lv(hS(S) - 0.02));
+    // размеры
+    pr.push({ t: 'dim', x1: 0, y1: zG, x2: S, y2: zG, off: -0.45, s: mmS(S) });
+    pr.push({ t: 'dim', x1: ru0, y1: zG, x2: ru1, y2: zG, off: -0.8, s: `${mmS(ru1 - ru0)} по кровле` });
+    pr.push({ t: 'dim', x1: tIn + 0.25, y1: 0.02, x2: tIn + 0.25, y2: hS(tIn) - 0.0125, off: 0, s: `${mmS(hS(tIn) - 0.0125 - 0.02)} в чистоте` });
+    pr.push({ t: 'dim', x1: S - tIn - 0.25, y1: 0.02, x2: S - tIn - 0.25, y2: hS(S - tIn) - 0.0125, off: 0, s: mmS(hS(S - tIn) - 0.0125 - 0.02) });
+    // уклон
+    const sl = Math.abs(hz(S) - hz(0)) / S;
+    pr.push({ t: 'text', x: S / 2, y: hS(S / 2) + rB + 0.24, s: `i = ${Math.round(sl * 100)}% (${(Math.atan(sl) * 180 / Math.PI).toFixed(1).replace('.', ',')}°)`, size: 0.15, anchor: 'middle', bold: true });
+    // выноски
+    const tag = (u: number, z: number, tx: number, tz: number, txt: string) => {
+      pr.push({ t: 'line', x1: u, y1: z, x2: tx, y2: tz, w: 0.35, c: '#333' });
+      pr.push({ t: 'line', x1: tx, y1: tz, x2: tx + 0.1, y2: tz, w: 0.35, c: '#333' });
+      pr.push({ t: 'text', x: tx + 0.14, y: tz - 0.045, s: txt, size: 0.125 });
+    };
+    const TX = S + ovr + 1.7;
+    tag(S * 0.75, hS(S * 0.75) + rB + 0.09, TX, hS(S) + 0.75, `${p.cover === 'tile' ? 'Металлочерепица' : 'Профнастил С-20'} по обрешётке, мембрана`);
+    tag(S * 0.6, hS(S * 0.6) + rB * 0.5, TX, hS(S) + 0.45, `Стропила ${i.rafterProf || ''} шаг 0,6 м${ins ? ' + утеплитель 100' : ''}`);
+    tag(S * 0.5, hS(S * 0.5) - 0.006, TX, hS(S) + 0.15, `Потолок: пароизоляция, ${p.lining === 'osb' ? 'OSB 12' : 'вагонка 12,5'}`);
+    tag(S + tOut * 0.5, 1.2, TX, 1.2, `Стена ≈ ${mmS(tIn + tOut)} мм (состав — отд. лист)`);
+    if (p.base === 'floor') {
+      tag(S * 0.5, -0.07, TX, 0.55, `Пол: OSB 18, лаги 50×150${ins ? ' + утеплитель 150' : ''}`);
+      tag(S, -0.075, TX, -0.12, 'Ростверк — брус 150×150');
+      tag(S + 0.08, (zG - 0.15) / 2, TX, zG + 0.05, p.floorOn === 'blocks' ? 'Блоки 200×200×400 на ПГС' : 'Винтовые сваи Ø89');
+    }
+    out.push({ title: 'Разрез 1-1', x0: -ovr - 1.45, y0: zG - 1.05, x1: TX + 3.1, y1: Math.max(hS(0), hS(S)) + rB + 0.45, prims: pr });
+  }
+  return out;
+}
+
+function compositionSheet(res: CanopyResult): Sheet {
+  const p: any = res.params, i: any = res.info;
+  const K = 10, BW = 2.4;
+  const WOOD = '#DDBE8E', INS = '#F3E39A', AIR = '#FFFFFF', MEMB = '#5B8FD6', VAPOR = '#C0392B', CONC = '#D2CFC8';
+  type Ly = { t: number; name: string; fill: string; hatch?: any; line?: string; min?: number };
+  const ins = p.insulate;
+  const lining = p.lining === 'osb' ? 'OSB-3 12 мм' : p.lining === 'vagonka' ? 'вагонка 12,5 мм' : 'внутренняя обшивка — по выбору';
+  const clad = Object.values(p.walls).includes('wood') ? 'Имитация бруса / доска 18–20 мм' : 'Профлист С-8 на всю высоту';
+  const [stA, stB] = String(i.postProf || '50×100').split('×');
+  const [rA, rB] = String(i.rafterProf || '50×150').split('×');
+  const blocks: { title: string; sub: string; layers: Ly[] }[] = [
+    { title: 'Кровля', sub: 'сверху вниз', layers: [
+      { t: 3, name: `${p.cover === 'tile' ? 'Металлочерепица' : 'Профнастил'} ${p.color === 'none' ? 'оцинкованный' : p.color}`, fill: '#8a5a4a', min: 0.05 },
+      { t: 25, name: 'Обрешётка 25×100 (разреженная)', fill: WOOD },
+      { t: 50, name: 'Контробрешётка 30×50 — вентзазор', fill: AIR, line: '#999' },
+      { t: 1, name: 'Гидро-ветрозащитная мембрана', fill: MEMB, min: 0.035 },
+      { t: Number(rB) || 150, name: `Стропила ${rA}×${rB} через 0,6 м${ins ? ' + минвата 100 мм' : ''}`, fill: ins ? INS : AIR, hatch: ins ? 'sand' : undefined },
+      ...(ins ? [{ t: 1, name: 'Пароизоляция (стыки на скотч)', fill: VAPOR, min: 0.035 } as Ly, { t: 12.5, name: lining, fill: WOOD } as Ly] : []),
+    ] },
+    { title: 'Стена', sub: 'снаружи → внутрь', layers: [
+      { t: 18, name: clad, fill: WOOD },
+      { t: 25, name: 'Контррейка 25×50 — вентзазор', fill: AIR, line: '#999' },
+      { t: 1, name: 'Ветро-влагозащитная мембрана', fill: MEMB, min: 0.035 },
+      { t: Number(stB) || 100, name: `Стойки ${stA}×${stB} через ${String(p.postStep).replace('.', ',')} м${ins ? ' + минвата 100 мм' : ''}`, fill: ins ? INS : AIR, hatch: ins ? 'sand' : undefined },
+      ...(ins ? [{ t: 1, name: 'Пароизоляция (стыки на скотч)', fill: VAPOR, min: 0.035 } as Ly, { t: 12.5, name: lining, fill: WOOD } as Ly] : []),
+    ] },
+  ];
+  if (p.base === 'floor') blocks.push({ title: 'Пол', sub: 'сверху вниз', layers: [
+    { t: 18, name: 'OSB-3 18 мм — чистовой пол', fill: '#E2C48F' },
+    { t: 1, name: 'Пароизоляция', fill: VAPOR, min: 0.035 },
+    { t: 150, name: `Лаги 50×150 через 0,5 м${ins ? ' + минвата 150 мм' : ''}`, fill: ins ? INS : AIR, hatch: ins ? 'sand' : undefined },
+    { t: 1, name: 'Ветро-влагозащитная мембрана', fill: MEMB, min: 0.035 },
+    { t: 25, name: 'Черновой пол 25 мм на черепных брусках 50×50', fill: WOOD },
+    { t: 150, name: 'Подполье с продухами (≥150 мм)', fill: AIR, line: '#bbb' },
+    { t: 150, name: 'Ростверк — брус 150×150, рубероид 2 слоя', fill: '#C49A6C' },
+    { t: 200, name: p.floorOn === 'blocks' ? 'Опора: блоки 200×200×400 на подушке ПГС' : 'Опора: винтовая свая Ø89', fill: CONC, hatch: 'concrete' },
+  ] });
+  const pr: Prim[] = [];
+  const colW = 7.9;
+  let maxH = 0;
+  blocks.forEach((b, bi) => {
+    const x0 = bi * colW;
+    let y = 0;
+    const hs = b.layers.map((l) => Math.max(l.t / 1000 * K, l.min ?? 0.08));
+    const total = hs.reduce((a, v) => a + v, 0);
+    maxH = Math.max(maxH, total);
+    pr.push({ t: 'text', x: x0, y: 0.75, s: b.title, size: 0.34, bold: true });
+    pr.push({ t: 'text', x: x0 + 1.6, y: 0.75, s: b.sub, size: 0.2, c: '#666' });
+    const n = b.layers.length;
+    b.layers.forEach((l, li) => {
+      const h = hs[li];
+      const yt = -y, yb = -y - h;
+      pr.push({ t: 'poly', pts: [[x0, yb], [x0 + BW, yb], [x0 + BW, yt], [x0, yt]], fill: l.fill, c: l.line || '#444', w: 0.6, hatch: l.hatch });
+      if (l.fill === WOOD || l.fill === '#C49A6C' || l.fill === '#E2C48F') for (let k = 0.25; k < BW; k += 0.45) pr.push({ t: 'line', x1: x0 + k, y1: (yt + yb) / 2 + Math.min(0.02, h / 4), x2: x0 + k + 0.3, y2: (yt + yb) / 2 - Math.min(0.02, h / 4), w: 0.3, c: '#9b7a4c' });
+      // выноска: ступенькой к подписи, подписи — равномерно по высоте блока
+      const ly = -((li + 0.5) / n) * Math.max(total, n * 0.42);
+      const my = (yt + yb) / 2;
+      pr.push({ t: 'line', x1: x0 + BW * 0.6, y1: my, x2: x0 + BW + 0.25, y2: my, w: 0.4, c: '#333' });
+      pr.push({ t: 'line', x1: x0 + BW + 0.25, y1: my, x2: x0 + BW + 0.5, y2: ly, w: 0.4, c: '#333' });
+      pr.push({ t: 'text', x: x0 + BW + 0.58, y: ly - 0.06, s: `${li + 1}. ${l.name}${l.t >= 3 ? ` — ${String(l.t).replace('.', ',')} мм` : ''}`, size: 0.19 });
+      y += h;
+    });
+    const tt = b.layers.reduce((a, l) => a + l.t, 0);
+    pr.push({ t: 'text', x: x0, y: -Math.max(total, n * 0.42) - 0.45, s: `Итого ≈ ${Math.round(tt)} мм`, size: 0.2, bold: true, c: '#1f5fae' });
+  });
+  const H = Math.max(maxH, 8 * 0.42) + 0.8;
+  pr.push({ t: 'text', x: 0, y: -H - 0.3, s: 'Толщины показаны условно (×10). Мембрана снаружи утеплителя, пароизоляция — с тёплой стороны; вентзазор обязателен под обшивкой и кровлей.', size: 0.17, c: '#555' });
+  return { title: 'Состав стены, пола и кровли', x0: -0.3, y0: -H - 0.6, x1: blocks.length * colW + 0.2, y1: 1.1, prims: pr };
 }
