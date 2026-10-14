@@ -1,6 +1,6 @@
 import Fastify, { FastifyInstance, FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { MEDIA_DIR } from './instagram';
+import { MEDIA_DIR, finishConnect } from './instagram';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +82,18 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
     const cb = webhookCallback(opts.bot, 'fastify', { secretToken: env.WEBHOOK_SECRET || undefined });
     app.post('/bot/webhook', cb as any);
   }
+
+  // Подключение Instagram: сюда Instagram возвращает после входа
+  app.get('/ig/callback', async (req, reply) => {
+    const q = req.query as any;
+    const page = (title: string, text: string) => reply.header('Content-Type', 'text/html; charset=utf-8').send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><body style="font:17px system-ui;padding:28px;background:#0D2440;color:#EAF4FF"><h1>${title}</h1><p>${text}</p></body>`);
+    if (q.error) return page('Не подключено', 'Доступ не разрешён. Отправьте боту /instagram и попробуйте ещё раз.');
+    try {
+      const r = await finishConnect(String(q.code || ''), String(q.state || ''));
+      if (opts.bot) await opts.bot.api.sendMessage(r.tg, `✅ Instagram @${r.username} подключён. Ролики из очереди можно публиковать кнопкой «Опубликовать».`).catch(() => {});
+      return page('Instagram подключён', `Аккаунт @${r.username}. Можно закрыть страницу и вернуться в Telegram.`);
+    } catch (e: any) { req.log.error(e, 'ig connect'); return page('Не получилось', String(e.message).replace(/</g, '&lt;')); }
+  });
 
   // Ролики для Instagram (Instagram скачивает видео по публичной ссылке)
   if (fs.existsSync(MEDIA_DIR)) await app.register(fastifyStatic, { root: MEDIA_DIR, prefix: '/media/', decorateReply: false });

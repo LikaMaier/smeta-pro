@@ -7,6 +7,7 @@
  * Токен: IG_TOKEN (Instagram API со входом через Instagram), IG_USER_ID. Токен продлевается сам раз в 30 дней.
  */
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { InlineKeyboard, type Bot } from 'grammy';
@@ -28,8 +29,18 @@ const kvSet = (key: string, value: string) => prisma.appKV.upsert({ where: { key
 /** Захват ключа один раз (если двух копий сервера — сработает только у одной) */
 const kvClaim = async (key: string, value: string) => { try { await prisma.appKV.create({ data: { key, value } }); return true; } catch { return false; } };
 
-export const igEnabled = () => Boolean(env.IG_TOKEN && env.IG_USER_ID);
-async function token() { return (await kvGet('ig:token')) || env.IG_TOKEN; }
+// подключение: токен и ID аккаунта из «входа через Instagram» (кнопка в боте) или из переменных Railway
+let cached: { token: string; userId: string } | null = null;
+async function creds() {
+  if (!cached) {
+    const t = (await kvGet('ig:token')) || env.IG_TOKEN, u = (await kvGet('ig:userId')) || env.IG_USER_ID;
+    if (t && u) cached = { token: t, userId: u };
+  }
+  return cached;
+}
+export const igEnabled = async () => Boolean(await creds());
+async function token() { return (await creds())?.token || ''; }
+async function uid() { return (await creds())?.userId || ''; }
 
 async function ig(pathname: string, params: Record<string, string> = {}, method: 'GET' | 'POST' = 'GET') {
   const qs = new URLSearchParams({ ...params, access_token: await token() });
@@ -45,7 +56,7 @@ async function refreshToken(log: any) {
   if (Date.now() - last < 30 * 864e5) return;
   const r = await fetch(`https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(await token())}`);
   const j: any = await r.json().catch(() => ({}));
-  if (j.access_token) { await kvSet('ig:token', j.access_token); await kvSet('ig:tokenAt', String(Date.now())); log.info('Instagram: токен продлён'); }
+  if (j.access_token) { await kvSet('ig:token', j.access_token); cached = null; await kvSet('ig:tokenAt', String(Date.now())); log.info('Instagram: токен продлён'); }
   else log.error({ ig: j }, 'Instagram: не удалось продлить токен');
 }
 
@@ -78,14 +89,14 @@ async function offerNew(bot: Bot, log: any) {
 
 /** Публикация Reels: контейнер → ждём обработку → публикуем */
 export async function publishReel(it: Item) {
-  const c = await ig(`/${env.IG_USER_ID}/media`, { media_type: 'REELS', video_url: videoUrl(it), caption: it.caption, share_to_feed: 'true' }, 'POST');
+  const c = await ig(`/${await uid()}/media`, { media_type: 'REELS', video_url: videoUrl(it), caption: it.caption, share_to_feed: 'true' }, 'POST');
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 6000));
     const s = await ig(`/${c.id}`, { fields: 'status_code,status' });
     if (s.status_code === 'FINISHED') break;
     if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') throw new Error(`Instagram не смог обработать видео: ${s.status || s.status_code}`);
   }
-  const p = await ig(`/${env.IG_USER_ID}/media_publish`, { creation_id: c.id }, 'POST');
+  const p = await ig(`/${await uid()}/media_publish`, { creation_id: c.id }, 'POST');
   const m = await ig(`/${p.id}`, { fields: 'permalink' }).catch(() => ({}));
   return { id: p.id, permalink: m.permalink as string | undefined };
 }
@@ -93,7 +104,7 @@ export async function publishReel(it: Item) {
 // ---------- комментарии ----------
 async function checkComments(bot: Bot, log: any) {
   const me = (await kvGet('ig:username')) || (await ig('/me', { fields: 'username' }).then(async (r) => { await kvSet('ig:username', r.username); return r.username; }));
-  const media = await ig(`/${env.IG_USER_ID}/media`, { fields: 'id,caption,permalink,timestamp', limit: '10' });
+  const media = await ig(`/${await uid()}/media`, { fields: 'id,caption,permalink,timestamp', limit: '10' });
   for (const m of media.data || []) {
     const cm = await ig(`/${m.id}/comments`, { fields: 'id,text,username,timestamp', limit: '50' }).catch(() => ({ data: [] }));
     for (const c of cm.data || []) {
@@ -115,7 +126,7 @@ async function weeklyReport(bot: Bot) {
   if (now.getUTCDay() !== 1 || now.getUTCHours() < 10) return;
   if (!(await kvClaim(`ig:week:${now.toISOString().slice(0, 10)}`, '1'))) return;
   const acc = await ig('/me', { fields: 'username,followers_count,media_count' });
-  const media = await ig(`/${env.IG_USER_ID}/media`, { fields: 'caption,like_count,comments_count,timestamp,permalink', limit: '10' });
+  const media = await ig(`/${await uid()}/media`, { fields: 'caption,like_count,comments_count,timestamp,permalink', limit: '10' });
   const week = (media.data || []).filter((m: any) => Date.now() - Date.parse(m.timestamp) < 7 * 864e5);
   const lines = week.map((m: any) => `• ❤️ ${m.like_count ?? 0} · 💬 ${m.comments_count ?? 0} — ${esc((m.caption || '').split('\n')[0].slice(0, 60))}`);
   const best = [...week].sort((a: any, b: any) => (b.like_count || 0) - (a.like_count || 0))[0];
@@ -123,9 +134,42 @@ async function weeklyReport(bot: Bot) {
   for (const id of reportTo()) await bot.api.sendMessage(Number(id), text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } }).catch(() => {});
 }
 
+// ---------- подключение через «Вход с Instagram» ----------
+const REDIRECT = () => `${env.PUBLIC_URL}/ig/callback`;
+const SCOPES = 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments';
+const sign = (v: string) => crypto.createHmac('sha256', env.SESSION_SECRET || 'dev').update(v).digest('base64url').slice(0, 24);
+export function connectLink(adminTgId: number) {
+  const st = `${adminTgId}.${Date.now() + 3600e3}`;
+  return `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${env.IG_APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT())}&response_type=code&scope=${SCOPES}&state=${encodeURIComponent(`${st}.${sign(st)}`)}`;
+}
+/** Обмен кода на долгий токен (60 дней) и сохранение. Возвращает ник аккаунта. */
+export async function finishConnect(code: string, state: string) {
+  const [tg, exp, sig] = state.split('.');
+  if (!tg || !exp || sign(`${tg}.${exp}`) !== sig || Number(exp) < Date.now()) throw new Error('Ссылка устарела — отправьте боту /instagram ещё раз');
+  const r1 = await fetch('https://api.instagram.com/oauth/access_token', { method: 'POST', body: new URLSearchParams({ client_id: env.IG_APP_ID, client_secret: env.IG_APP_SECRET, grant_type: 'authorization_code', redirect_uri: REDIRECT(), code: code.replace(/#_$/, '') }) });
+  const j1: any = await r1.json().catch(() => ({}));
+  if (!j1.access_token) throw new Error(j1.error_message || j1.error?.message || 'Instagram не выдал доступ');
+  const r2 = await fetch(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(env.IG_APP_SECRET)}&access_token=${encodeURIComponent(j1.access_token)}`);
+  const j2: any = await r2.json().catch(() => ({}));
+  const long = j2.access_token || j1.access_token;
+  const me: any = await (await fetch(`${API}/me?fields=user_id,username&access_token=${encodeURIComponent(long)}`)).json().catch(() => ({}));
+  const id = String(me.user_id || me.id || j1.user_id || '');
+  if (!id) throw new Error('Не удалось узнать ID аккаунта Instagram');
+  await kvSet('ig:token', long); await kvSet('ig:userId', id); await kvSet('ig:tokenAt', String(Date.now())); await kvSet('ig:username', me.username || '');
+  cached = null;
+  return { username: me.username as string, tg: Number(tg) };
+}
+
 // ---------- бот: кнопки и ответы ----------
 export function attachInstagram(bot: Bot) {
   const isAdmin = (id?: number) => id != null && reportTo().includes(String(id));
+  bot.command('instagram', async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) return;
+    if (!env.IG_APP_ID || !env.IG_APP_SECRET) return ctx.reply('Сначала добавьте в Railway переменные IG_APP_ID и IG_APP_SECRET (ID и секрет приложения Instagram из панели Meta).');
+    const on = await igEnabled();
+    await ctx.reply(`${on ? '✅ Instagram подключён' + ((await kvGet('ig:username')) ? ` (@${await kvGet('ig:username')})` : '') + '. Переподключить:' : '📸 Подключите Instagram — нажмите кнопку, войдите в аккаунт и разрешите доступ:'}`,
+      { reply_markup: new InlineKeyboard().url('Войти через Instagram', connectLink(ctx.from!.id)) });
+  });
   bot.callbackQuery(/^ig:(pub|skip):([\w.-]{1,80})$/, async (ctx) => {
     if (!isAdmin(ctx.from?.id)) return ctx.answerCallbackQuery();
     const [, act, id] = ctx.match as RegExpMatchArray;
@@ -134,7 +178,7 @@ export function attachInstagram(bot: Bot) {
     if (!it) return ctx.answerCallbackQuery({ text: 'Ролик не найден в очереди' });
     if (state === 'published' || state === 'skipped' || state === 'publishing') return ctx.answerCallbackQuery({ text: 'Уже обработан' });
     if (act === 'skip') { await kvSet(`ig:item:${id}`, 'skipped'); await ctx.editMessageReplyMarkup().catch(() => {}); return ctx.answerCallbackQuery({ text: 'Не публикуем' }); }
-    if (!igEnabled()) return ctx.answerCallbackQuery({ text: 'Instagram не подключён: нет IG_TOKEN и IG_USER_ID в Railway', show_alert: true });
+    if (!(await igEnabled())) return ctx.answerCallbackQuery({ text: 'Instagram ещё не подключён — отправьте боту /instagram', show_alert: true });
     const claimed = await prisma.appKV.updateMany({ where: { key: `ig:item:${id}`, value: 'offered' }, data: { value: 'publishing' } });
     if (!claimed.count) return ctx.answerCallbackQuery({ text: 'Уже обработан' });
     await ctx.answerCallbackQuery({ text: 'Публикую… это 1–3 минуты' });
@@ -165,7 +209,7 @@ export function startInstagram(bot: Bot, log: { error: (o: any, m?: string) => v
     if (running) return; running = true;
     try {
       await offerNew(bot, log);
-      if (igEnabled()) {
+      if (await igEnabled()) {
         await refreshToken(log).catch((e) => log.error({ err: e }, 'ig token'));
         await checkComments(bot, log).catch((e) => log.error({ err: e }, 'ig comments'));
         await weeklyReport(bot).catch((e) => log.error({ err: e }, 'ig report'));
@@ -174,5 +218,5 @@ export function startInstagram(bot: Bot, log: { error: (o: any, m?: string) => v
   };
   setTimeout(tick, 20000);
   setInterval(tick, 10 * 60e3);
-  log.info(`Instagram-агент: ${igEnabled() ? 'подключён' : 'ждёт IG_TOKEN и IG_USER_ID'}, в очереди ${queue().length}`);
+  igEnabled().then((on) => log.info(`Instagram-агент: ${on ? 'подключён' : 'ждёт подключения (/instagram в боте)'}, в очереди ${queue().length}`));
 }

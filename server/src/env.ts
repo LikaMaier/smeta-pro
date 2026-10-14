@@ -24,6 +24,8 @@ export const env = {
   AI_PROVIDER: process.env.AI_API_KEY || process.env.OPENAI_API_KEY ? 'on' : '',
   // ЮKassa: оплата картой и СБП. Без ключей кнопка оплаты через ЮKassa скрыта.
   IG_TOKEN: process.env.IG_TOKEN || '',
+  IG_APP_ID: process.env.IG_APP_ID || '',
+  IG_APP_SECRET: process.env.IG_APP_SECRET || '',
   IG_USER_ID: process.env.IG_USER_ID || '',
   YOOKASSA_SHOP_ID: process.env.YOOKASSA_SHOP_ID || '',
   YOOKASSA_SECRET_KEY: process.env.YOOKASSA_SECRET_KEY || '',
