@@ -15,6 +15,13 @@ import { PRICES } from '../../../shared/plans';
 export { normCode };
 const PACKS = ['est1', 'est10', 'design1', 'studio_m']; // не подписка «Про»/«Бригада»
 
+export async function findPromo(code?: string | null) {
+  if (!code) return null;
+  const c = normCode(code);
+  if (c.length < 3) return null;
+  return prisma.promoCode.findFirst({ where: { code: c, active: true } });
+}
+
 /** Были ли у человека оплаты подписки (скидка — только на первую) */
 const hadSubscription = async (userId: string) => (await prisma.payment.count({ where: { userId, planCode: { notIn: PACKS } } })) > 0;
 
