@@ -45,6 +45,15 @@ model User {
   lastDigestAt      DateTime?
   referredById      String? // кто пригласил
   referralRewardedAt DateTime? // когда пригласившему начислен бонусный месяц
+  extraUntil        DateTime? // до когда действуют купленные сметы (пакет — на полгода)
+  studioUntil       DateTime? // «3D-Студия»: 3D-проекты и 3D-ссылки без ограничений
+  offerPct          Int? // персональная скидка на месяц «Про» (возврат)
+  offerUntil        DateTime?
+  trialWarnAt       DateTime? // воронка: «пробный закончится завтра»
+  trialEndAt        DateTime? // «пробный закончился — первый месяц со скидкой»
+  firstRemindAt     DateTime? // напоминание о первом месяце
+  yearNudgeAt       DateTime? // предложение перейти на год
+  winbackAt         DateTime? // предложение вернуться
   createdAt         DateTime  @default(now())
 
   priceLists PriceList[]
@@ -81,6 +90,7 @@ model Design {
   sharedAt   DateTime?
   viewedAt   DateTime?
   estimateId String?
+  paidAt    DateTime? // 3D-проект для заказчика оплачен: чистый PDF и 3D-ссылка
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -284,6 +294,7 @@ model Estimate {
   sectionCoefs   Json? // { "Название раздела": 1.15 }
   paySchedule    Json? // [{ title, pct }]
   purchased      Json? // ключи материалов, отмеченных как купленные
+  paidAt         DateTime? // смета оплачена отдельно (99 ₽): без пометки, с логотипом
   acts           WorkAct[]
   deletedAt      DateTime?
   createdAt      DateTime       @default(now())

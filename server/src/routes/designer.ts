@@ -17,21 +17,44 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OBJ_LABEL } from '../../../shared/design/canopy';
-import { TIERS, can, monthKey } from '../../../shared/plans';
+import { TIERS, PRICES, can, monthKey } from '../../../shared/plans';
 
-/** Лимит PDF «Эскизный проект»: бесплатно — 1 всего (с водяным знаком), Про — 5 в месяц, Бригада — без ограничений.
- *  Сверх лимита тратится купленный эскизный проект. Возвращает true, если тратим покупку. */
-export async function designPdfQuota(u: any): Promise<boolean> {
+/** 3D-проект для заказчика — отдельная премиальная покупка.
+ *  Чистый PDF и 3D-ссылка: «Бригада», «3D-Студия», проект оплачен (paidAt) или есть купленный проект (кредит — тратится на этот объект).
+ *  Без оплаты — черновой PDF с водяным знаком: бесплатно 1 всего, с подпиской — несколько в месяц. */
+export const studioActive = (u: any) => Boolean(u.studioUntil && new Date(u.studioUntil) > new Date());
+const premiumUser = (u: any) => studioActive(u) || accessOf(u).tier === 'team';
+const projectOffer = (u: any) => {
+  const sub = accessOf(u).mode === 'subscription' || accessOf(u).mode === 'team';
+  return `3D-проект для заказчика (PDF без водяного знака + 3D-ссылка) — ${sub ? PRICES.designPro : PRICES.design} ₽ за объект${sub ? '' : ` (с «Про» — ${PRICES.designPro} ₽)`}, или «3D-Студия» без ограничений — ${PRICES.studio} ₽ в месяц.`;
+};
+/** Можно ли выдать чистый проект; при необходимости тратит купленный кредит и отмечает объект оплаченным */
+async function cleanProject(u: any, designId?: string | null): Promise<boolean> {
+  if (premiumUser(u)) return true;
+  const d = designId ? await prisma.design.findFirst({ where: { id: designId, userId: u.id, deletedAt: null }, select: { id: true, paidAt: true } }) : null;
+  if (d?.paidAt) return true;
+  if ((u.extraDesigns || 0) > 0) {
+    const took = await prisma.user.updateMany({ where: { id: u.id, extraDesigns: { gt: 0 } }, data: { extraDesigns: { decrement: 1 } } });
+    if (took.count) {
+      if (d) await prisma.design.update({ where: { id: d.id }, data: { paidAt: new Date() } });
+      return true;
+    }
+  }
+  return false;
+}
+/** Черновой PDF (с водяным знаком): остался ли лимит */
+async function draftLeft(u: any) {
   const tier = accessOf(u).tier;
   const limit = TIERS[tier].designPdf;
-  if (limit === Infinity) return false;
   const since = tier === 'free' ? new Date(0) : new Date(`${monthKey()}-01T00:00:00+03:00`);
-  const used = await prisma.auditLog.count({ where: { userId: u.id, entity: 'design', action: 'pdf_sent', createdAt: { gte: since } } });
-  if (used < limit) return false;
-  if ((u.extraDesigns || 0) > 0) return true;
-  throw new HttpError(402, tier === 'free'
-    ? 'Бесплатный эскизный проект уже использован. Купите разовый проект за 390 ₽ (без водяного знака) или оформите «Про» — 5 проектов в месяц.'
-    : `В тарифе «${TIERS[tier].label}» — ${limit} эскизных проектов в месяц, они закончились. Купите разовый проект за 390 ₽ или перейдите на «Бригаду» — без ограничений.`, 'plan_required');
+  const used = await prisma.auditLog.count({ where: { userId: u.id, entity: 'design', action: 'pdf_draft', createdAt: { gte: since } } });
+  return used < limit;
+}
+/** Решение для PDF: 'clean' | 'draft', иначе 402 с предложением купить */
+export async function designPdfMode(u: any, designId?: string | null): Promise<'clean' | 'draft'> {
+  if (await cleanProject(u, designId)) return 'clean';
+  if (await draftLeft(u)) return 'draft';
+  throw new HttpError(402, `Черновые PDF с водяным знаком закончились. ${projectOffer(u)}`, 'design_required', designId || undefined);
 }
 
 const viewUrl = (token: string) => `${env.PUBLIC_URL || ''}/v/${token}`;
@@ -95,8 +118,8 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
   const shareInfo = (d: any) => ({ url: d.shareToken ? viewUrl(d.shareToken) : null, sharedAt: d.sharedAt, viewedAt: d.viewedAt, estimateId: d.estimateId });
 
   app.post('/api/designs/:id/share', async (req) => {
-    requireFeature(req.user, 'share3d');
     const d = await own(req.user.id, (req.params as any).id);
+    if (!d.shareToken && !(await cleanProject(req.user, d.id))) throw new HttpError(402, `3D-ссылка для заказчика входит в 3D-проект. ${projectOffer(req.user)}`, 'design_required', d.id);
     const upd = d.shareToken ? d : await prisma.design.update({ where: { id: d.id }, data: { shareToken: newToken(), sharedAt: new Date(), viewedAt: null } });
     await audit(req.user.id, 'design', d.id, 'share');
     return shareInfo(upd);
@@ -110,7 +133,7 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     const d = await own(req.user.id, (req.params as any).id);
     const { estimateId } = z.object({ estimateId: z.string().min(1).max(64) }).parse(req.body);
     await loadEstimate(req.user.id, estimateId);
-    const share = can(accessOf(req.user).tier, 'share3d'); // 3D-кнопка в смете для заказчика — с тарифа «Про»
+    const share = premiumUser(req.user) || Boolean(d.paidAt); // 3D-кнопка в смете для заказчика — если проект оплачен
     const upd = await prisma.design.update({ where: { id: d.id }, data: { estimateId, ...(d.shareToken || !share ? {} : { shareToken: newToken(), sharedAt: new Date() }) } });
     return shareInfo(upd);
   });
@@ -158,14 +181,14 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
 
   // PDF «Эскизный проект» в чат бота
   app.post('/api/designer/pdf/send', { bodyLimit: 4 * 1024 * 1024 }, async (req) => {
-    const b = z.object({ title: z.string().trim().min(1).max(200), params: paramsSchema, lines: z.array(lineSchema).max(500).optional() }).parse(req.body);
+    const b = z.object({ title: z.string().trim().min(1).max(200), params: paramsSchema, lines: z.array(lineSchema).max(500).optional(), designId: z.string().max(64).optional() }).parse(req.body);
     if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
-    const useCredit = await designPdfQuota(req.user);
+    const mode = await designPdfMode(req.user, b.designId);
     const r = buildDesign(b.params as any, (req.user as any).designPrices || null);
     const u: any = req.user;
     const data = designPdfData(r, {
       title: b.title, company: u.companyName || [u.firstName, u.username ? `@${u.username}` : ''].filter(Boolean).join(' '),
-      logoPath: brandPath(u.logoFile), freeMark: !accessOf(u).active && !useCredit, lines: b.lines,
+      logoPath: brandPath(u.logoFile), freeMark: mode === 'draft', lines: b.lines,
     });
     if (data.freeMark) (data as any).bot = botInfo.username;
     const pdf = await renderDesign(data);
@@ -173,8 +196,8 @@ export async function designerRoutes(app: FastifyInstance, opts: { bot?: any } =
     await opts.bot.api.sendDocument(Number(u.tgId), new InputFile(pdf, fileName(`Эскизный проект — ${b.title}`, 'pdf')), {
       caption: `Эскизный проект «${b.title}»: ${designKindOf(b.params) === 'site' ? '3D участка, генплан с расстояниями по нормам, схема сетей' : designKindOf(b.params) === 'mep' ? '3D в разрезе, план электрики, схема щита, план сантехники' : designKindOf(b.params) === 'fence' ? '3D, фасад, план участка, узлы, раскрой металла' : '3D, план, фасады, разрез основания, раскрой металла'} и ведомость. Всего ≈ ${data.total.toLocaleString('ru-RU')} ₽.`,
     });
-    await audit(u.id, 'design', '-', useCredit ? 'pdf_sent_credit' : 'pdf_sent', { title: b.title });
-    if (useCredit) await prisma.user.updateMany({ where: { id: u.id, extraDesigns: { gt: 0 } }, data: { extraDesigns: { decrement: 1 } } });
-    return { ok: true };
+    await audit(u.id, 'design', b.designId || '-', mode === 'draft' ? 'pdf_draft' : 'pdf_sent', { title: b.title });
+    if (mode === 'draft') await opts.bot.api.sendMessage(Number(u.tgId), `Это черновой PDF с водяным знаком — для себя. ${projectOffer(u)}\n💡 Включите 3D-проект в смету заказчику отдельной строкой — обычно это 3–5 тыс. ₽.`).catch(() => {});
+    return { ok: true, mode };
   });
 }

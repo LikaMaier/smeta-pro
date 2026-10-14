@@ -16,7 +16,7 @@ test('возможности по уровням', () => {
 test('лимиты тарифов', () => {
   assert.equal(TIERS.free.designPdf, 1);
   assert.equal(TIERS.lite.designPdf, 3);
-  assert.equal(TIERS.pro.designPdf, 5);
+  assert.equal(TIERS.pro.designPdf, 3);
   assert.equal(TIERS.team.designPdf, Infinity);
   assert.equal(TIERS.pro.ai, 300);
   assert.equal(TIERS.team.ai, 1000);

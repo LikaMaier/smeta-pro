@@ -57,7 +57,7 @@ export default function AdminPromos() {
               <Field label="Скидка подписчикам"><NumInput value={form.discountPct} onChange={(v) => setForm({ ...form, discountPct: v })} unit="%" /></Field>
               <Field label="Блогеру с оплат"><NumInput value={form.commissionPct} onChange={(v) => setForm({ ...form, commissionPct: v })} unit="%" /></Field>
             </div>
-            <Field label="Пробный «Про» для новичков" hint="Обычный — 7 дней"><NumInput value={form.trialDays} onChange={(v) => setForm({ ...form, trialDays: v })} unit="дн." /></Field>
+            <Field label="Пробный «Про» для новичков" hint="Обычный — 3 дня"><NumInput value={form.trialDays} onChange={(v) => setForm({ ...form, trialDays: v })} unit="дн." /></Field>
             <button className="btn primary block lg" disabled={form.code.trim().length < 3 || !form.name.trim()} onClick={save}>Создать</button>
           </div>
         )}

@@ -25,7 +25,7 @@ export function plain<T = any>(v: any): T {
 export const num = (v: any): number => (v == null ? 0 : typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string, public code?: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string, public target?: string) { super(message); }
 }
 export const notFound = (what = 'Запись') => new HttpError(404, `${what} не найдена`, 'not_found');
 
@@ -34,7 +34,7 @@ export function handleError(err: any, reply: FastifyReply) {
     const first = err.issues[0];
     return reply.status(400).send({ error: `Проверьте поле «${first.path.join('.')}»: ${first.message}`, code: 'validation', issues: err.issues });
   }
-  if (err instanceof HttpError) return reply.status(err.status).send({ error: err.message, code: err.code });
+  if (err instanceof HttpError) return reply.status(err.status).send({ error: err.message, code: err.code, ...(err.target ? { target: err.target } : {}) });
   if (err?.statusCode && err.statusCode < 500) return reply.status(err.statusCode).send({ error: err.message });
   reply.log.error(err);
   return reply.status(500).send({ error: 'Внутренняя ошибка сервера. Попробуйте ещё раз.', code: 'internal' });
@@ -93,9 +93,11 @@ export async function useAi(u: AccessUser & { id: string }, n = 1) {
 
 /** Данные для бесплатного режима: 3 сметы в месяц + купленные раньше пакеты.
  *  estimateCount — создано в этом месяце, limit — сколько можно всего в этом месяце (estimateCount + остаток). */
-export async function freeCtx(userId: string, extra?: number) {
-  const more = extra ?? (await prisma.user.findUnique({ where: { id: userId }, select: { extraEstimates: true } }))?.extraEstimates ?? 0;
-  const list = await prisma.estimate.findMany({ where: { userId, isTemplate: false }, select: { id: true, createdAt: true } }); // удалённые тоже считаются
+export async function freeCtx(userId: string, _extra?: number) {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { extraEstimates: true, extraUntil: true } });
+  // купленные сметы действуют до extraUntil (пакет — полгода); старые покупки без срока — бессрочно
+  const more = u && (!u.extraUntil || u.extraUntil > new Date()) ? u.extraEstimates : 0;
+  const list = await prisma.estimate.findMany({ where: { userId, isTemplate: false }, select: { id: true, createdAt: true, paidAt: true } }); // удалённые тоже считаются
   const a = freeAllowance(list, Math.max(0, more), monthKey(), (d) => monthKey(d));
-  return { estimateCount: a.thisMonth, freeEstimateIds: a.freeIds, limit: a.thisMonth + a.left };
+  return { estimateCount: a.thisMonth, freeEstimateIds: a.freeIds, paidEstimateIds: a.packIds, limit: a.thisMonth + a.left };
 }

@@ -36,7 +36,7 @@ export function DesignActions({ kind, title, params, errors, total, persist, des
   const guard = async (k: string, f: () => Promise<void>) => {
     if (errors.length) return toast(errors[0], true);
     setBusy(k);
-    try { await f(); } catch (e: any) { if (e.code !== 'subscription_required' && e.code !== 'plan_required') toast(e.message, true); } finally { setBusy(''); }
+    try { await f(); } catch (e: any) { if (e.code !== 'subscription_required' && e.code !== 'plan_required' && e.code !== 'design_required') toast(e.message, true); } finally { setBusy(''); }
   };
   const shareText = `${title}: 3D-проект, чертежи и параметры. Покрутите модель пальцем:`;
   const sendTg = () => { if (!share?.url) return; const u = `https://t.me/share/url?url=${encodeURIComponent(share.url)}&text=${encodeURIComponent(shareText)}`; if (tg?.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank'); };
@@ -50,7 +50,7 @@ export function DesignActions({ kind, title, params, errors, total, persist, des
     <>
       <div className="stack" style={{ marginTop: 12 }}>
         <button className="btn primary block lg" disabled={busy === 'share'} onClick={() => guard('share', async () => { const id = await persist(); setShare(await post(`/designs/${id}/share`)); haptic('success'); })}>{busy === 'share' ? 'Готовлю ссылку…' : '🧊 3D-ссылка для заказчика'}</button>
-        <button className="btn block" disabled={busy === 'pdf'} onClick={() => guard('pdf', async () => { await post('/designer/pdf/send', { title, params }); haptic('success'); toast('PDF эскизного проекта отправлен в чат с ботом'); })}>{busy === 'pdf' ? 'Готовлю PDF…' : '📄 PDF эскизного проекта в Telegram'}</button>
+        <button className="btn block" disabled={busy === 'pdf'} onClick={() => guard('pdf', async () => { const id = await persist().catch(() => null); const r = await post('/designer/pdf/send', { title, params, ...(id ? { designId: id } : {}) }); haptic('success'); toast(r?.mode === 'draft' ? 'Черновой PDF (с водяным знаком) отправлен в чат с ботом' : 'PDF 3D-проекта отправлен в чат с ботом'); })}>{busy === 'pdf' ? 'Готовлю PDF…' : '📄 PDF 3D-проекта в Telegram'}</button>
         <div className="grid2">
           <button className="btn" disabled={busy === 'save'} onClick={() => guard('save', async () => { await persist(); haptic('success'); toast('Проект сохранён'); })}>{designId ? 'Сохранить' : 'Сохранить проект'}</button>
           <button className="btn" onClick={openList}>Мои проекты</button>

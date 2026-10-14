@@ -11,20 +11,22 @@ export const FREE_ESTIMATES = 3;
  * Бесплатные сметы: первые FREE_ESTIMATES каждого месяца + купленные раньше пакеты (сверх месячных, по порядку).
  * freeIds — сметы, которые бесплатный пользователь может редактировать; left — сколько ещё можно создать сейчас.
  */
-export function freeAllowance(list: { id: string; createdAt: Date | string }[], extra: number, nowMonth: string, monthOf: (d: Date) => string) {
+export function freeAllowance(list: { id: string; createdAt: Date | string; paidAt?: Date | string | null }[], extra: number, nowMonth: string, monthOf: (d: Date) => string) {
   const sorted = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const perMonth: Record<string, number> = {};
   const freeIds: string[] = [];
+  const packIds: string[] = []; // сметы по купленному пакету — без пометки
   let packUsed = 0;
   for (const e of sorted) {
+    if (e.paidAt) { freeIds.push(e.id); packIds.push(e.id); continue; } // оплачена отдельно — в лимит не входит
     const m = monthOf(new Date(e.createdAt));
     perMonth[m] = (perMonth[m] || 0) + 1;
     if (perMonth[m] <= FREE_ESTIMATES) freeIds.push(e.id);
-    else if (packUsed < extra) { packUsed++; freeIds.push(e.id); }
+    else if (packUsed < extra) { packUsed++; freeIds.push(e.id); packIds.push(e.id); }
   }
   const thisMonth = perMonth[nowMonth] || 0;
   const left = Math.max(0, FREE_ESTIMATES - thisMonth) + Math.max(0, extra - packUsed);
-  return { thisMonth, left, freeIds };
+  return { thisMonth, left, freeIds, packIds };
 }
 export interface FreeCtx { estimateCount: number; freeEstimateIds: string[]; limit?: number }
 

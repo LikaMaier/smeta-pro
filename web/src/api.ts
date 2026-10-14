@@ -7,7 +7,7 @@ export function setToken(t: string | null) {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public code?: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string, public target?: string) { super(message); }
 }
 
 type Listener = (e: ApiError) => void;
@@ -36,7 +36,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const e = new ApiError(res.status, data.error || `Ошибка ${res.status}`, data.code);
+    const e = new ApiError(res.status, data.error || `Ошибка ${res.status}`, data.code, data.target);
     listeners.forEach((l) => l(e));
     throw e;
   }

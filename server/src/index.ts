@@ -5,6 +5,7 @@ import { seedPlans } from './routes/billing';
 import { prisma } from './util';
 import { startReminderLoop } from './routes/organizer';
 import { startAdminReports } from './stats';
+import { startFunnel } from './funnel';
 import { notifyAiWishers } from './routes/ai';
 import { COMPOSITIONS, compositionFor } from '../../shared/compositions';
 import { STARTER_PRICES } from '../../shared/starterPrices';
@@ -47,6 +48,7 @@ async function main() {
     setupBot(bot).catch((e) => app.log.error({ err: e }, 'Не удалось настроить бота'));
     startReminderLoop(bot, app.log, env.PUBLIC_URL);
     startAdminReports(bot, app.log);
+    startFunnel(bot, app.log, env.PUBLIC_URL);
     notifyAiWishers(bot, env.PUBLIC_URL, app.log).catch((e) => app.log.error({ err: e }, 'ai wish notify'));
   } else {
     app.log.warn('BOT_TOKEN не задан — бот и оплата отключены');

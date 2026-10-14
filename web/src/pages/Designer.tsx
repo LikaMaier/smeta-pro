@@ -111,7 +111,7 @@ export default function Designer() {
       const r = await post('/designer/parse', { text, params });
       apply(r.params, r.title, designId); setQuestions(r.questions || []); haptic('success');
       toast('Параметры заполнены — проверьте и поправьте при необходимости');
-    } catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
+    } catch (e: any) { if (!['subscription_required', 'plan_required', 'design_required'].includes(e.code)) toast(e.message, true); } finally { setBusy(''); }
   };
   // три варианта (эконом / стандарт / премиум) с ценами из справочника прораба
   const items = useLoad(() => get<any[]>('/items').catch(() => []), []);
@@ -135,14 +135,14 @@ export default function Designer() {
   const save = async () => {
     setBusy('save');
     try { await persist(); haptic('success'); toast('Проект сохранён'); }
-    catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
+    catch (e: any) { if (!['subscription_required', 'plan_required', 'design_required'].includes(e.code)) toast(e.message, true); } finally { setBusy(''); }
   };
   const [share, setShare] = useState<{ url: string | null; viewedAt?: string | null } | null>(null);
   const openShare = async () => {
     if (errors.length) return toast(errors[0], true);
     setBusy('share');
     try { const id = await persist(); setShare(await post(`/designs/${id}/share`)); haptic('success'); }
-    catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
+    catch (e: any) { if (!['subscription_required', 'plan_required', 'design_required'].includes(e.code)) toast(e.message, true); } finally { setBusy(''); }
   };
   const shareText = `${title}: 3D-проект, чертежи и параметры. Покрутите модель пальцем:`;
   const sendTg = () => { if (!share?.url) return; const u = `https://t.me/share/url?url=${encodeURIComponent(share.url)}&text=${encodeURIComponent(shareText)}`; if (tg?.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank'); };
@@ -151,8 +151,8 @@ export default function Designer() {
   const sendPdf = async () => {
     if (errors.length) return toast(errors[0], true);
     setBusy('pdf');
-    try { await post('/designer/pdf/send', { title, params }); haptic('success'); toast('PDF эскизного проекта отправлен в чат с ботом'); }
-    catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setBusy(''); }
+    try { const id = await persist().catch(() => null); const r = await post('/designer/pdf/send', { title, params, ...(id ? { designId: id } : {}) }); haptic('success'); toast(r?.mode === 'draft' ? 'Черновой PDF (с водяным знаком) отправлен в чат с ботом' : 'PDF 3D-проекта отправлен в чат с ботом'); }
+    catch (e: any) { if (!['subscription_required', 'plan_required', 'design_required'].includes(e.code)) toast(e.message, true); } finally { setBusy(''); }
   };
   const openList = async () => { setListOpen(true); setList(null); try { setList(await get('/designs', { kind: 'canopy' })); } catch (e: any) { toast(e.message, true); setList([]); } };
   const remove = async (d: any) => {
@@ -372,7 +372,7 @@ export default function Designer() {
 
       <div className="stack" style={{ marginTop: 12 }}>
         <button className="btn primary block lg" disabled={busy === 'share'} onClick={openShare}>{busy === 'share' ? 'Готовлю ссылку…' : '🧊 3D-ссылка для заказчика'}</button>
-        <button className="btn block" disabled={busy === 'pdf'} onClick={sendPdf}>{busy === 'pdf' ? 'Готовлю PDF…' : '📄 PDF эскизного проекта в Telegram'}</button>
+        <button className="btn block" disabled={busy === 'pdf'} onClick={sendPdf}>{busy === 'pdf' ? 'Готовлю PDF…' : '📄 PDF 3D-проекта в Telegram'}</button>
         <div className="grid2">
           <button className="btn" disabled={busy === 'save'} onClick={save}>{designId ? 'Сохранить' : 'Сохранить проект'}</button>
           <button className="btn" onClick={openList}>Мои проекты</button>

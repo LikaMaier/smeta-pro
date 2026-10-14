@@ -31,12 +31,14 @@ import Tools from './pages/Tools';
 import NewEstimate from './pages/NewEstimate';
 import Contacts from './pages/Contacts';
 import { applyTheme } from './theme';
+import { Offers } from './components/Pay';
+import { PRICES } from '../../shared/plans';
 
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
   aiEnabled: boolean; aiAvailable: boolean; aiWish?: boolean; promo?: { code: string; discountPct: number } | null; isAdmin: boolean; theme?: string; designPrices?: Record<string, number> | null; pay?: { yookassa: boolean; receipt: boolean };
-  access: { active: boolean; mode: 'trial' | 'subscription' | 'team' | 'expired' | 'free' | 'admin'; tier?: 'free' | 'lite' | 'pro' | 'team'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeLimit?: number; freeEstimateIds?: string[]; estimateCount?: number };
-  plan?: { tier: 'free' | 'lite' | 'pro' | 'team'; label: string; aiLimit: number; aiUsed: number; extraDesigns: number; team: 'owner' | 'member' | null };
+  access: { active: boolean; mode: 'trial' | 'subscription' | 'team' | 'expired' | 'free' | 'admin'; tier?: 'free' | 'lite' | 'pro' | 'team'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeLimit?: number; freeEstimateIds?: string[]; paidEstimateIds?: string[]; estimateCount?: number };
+  plan?: { tier: 'free' | 'lite' | 'pro' | 'team'; label: string; aiLimit: number; aiUsed: number; extraDesigns: number; extraUntil?: string | null; studioUntil?: string | null; offer?: { pct: number; until: string } | null; team: 'owner' | 'member' | null };
 }
 const MeCtx = createContext<{ me: Me; setMe: (m: Me) => void; refreshMe: () => Promise<void> }>(null as any);
 export const useMe = () => useContext(MeCtx);
@@ -104,16 +106,34 @@ function TgBack() {
 
 function Paywall() {
   const [open, setOpen] = useState<false | string>(false);
+  const [design, setDesign] = useState<null | { msg: string; target?: string }>(null);
   const nav = useNavigate();
-  useEffect(() => onApiError((e) => { if (e.code === 'subscription_required') setOpen(''); if (e.code === 'plan_required') setOpen(e.message || ''); }), []);
+  useEffect(() => onApiError((e) => {
+    if (e.code === 'subscription_required') setOpen('');
+    if (e.code === 'plan_required') setOpen(e.message || '');
+    if (e.code === 'design_required') setDesign({ msg: e.message, target: e.target });
+  }), []);
   return (
-    <Sheet open={open !== false} onClose={() => setOpen(false)} title={open ? 'Нужен тариф выше' : 'Нужна подписка'}>
-      <div className="stack">
-        <p style={{ margin: 0 }}>{open || 'Бесплатно — 3 сметы каждый месяц, справочник, мастера, календарь и напоминания. Сметы без ограничений, объекты и деньги, договоры, акты и 3D для заказчика — в тарифе «Про» за 590 ₽ в месяц.'}</p>
-        <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
-        <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
-      </div>
-    </Sheet>
+    <>
+      <Sheet open={open !== false} onClose={() => setOpen(false)} title={open ? 'Нужен тариф выше' : 'Нужна подписка'}>
+        <div className="stack">
+          <p style={{ margin: 0 }}>{open || `Бесплатно — 3 сметы каждый месяц, справочник, мастера, календарь и напоминания. Сметы без ограничений, объекты и деньги, договоры и акты — в тарифе «Про» за ${PRICES.pro} ₽ в месяц (первый месяц — ${PRICES.proFirst} ₽).`}</p>
+          <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
+          <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
+        </div>
+      </Sheet>
+      <Sheet open={!!design} onClose={() => setDesign(null)} title="3D-проект для заказчика">
+        {design && (
+          <div className="stack">
+            <p className="small" style={{ margin: 0 }}>Чистый PDF без водяного знака и 3D-ссылка, которую заказчик крутит пальцем. {design.target ? 'Покупка сразу применится к этому проекту.' : 'Сохраните проект — и покупка применится к нему.'}</p>
+            <Offers target={design.target} onPaid={() => setDesign(null)} items={[
+              { code: 'design1', title: '🧊 Этот 3D-проект', text: 'PDF и 3D-ссылка для одного объекта — сколько угодно раз. Включите в смету: обычно 3–5 тыс. ₽.', best: true },
+              { code: 'studio_m', title: '✨ 3D-Студия на месяц', text: 'Все проекты и 3D-ссылки без ограничений — окупается со 2-го проекта.' },
+            ]} />
+          </div>
+        )}
+      </Sheet>
+    </>
   );
 }
 

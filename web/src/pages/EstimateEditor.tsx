@@ -7,6 +7,8 @@ import { calcEstimate } from '../../../shared/estimate';
 import { checkEstimate } from '../../../shared/estimateCheck';
 import { payStages, DEFAULT_SCHEDULE } from '../../../shared/payments';
 import { useMe } from '../App';
+import { Offers } from '../components/Pay';
+import { PRICES } from '../../../shared/plans';
 import { Field, Fold, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog, haptic, tg } from '../tg';
@@ -50,7 +52,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [lines, setLines] = useState<L[]>(() => initial.lines.map(toL));
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
-  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract' | 'pay' | 'check' | 'prices'>(null);
+  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract' | 'pay' | 'check' | 'prices' | 'clean'>(null);
   const [share, setShare] = useState<any>(() => ({ url: null, sharedAt: initial.sharedAt, viewedAt: initial.viewedAt, approvedAt: initial.approvedAt, customerComment: initial.customerComment }));
   const [editLine, setEditLine] = useState<string | null>(null);
   const [secEdit, setSecEdit] = useState<string | null>(null);
@@ -363,6 +365,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       </button>
       {issues.length > 0 && <button className="xs" style={{ background: 'none', border: 0, padding: '8px 0 0', color: issues.some((i) => i.level === 'error') ? 'var(--bad)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={() => { setPending(null); setSheet('check'); }}>⚠️ Проверка сметы: замечаний {issues.length} — посмотреть</button>}
 
+      {!readOnly && !me.access.active && !initial.paidAt && !(me.access.paidEstimateIds || []).includes(initial.id) && (
+        <button className="banner" style={{ display: 'block', width: '100%', textAlign: 'left', marginTop: 12, cursor: 'pointer' }} onClick={() => setSheet('clean')}>
+          <b>Заказчик увидит пометку «Сделано в СМЕТА PRO»</b>
+          <div className="xs">Убрать и поставить ваш логотип — {PRICES.estimate} ₽ за эту смету или «Про» от {PRICES.proFirst} ₽ →</div>
+        </button>
+      )}
       <div className="grid2" style={{ marginTop: 12 }}>
         <button className="btn primary" disabled={pdfBusy} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 PDF в Telegram'}</button>
         <button className="btn" disabled={pdfBusy} onClick={() => guard(openPdf)}>Открыть PDF</button>
@@ -406,6 +414,14 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       </Sheet>
 
       {/* ---- Договор ---- */}
+      <Sheet open={sheet === 'clean'} onClose={() => setSheet(null)} title="Смета без пометки">
+        <p className="small" style={{ marginTop: 0 }}>Без «Сделано в СМЕТА PRO», с вашим логотипом и подписью — заказчик видит солидную смету от вашей фирмы.</p>
+        <Offers target={initial.id} onPaid={() => { setSheet(null); reload(); }} items={[
+          { code: 'pro_m', title: '⭐ «Про» — все сметы без ограничений', text: 'Сметы без пометки, договор и акты, объекты и учёт денег.', best: true },
+          { code: 'est1', title: '📄 Только эта смета', text: 'Без пометки и с логотипом. Править и отправлять — сколько угодно.' },
+          { code: 'est10', title: `📦 10 смет на ${PRICES.packMonths} месяцев`, text: 'Если заказы бывают не каждый месяц.' },
+        ]} />
+      </Sheet>
       <Sheet open={sheet === 'contract'} onClose={() => setSheet(null)} title="Договор подряда">
         <div className="stack">
           <p className="small muted" style={{ margin: 0 }}>Типовой договор подряда, смета — приложением № 1. Стороны, адрес, сумма и условия оплаты берутся из сметы.</p>

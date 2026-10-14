@@ -11,27 +11,42 @@ import { botLink } from '../botInfo';
  * Блогеру — процент со всех оплат приведённых им людей (считаем в админке, выплачиваете вы).
  */
 import { normCode } from '../../../shared/promo';
+import { PRICES } from '../../../shared/plans';
 export { normCode };
-const PACKS = ['est10', 'design1'];
-
-export async function findPromo(code?: string | null) {
-  if (!code) return null;
-  const c = normCode(code);
-  if (c.length < 3) return null;
-  return prisma.promoCode.findFirst({ where: { code: c, active: true } });
-}
+const PACKS = ['est1', 'est10', 'design1', 'studio_m']; // не подписка «Про»/«Бригада»
 
 /** Были ли у человека оплаты подписки (скидка — только на первую) */
 const hadSubscription = async (userId: string) => (await prisma.payment.count({ where: { userId, planCode: { notIn: PACKS } } })) > 0;
 
-/** Цена тарифа для пользователя с учётом промокода */
-export async function priceFor(user: { id: string; promoCode?: string | null }, plan: { code: string; months: number; starsPrice: number; rubPrice: number }) {
-  const base = { stars: plan.starsPrice, rub: plan.rubPrice, discountPct: 0, promo: null as string | null };
-  if (!user.promoCode || plan.months === 0) return base;
-  const promo = await findPromo(user.promoCode);
-  if (!promo || !promo.discountPct || (await hadSubscription(user.id))) return base;
-  const k = 1 - Math.min(90, promo.discountPct) / 100;
-  return { stars: Math.max(1, Math.round(plan.starsPrice * k)), rub: Math.max(1, Math.round(plan.rubPrice * k)), discountPct: promo.discountPct, promo: promo.code };
+type PriceUser = { id: string; promoCode?: string | null; offerPct?: number | null; offerUntil?: Date | null; subscriptionUntil?: Date | null; plan?: string | null; teamUntil?: Date | null };
+const rubToStars = (rub: number) => Math.max(1, Math.round(rub / 2.46));
+
+/** Цена тарифа для пользователя: первый месяц «Про», промокод блогера, персональная скидка возврата, 3D-проект дешевле с подпиской.
+ *  Из скидок берётся одна — самая выгодная для человека. */
+export async function priceFor(user: PriceUser, plan: { code: string; months: number; starsPrice: number; rubPrice: number }) {
+  const base = { stars: plan.starsPrice, rub: plan.rubPrice, discountPct: 0, promo: null as string | null, note: null as string | null };
+  const now = new Date();
+  // 3D-проект: с «Про» или «Бригадой» — дешевле
+  if (plan.code === 'design1') {
+    const sub = (user.subscriptionUntil && user.subscriptionUntil > now) || (user.teamUntil && user.teamUntil > now);
+    return sub ? { ...base, rub: PRICES.designPro, stars: rubToStars(PRICES.designPro), note: 'цена с подпиской' } : base;
+  }
+  if (plan.months === 0 || plan.code === 'studio_m') return base;
+  const options = [base];
+  const first = !(await hadSubscription(user.id));
+  if (first && plan.code === 'pro_m') options.push({ ...base, rub: PRICES.proFirst, stars: rubToStars(PRICES.proFirst), discountPct: Math.round((1 - PRICES.proFirst / plan.rubPrice) * 100), note: 'первый месяц' });
+  if (user.offerPct && user.offerUntil && user.offerUntil > now && plan.code === 'pro_m') {
+    const k = 1 - Math.min(90, user.offerPct) / 100;
+    options.push({ ...base, rub: Math.max(1, Math.round(plan.rubPrice * k)), stars: Math.max(1, Math.round(plan.starsPrice * k)), discountPct: user.offerPct, note: `скидка до ${user.offerUntil.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` });
+  }
+  if (user.promoCode && first) {
+    const promo = await findPromo(user.promoCode);
+    if (promo && promo.discountPct) {
+      const k = 1 - Math.min(90, promo.discountPct) / 100;
+      options.push({ ...base, stars: Math.max(1, Math.round(plan.starsPrice * k)), rub: Math.max(1, Math.round(plan.rubPrice * k)), discountPct: promo.discountPct, promo: promo.code, note: 'по промокоду' });
+    }
+  }
+  return options.reduce((a, b) => (b.rub < a.rub ? b : a));
 }
 
 /** Привязать код. Новичку (isNew) продлеваем пробный «Про» до trialDays. Код у человека один — первый. */

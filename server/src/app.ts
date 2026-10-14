@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { User } from '@prisma/client';
 import { env } from './env';
+import { PRICES } from '../../shared/plans';
 import { prisma, handleError, HttpError, accessOf, freeCtx } from './util';
 import { freeWriteAllowed, needsEstimateCtx } from '../../shared/access';
 import { verifySession } from './auth';
@@ -50,7 +51,7 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
     if (isWrite && !OPEN_WRITE.some((r) => r.test(url)) && !accessOf(user).active) {
       const ctx = needsEstimateCtx(url) ? await freeCtx(user.id, user.extraEstimates) : { estimateCount: 99, freeEstimateIds: [] };
       if (!freeWriteAllowed(req.method, url, ctx)) {
-        return reply.status(402).send({ error: 'Это доступно в тарифе «Про» — 590 ₽ в месяц. Бесплатно: 3 сметы каждый месяц, справочник, мастера, календарь и напоминания.', code: 'subscription_required' });
+        return reply.status(402).send({ error: `Это доступно в тарифе «Про» — ${PRICES.pro} ₽ в месяц, первый месяц — ${PRICES.proFirst} ₽. Бесплатно: 3 сметы каждый месяц, справочник, мастера, календарь и напоминания.`, code: 'subscription_required' });
       }
     }
   });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freeWriteAllowed } from '../shared/access';
+import { freeWriteAllowed, freeAllowance } from '../shared/access';
 
 const fresh = { estimateCount: 0, freeEstimateIds: [] as string[] };
 const two = { estimateCount: 2, freeEstimateIds: ['e0', 'e1'] };
@@ -53,4 +53,14 @@ test('импорт из Excel — как создание первой смет�
 test('купленный пакет смет увеличивает лимит', () => {
   assert.equal(freeWriteAllowed('POST', '/api/estimates', { estimateCount: 5, freeEstimateIds: [], limit: 13 }), true);
   assert.equal(freeWriteAllowed('POST', '/api/estimates', { estimateCount: 13, freeEstimateIds: [], limit: 13 }), false);
+});
+
+test('оплаченная отдельно смета не входит в лимит и считается без пометки', () => {
+  const m = (d: Date) => d.toISOString().slice(0, 7);
+  const list = [1, 2, 3, 4].map((i) => ({ id: `e${i}`, createdAt: `2026-10-0${i}T10:00:00Z`, paidAt: i === 2 ? '2026-10-05T10:00:00Z' : null }));
+  const a = freeAllowance(list, 0, '2026-10', m);
+  assert.equal(a.thisMonth, 3);
+  assert.deepEqual(a.freeIds.sort(), ['e1', 'e2', 'e3', 'e4']);
+  assert.deepEqual(a.packIds, ['e2']);
+  assert.equal(a.left, 0);
 });

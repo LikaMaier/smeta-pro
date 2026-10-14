@@ -66,10 +66,11 @@ export async function meView(user: any) {
     companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
     aiAvailable: Boolean(env.AI_PROVIDER), aiWish,
     promo: user.promoCode ? await findPromo(user.promoCode).then((p) => (p ? { code: p.code, discountPct: p.discountPct } : null)) : null,
-    access: { ...acc, freeEstimateLeft: free.estimateCount < free.limit, freeLeft: Math.max(0, free.limit - free.estimateCount), freeLimit: free.limit, freeEstimateIds: free.freeEstimateIds, estimateCount: free.estimateCount },
+    access: { ...acc, freeEstimateLeft: free.estimateCount < free.limit, freeLeft: Math.max(0, free.limit - free.estimateCount), freeLimit: free.limit, freeEstimateIds: free.freeEstimateIds, paidEstimateIds: free.paidEstimateIds, estimateCount: free.estimateCount },
     plan: {
       tier: acc.tier, label: TIERS[acc.tier].label, aiLimit: TIERS[acc.tier].ai, aiUsed: user.aiMonth === monthKey() ? user.aiUsed : 0,
-      extraDesigns: user.extraDesigns || 0, team: user.teamOwnerId ? 'member' : user.plan === 'team' && acc.mode === 'subscription' ? 'owner' : null,
+      extraDesigns: user.extraDesigns || 0, extraUntil: user.extraUntil || null, studioUntil: user.studioUntil && user.studioUntil > new Date() ? user.studioUntil : null,
+      offer: user.offerPct && user.offerUntil && user.offerUntil > new Date() ? { pct: user.offerPct, until: user.offerUntil } : null, team: user.teamOwnerId ? 'member' : user.plan === 'team' && acc.mode === 'subscription' ? 'owner' : null,
     },
     isAdmin: env.ADMIN_TG_IDS.includes(String(user.tgId)),
     logoUrl: brandUrl(user.logoFile), signUrl: brandUrl(user.signFile),

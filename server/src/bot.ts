@@ -108,10 +108,10 @@ export function createBot() {
 
   bot.on('message:successful_payment', async (ctx) => {
     const p = ctx.message.successful_payment;
-    const [userId, planCode] = p.invoice_payload.split(':');
+    const [userId, planCode, target] = p.invoice_payload.split(':');
     const user = await prisma.user.findFirst({ where: { id: userId, tgId: BigInt(ctx.from.id) } });
     if (!user) return;
-    const res = await applyPayment(userId, planCode, p.total_amount, p.telegram_payment_charge_id);
+    const res = await applyPayment(userId, planCode, p.total_amount, p.telegram_payment_charge_id, { target: target || null });
     if (res && res.referrer) {
       await bot.api.sendMessage(Number(res.referrer.tgId),
         `🎁 Ваш друг оформил подписку СМЕТА PRO — дарим вам месяц бесплатно!\nПодписка продлена до ${res.referrer.until.toLocaleDateString('ru-RU')}.`,
@@ -142,7 +142,7 @@ export function welcomeText(u: any) {
     '💰 <b>Деньги по объектам</b>: сколько получили, сколько потратили и сколько осталось вам, а не только поставщику бетона.\n' +
     '⏰ <b>Напоминания</b>: «забрать оплату», «вернуть экскаватор» — бот напомнит, даже если вы забыли, что просили.\n' +
     '👷 <b>Бригада</b>: один справочник цен на всю команду.\n\n' +
-    `🎁 3 сметы каждый месяц — бесплатно${env.PRO_TRIAL_DAYS > 0 ? `, плюс ${env.PRO_TRIAL_DAYS} дней полного тарифа «Про»: пробуйте всё, пока чай не остыл` : ''}.\n\n` +
+    `🎁 3 сметы каждый месяц — бесплатно${env.PRO_TRIAL_DAYS > 0 ? `, плюс ${env.PRO_TRIAL_DAYS} ${env.PRO_TRIAL_DAYS % 10 === 1 && env.PRO_TRIAL_DAYS % 100 !== 11 ? 'день' : [2, 3, 4].includes(env.PRO_TRIAL_DAYS % 10) && ![12, 13, 14].includes(env.PRO_TRIAL_DAYS % 100) ? 'дня' : 'дней'} полного тарифа «Про»: пробуйте всё, пока чай не остыл` : ''}.\n\n` +
     'Жмите кнопку ниже 👇';
 }
 

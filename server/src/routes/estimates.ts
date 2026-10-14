@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { prisma, plain, notFound, audit, num, HttpError, accessOf } from '../util';
+import { prisma, plain, notFound, audit, num, HttpError, accessOf, freeCtx } from '../util';
 import { calcEstimate } from '../../../shared/estimate';
 import { runImport, pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind } from '../pdf';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
@@ -144,7 +144,8 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       return { buf: await renderXlsx(xlsxEstimateData(e, user, number, kind === 'xlsxown')), name: fileName(kind === 'xlsxown' ? `${e.title} (для себя)` : e.title, 'xlsx'),
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
     }
-    const data: any = pdfData(e, user, number, !accessOf(user).active, await estimatePaid(e));
+    const free = !accessOf(user).active && !e.paidAt && !(await freeCtx(user.id)).paidEstimateIds.includes(e.id); // пометка — только у бесплатных смет
+    const data: any = pdfData(e, user, number, free, await estimatePaid(e));
     if (kind === 'act') Object.assign(data, { docType: 'act', actDate: actDate || new Date().toISOString().slice(0, 10) });
     if (kind === 'contract') Object.assign(data, { docType: 'contract', contractDate: actDate || new Date().toISOString().slice(0, 10) });
     const title = kind === 'act' ? `Акт — ${e.title}` : kind === 'contract' ? `Договор — ${e.title}` : e.title;

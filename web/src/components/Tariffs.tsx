@@ -1,87 +1,62 @@
 import React, { useState } from 'react';
 import { get, post, del } from '../api';
 import { useMe } from '../App';
-import { Field, Load, useLoad, useToast } from './ui';
+import { Load, useLoad, useToast } from './ui';
 import { openInvoice, haptic, tg, confirmDialog } from '../tg';
-import { TIERS, SEAT_RUB, type Tier } from '../../../shared/plans';
+import { TIERS, SEAT_RUB, PRICES, type Tier } from '../../../shared/plans';
+import { PayButtons, rub } from './Pay';
 
-const rub = (v: number) => `${(v || 0).toLocaleString('ru-RU')} ₽`;
 const TIER_ICON: Record<string, string> = { lite: '🔹', pro: '⭐', team: '👷' };
+const PACK_TEXT: Record<string, string> = {
+  est10: `10 смет без пометки, с вашим логотипом. Действуют ${PRICES.packMonths} месяцев — удобно, если заказы бывают не каждый месяц.`,
+  design1: 'Премиальный 3D-проект одного объекта для заказчика: PDF без водяного знака (3D, план, фасады, узлы, ведомость) и 3D-ссылка, которую заказчик крутит пальцем. Включите его в смету — обычно это 3–5 тыс. ₽.',
+};
 
-/** Тарифы Про / Бригада (3, 5 или 10 человек), разовый эскизный проект и оплата (ЮKassa — картой и СБП, Telegram Stars) */
+/** Тарифы: Про / Бригада (3, 5 или 10 человек), «3D-Студия», разовые покупки; оплата ЮKassa (карта, СБП) и Telegram Stars */
 export default function Tariffs() {
-  const { me, refreshMe } = useMe();
-  const toast = useToast();
-  const plans = useLoad(() => get<any[]>('/plans'), [me.promo?.code]);
-  const [year, setYear] = useState(false);
+  const { me } = useMe();
+  const plans = useLoad(() => get<any[]>('/plans'), [me.promo?.code, me.access.mode, me.plan?.tier]);
+  const [year, setYear] = useState(true);
   const [seats, setSeats] = useState(5);
-  const [paying, setPaying] = useState('');
-  const [email, setEmail] = useState(() => { try { return localStorage.getItem('smeta_pay_email') || ''; } catch { return ''; } });
-  const [ykId, setYkId] = useState<string | null>(null);
   const cur: Tier = me.plan?.tier || 'free';
   const paid = me.access.mode === 'subscription';
-
-  const payYk = async (code: string) => {
-    if (me.pay?.receipt && !/^\S+@\S+\.\S+$/.test(email)) return toast('Укажите email — на него придёт чек', true);
-    setPaying(code);
-    try {
-      try { localStorage.setItem('smeta_pay_email', email); } catch { /* */ }
-      const { url, id } = await post(`/pay/${code}/yookassa`, me.pay?.receipt ? { email } : {});
-      setYkId(id);
-      if (tg?.openLink) tg.openLink(url); else window.open(url, '_blank');
-      toast('Оплатите на странице ЮKassa и вернитесь — доступ включится сам');
-    } catch (e: any) { toast(e.message, true); } finally { setPaying(''); }
-  };
-  const checkYk = async () => {
-    if (!ykId) return;
-    try { const r = await post(`/pay/yookassa/${ykId}/check`); await refreshMe(); toast(r.status === 'succeeded' ? 'Оплата получена' : 'Оплата ещё не поступила — попробуйте через минуту', r.status !== 'succeeded'); }
-    catch (e: any) { toast(e.message, true); }
-  };
-  const pay = async (code: string) => {
-    setPaying(code);
-    try {
-      const { url } = await post(`/pay/${code}`);
-      const status = await openInvoice(url);
-      if (status === 'paid') {
-        haptic('success'); toast('Оплата прошла, обновляю доступ…');
-        for (let i = 0; i < 5; i++) { await new Promise((r) => setTimeout(r, 1500)); await refreshMe(); }
-      } else if (status === 'failed') toast('Оплата не прошла. Попробуйте ещё раз.', true);
-    } catch (e: any) { toast(e.message, true); } finally { setPaying(''); }
-  };
-  const Buy = ({ p, label }: { p: any; label?: string }) => (
-    <div className={me.pay?.yookassa ? 'grid2' : ''} style={{ marginTop: 8 }}>
-      {me.pay?.yookassa && <button className="btn primary sm block" disabled={!!paying} onClick={() => payYk(p.code)}>{paying === p.code ? 'Открываю…' : `Картой / СБП · ${rub(p.price?.rub ?? p.rubPrice)}`}</button>}
-      <button className={`btn sm block ${me.pay?.yookassa ? '' : 'primary'}`} disabled={!!paying} onClick={() => pay(p.code)}>{paying === p.code && !me.pay?.yookassa ? 'Открываю…' : `${label ? `${label} · ` : ''}${p.price?.stars ?? p.starsPrice} ⭐`}</button>
-    </div>
-  );
+  const perDay = (v: number, months: number) => Math.round(v / (months * 30.4));
 
   return (
     <>
       <h2 className="section-title">Тарифы</h2>
+      {me.plan?.offer && <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Для вас скидка {me.plan.offer.pct}% на месяц «Про» — до {new Date(me.plan.offer.until).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.</div>}
       <div className="seg" style={{ marginBottom: 8 }}>
-        <button className={`chip ${!year ? 'on' : ''}`} onClick={() => setYear(false)}>На месяц</button>
         <button className={`chip ${year ? 'on' : ''}`} onClick={() => setYear(true)}>На год · −30%</button>
+        <button className={`chip ${!year ? 'on' : ''}`} onClick={() => setYear(false)}>На месяц</button>
       </div>
-      <Load state={plans}>{(list) => (
+      <Load state={plans}>{(list) => {
+        const proM = list.find((x) => x.code === 'pro_m');
+        const firstDeal = proM?.price?.note === 'первый месяц';
+        const studio = list.find((x) => x.code === 'studio_m');
+        return (
         <>
+          {year && firstDeal && <div className="xs muted" style={{ marginBottom: 6 }}>🎁 Первый месяц «Про» — {rub(proM.price.rub)}: переключитесь на «На месяц».</div>}
           <div className="tariffs">
             {cur === 'lite' && paid && <div className="dz-warn">У вас тариф «Лайт» — он работает до {new Date(me.access.until).toLocaleDateString('ru-RU')}. Новых подписок «Лайт» больше нет: при переходе на «Про» оставшиеся дни пересчитаются.</div>}
             {(['pro', 'team'] as const).map((t) => {
               const p = list.find((x) => x.tier === t && x.months === (year ? 12 : 1) && (t !== 'team' || (x.seats || 3) === seats));
               if (!p) return null;
               const on = cur === t && paid;
+              const price = p.price?.rub ?? p.rubPrice;
               return (
                 <div key={t} className={`tariff ${t === 'pro' ? 'best' : ''} ${on ? 'on' : ''}`}>
                   <div className="row between">
                     <b className="tariff-name">{TIER_ICON[t]} {TIERS[t].label}</b>
-                    {t === 'pro' && !on && <span className="badge ok">выбирают чаще</span>}
+                    {t === 'pro' && !on && <span className="badge ok">{p.price?.note || 'выбирают чаще'}</span>}
                     {on && <span className="badge ok">ваш тариф</span>}
                   </div>
                   <div className="tariff-price">
-                    {p.price?.discountPct > 0 && <s className="muted" style={{ marginRight: 6 }}>{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</s>}
-                    <b className="num">{rub(year ? Math.round((p.price?.rub ?? p.rubPrice) / 12) : (p.price?.rub ?? p.rubPrice))}</b><span className="muted"> в месяц{year ? ` · ${rub(p.price?.rub ?? p.rubPrice)} за год` : ''}</span>
-                    {p.price?.discountPct > 0 && <span className="badge ok" style={{ marginLeft: 6 }}>−{p.price.discountPct}% по промокоду</span>}
+                    {price < p.rubPrice && <s className="muted" style={{ marginRight: 6 }}>{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</s>}
+                    <b className="num">{rub(year ? Math.round(price / 12) : price)}</b><span className="muted"> в месяц{year ? ` · ${rub(price)} за год` : ''}</span>
                   </div>
+                  <div className="xs muted">≈ {perDay(price, p.months)} ₽ в день{t === 'pro' ? ' — дешевле пачки саморезов' : ''}{year ? ` · экономия ${rub(Math.round((list.find((x) => x.tier === t && x.months === 1 && (t !== 'team' || (x.seats || 3) === seats))?.rubPrice || 0) * 12 - p.rubPrice))}` : ''}</div>
+                  {p.price?.discountPct > 0 && p.price?.note && p.price.note !== 'первый месяц' && <span className="badge ok">−{p.price.discountPct}% {p.price.note}</span>}
                   {t === 'team' && (
                     <div className="segc" role="radiogroup" aria-label="Человек в бригаде" style={{ margin: '6px 0 2px' }}>
                       {[3, 5, 10].map((n) => <button key={n} role="radio" aria-checked={seats === n} className={seats === n ? 'on' : ''} onClick={() => setSeats(n)}>до {n} чел.</button>)}
@@ -89,28 +64,47 @@ export default function Tariffs() {
                   )}
                   {t === 'team' && <div className="xs muted">3 человека в базовой цене, каждый следующий — +{SEAT_RUB} ₽ в месяц</div>}
                   <ul className="tariff-perks">{TIERS[t].perks.map((x) => (t === 'team' && /^от 3 человек/.test(x) ? `до ${seats} человек, общий справочник цен` : x)).map((x) => <li key={x}>{!me.aiAvailable && /^ИИ/.test(x) ? <>{x.replace(/^ИИ-сметчик: /, 'ИИ-сметчик (').replace(/^ИИ: /, 'ИИ (')}) — <b className="soon">скоро, без доплаты</b></> : x}</li>)}</ul>
-                  <Buy p={p} label={on ? 'Продлить' : undefined} />
+                  <PayButtons p={p} label={on ? 'Продлить' : undefined} />
                 </div>
               );
             })}
           </div>
-          {paid && <p className="xs muted">При смене тарифа или размера бригады оставшиеся дни пересчитываются по цене месяца: например, 10 дней «Про» станут 3 днями «Бригады» на 5 человек.</p>}
+          {paid && <p className="xs muted">При смене тарифа или размера бригады оставшиеся дни пересчитываются по цене месяца.</p>}
+
+          <h2 className="section-title">🧊 3D-проекты для заказчиков</h2>
+          <p className="small muted" style={{ marginTop: 0 }}>3D-конструктор и смета по модели — во всех тарифах. Готовый проект для заказчика — отдельный премиальный продукт: его можно включить в смету и заработать.</p>
+          <div className="list">
+            {['design1'].map((c) => list.find((x) => x.code === c)).filter(Boolean).map((p: any) => (
+              <div key={p.code} className="list-item" style={{ display: 'block', cursor: 'default' }}>
+                <div className="row between"><div className="title">{p.title} — за объект</div>{p.price?.note && <span className="badge ok">{p.price.note}</span>}</div>
+                <div className="xs muted">{PACK_TEXT.design1}{me.plan?.extraDesigns ? ` Куплено и не использовано: ${me.plan.extraDesigns}.` : ''}</div>
+                <PayButtons p={p} />
+              </div>
+            ))}
+            {studio && (
+              <div className={`list-item ${me.plan?.studioUntil ? 'on' : ''}`} style={{ display: 'block', cursor: 'default' }}>
+                <div className="row between"><div className="title">✨ 3D-Студия — без ограничений</div>{me.plan?.studioUntil && <span className="badge ok">до {new Date(me.plan.studioUntil).toLocaleDateString('ru-RU')}</span>}</div>
+                <div className="xs muted">Для тех, кто продаёт навесы, беседки, бытовки и заборы: 3D-проекты и 3D-ссылки для всех заказчиков, без водяного знака. Окупается со 2-го проекта. «Бригаде» уже входит.</div>
+                <PayButtons p={studio} label={me.plan?.studioUntil ? 'Продлить' : undefined} />
+              </div>
+            )}
+          </div>
 
           <h2 className="section-title">Разово, без подписки</h2>
           <div className="list">
-            {list.filter((p) => p.tier === 'pack').map((p) => (
+            {list.filter((p) => p.code === 'est10').map((p) => (
               <div key={p.code} className="list-item" style={{ display: 'block', cursor: 'default' }}>
                 <div className="title">{p.title}</div>
-                <div className="xs muted">{`Полный PDF без водяного знака: 3D, план, разрез, фасады, узлы, раскрой и ведомость.${me.plan?.extraDesigns ? ` Куплено и не использовано: ${me.plan.extraDesigns}.` : ''}`}</div>
-                <Buy p={p} />
+                <div className="xs muted">{PACK_TEXT[p.code]}{me.plan?.extraUntil && new Date(me.plan.extraUntil) > new Date() ? ` Купленные сметы действуют до ${new Date(me.plan.extraUntil).toLocaleDateString('ru-RU')}.` : ''}</div>
+                <PayButtons p={p} />
               </div>
             ))}
           </div>
+          <p className="xs muted">Одну смету без пометки за {PRICES.estimate} ₽ можно оплатить прямо в смете.</p>
         </>
-      )}</Load>
-      {me.pay?.yookassa && me.pay.receipt && <Field label="Email для чека"><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@mail.ru" /></Field>}
-      {ykId && <button className="btn block" onClick={checkYk}>Я оплатил(а) — проверить оплату</button>}
-      <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa, чек придёт на email. Или в Telegram Stars.' : 'Оплата в Telegram Stars; сумма в рублях примерная — зависит от того, где покупать звёзды.'} Доступ включается сразу после подтверждения платежа.</p>
+        );
+      }}</Load>
+      <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa. Или в Telegram Stars.' : 'Оплата в Telegram Stars; сумма в рублях примерная — зависит от того, где покупать звёзды.'} Доступ включается сразу после подтверждения платежа.</p>
       <PromoField />
       <TeamPanel />
     </>
