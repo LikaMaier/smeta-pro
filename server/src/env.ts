@@ -23,6 +23,8 @@ export const env = {
   AI_FOLDER: process.env.AI_FOLDER || '', // Yandex AI Studio: ID каталога (заголовок OpenAI-Project)
   AI_PROVIDER: process.env.AI_API_KEY || process.env.OPENAI_API_KEY ? 'on' : '',
   // ЮKassa: оплата картой и СБП. Без ключей кнопка оплаты через ЮKassa скрыта.
+  IG_TOKEN: process.env.IG_TOKEN || '',
+  IG_USER_ID: process.env.IG_USER_ID || '',
   YOOKASSA_SHOP_ID: process.env.YOOKASSA_SHOP_ID || '',
   YOOKASSA_SECRET_KEY: process.env.YOOKASSA_SECRET_KEY || '',
   YOOKASSA_RECEIPT: process.env.YOOKASSA_RECEIPT === '1', // отправлять чек 54-ФЗ (нужен email покупателя)

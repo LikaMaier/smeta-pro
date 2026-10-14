@@ -12,6 +12,7 @@ import { transcribe } from './ai/openai';
 import { remAction } from './routes/organizer';
 import { joinTeam } from './routes/team';
 import { priceFor } from './routes/promo';
+import { attachInstagram } from './instagram';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -62,6 +63,7 @@ export function createBot() {
   });
 
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
+  attachInstagram(bot); // кнопки «Опубликовать» и ответы на комментарии — раньше ИИ-обработчика текста
 
   // Голос и текст для ИИ-сметчика: учитываем переключатель и подписку
   bot.on(['message:voice', 'message:text'], async (ctx, next) => {

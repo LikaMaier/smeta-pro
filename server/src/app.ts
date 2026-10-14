@@ -1,5 +1,6 @@
 import Fastify, { FastifyInstance, FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
+import { MEDIA_DIR } from './instagram';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -81,6 +82,9 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
     const cb = webhookCallback(opts.bot, 'fastify', { secretToken: env.WEBHOOK_SECRET || undefined });
     app.post('/bot/webhook', cb as any);
   }
+
+  // Ролики для Instagram (Instagram скачивает видео по публичной ссылке)
+  if (fs.existsSync(MEDIA_DIR)) await app.register(fastifyStatic, { root: MEDIA_DIR, prefix: '/media/', decorateReply: false });
 
   // Статика Mini App
   const here = path.dirname(fileURLToPath(import.meta.url));
