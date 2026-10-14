@@ -72,19 +72,23 @@ function queue(): Item[] {
 const videoPath = (it: Item) => path.join(MEDIA_DIR, path.basename(it.video));
 const videoUrl = (it: Item) => `${env.PUBLIC_URL}/media/${encodeURIComponent(path.basename(it.video))}`;
 
-/** Автопубликация (по умолчанию включена): ролик выходит сам в ближайшие 19:00 МСК, владелица может отменить */
-const PUB_HOUR = 19;
+/** Автопубликация (по умолчанию включена): ролики выходят сами в 12:00 и 19:00 МСК, владелица может отменить */
+export const PUB_HOURS = [12, 19];
 export const autoOn = async () => (await kvGet('ig:auto')) !== '0';
-/** Ближайшее время публикации: сегодня в 19:00 МСК, если до него больше часа, иначе завтра */
-export function nextSlot(now = Date.now()) {
+/** Ближайший свободный слот публикации (12:00 или 19:00 МСК), минимум через 30 мин */
+export function nextSlot(now = Date.now(), taken: number[] = []) {
   const msk = new Date(now + 3 * 3600e3);
-  let t = Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), msk.getUTCDate(), PUB_HOUR) - 3 * 3600e3;
-  if (t - now < 3600e3) t += 864e5;
-  return t;
+  const day0 = Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), msk.getUTCDate()) - 3 * 3600e3;
+  for (let d = 0; d < 30; d++) for (const h of PUB_HOURS) {
+    const t = day0 + d * 864e5 + h * 3600e3;
+    if (t - now >= 30 * 60e3 && !taken.includes(t)) return t;
+  }
+  return now + 3600e3;
 }
 const slotText = (t: number) => {
   const d = new Date(t + 3 * 3600e3), today = new Date(Date.now() + 3 * 3600e3);
-  return `${d.getUTCDate() === today.getUTCDate() ? 'сегодня' : 'завтра'} в ${PUB_HOUR}:00`;
+  const diff = Math.round((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())) / 864e5);
+  return `${diff === 0 ? 'сегодня' : diff === 1 ? 'завтра' : d.toISOString().slice(8, 10) + '.' + d.toISOString().slice(5, 7)} в ${d.getUTCHours()}:00`;
 };
 const notifyAll = (bot: Bot, text: string, extra: any = {}) =>
   Promise.all(reportTo().map((id) => bot.api.sendMessage(Number(id), text, { link_preview_options: { is_disabled: true }, ...extra }).catch(() => null)));
@@ -94,7 +98,8 @@ async function offerNew(bot: Bot, log: any) {
   for (const it of queue()) {
     if (!fs.existsSync(videoPath(it))) continue;
     const auto = (await autoOn()) && (await igEnabled());
-    const at = nextSlot();
+    const taken = (await prisma.appKV.findMany({ where: { key: { startsWith: 'ig:item:' }, value: { startsWith: 'scheduled:' } } })).map((r) => Number(r.value.split(':')[1]));
+    const at = nextSlot(Date.now(), taken);
     if (!(await kvClaim(`ig:item:${it.id}`, auto ? `scheduled:${at}` : 'offered'))) continue;
     const kb = auto
       ? new InlineKeyboard().text('🚫 Не публиковать', `ig:skip:${it.id}`).text('⚡ Сейчас', `ig:pub:${it.id}`)
@@ -181,17 +186,20 @@ async function checkComments(bot: Bot, log: any) {
 }
 const FALLBACK_H = 4;
 
-/** Понедельничный отчёт: подписчики, последние ролики с лайками и комментариями */
+/** Отчёт по понедельникам и четвергам: подписчики, ролики за период с лайками и комментариями */
 async function weeklyReport(bot: Bot) {
   const now = new Date(Date.now() + 3 * 3600e3);
-  if (now.getUTCDay() !== 1 || now.getUTCHours() < 10) return;
+  if (![1, 4].includes(now.getUTCDay()) || now.getUTCHours() < 10) return;
   if (!(await kvClaim(`ig:week:${now.toISOString().slice(0, 10)}`, '1'))) return;
   const acc = await ig('/me', { fields: 'username,followers_count,media_count' });
-  const media = await ig(`/${await uid()}/media`, { fields: 'caption,like_count,comments_count,timestamp,permalink', limit: '10' });
-  const week = (media.data || []).filter((m: any) => Date.now() - Date.parse(m.timestamp) < 7 * 864e5);
+  const prev = Number(await kvGet('ig:followers')) || 0;
+  if (acc.followers_count != null) await kvSet('ig:followers', String(acc.followers_count));
+  const media = await ig(`/${await uid()}/media`, { fields: 'caption,like_count,comments_count,timestamp,permalink', limit: '25' });
+  const days = now.getUTCDay() === 1 ? 4 : 3;
+  const week = (media.data || []).filter((m: any) => Date.now() - Date.parse(m.timestamp) < days * 864e5);
   const lines = week.map((m: any) => `• ❤️ ${m.like_count ?? 0} · 💬 ${m.comments_count ?? 0} — ${esc((m.caption || '').split('\n')[0].slice(0, 60))}`);
   const best = [...week].sort((a: any, b: any) => (b.like_count || 0) - (a.like_count || 0))[0];
-  const text = `📸 <b>Instagram за неделю</b> — @${esc(acc.username)}\nПодписчиков: <b>${acc.followers_count ?? '—'}</b> · публикаций: ${acc.media_count ?? '—'}\n\n${lines.join('\n') || 'За неделю публикаций не было.'}${best ? `\n\n🏆 Лучший: ${best.permalink}` : ''}`;
+  const text = `📸 <b>Instagram за ${days} дн.</b> — @${esc(acc.username)}\nПодписчиков: <b>${acc.followers_count ?? '—'}</b>${prev && acc.followers_count != null ? ` (${acc.followers_count - prev >= 0 ? '+' : ''}${acc.followers_count - prev})` : ''} · публикаций: ${acc.media_count ?? '—'}\n\n${lines.join('\n') || 'Публикаций за период не было.'}${best ? `\n\n🏆 Лучший: ${best.permalink}` : ''}`;
   for (const id of reportTo()) await bot.api.sendMessage(Number(id), text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } }).catch(() => {});
 }
 
@@ -257,7 +265,7 @@ export function attachInstagram(bot: Bot) {
     const on = !(await autoOn());
     await kvSet('ig:auto', on ? '1' : '0');
     await ctx.editMessageReplyMarkup({ reply_markup: await panelKb(ctx.from.id) }).catch(() => {});
-    await ctx.answerCallbackQuery({ text: on ? `Автопубликация включена: ролики выходят сами в ${PUB_HOUR}:00` : 'Автопубликация выключена: буду присылать на одобрение', show_alert: true });
+    await ctx.answerCallbackQuery({ text: on ? `Автопубликация включена: ролики выходят сами в ${PUB_HOURS.map((h) => h + ':00').join(' и ')}` : 'Автопубликация выключена: буду присылать на одобрение', show_alert: true });
   });
   // ответ администратора на пересланный комментарий → в Instagram
   bot.on('message:text', async (ctx, next) => {
