@@ -3,7 +3,8 @@
  *
  * Ролики готовит агент по расписанию: кладёт mp4 в marketing/media и описание в marketing/queue/<id>.json
  * ({ id, video, caption }) и пушит в репозиторий. После деплоя сервер находит новые ролики и присылает
- * администратору в бот с кнопками «Опубликовать» / «Не публиковать».
+ * администратору в бот. Автопубликация (по умолчанию): ролик выходит сам в 19:00 МСК, кнопка «Не публиковать» отменяет.
+ * Комментарии: частые вопросы — готовый ответ; остальное — владелице, без ответа за 4 ч — вежливый общий ответ.
  * Токен: IG_TOKEN (Instagram API со входом через Instagram), IG_USER_ID. Токен продлевается сам раз в 30 дней.
  */
 import fs from 'node:fs';
@@ -14,7 +15,7 @@ import { InlineKeyboard, type Bot } from 'grammy';
 import { prisma } from './util';
 import { env } from './env';
 import { reportTo } from './stats';
-import { autoReply } from '../../shared/igReplies';
+import { autoReply, fallbackReply, isSpam, needsHuman } from '../../shared/igReplies';
 export { autoReply };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../marketing');
@@ -71,20 +72,69 @@ function queue(): Item[] {
 const videoPath = (it: Item) => path.join(MEDIA_DIR, path.basename(it.video));
 const videoUrl = (it: Item) => `${env.PUBLIC_URL}/media/${encodeURIComponent(path.basename(it.video))}`;
 
-/** Новые ролики из очереди — администратору на одобрение */
+/** Автопубликация (по умолчанию включена): ролик выходит сам в ближайшие 19:00 МСК, владелица может отменить */
+const PUB_HOUR = 19;
+export const autoOn = async () => (await kvGet('ig:auto')) !== '0';
+/** Ближайшее время публикации: сегодня в 19:00 МСК, если до него больше часа, иначе завтра */
+export function nextSlot(now = Date.now()) {
+  const msk = new Date(now + 3 * 3600e3);
+  let t = Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), msk.getUTCDate(), PUB_HOUR) - 3 * 3600e3;
+  if (t - now < 3600e3) t += 864e5;
+  return t;
+}
+const slotText = (t: number) => {
+  const d = new Date(t + 3 * 3600e3), today = new Date(Date.now() + 3 * 3600e3);
+  return `${d.getUTCDate() === today.getUTCDate() ? 'сегодня' : 'завтра'} в ${PUB_HOUR}:00`;
+};
+const notifyAll = (bot: Bot, text: string, extra: any = {}) =>
+  Promise.all(reportTo().map((id) => bot.api.sendMessage(Number(id), text, { link_preview_options: { is_disabled: true }, ...extra }).catch(() => null)));
+
+/** Новые ролики из очереди: в автоматическом режиме — в расписание, иначе — на одобрение */
 async function offerNew(bot: Bot, log: any) {
   for (const it of queue()) {
     if (!fs.existsSync(videoPath(it))) continue;
-    if (!(await kvClaim(`ig:item:${it.id}`, 'offered'))) continue;
-    const kb = new InlineKeyboard().text('✅ Опубликовать', `ig:pub:${it.id}`).text('🚫 Не публиковать', `ig:skip:${it.id}`);
+    const auto = (await autoOn()) && (await igEnabled());
+    const at = nextSlot();
+    if (!(await kvClaim(`ig:item:${it.id}`, auto ? `scheduled:${at}` : 'offered'))) continue;
+    const kb = auto
+      ? new InlineKeyboard().text('🚫 Не публиковать', `ig:skip:${it.id}`).text('⚡ Сейчас', `ig:pub:${it.id}`)
+      : new InlineKeyboard().text('✅ Опубликовать', `ig:pub:${it.id}`).text('🚫 Не публиковать', `ig:skip:${it.id}`);
     for (const id of reportTo()) {
       const { InputFile } = await import('grammy');
       await bot.api.sendVideo(Number(id), new InputFile(videoPath(it)), {
-        caption: `🎬 <b>Новый ролик для Instagram</b>${it.title ? ` — ${esc(it.title)}` : ''}\n\n${esc(it.caption).slice(0, 800)}`,
+        caption: `🎬 <b>Новый ролик для Instagram</b>${it.title ? ` — ${esc(it.title)}` : ''}\n${auto ? `🤖 Выйдет сам ${slotText(at)}. Ничего делать не нужно.` : ''}\n\n${esc(it.caption).slice(0, 700)}`,
         parse_mode: 'HTML', reply_markup: kb, supports_streaming: true,
       }).catch((e: any) => log.error({ err: e }, 'ig offer'));
     }
   }
+}
+
+/** Публикация роликов, у которых подошло время */
+async function publishDue(bot: Bot, log: any) {
+  const rows = await prisma.appKV.findMany({ where: { key: { startsWith: 'ig:item:' }, value: { startsWith: 'scheduled:' } } });
+  for (const r of rows) {
+    if (Number(r.value.split(':')[1]) > Date.now()) continue;
+    const id = r.key.slice('ig:item:'.length);
+    const it = queue().find((x) => x.id === id);
+    if (!it) { await kvSet(r.key, 'skipped'); continue; }
+    await publishItem(bot, it, r.value, log);
+  }
+}
+
+/** Захватить ролик и опубликовать; при ошибке — вернуть в расписание на завтра и сообщить */
+async function publishItem(bot: Bot, it: Item, from: string, log: any) {
+  const claimed = await prisma.appKV.updateMany({ where: { key: `ig:item:${it.id}`, value: from }, data: { value: 'publishing' } });
+  if (!claimed.count) return false;
+  try {
+    const r = await publishReel(it);
+    await kvSet(`ig:item:${it.id}`, 'published');
+    await notifyAll(bot, `✅ Опубликовано в Instagram${it.title ? ` — ${it.title}` : ''}${r.permalink ? `\n${r.permalink}` : ''}`);
+  } catch (e: any) {
+    log.error({ err: e }, 'ig publish');
+    await kvSet(`ig:item:${it.id}`, 'offered');
+    await notifyAll(bot, `⚠️ Не получилось опубликовать «${it.title || it.id}»: ${e.message}`, { reply_markup: new InlineKeyboard().text('🔁 Ещё раз', `ig:pub:${it.id}`) });
+  }
+  return true;
 }
 
 /** Публикация Reels: контейнер → ждём обработку → публикуем */
@@ -112,13 +162,24 @@ async function checkComments(bot: Bot, log: any) {
       if (!(await kvClaim(`ig:c:${c.id}`, 'seen'))) continue;
       const ans = autoReply(c.text);
       if (ans) { await ig(`/${c.id}/replies`, { message: ans }, 'POST').catch((e) => log.error({ err: e }, 'ig reply')); continue; }
+      const spam = isSpam(c.text), human = needsHuman(c.text);
+      if (!spam && !human) await kvSet(`ig:pending:${c.id}`, String(Date.now()));
       for (const id of reportTo()) {
-        const msg = await bot.api.sendMessage(Number(id), `💬 <b>Комментарий в Instagram</b> от @${esc(c.username || '?')}:\n«${esc(c.text).slice(0, 900)}»\n\n<i>Ответьте на это сообщение (свайп влево → «Ответить») — ответ уйдёт в Instagram.</i>${m.permalink ? `\n${m.permalink}` : ''}`, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } }).catch(() => null);
+        const msg = await bot.api.sendMessage(Number(id), `💬 <b>Комментарий в Instagram</b> от @${esc(c.username || '?')}:\n«${esc(c.text).slice(0, 900)}»\n\n<i>${spam ? 'Похоже на спам — отвечать не буду.' : human ? '⚠️ Похоже на жалобу — лучше ответить самой.' : `Если не ответите за ${FALLBACK_H} ч, отвечу сама вежливо и со ссылкой на бота.`} Чтобы ответить своими словами — ответьте на это сообщение (свайп влево).</i>${m.permalink ? `\n${m.permalink}` : ''}`, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } }).catch(() => null);
         if (msg) await kvSet(`ig:reply:${id}:${msg.message_id}`, c.id);
       }
     }
   }
+  // вопросы, на которые владелица не ответила, — вежливый общий ответ
+  const pend = await prisma.appKV.findMany({ where: { key: { startsWith: 'ig:pending:' } } });
+  for (const p of pend) {
+    if (Date.now() - Number(p.value) < FALLBACK_H * 3600e3) continue;
+    const cid = p.key.slice('ig:pending:'.length);
+    await prisma.appKV.deleteMany({ where: { key: p.key } });
+    await ig(`/${cid}/replies`, { message: fallbackReply(cid) }, 'POST').catch((e) => log.error({ err: e }, 'ig fallback'));
+  }
 }
+const FALLBACK_H = 4;
 
 /** Понедельничный отчёт: подписчики, последние ролики с лайками и комментариями */
 async function weeklyReport(bot: Bot) {
@@ -172,31 +233,31 @@ export function attachInstagram(bot: Bot) {
     if (!env.IG_APP_ID || !env.IG_APP_SECRET) return ctx.reply('Сначала добавьте в Railway переменные IG_APP_ID и IG_APP_SECRET (ID и секрет приложения Instagram из панели Meta).');
     const on = await igEnabled();
     await ctx.reply(`${on ? '✅ Instagram подключён' + ((await kvGet('ig:username')) ? ` (@${await kvGet('ig:username')})` : '') + '. Переподключить:' : '📸 Подключите Instagram — нажмите кнопку, войдите в аккаунт и разрешите доступ:'}`,
-      { reply_markup: new InlineKeyboard().url('Войти через Instagram', connectLink(ctx.from!.id)) });
+      { reply_markup: await panelKb(ctx.from!.id) });
   };
+  const panelKb = async (tg: number) => new InlineKeyboard().url('Войти через Instagram', connectLink(tg)).row()
+    .text(`🤖 Автопубликация: ${(await autoOn()) ? 'ВКЛ' : 'выкл'}`, 'ig:auto');
   bot.command(['instagram', 'insta', 'inst', 'ig'], connect);
   bot.hears(/^\/?(инст|инста|инстаграм|инстаграмм|instagram|insta)\s*$/i, connect);
   bot.callbackQuery(/^ig:(pub|skip):([\w.-]{1,80})$/, async (ctx) => {
     if (!isAdmin(ctx.from?.id)) return ctx.answerCallbackQuery();
     const [, act, id] = ctx.match as RegExpMatchArray;
     const it = queue().find((x) => x.id === id);
-    const state = await kvGet(`ig:item:${id}`);
+    const state = (await kvGet(`ig:item:${id}`)) || '';
     if (!it) return ctx.answerCallbackQuery({ text: 'Ролик не найден в очереди' });
-    if (state === 'published' || state === 'skipped' || state === 'publishing') return ctx.answerCallbackQuery({ text: 'Уже обработан' });
+    if (state !== 'offered' && !state.startsWith('scheduled:')) return ctx.answerCallbackQuery({ text: state === 'published' ? 'Уже опубликован' : 'Уже обработан' });
     if (act === 'skip') { await kvSet(`ig:item:${id}`, 'skipped'); await ctx.editMessageReplyMarkup().catch(() => {}); return ctx.answerCallbackQuery({ text: 'Не публикуем' }); }
     if (!(await igEnabled())) return ctx.answerCallbackQuery({ text: 'Instagram ещё не подключён — отправьте боту /instagram', show_alert: true });
-    const claimed = await prisma.appKV.updateMany({ where: { key: `ig:item:${id}`, value: 'offered' }, data: { value: 'publishing' } });
-    if (!claimed.count) return ctx.answerCallbackQuery({ text: 'Уже обработан' });
     await ctx.answerCallbackQuery({ text: 'Публикую… это 1–3 минуты' });
     await ctx.editMessageReplyMarkup().catch(() => {});
-    try {
-      const r = await publishReel(it);
-      await kvSet(`ig:item:${id}`, 'published');
-      await ctx.reply(`✅ Опубликовано в Instagram${r.permalink ? `: ${r.permalink}` : ''}`);
-    } catch (e: any) {
-      await kvSet(`ig:item:${id}`, 'offered');
-      await ctx.reply(`⚠️ Не получилось опубликовать: ${e.message}`, { reply_markup: new InlineKeyboard().text('🔁 Ещё раз', `ig:pub:${id}`) });
-    }
+    await publishItem(bot, it, state, console);
+  });
+  bot.callbackQuery('ig:auto', async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) return ctx.answerCallbackQuery();
+    const on = !(await autoOn());
+    await kvSet('ig:auto', on ? '1' : '0');
+    await ctx.editMessageReplyMarkup({ reply_markup: await panelKb(ctx.from.id) }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: on ? `Автопубликация включена: ролики выходят сами в ${PUB_HOUR}:00` : 'Автопубликация выключена: буду присылать на одобрение', show_alert: true });
   });
   // ответ администратора на пересланный комментарий → в Instagram
   bot.on('message:text', async (ctx, next) => {
@@ -204,7 +265,7 @@ export function attachInstagram(bot: Bot) {
     if (!rt || !isAdmin(ctx.from?.id)) return next();
     const commentId = await kvGet(`ig:reply:${ctx.from.id}:${rt.message_id}`);
     if (!commentId) return next();
-    try { await ig(`/${commentId}/replies`, { message: ctx.message.text }, 'POST'); await ctx.reply('✅ Ответ отправлен в Instagram'); }
+    try { await ig(`/${commentId}/replies`, { message: ctx.message.text }, 'POST'); await prisma.appKV.deleteMany({ where: { key: `ig:pending:${commentId}` } }); await ctx.reply('✅ Ответ отправлен в Instagram'); }
     catch (e: any) { await ctx.reply(`⚠️ Не отправилось: ${e.message}`); }
   });
 }
@@ -216,6 +277,7 @@ export function startInstagram(bot: Bot, log: { error: (o: any, m?: string) => v
     try {
       await offerNew(bot, log);
       if (await igEnabled()) {
+        await publishDue(bot, log).catch((e) => log.error({ err: e }, 'ig due'));
         await refreshToken(log).catch((e) => log.error({ err: e }, 'ig token'));
         await checkComments(bot, log).catch((e) => log.error({ err: e }, 'ig comments'));
         await weeklyReport(bot).catch((e) => log.error({ err: e }, 'ig report'));
