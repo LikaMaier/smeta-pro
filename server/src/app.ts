@@ -1,6 +1,7 @@
 import Fastify, { FastifyInstance, FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { MEDIA_DIR, finishConnect } from './instagram';
+import { thFinishConnect } from './threads';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -94,6 +95,20 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
       return page('Instagram подключён', `Аккаунт @${r.username}. Можно закрыть страницу и вернуться в Telegram.`);
     } catch (e: any) { req.log.error(e, 'ig connect'); return page('Не получилось', String(e.message).replace(/</g, '&lt;')); }
   });
+
+  // Подключение Threads: возврат после входа + обязательные для Meta адреса отключения и удаления данных
+  app.get('/threads/callback', async (req, reply) => {
+    const q = req.query as any;
+    const page = (title: string, text: string) => reply.header('Content-Type', 'text/html; charset=utf-8').send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><body style="font:17px system-ui;padding:28px;background:#0D2440;color:#EAF4FF"><h1>${title}</h1><p>${text}</p></body>`);
+    if (q.error) return page('Не подключено', 'Доступ не разрешён. Отправьте боту /threads и попробуйте ещё раз.');
+    try {
+      const r = await thFinishConnect(String(q.code || ''), String(q.state || ''));
+      if (opts.bot) for (const id of r.tg) await opts.bot.api.sendMessage(id, `✅ Threads @${r.username} подключён. Посты на день будут выходить сами, план пришлю утром.`).catch(() => {});
+      return page('Threads подключён', `Аккаунт @${r.username}. Можно закрыть страницу и вернуться в Telegram.`);
+    } catch (e: any) { req.log.error(e, 'threads connect'); return page('Не получилось', String(e.message).replace(/</g, '&lt;')); }
+  });
+  app.post('/threads/uninstall', async () => ({ ok: true }));
+  app.post('/threads/delete', async () => ({ url: `${env.PUBLIC_URL}/`, confirmation_code: 'smeta-pro' }));
 
   // Ролики для Instagram (Instagram скачивает видео по публичной ссылке)
   if (fs.existsSync(MEDIA_DIR)) await app.register(fastifyStatic, { root: MEDIA_DIR, prefix: '/media/', decorateReply: false });

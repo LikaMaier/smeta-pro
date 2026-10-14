@@ -8,6 +8,7 @@ import { startAdminReports } from './stats';
 import { startFunnel } from './funnel';
 import { startInstagram } from './instagram';
 import { startTenders } from './tenders';
+import { startThreads } from './threads';
 import { notifyAiWishers } from './routes/ai';
 import { COMPOSITIONS, compositionFor } from '../../shared/compositions';
 import { STARTER_PRICES } from '../../shared/starterPrices';
@@ -53,6 +54,7 @@ async function main() {
     startFunnel(bot, app.log, env.PUBLIC_URL);
     startInstagram(bot, app.log);
     startTenders(bot, app.log);
+    startThreads(bot, app.log);
     notifyAiWishers(bot, env.PUBLIC_URL, app.log).catch((e) => app.log.error({ err: e }, 'ai wish notify'));
   } else {
     app.log.warn('BOT_TOKEN не задан — бот и оплата отключены');
