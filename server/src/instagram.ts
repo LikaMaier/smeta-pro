@@ -144,8 +144,11 @@ export function connectLink(adminTgId: number) {
 }
 /** Обмен кода на долгий токен (60 дней) и сохранение. Возвращает ник аккаунта. */
 export async function finishConnect(code: string, state: string) {
+  // Вход мог начаться не из бота (ссылка из панели Meta) — тогда state нет; это безопасно:
+  // приложение в режиме разработки пускает только аккаунты-тестировщики владелицы.
   const [tg, exp, sig] = state.split('.');
-  if (!tg || !exp || sign(`${tg}.${exp}`) !== sig || Number(exp) < Date.now()) throw new Error('Ссылка устарела — отправьте боту /instagram ещё раз');
+  const fromBot = !!tg && !!exp && sign(`${tg}.${exp}`) === sig && Number(exp) > Date.now();
+  if (!code) throw new Error('Instagram не передал код входа — отправьте боту /instagram и попробуйте ещё раз');
   const r1 = await fetch('https://api.instagram.com/oauth/access_token', { method: 'POST', body: new URLSearchParams({ client_id: env.IG_APP_ID, client_secret: env.IG_APP_SECRET, grant_type: 'authorization_code', redirect_uri: REDIRECT(), code: code.replace(/#_$/, '') }) });
   const j1: any = await r1.json().catch(() => ({}));
   if (!j1.access_token) throw new Error(j1.error_message || j1.error?.message || 'Instagram не выдал доступ');
@@ -157,19 +160,22 @@ export async function finishConnect(code: string, state: string) {
   if (!id) throw new Error('Не удалось узнать ID аккаунта Instagram');
   await kvSet('ig:token', long); await kvSet('ig:userId', id); await kvSet('ig:tokenAt', String(Date.now())); await kvSet('ig:username', me.username || '');
   cached = null;
-  return { username: me.username as string, tg: Number(tg) };
+  return { username: me.username as string, tg: fromBot ? [Number(tg)] : reportTo().map(Number) };
 }
 
 // ---------- бот: кнопки и ответы ----------
+const OWNER = '503303776';
 export function attachInstagram(bot: Bot) {
-  const isAdmin = (id?: number) => id != null && reportTo().includes(String(id));
-  bot.command('instagram', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) return;
+  const isAdmin = (id?: number) => id != null && (reportTo().includes(String(id)) || String(id) === OWNER);
+  const connect = async (ctx: any) => {
+    if (!isAdmin(ctx.from?.id)) return ctx.reply(`Эта команда только для владельца. Ваш Telegram ID: ${ctx.from?.id}`);
     if (!env.IG_APP_ID || !env.IG_APP_SECRET) return ctx.reply('Сначала добавьте в Railway переменные IG_APP_ID и IG_APP_SECRET (ID и секрет приложения Instagram из панели Meta).');
     const on = await igEnabled();
     await ctx.reply(`${on ? '✅ Instagram подключён' + ((await kvGet('ig:username')) ? ` (@${await kvGet('ig:username')})` : '') + '. Переподключить:' : '📸 Подключите Instagram — нажмите кнопку, войдите в аккаунт и разрешите доступ:'}`,
       { reply_markup: new InlineKeyboard().url('Войти через Instagram', connectLink(ctx.from!.id)) });
-  });
+  };
+  bot.command(['instagram', 'insta', 'inst', 'ig'], connect);
+  bot.hears(/^\/?(инст|инста|инстаграм|инстаграмм|instagram|insta)\s*$/i, connect);
   bot.callbackQuery(/^ig:(pub|skip):([\w.-]{1,80})$/, async (ctx) => {
     if (!isAdmin(ctx.from?.id)) return ctx.answerCallbackQuery();
     const [, act, id] = ctx.match as RegExpMatchArray;

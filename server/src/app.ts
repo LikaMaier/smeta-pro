@@ -90,7 +90,7 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
     if (q.error) return page('Не подключено', 'Доступ не разрешён. Отправьте боту /instagram и попробуйте ещё раз.');
     try {
       const r = await finishConnect(String(q.code || ''), String(q.state || ''));
-      if (opts.bot) await opts.bot.api.sendMessage(r.tg, `✅ Instagram @${r.username} подключён. Ролики из очереди можно публиковать кнопкой «Опубликовать».`).catch(() => {});
+      if (opts.bot) for (const id of r.tg) await opts.bot.api.sendMessage(id, `✅ Instagram @${r.username} подключён. Ролики из очереди можно публиковать кнопкой «Опубликовать».`).catch(() => {});
       return page('Instagram подключён', `Аккаунт @${r.username}. Можно закрыть страницу и вернуться в Telegram.`);
     } catch (e: any) { req.log.error(e, 'ig connect'); return page('Не получилось', String(e.message).replace(/</g, '&lt;')); }
   });
