@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTI'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Italic.ttf'); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.emo { position: absolute; font-family: 'Noto Color Emoji'; line-height: 1; }
+.bv { position: absolute; width: 70px; height: 80px; }
+.bv .b { position: absolute; left: 0; top: 16px; font-family: 'Noto Color Emoji'; font-size: 60px; line-height: 1; }
+.bv .h { position: absolute; left: 14px; top: 8px; width: 34px; height: 17px; background: #FFC93C; border-radius: 17px 17px 3px 3px; box-shadow: inset 0 -3px 0 #d99c00; }
+.bv .h:after { content: ''; position: absolute; left: -5px; right: -5px; bottom: -3px; height: 5px; background: #FFC93C; border-radius: 3px; }
+.bv .p { position: absolute; left: 34px; top: 34px; font-family: 'Noto Color Emoji'; font-size: 30px; line-height: 1; }
+#bars:before, #bars:after { content: ''; position: absolute; left: 0; right: 0; height: 64px; background: #000; z-index: 20; }
+#bars:before { top: 0; } #bars:after { bottom: 0; }
+#title { position: absolute; left: 0; right: 0; top: 92px; text-align: center; font-family: 'PTN'; font-size: 32px; letter-spacing: 7px; color: rgba(255,255,255,.92); text-shadow: 0 2px 8px rgba(0,0,0,.6); z-index: 18; }
+#sub { position: absolute; left: 26px; right: 26px; bottom: 84px; height: 120px; display: flex; align-items: center; justify-content: center; text-align: center; font-family: 'PTI', 'Noto Color Emoji', serif; font-size: 31px; line-height: 1.22; color: #fff; z-index: 19;
+  text-shadow: 0 2px 6px rgba(0,0,0,.95), 0 0 2px #000, 0 0 14px rgba(0,0,0,.6); }
+#sub b { font-family: 'PT'; font-style: normal; color: #FFD43B; }
+#bubble { position: absolute; right: 30px; top: 190px; max-width: 300px; background: #fff; color: #111; border-radius: 20px; padding: 14px 18px; font-family: 'PT', 'Noto Color Emoji'; font-size: 26px; line-height: 1.15; opacity: 0; z-index: 12; box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+#bubble:after { content: ''; position: absolute; right: 50px; bottom: -14px; border: 14px solid transparent; border-top-color: #fff; border-bottom: 0; }
+#bubble small { display: block; font-size: 15px; color: #888; margin-bottom: 3px; }
+#cal { position: absolute; left: 330px; top: 200px; width: 150px; height: 160px; border-radius: 14px; background: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.4); opacity: 0; z-index: 12; overflow: hidden; text-align: center; font-family: 'PT'; }
+#cal .top { background: #e5383b; color: #fff; font-size: 20px; padding: 8px 0; letter-spacing: 2px; }
+#cal .big { font-size: 74px; color: #222; line-height: 1.25; }
+#cal .sm { font-size: 16px; color: #888; margin-top: -8px; }
+#phone { position: absolute; left: 262px; top: 196px; width: 262px; height: 560px; border-radius: 40px; background: #05080d; padding: 9px; box-shadow: 0 30px 70px rgba(0,0,0,.6), inset 0 0 0 3px #2c3442; z-index: 10; opacity: 0; transform-origin: 50% 80%; }
+#phone .scr { position: relative; width: 100%; height: 100%; border-radius: 32px; overflow: hidden; background: #0D2440; }
+#phone img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#tap { position: absolute; width: 44px; height: 44px; margin: -22px; border-radius: 50%; background: rgba(255,255,255,.4); border: 3px solid rgba(255,255,255,.9); opacity: 0; }
+#paw { position: absolute; font-family: 'Noto Color Emoji'; font-size: 40px; opacity: 0; z-index: 11; }
+#toast { position: absolute; left: 50%; top: 250px; transform: translateX(-50%); background: #fff; border-radius: 18px; padding: 12px 18px; font-family: 'PT', 'Noto Color Emoji'; font-size: 22px; color: #111; opacity: 0; z-index: 12; white-space: nowrap; box-shadow: 0 10px 26px rgba(0,0,0,.35); }
+#toast small { display: block; font-size: 14px; color: #888; }
+#end { position: absolute; inset: 0; z-index: 30; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; opacity: 0; color: #fff; text-align: center; font-family: 'PT'; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 29px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 8px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#fade { position: absolute; inset: 0; background: #000; opacity: 0; z-index: 25; pointer-events: none; }
+</style></head><body><div id="stage">
+<svg id="sv" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="skyA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6aa3d6"/><stop offset=".5" stop-color="#f3c58a"/><stop offset=".72" stop-color="#ffdca6"/></linearGradient>
+    <linearGradient id="skyC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2350"/><stop offset=".45" stop-color="#9a4f7a"/><stop offset=".7" stop-color="#f29a6b"/></linearGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b58052"/><stop offset="1" stop-color="#7d5233"/></linearGradient>
+    <linearGradient id="furH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a87548"/><stop offset="1" stop-color="#c08b5b"/></linearGradient>
+    <radialGradient id="ora" cx=".38" cy=".35" r=".7"><stop offset="0" stop-color="#ffd27a"/><stop offset=".55" stop-color="#ff9a1f"/><stop offset="1" stop-color="#e06d00"/></radialGradient>
+    <linearGradient id="riv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fb7d8"/><stop offset="1" stop-color="#4b88b0"/></linearGradient>
+    <linearGradient id="grd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c7a46e"/><stop offset="1" stop-color="#8d6b41"/></linearGradient>
+    <linearGradient id="hot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd3e0"/><stop offset="1" stop-color="#3f8fa6"/></linearGradient>
+    <radialGradient id="sunG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff6d0"/><stop offset=".4" stop-color="#ffd27a" stop-opacity=".8"/><stop offset="1" stop-color="#ffb066" stop-opacity="0"/></radialGradient>
+    <radialGradient id="vigG" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+    <filter id="bl" filterUnits="userSpaceOnUse" x="-400" y="-400" width="1400" height="1800"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="bl3" filterUnits="userSpaceOnUse" x="-400" y="-400" width="1400" height="1800"><feGaussianBlur stdDeviation="3"/></filter>
+    <clipPath id="wclip"><rect x="-400" y="-900" width="1200" height="858"/></clipPath>
+  </defs>
+  <g id="A">
+    <g id="camA">
+      <rect x="-200" y="-200" width="940" height="1400" fill="url(#skyA)"/>
+      <circle cx="380" cy="390" r="210" fill="url(#sunG)"/>
+      <g id="clouds"></g>
+      <g transform="translate(0,-100)">
+      <g id="hills"></g>
+      <rect x="-200" y="560" width="940" height="70" fill="url(#riv)"/>
+      <g id="reeds"></g>
+      <rect x="-200" y="620" width="940" height="600" fill="url(#grd)"/>
+      <g id="site"></g>
+      </g>
+      <g id="beaversBack"></g>
+      <g id="capyA" transform="translate(180,740) scale(1.2)"></g>
+    </g>
+  </g>
+  <g id="B" opacity="0">
+    <rect width="540" height="960" fill="url(#skyA)"/>
+    <g filter="url(#bl)" opacity=".9"><rect x="-100" y="600" width="740" height="500" fill="#a98656"/><rect x="40" y="380" width="14" height="260" fill="#8a5a33"/><rect x="200" y="400" width="14" height="240" fill="#8a5a33"/><rect x="20" y="380" width="230" height="14" fill="#8a5a33"/></g>
+    <g id="capyB" transform="translate(150,960) scale(2.25)"></g>
+  </g>
+  <g id="C" opacity="0">
+    <rect width="540" height="960" fill="url(#skyC)"/>
+    <g id="stars"></g>
+    <g id="hillsC"></g>
+    <ellipse cx="270" cy="760" rx="330" ry="120" fill="#5b4a3a"/>
+    <ellipse cx="270" cy="740" rx="290" ry="95" fill="url(#hot)"/>
+    <g id="capyC" transform="translate(240,790) scale(1.55)"></g>
+    <ellipse cx="270" cy="760" rx="290" ry="40" fill="#5fb0c4" opacity=".55"/>
+    <g id="steam"></g>
+    <g id="tinyBeavers"></g>
+  </g>
+  <rect id="vig" width="540" height="960" fill="url(#vigG)"/>
+</svg>
+<div id="beavers"></div>
+<div id="papers"></div>
+<div id="bubble"><small>Заказчик</small>А давайте на 2 метра шире! 🙃</div>
+<div id="cal"><div class="top">НЕДЕЛЯ</div><div class="big" id="calN">1</div><div class="sm">считаем смету</div></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="paw">🐾</div>
+<div id="toast"><small>СМЕТА PRO</small>✅ Смета отправлена заказчику</div>
+<div id="title">ДИКАЯ ПРИРОДА СТРОЙКИ</div>
+<div id="sub"></div>
+<div id="bars"></div>
+<div id="fade"></div>
+<div id="end"><div style="font-family:'Noto Color Emoji';font-size:90px">🍊</div><div class="logo">СМЕТА PRO</div><div class="l2">Будь как капибара:<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">3 сметы в месяц — бесплатно</div></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const E = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const back = (x) => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const st = { stroke: '#3a2414', 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+
+window.DUR = 28;
+const T = { A: [0, 13.5], B: [13.5, 20.5], C: [20.5, 25.2], end: [25.2, 28] };
+const SUBS = [
+  [0.3, 2.2, 'Это капибара.'],
+  [2.2, 4.6, 'Самый спокойный прораб<br>в дикой природе.'],
+  [4.6, 7.6, 'Вокруг неё — бобры.<br>Они считают смету на бумажке.'],
+  [7.6, 9.8, 'Третью неделю.'],
+  [9.8, 13.4, 'Заказчик поменял размеры.<br>Бобры начинают сначала.'],
+  [13.6, 16.2, 'Капибара не суетится.<br>Капибара открывает <b>СМЕТА PRO</b>.'],
+  [16.2, 18.4, 'Пара цифр — работы<br>и материалы посчитаны.'],
+  [18.4, 20.4, 'PDF заказчику.<br><b>Две минуты.</b>'],
+  [20.7, 22.8, 'Пока бобры считают…'],
+  [22.8, 25.1, '…капибара может себе<br>позволить. 🍊'],
+];
+
+// ---------------- капибара ----------------
+function capy(g, o = {}) {
+  const C = {};
+  E('ellipse', { cx: 0, cy: 4, rx: 140, ry: 16, fill: 'rgba(0,0,0,.3)', filter: 'url(#bl3)' }, g);
+  C.body = E('g', {}, g);
+  const b = C.body;
+  // задние и передние лапы
+  for (const x of [-92, -58, 52, 84]) E('rect', { x: x - 13, y: -46, width: 26, height: 48, rx: 11, fill: x < 0 ? '#7d5233' : '#8a5c39', ...st }, b);
+  // туловище — «бочка»
+  E('path', { d: 'M-125 -95 C-130 -165 -60 -175 0 -170 C70 -168 120 -150 118 -95 C116 -45 70 -30 0 -30 C-80 -30 -122 -45 -125 -95Z', fill: 'url(#fur)', ...st }, b);
+  for (let i = 0; i < 14; i++) E('path', { d: `M${-100 + i * 15} ${-150 + R(i) * 20} l6 10`, stroke: '#6f4729', 'stroke-width': 2, opacity: .5 }, b);
+  // голова
+  C.head = E('g', { transform: 'translate(95,-130)' }, b);
+  const h = C.head;
+  E('path', { d: 'M-25 -40 C10 -62 90 -55 112 -22 C122 -2 112 30 82 34 C40 40 -10 38 -28 18 C-42 0 -40 -28 -25 -40Z', fill: 'url(#furH)', ...st }, h);
+  E('ellipse', { cx: -6, cy: -46, rx: 13, ry: 11, fill: '#6b4428', ...st }, h);           // ухо
+  E('ellipse', { cx: -6, cy: -44, rx: 6, ry: 5, fill: '#3a2414' }, h);
+  E('ellipse', { cx: 104, cy: -8, rx: 11, ry: 14, fill: '#3a2414' }, h);                 // нос
+  E('path', { d: 'M98 18 q-10 8 -24 4', stroke: '#3a2414', 'stroke-width': 3, fill: 'none' }, h); // рот
+  C.eyeOpen = E('g', {}, h);
+  E('ellipse', { cx: 50, cy: -22, rx: 9, ry: 8, fill: '#1c120a' }, C.eyeOpen);
+  E('circle', { cx: 53, cy: -25, r: 2.6, fill: '#fff' }, C.eyeOpen);
+  E('path', { d: 'M38 -27 q12 -6 24 0', stroke: '#3a2414', 'stroke-width': 3, fill: '#a87548' }, C.eyeOpen); // полуприкрытое веко — невозмутимость
+  C.eyeShut = E('path', { d: 'M40 -21 q10 7 20 0', stroke: '#1c120a', 'stroke-width': 3.5, fill: 'none', opacity: 0 }, h);
+  E('path', { d: 'M78 -2 l18 -4 M78 6 l18 2', stroke: '#3a2414', 'stroke-width': 1.5, opacity: .6 }, h);  // усы
+  if (o.hat) { C.hat = E('g', { transform: 'translate(30,-56)' }, h); E('path', { d: 'M-34 4 C-34 -34 34 -34 34 4Z', fill: '#FFC93C', ...st }, C.hat); E('rect', { x: -44, y: 0, width: 88, height: 10, rx: 5, fill: '#FFC93C', ...st }, C.hat); E('rect', { x: -4, y: -28, width: 8, height: 28, fill: '#e3a800' }, C.hat); }
+  if (o.orange) { C.orange = E('g', { transform: 'translate(36,-62)' }, h); E('circle', { cx: 0, cy: -16, r: 22, fill: 'url(#ora)', ...st, 'stroke-width': 2.5 }, C.orange); E('path', { d: 'M2 -38 q12 -10 22 -4 q-10 8 -22 4Z', fill: '#4caf50', ...st, 'stroke-width': 2 }, C.orange); for (let i = 0; i < 6; i++) E('circle', { cx: -8 + R(i) * 18, cy: -24 + R(i + 4) * 16, r: 1.2, fill: '#c95f00', opacity: .6 }, C.orange); }
+  return C;
+}
+const CA = capy($('capyA'), { hat: true });
+const CB = capy($('capyB'), { hat: true });
+const CC = capy($('capyC'), { orange: true });
+CC.eyeOpen.setAttribute('opacity', 0); CC.eyeShut.setAttribute('opacity', 1);
+$('capyC').setAttribute('clip-path', 'url(#wclip)'); // вода перекрывается эллипсом сверху
+
+// ---------------- стройка ----------------
+(function site() {
+  const hills = $('hills');
+  E('path', { d: 'M-200 560 Q-60 470 80 530 T340 510 T740 540 L740 600 L-200 600Z', fill: '#8fae7c', opacity: .8 }, hills);
+  E('path', { d: 'M-200 575 Q40 520 220 560 T740 555 L740 600 L-200 600Z', fill: '#6f935f' }, hills);
+  for (let i = 0; i < 26; i++) { const x = -60 + i * 26 + R(i) * 10; E('path', { d: `M${x} 640 q${-4 + R(i) * 8} -40 ${R(i + 2) * 10 - 5} ${-60 - R(i + 3) * 30}`, stroke: '#5c7a3f', 'stroke-width': 3, fill: 'none' }, $('reeds')); }
+  const s = $('site');
+  // каркас дома из брёвен
+  const g = E('g', { transform: 'translate(290,700)' }, s);
+  for (const x of [0, 70, 140, 210]) E('rect', { x, y: -190, width: 14, height: 190, fill: '#a0703f', ...st, 'stroke-width': 2 }, g);
+  E('rect', { x: -10, y: -196, width: 240, height: 14, fill: '#a0703f', ...st, 'stroke-width': 2 }, g);
+  E('path', { d: 'M-14 -196 L110 -270 L234 -196', stroke: '#8a5a33', 'stroke-width': 10, fill: 'none' }, g);
+  E('path', { d: 'M0 -90 L224 -90', stroke: '#8a5a33', 'stroke-width': 8 }, g);
+  // куча брёвен и песка
+  E('ellipse', { cx: 90, cy: 700, rx: 90, ry: 30, fill: '#d9b77b' }, s);
+  for (let i = 0; i < 5; i++) { E('rect', { x: 20 + (i % 3) * 8, y: 690 - i * 14, width: 140, height: 14, rx: 7, fill: '#9b6a3b', ...st, 'stroke-width': 2 }, s); E('circle', { cx: 160 + (i % 3) * 8, cy: 697 - i * 14, r: 7, fill: '#d7a76d', ...st, 'stroke-width': 2 }, s); }
+  // табличка
+  const tb = E('g', { transform: 'translate(470,790) scale(1.2)' }, s);
+  E('rect', { x: 8, y: -20, width: 8, height: 80, fill: '#6b4428' }, tb);
+  E('rect', { x: -38, y: -78, width: 100, height: 62, rx: 6, fill: '#fff8e7', ...st }, tb);
+  E('text', { x: 12, y: -52, 'text-anchor': 'middle', 'font-family': 'PT', 'font-size': 15, fill: '#3a2414' }, tb).textContent = 'СМЕТА:';
+  const q = E('text', { x: 12, y: -28, 'text-anchor': 'middle', 'font-family': 'PT', 'font-size': 20, fill: '#e5383b', id: 'q' }, tb); q.textContent = '???';
+  for (let i = 0; i < 5; i++) { const c = E('g', { class: 'cl', 'data-i': i, opacity: .85 }, $('clouds')); const x = R(i) * 540, y = 150 + R(i + 1) * 200, w = 60 + R(i + 2) * 60; for (let k = 0; k < 4; k++) E('ellipse', { cx: x + k * w * .35, cy: y - (k % 2) * 12, rx: w * .4, ry: w * .22, fill: '#fff4e2' }, c); }
+  for (let i = 0; i < 4; i++) E('path', { d: 'M-10 0 q5 -6 10 0 q5 -6 10 0', stroke: '#3a2a3a', 'stroke-width': 2.2, fill: 'none', class: 'bird', 'data-i': i }, $('clouds'));
+  // вечерние холмы и звёзды для сцены C
+  E('path', { d: 'M0 640 Q120 560 260 610 T540 600 L540 700 L0 700Z', fill: '#3b2f4f' }, $('hillsC'));
+  for (let i = 0; i < 40; i++) E('circle', { cx: R(i) * 540, cy: 80 + R(i + 1) * 420, r: .8 + R(i + 2) * 1.6, fill: '#fff', opacity: .4 + R(i + 3) * .5, class: 'star', 'data-i': i }, $('stars'));
+  for (let i = 0; i < 12; i++) E('ellipse', { cx: 40 + R(i * 3) * 460, cy: 700, rx: 50 + R(i) * 40, ry: 26 + R(i + 1) * 20, fill: '#fff', opacity: .25, filter: 'url(#bl)', class: 'stm', 'data-i': i }, $('steam'));
+})();
+
+// бобры — HTML (эмодзи + каски)
+const BV = [];
+for (let i = 0; i < 6; i++) {
+  const d = document.createElement('div'); d.className = 'bv'; d.innerHTML = `<div class="h"></div><div class="b">🦫</div><div class="p">${['📄', '🧮', '📄', '✏️', '📄', '📋'][i]}</div>`;
+  $('beavers').appendChild(d); BV.push(d);
+}
+const PAP = [];
+for (let i = 0; i < 26; i++) { const d = document.createElement('div'); d.className = 'emo'; d.textContent = i % 5 === 0 ? '🧾' : '📄'; d.style.fontSize = (26 + R(i) * 22) + 'px'; $('papers').appendChild(d); PAP.push(d); }
+// бобры вдали в сцене C (силуэты)
+for (let i = 0; i < 3; i++) { const t = E('text', { x: 0, y: 0, 'font-size': 26, 'font-family': 'Noto Color Emoji', opacity: .85, class: 'tb', 'data-i': i }, $('tinyBeavers')); t.textContent = '🦫'; }
+
+const SCR = '/home/claude/smeta-pro/marketing/engine/sc/';
+const SCREENS = [[13.9, '2dirs', 130, 300], [15.3, '4form', 130, 330], [16.5, '5result', 120, 470], [18.0, '8est', 120, 500]];
+function setImg(el, n) { if (el._n !== n) { el.src = SCR + n + '.png'; el._n = n; } }
+
+let subH = '';
+window.render = function (t) {
+  // --- субтитры
+  const s = SUBS.find(([a, b]) => t >= a && t < b);
+  const h = s ? s[2] : '';
+  if (h !== subH) { $('sub').innerHTML = `<span>${h}</span>`; subH = h; }
+  $('sub').style.opacity = s ? clamp(Math.min((t - s[0]) / .25, (s[1] - t) / .2)) : 0;
+  $('title').style.opacity = clamp(Math.min((t - .1) / .5, (4.4 - t) / .5));
+
+  // --- сцены
+  const inB = clamp((t - T.B[0]) / .35), inC = clamp((t - T.C[0]) / .5);
+  $('A').setAttribute('opacity', 1 - inB);
+  $('B').setAttribute('opacity', inB * (1 - inC));
+  $('C').setAttribute('opacity', inC);
+
+  // ===== A: стройка
+  const zoom = 1 + ease((t - 11.6) / 1.9) * 1.1 + t * .004;
+  const zk = ease((t - 11.6) / 1.9), fx = 340, fy = 560;
+  $('camA').setAttribute('transform', `translate(${lerp(fx, 260, zk)} ${lerp(fy, 470, zk)}) scale(${zoom}) translate(${-fx} ${-fy})`);
+  document.querySelectorAll('.cl').forEach((e) => e.setAttribute('transform', `translate(${(t * (6 + +e.dataset.i * 2)) % 700 - 100} 0)`));
+  document.querySelectorAll('.bird').forEach((e) => { const i = +e.dataset.i; e.setAttribute('transform', `translate(${(t * 28 + i * 60) % 760 - 100} ${230 + i * 22 + Math.sin(t * 2 + i) * 8}) scale(${1 + Math.sin(t * 9 + i) * .2} 1)`); });
+  // дыхание и моргание капибары
+  const br = 1 + Math.sin(t * 2.2) * .012;
+  CA.body.setAttribute('transform', `scale(1 ${br}) translate(0 ${(1 - br) * 100})`);
+  const blink = (t % 3.1) < .14;
+  CA.eyeOpen.setAttribute('opacity', blink ? 0 : 1); CA.eyeShut.setAttribute('opacity', blink ? 1 : 0);
+  CA.head.setAttribute('transform', `translate(95,-130) rotate(${t > 11.6 && t < 13.5 ? -4 * ease((t - 11.6) / .6) : Math.sin(t * .8) * 1.5})`);
+  // бобры бегают
+  const panic = t > 9.8 ? 1.9 : 1;
+  BV.forEach((d, i) => {
+    const vis = t < T.B[0] ? clamp((t - 4.4 - i * .12) / .3) : 0;
+    const sp = (.9 + R(i) * .7) * panic, ph = R(i + 5) * 6;
+    const base = [350, 430, 470, 390, 320, 455][i], y = [610, 640, 690, 730, 700, 760][i];
+    const x = Math.min(475, base + Math.sin(t * sp + ph) * (35 + R(i) * 25));
+    const dir = Math.cos(t * sp + ph) > 0 ? -1 : 1;
+    const hop = Math.abs(Math.sin(t * sp * 6 + i)) * -12;
+    let rot = Math.sin(t * 10 + i) * 6;
+    if (i === 2 && t > 11.4) rot = -90 * eOut((t - 11.4) / .3);   // упал в обморок
+    const zx = zoom > 1.05 ? (x - 250) * zoom + 270 - 20 * (zoom - 1) : x;
+    d.style.opacity = vis * clamp(1 - (t - 11.6) / .4);
+    d.style.left = (i === 2 && t > 11.4 ? 440 : x) + 'px'; d.style.top = (y + (i === 2 && t > 11.4 ? 30 : hop)) + 'px';
+    d.style.transform = `scaleX(${dir}) rotate(${rot}deg) scale(${1.05 + (y - 640) / 300})`;
+  });
+  // календарь недель
+  const calK = t > 7.4 && t < 10 ? 1 : 0;
+  $('cal').style.opacity = t > 7.4 && t < 9.9 ? clamp(Math.min((t - 7.4) / .2, (9.9 - t) / .2)) : 0;
+  $('cal').style.transform = `rotate(-6deg) scale(${back((t - 7.4) / .4)})`;
+  $('calN').textContent = t < 8.1 ? '1' : t < 8.6 ? '2' : '3';
+  // заказчик меняет размеры
+  $('bubble').style.opacity = t > 9.9 && t < 12.2 ? clamp(Math.min((t - 9.9) / .15, (12.2 - t) / .2)) : 0;
+  $('bubble').style.transform = `scale(${back((t - 9.9) / .4)}) rotate(2deg)`;
+  // листы разлетаются
+  PAP.forEach((d, i) => {
+    const a = 10.3 + R(i) * .4, k = (t - a) / 2.2;
+    if (k <= 0 || k >= 1 || t > T.B[0]) { d.style.opacity = 0; return; }
+    const vx = (R(i + 1) - .5) * 700, vy = -500 - R(i + 2) * 500;
+    d.style.opacity = Math.min(1, (1 - k) * 2);
+    d.style.left = (400 + vx * k) + 'px'; d.style.top = (620 + vy * k + 900 * k * k) + 'px';
+    d.style.transform = `rotate(${(R(i + 3) - .5) * 900 * k}deg)`;
+  });
+
+  // ===== B: капибара с телефоном
+  const pin = back((t - (T.B[0] + .1)) / .5);
+  $('phone').style.opacity = t > T.B[0] && t < T.C[0] + .3 ? clamp((t - T.B[0]) / .2) * (1 - inC) : 0;
+  $('phone').style.transform = `translateY(${(1 - pin) * 500}px) rotate(${lerp(14, 5, pin) + Math.sin(t * 1.3) * 1}deg)`;
+  let cur = SCREENS[0], nxt = null;
+  for (let i = 0; i < SCREENS.length; i++) if (t >= SCREENS[i][0]) { cur = SCREENS[i]; nxt = SCREENS[i + 1]; }
+  setImg($('imA'), cur[1]);
+  const sw = nxt ? clamp((t - (nxt[0] - .25)) / .25) : 0;
+  if (nxt) setImg($('imB'), nxt[1]);
+  $('imA').style.transform = `translateX(${-sw * 100}%)`; $('imB').style.transform = `translateX(${(1 - sw) * 100}%)`; $('imB').style.opacity = sw > 0 ? 1 : 0;
+  // тап лапой
+  const tk = nxt ? (t - (nxt[0] - .7)) / .45 : -1;
+  const tp = $('tap');
+  if (tk > 0 && tk < 1) { tp.style.left = cur[2] + 'px'; tp.style.top = cur[3] + 'px'; tp.style.opacity = 1 - tk; tp.style.transform = `scale(${.6 + tk})`; } else tp.style.opacity = 0;
+  const pw = $('paw');
+  pw.style.opacity = t > 14 && t < 19.8 ? (tk > -.5 && tk < 1.2 ? 1 : .0) : 0;
+  pw.style.left = (262 + 9 + cur[2] - 10) + 'px'; pw.style.top = (196 + 9 + cur[3] + (tk > 0 && tk < .4 ? 0 : 14)) + 'px';
+  CB.body.setAttribute('transform', `scale(1 ${br})`);
+  CB.head.setAttribute('transform', `translate(95,-130) rotate(${-8 + Math.sin(t * .9) * 2})`);
+  const blinkB = (t % 2.7) < .13; CB.eyeOpen.setAttribute('opacity', blinkB ? 0 : 1); CB.eyeShut.setAttribute('opacity', blinkB ? 1 : 0);
+  $('capyB').setAttribute('transform', `translate(${lerp(-280, -175, eOut((t - T.B[0]) / .8))},${1000}) scale(2.25)`);
+  $('toast').style.opacity = t > 19.2 && t < T.C[0] + .2 ? clamp((t - 19.2) / .15) * (1 - inC) : 0;
+  $('toast').style.transform = `translateX(-50%) scale(${back((t - 19.2) / .4)})`;
+
+  // ===== C: тёплый источник и мандарин
+  const bob = Math.sin(t * 1.6) * 3;
+  $('capyC').setAttribute('transform', `translate(165,${815 + bob}) scale(1.6)`);
+  CC.head.setAttribute('transform', `translate(95,-130) rotate(${-6 + Math.sin(t * .7) * 2})`);
+  if (CC.orange) CC.orange.setAttribute('transform', `translate(36,${-62 - (t > 22.6 && t < 23.2 ? Math.sin((t - 22.6) / .6 * Math.PI) * 14 : 0)}) rotate(${Math.sin(t * 1.6) * 4})`);
+  document.querySelectorAll('.stm').forEach((e) => { const i = +e.dataset.i; const k = ((t * .25 + R(i)) % 1); e.setAttribute('transform', `translate(${Math.sin(t + i) * 12} ${-k * 260})`); e.setAttribute('opacity', .32 * Math.sin(k * Math.PI)); });
+  document.querySelectorAll('.star').forEach((e) => { const i = +e.dataset.i; e.setAttribute('opacity', .3 + .5 * Math.abs(Math.sin(t * 1.5 + i))); });
+  document.querySelectorAll('.tb').forEach((e) => { const i = +e.dataset.i; const x = 60 + i * 150 + Math.sin(t * 3 + i) * 40; e.setAttribute('x', x); e.setAttribute('y', 640 - Math.abs(Math.sin(t * 9 + i)) * 6); e.setAttribute('transform', `scale(1) `); });
+
+  // ===== концовка
+  $('end').style.opacity = clamp((t - T.end[0]) / .4);
+  $('end').firstChild.style.transform = `rotate(${Math.sin(t * 3) * 10}deg) scale(${back((t - T.end[0] - .1) / .5)})`;
+  $('fade').style.opacity = clamp(1 - Math.abs(t - T.B[0]) / .18) * .6 + clamp(1 - Math.abs(t - T.C[0]) / .3) * .8;
+};
+window.READY = Promise.all([document.fonts.ready, ...['2dirs', '4form', '5result', '8est'].map((n) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = SCR + n + '.png'; }))]).then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

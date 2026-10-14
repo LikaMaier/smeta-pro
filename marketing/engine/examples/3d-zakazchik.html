@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTR'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Regular.ttf'); }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTBI'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Italic.ttf'); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; font-family: 'PT', 'Noto Color Emoji', sans-serif; }
+#bg { position: absolute; inset: -40px; background:
+  radial-gradient(70% 45% at 50% 38%, rgba(255,190,90,.22), rgba(255,190,90,0) 70%),
+  linear-gradient(rgba(120,170,230,.09) 1px, transparent 1px) 0 0/30px 30px,
+  linear-gradient(90deg, rgba(120,170,230,.09) 1px, transparent 1px) 0 0/30px 30px,
+  linear-gradient(#0b1d36, #10294a 55%, #0a1a30); }
+.cap { position: absolute; left: 18px; right: 18px; top: 46px; text-align: center; font-weight: 700; color: #fff; z-index: 20;
+  font-size: 36px; line-height: 1.14; -webkit-text-stroke: 7px #000; paint-order: stroke fill; }
+.cap .y { color: #FFD43B; }
+/* телефон */
+#phone { position: absolute; left: 115px; top: 248px; width: 310px; height: 672px; border-radius: 44px; background: #05080d; padding: 10px;
+  box-shadow: 0 40px 90px rgba(0,0,0,.65), inset 0 0 0 3px #2c3442; z-index: 5; transform-origin: 50% 60%; }
+#scr { position: relative; width: 100%; height: 100%; border-radius: 35px; overflow: hidden; background: #0D2440; color: #EAF4FF; }
+.hdr { position: absolute; left: 0; right: 0; top: 0; height: 58px; padding: 22px 16px 0; display: flex; gap: 10px; align-items: center; font-family: 'PTBI'; font-size: 19px; letter-spacing: .5px; }
+.hdr i { font-style: normal; font-family: 'PT'; font-size: 24px; color: #9fc8f5; }
+.pg { position: absolute; left: 0; right: 0; top: 58px; bottom: 0; }
+/* экран 1: виды построек */
+.note { margin: 6px 10px 8px; padding: 7px 9px; border-radius: 9px; background: #15345a; font-family: 'PTR'; font-size: 10.5px; color: #b9d4f2; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0 10px; }
+.tile { height: 80px; border-radius: 10px; background: #173a63; border: 1.5px solid #24507f; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; text-align: center; line-height: 1.05; color: #d8e9fb; }
+.tile b { font-family: 'Noto Color Emoji'; font-size: 26px; font-weight: 400; }
+.tile.on { border-color: #fff; background: #1d4778; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+.lbl { margin: 12px 12px 6px; font-size: 11px; color: #9fc8f5; font-family: 'PTR'; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 10px; }
+.chip { padding: 7px 11px; border-radius: 16px; background: #173a63; border: 1.5px solid #24507f; font-size: 11.5px; color: #e3effc; font-family: 'PTR'; }
+.chip.on { background: #fff; color: #0D2440; border-color: #fff; font-family: 'PT'; }
+/* экран 2: конструктор */
+#view { position: absolute; left: 8px; right: 8px; top: 4px; height: 262px; border-radius: 14px; background: #F4F1E8; overflow: hidden; }
+#model { position: absolute; inset: 0; }
+#model svg { width: 100%; height: 100%; }
+.vchips { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; }
+.vchips span { font-size: 9px; padding: 4px 7px; border-radius: 10px; background: rgba(13,36,64,.75); color: #fff; font-family: 'PTR'; }
+.swipe { position: absolute; left: 8px; top: 8px; font-size: 9px; padding: 4px 7px; border-radius: 10px; background: rgba(13,36,64,.75); color: #fff; font-family: 'PTR'; }
+.stats { position: absolute; left: 8px; right: 8px; top: 274px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.st { background: #15345a; border: 1px solid #24507f; border-radius: 9px; padding: 6px 7px; font-size: 9px; color: #9fc8f5; font-family: 'PTR'; line-height: 1.2; }
+.st b { display: block; font-family: 'PT'; font-size: 13px; color: #fff; }
+.card { position: absolute; left: 8px; right: 8px; top: 334px; border-radius: 12px; background: #15345a; border: 1px solid #24507f; padding: 10px; }
+.card h4 { font-size: 13px; margin-bottom: 8px; }
+.row { display: flex; gap: 8px; }
+.fld { flex: 1; } .fld .l { font-size: 9.5px; color: #9fc8f5; font-family: 'PTR'; margin-bottom: 3px; }
+.inp { height: 32px; border-radius: 8px; background: #0f2a4a; border: 1.5px solid #2f5d90; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-size: 15px; }
+.inp.act { border-color: #FFD43B; box-shadow: 0 0 0 3px rgba(255,212,59,.25); }
+.inp small { font-family: 'PTR'; font-size: 10px; color: #9fc8f5; }
+.card .chips { margin: 6px 0 0; }
+#total { position: absolute; left: 8px; right: 8px; bottom: 12px; height: 46px; border-radius: 12px; background: #FFD43B; color: #0a1a30; display: flex; align-items: center; justify-content: center; font-size: 15.5px; box-shadow: 0 4px 0 #b38b00; }
+#total.flash { background: #fff1a8; }
+#tap { position: absolute; width: 44px; height: 44px; margin: -22px; border-radius: 50%; background: rgba(255,255,255,.4); border: 3px solid rgba(255,255,255,.9); opacity: 0; z-index: 9; }
+#hand { position: absolute; font-family: 'Noto Color Emoji'; font-size: 44px; opacity: 0; z-index: 9; }
+/* комментарии */
+.cm { position: absolute; width: 318px; background: #fff; border-radius: 18px; padding: 10px 14px 11px 58px; color: #111; z-index: 15; opacity: 0;
+  box-shadow: 0 14px 34px rgba(0,0,0,.45); transform-origin: 30px 50%; }
+.cm .av { position: absolute; left: 10px; top: 10px; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Noto Color Emoji'; font-size: 22px; }
+.cm .n { font-family: 'PT'; font-size: 15px; color: #6b7480; }
+.cm .n em { font-style: normal; font-size: 11px; background: #fe2c55; color: #fff; border-radius: 5px; padding: 1px 5px; margin-left: 4px; vertical-align: 2px; }
+.cm .t { font-family: 'PT', 'Noto Color Emoji'; font-size: 21px; line-height: 1.18; margin-top: 2px; }
+.cm .lk { position: absolute; right: 12px; bottom: 9px; font-size: 11px; color: #9aa3ad; font-family: 'PTR'; }
+.cm.big { width: 440px; padding: 18px 20px 18px 84px; border-radius: 24px; }
+.cm.big .av { width: 56px; height: 56px; font-size: 32px; left: 16px; top: 18px; }
+.cm.big .n { font-size: 19px; } .cm.big .t { font-size: 34px; }
+.rep { position: absolute; left: 50%; top: 340px; width: 430px; margin-left: -215px; z-index: 15; opacity: 0; background: #fff; border-radius: 22px; padding: 18px 22px; color: #111; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+.rep .h { font-family: 'PTR'; font-size: 17px; color: #6b7480; display: flex; align-items: center; gap: 8px; }
+.rep .h b { font-family: 'Noto Color Emoji'; font-weight: 400; font-size: 22px; }
+.rep .t { font-family: 'PT', 'Noto Color Emoji'; font-size: 34px; line-height: 1.15; margin-top: 8px; }
+#hearts { position: absolute; inset: 0; z-index: 14; pointer-events: none; }
+#hearts span { position: absolute; font-family: 'Noto Color Emoji'; font-size: 34px; opacity: 0; }
+/* листы проекта */
+.sheet { position: absolute; left: 115px; top: 330px; width: 310px; height: 240px; background: #fff; border-radius: 6px; box-shadow: 0 18px 40px rgba(0,0,0,.45); z-index: 12; opacity: 0; overflow: hidden; padding: 8px; }
+.sheet .tt { font-family: 'PT'; font-size: 12px; color: #0D2440; margin-bottom: 2px; }
+.sheet svg { width: 100%; height: 205px; }
+#est { position: absolute; left: 105px; top: 300px; width: 330px; background: #fff; color: #111; border-radius: 12px; z-index: 13; opacity: 0; padding: 10px 12px; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+#est .h { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; } #est .h span { font-size: 11px; color: #c08a00; }
+#est .li { display: flex; justify-content: space-between; gap: 8px; font-family: 'PTR'; font-size: 11px; padding: 4px 0; border-top: 1px solid #eee; }
+#est .li b { font-family: 'PT'; white-space: nowrap; }
+#est .tot { display: flex; justify-content: space-between; font-size: 17px; margin-top: 6px; padding-top: 6px; border-top: 2px solid #0D2440; }
+#end { position: absolute; inset: 0; z-index: 30; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; opacity: 0; color: #fff; text-align: center; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 30px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 8px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#endModel { width: 300px; height: 210px; }
+#endModel svg { width: 100%; height: 100%; }
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 40; pointer-events: none; }
+</style></head><body><div id="stage">
+<div id="bg"></div>
+<div id="phone"><div id="scr">
+  <div class="hdr"><i>‹</i> ПОСТРОЙКИ 3D</div>
+  <div class="pg" id="p1">
+    <div class="note">🤖 Выберите тип постройки и типовой вариант — 3D и смета соберутся сами</div>
+    <div class="grid">
+      <div class="tile"><b>⛱️</b>Навес</div><div class="tile"><b>🗑️</b>Площадка ТКО</div><div class="tile"><b>🏠</b>Пристенный навес</div><div class="tile"><b>🚪</b>Козырёк</div>
+      <div class="tile"><b>🛖</b>Беседка</div><div class="tile"><b>🚗</b>Гараж / ангар</div><div class="tile"><b>🌱</b>Теплица</div><div class="tile" id="tWood"><b>🪵</b>Дровник / хозблок</div>
+    </div>
+    <div class="lbl">Типовые:</div>
+    <div class="chips"><span class="chip">Дровник 3×1,5</span><span class="chip" id="chByt">Бытовка 6×2,4 каркасная</span><span class="chip">Хозблок 3×2,5</span><span class="chip">Сарай из профлиста 4×3</span><span class="chip">Дровник + сарай 5×2</span></div>
+  </div>
+  <div class="pg" id="p2" style="opacity:0">
+    <div id="view"><div id="model"></div><div class="swipe">↔ вращайте пальцем</div><div class="vchips"><span>Спереди</span><span>Сзади</span><span>Сверху</span></div></div>
+    <div class="stats">
+      <div class="st">Размер в плане<b id="sA">14,4 м²</b></div><div class="st">Кровля<b id="sR">22,5 м²</b></div><div class="st">Столбов<b id="sP">24 шт</b></div>
+    </div>
+    <div class="card">
+      <h4>Размеры и форма крыши</h4>
+      <div class="row"><div class="fld"><div class="l">Длина (по фасаду)</div><div class="inp" id="inL"><span id="vL">6</span><small>м</small></div></div>
+        <div class="fld"><div class="l">Глубина</div><div class="inp"><span>2,4</span><small>м</small></div></div></div>
+      <div class="lbl" style="margin:9px 0 0">Кровля</div>
+      <div class="chips"><span class="chip on" id="rS">Односкатная</span><span class="chip" id="rG">Двускатная</span><span class="chip">Четырёхскатная</span></div>
+      <div class="lbl" style="margin:9px 0 0">Обшивка · утепление · окна</div>
+      <div class="chips"><span class="chip on">Доска</span><span class="chip on">Утеплить 100 мм</span><span class="chip">+ окно</span></div>
+    </div>
+    <div id="total">Смета по проекту · ≈ <span id="vT" style="margin-left:5px">665 856 ₽</span></div>
+  </div>
+  <div id="tap"></div>
+</div></div>
+<div id="hand">👆</div>
+<div id="sheets"></div>
+<div id="est"></div>
+<div id="cms"></div>
+<div class="rep" id="rep"><div class="h"><b>💬</b> Ответ пользователю <span style="color:#111;font-family:'PT'">@zakazchik_valera</span></div><div class="t">а как это будет выглядеть? я не представляю 🤔</div></div>
+<div id="hearts"></div><div id="shrug" style="position:absolute;left:0;right:0;top:600px;text-align:center;font-family:'Noto Color Emoji';font-size:150px;z-index:15;opacity:0">🤷‍♂️</div>
+<div class="cap" id="cap"></div>
+<div id="end"><div id="endModel"></div><div class="logo">СМЕТА PRO</div><div class="l2">3D-модель, смета и чертежи —<br><span style="color:#FFD43B">прямо в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">3D-конструктор — бесплатно</div></div>
+<div id="flash"></div>
+</div>
+<script src="eng.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const back = (x) => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const rub = (n) => Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₽';
+const num = (n, d = 1) => n.toFixed(d).replace('.', ',');
+
+window.DUR = 32.5;
+const T = { hook: [0, 3.0], pick: [3.0, 7.6], spin: [7.6, 13.4], len: [13.4, 19.2], roof: [19.2, 23.4], docs: [23.4, 27.4], win: [27.4, 29.8], end: [29.8, 32.5] };
+const GABLE = { roof: 'gable', hHigh: 3.4, hLow: 2.3 };
+
+const CAPS = [
+  [0, 3.0, 'Заказчик:<br>«Я не представляю, как это<br>будет <span class="y">выглядеть</span>» 🤔'],
+  [3.0, 7.6, 'Окей. Показываю<br><span class="y">в 3D</span> 👇'],
+  [7.6, 13.4, 'Крутишь пальцем —<br>видно <span class="y">каждую доску</span>'],
+  [13.4, 19.2, '+2 метра — смета<br><span class="y">пересчиталась сама</span> ⚡'],
+  [19.2, 23.4, 'Крышу домиком?<br><span class="y">Один тап.</span>'],
+  [23.4, 27.4, 'Чертежи и смета<br>на <span class="y">70+ позиций</span> — в PDF'],
+  [27.4, 29.8, 'Заказчик<br><span class="y">через 5 минут</span>:'],
+];
+// комментарии: [время появления, время ухода, сторона, ник, текст, аватар, цвет, автор?]
+const CMS = [
+  [4.6, 7.4, 'r', 640, 'sanya_kirpich', 'это что, симс для прорабов? 😂', '🧱', '#ffd8b0'],
+  [8.6, 11.0, 'l', 600, 'marina_zakazchik', 'а покрутить можно?', '💅', '#ffd0e4'],
+  [10.3, 13.2, 'r', 700, 'prorab', 'уже кручу 😎', '👷', '#ffe68a', 1],
+  [14.0, 16.4, 'r', 590, 'zakazchik_valera', 'а если на 2 метра длиннее?', '🧔', '#cfe6ff'],
+  [16.4, 19.0, 'l', 690, 'prorab', 'держи. смета уже пересчиталась ⚡', '👷', '#ffe68a', 1],
+  [19.7, 23.2, 'r', 640, 'tesha_galina', 'а крышу домиком? 🏠 и чтоб красиво', '👵', '#e3d4ff'],
+  [24.3, 27.3, 'l', 800, 'nikolaich_1978', 'я 20 лет чертежи на обоях рисовал 🥲', '🧓', '#d6f2d6'],
+];
+const cmEls = CMS.map((c, i) => {
+  const d = document.createElement('div'); d.className = 'cm';
+  d.innerHTML = `<div class="av" style="background:${c[7]}">${c[6]}</div><div class="n">@${c[4]}${c[8] ? '<em>автор</em>' : ''}</div><div class="t">${c[5]}</div><div class="lk">♡ ${[312, 1204, 2870, 958, 3411, 1876, 5230][i]}</div>`;
+  d.style.top = c[3] + 'px'; d.style.left = c[2] === 'l' ? '14px' : (540 - 318 - 14) + 'px';
+  $('cms').appendChild(d); return d;
+});
+const bigCm = document.createElement('div'); bigCm.className = 'cm big';
+bigCm.innerHTML = `<div class="av" style="background:#cfe6ff">🧔</div><div class="n">@zakazchik_valera</div><div class="t">БЕРУ. Когда начинаем? 🤝</div><div class="lk" style="font-size:14px">♡ 12,4 тыс.</div>`;
+bigCm.style.left = '50px'; bigCm.style.top = '390px'; $('cms').appendChild(bigCm);
+for (let i = 0; i < 22; i++) { const s = document.createElement('span'); s.textContent = ['❤️', '🔥', '👏', '😂'][i % 4]; $('hearts').appendChild(s); }
+
+// листы проекта и смета
+const SH = ENG.sheets('bytovka');
+const SHEETS = [0, 1, 3].map((k, i) => { const d = document.createElement('div'); d.className = 'sheet'; d.innerHTML = `<div class="tt">Лист ${i + 1}. ${SH[k].title}</div>${SH[k].svg}`; $('sheets').appendChild(d); return d; });
+(function buildEst() {
+  const L = ENG.lines('bytovka', { L: 8, ...GABLE });
+  const tot = ENG.total('bytovka', { L: 8, ...GABLE });
+  $('est').innerHTML = `<div class="h">Бытовка 8×2,4 м <span>${L.length} позиций</span></div>` + L.slice(0, 7).map((l) => `<div class="li"><span>${l.name.replace(/\s*\(.*?\)/, '')}</span><b>${rub(l.qty * l.price)}</b></div>`).join('') + `<div class="li" style="justify-content:center;color:#888">… ещё ${L.length - 7} позиций</div><div class="tot"><span>Итого</span><span>${rub(tot)}</span></div>`;
+})();
+
+// кэш 3D
+const cache = new Map();
+function modelSvg(yaw, Lm, gable, w = 294, h = 262) {
+  const k = `${Math.round(yaw * 2) / 2}|${Lm.toFixed(2)}|${gable}|${w}`;
+  if (!cache.has(k)) { cache.set(k, ENG.svg('bytovka', Math.round(yaw * 2) / 2, 22, w, h, gable ? { L: Lm, ...GABLE } : { L: Lm })); if (cache.size > 400) cache.delete(cache.keys().next().value); }
+  return cache.get(k);
+}
+const totCache = new Map();
+const totalFor = (Lm, gable) => { const k = Lm.toFixed(2) + gable; if (!totCache.has(k)) totCache.set(k, { t: ENG.total('bytovka', gable ? { L: Lm, ...GABLE } : { L: Lm }), i: ENG.info('bytovka', gable ? { L: Lm, ...GABLE } : { L: Lm }) }); return totCache.get(k); };
+
+let lastModel = '';
+function setHtml(el, h) { if (el._h !== h) { el.innerHTML = h; el._h = h; } }
+const tapAt = (x, y, k) => { const tp = $('tap'); tp.style.left = x + 'px'; tp.style.top = y + 'px'; tp.style.opacity = k > 0 && k < 1 ? (1 - k) : 0; tp.style.transform = `scale(${.6 + k * .9})`; };
+
+window.render = function (t) {
+  // фон чуть дышит
+  $('bg').style.transform = `translate(${Math.sin(t * .4) * 10}px, ${Math.cos(t * .3) * 8}px)`;
+  // подписи
+  const c = CAPS.find(([a, b]) => t >= a && t < b);
+  setHtml($('cap'), c ? c[2] : '');
+  $('cap').style.opacity = c ? clamp((t - c[0]) / .15) : 0;
+  $('cap').style.transform = c ? `scale(${lerp(.85, 1, back((t - c[0]) / .3))})` : '';
+
+  // крючок: стикер «ответ пользователю»
+  const rk = t < T.hook[1] ? back(t / .45) : 1 - eOut((t - T.hook[1]) / .35);
+  $('rep').style.opacity = clamp(t < T.hook[1] ? t / .2 : rk);
+  $('rep').style.transform = `scale(${t < T.hook[1] ? lerp(.5, 1, rk) : lerp(1, .55, eOut((t - T.hook[1]) / .35))}) rotate(${-2 + Math.sin(t * 3) * .6}deg) translateY(${t < T.hook[1] ? 0 : -eOut((t - T.hook[1]) / .35) * 260}px)`;
+
+  $('shrug').style.opacity = t < 3 ? clamp((t - .5) / .2) * clamp((2.9 - t) / .2) : 0;
+  $('shrug').style.transform = `translateY(${(1 - back((t - .5) / .4)) * 120}px) rotate(${Math.sin(t * 6) * 6}deg)`;
+  // телефон
+  const pin = eOut((t - 2.75) / .6);
+  const zoomDocs = t > T.docs[0] ? ease((t - T.docs[0]) / .6) : 0;
+  const out = t > T.win[0] ? ease((t - T.win[0]) / .5) : 0;
+  $('phone').style.transform = `translateY(${(1 - pin) * 760 + out * 40}px) scale(${1 - zoomDocs * .1 - out * .08}) rotate(${(1 - pin) * 8}deg)`;
+  $('phone').style.opacity = t < 2.6 ? 0 : 1 - out * .55;
+  $('phone').style.filter = zoomDocs > 0 ? `brightness(${1 - zoomDocs * .35 - out * .2})` : '';
+
+  // экран 1 → экран 2
+  const sw = ease((t - 6.3) / .45);
+  $('p1').style.opacity = 1 - sw; $('p1').style.transform = `translateX(${-sw * 80}px)`;
+  $('p2').style.opacity = sw; $('p2').style.transform = `translateX(${(1 - sw) * 80}px)`;
+  $('tWood').classList.toggle('on', t > 4.25); $('chByt').classList.toggle('on', t > 5.75);
+  // тапы и рука
+  let tp = -1, tx = 0, ty = 0;
+  if (t > 4.0 && t < 4.6) { tp = (t - 4.0) / .6; tx = 247; ty = 228; }
+  else if (t > 5.5 && t < 6.1) { tp = (t - 5.5) / .6; tx = 191; ty = 326; }
+  else if (t > 14.3 && t < 14.9) { tp = (t - 14.3) / .6; tx = 60; ty = 458; }
+  else if (t > 20.2 && t < 20.8) { tp = (t - 20.2) / .6; tx = 141; ty = 518; }
+  tapAt(tx, ty, tp);
+  // рука для вращения
+  const hand = $('hand');
+  if (t > 8.0 && t < 12.6) {
+    const k = (t - 8.0) / 4.6, sx = Math.sin(k * Math.PI * 2.2);
+    hand.style.opacity = clamp(Math.min((t - 8.0) / .3, (12.6 - t) / .3));
+    hand.style.left = (115 + 10 + 150 + sx * 85) + 'px'; hand.style.top = (248 + 10 + 58 + 170 + Math.cos(k * 9) * 6) + 'px';
+    hand.style.transform = `rotate(${-sx * 12}deg)`;
+  } else hand.style.opacity = 0;
+
+  // параметры модели
+  let yaw = 32 + Math.sin(t * .5) * 6;
+  if (t > 6.3) yaw += (t - 6.3) * 4;
+  if (t > 8.0) { const k = clamp((t - 8.0) / 4.6); yaw += -Math.sin(k * Math.PI * 2.2) * 70 + ease(k) * 360; }
+  const lk = ease((t - 14.9) / 1.6);
+  const Lm = Math.round(lerp(6, 8, lk) * 20) / 20;
+  const gable = t > 20.55;
+  const pop = gable ? back((t - 20.55) / .4) : 1;
+  if (t > 6.0 && t < T.docs[1] + .3) {
+    const h = modelSvg(yaw, Lm, gable);
+    if (h !== lastModel) { $('model').innerHTML = h; lastModel = h; }
+    $('model').style.transform = `scale(${t < 6.8 ? back((t - 6.3) / .5) : (gable ? lerp(.85, 1, pop) : 1)})`;
+  }
+  // поля
+  $('inL').classList.toggle('act', t > 14.5 && t < 17.2);
+  setHtml($('vL'), num(Lm, Lm % 1 ? 1 : 0).replace(',0', '').replace(/,(\d)5$/, ',$1'));
+  $('rS').classList.toggle('on', !gable); $('rG').classList.toggle('on', gable);
+  const ti = totalFor(Lm, gable);
+  setHtml($('vT'), rub(ti.t));
+  setHtml($('sA'), num(ti.i.slabArea, 1) + ' м²'); setHtml($('sR'), num(ti.i.roofArea, 1) + ' м²'); setHtml($('sP'), ti.i.posts + ' шт');
+  const fl = (t > 14.9 && t < 16.6 && Math.floor(t * 8) % 2 === 0) || (t > 20.55 && t < 21.0);
+  $('total').classList.toggle('flash', fl);
+  $('total').style.transform = `scale(${fl ? 1.04 : 1})`;
+
+  // комментарии
+  CMS.forEach((cm, i) => {
+    const el = cmEls[i], a = cm[0], b = cm[1];
+    const k = t < a ? 0 : t < b ? back((t - a) / .4) : 1 - eOut((t - b) / .25);
+    el.style.opacity = t < a ? 0 : t < b ? clamp((t - a) / .12) : clamp(1 - (t - b) / .25);
+    el.style.transform = `scale(${t < b ? lerp(.4, 1, k) : 1}) translateX(${t >= b ? (cm[2] === 'l' ? -1 : 1) * eOut((t - b) / .25) * 60 : 0}px) rotate(${(cm[2] === 'l' ? -1.5 : 1.5)}deg)`;
+  });
+
+  // документы: листы веером + смета
+  SHEETS.forEach((d, i) => {
+    const a = T.docs[0] + .25 + i * .35, k = back((t - a) / .5), gone = eOut((t - (T.docs[1] - .1)) / .4);
+    d.style.opacity = t < a ? 0 : clamp((t - a) / .15) * (1 - gone);
+    d.style.transform = `translate(${lerp(0, [-70, 0, 70][i], k)}px, ${lerp(120, [-30, 10, 50][i] - 30, k) + gone * 300}px) rotate(${lerp(0, [-9, 2, 10][i], k)}deg) scale(${lerp(.4, .9, k)})`;
+  });
+  const ea = T.docs[0] + 1.45, ek = back((t - ea) / .5), eg = eOut((t - (T.docs[1] - .1)) / .4);
+  $('est').style.opacity = t < ea ? 0 : clamp((t - ea) / .15) * (1 - eg);
+  $('est').style.transform = `translateY(${lerp(200, 120, ek) + eg * 300}px) scale(${lerp(.5, 1, ek)}) rotate(${lerp(4, -2, ek)}deg)`;
+
+  // финальный комментарий
+  const wa = T.win[0] + .25, wk = back((t - wa) / .45);
+  bigCm.style.opacity = t < wa ? 0 : clamp((t - wa) / .12) * (1 - clamp((t - (T.end[0] - .2)) / .2));
+  bigCm.style.transform = `scale(${lerp(.3, 1, wk)}) rotate(${-2 + Math.sin(t * 4) * .8}deg)`;
+  [...$('hearts').children].forEach((s, i) => {
+    const a = wa + .2 + R(i) * .9, k = (t - a) / 1.6;
+    s.style.opacity = k > 0 && k < 1 ? Math.min(1, (1 - k) * 2) : 0;
+    s.style.left = (40 + R(i + 3) * 440 + Math.sin(k * 6 + i) * 20) + 'px';
+    s.style.top = (760 - k * 520 * (.7 + R(i + 7) * .5)) + 'px';
+    s.style.transform = `scale(${.7 + R(i + 9) * .8})`;
+  });
+
+  // концовка
+  const ek2 = clamp((t - T.end[0]) / .35);
+  $('end').style.opacity = ek2;
+  if (t > T.end[0] - .1) {
+    const h = modelSvg(30 + (t - T.end[0]) * 25, 8, true, 300, 210);
+    if ($('endModel')._h !== h) { $('endModel').innerHTML = h; $('endModel')._h = h; }
+    $('endModel').style.transform = `scale(${back((t - T.end[0]) / .5)})`;
+  }
+  $('flash').style.opacity = Math.max(clamp(1 - Math.abs(t - 2.85) / .12) * .5, clamp(1 - Math.abs(t - T.end[0]) / .12) * .35);
+};
+window.READY = document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>
