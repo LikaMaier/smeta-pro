@@ -30,6 +30,7 @@ export default function Home() {
 
   return (
     <>
+      {me.isAdmin && <Link to="/admin/stats" className="list-item panel" style={{ marginBottom: 10 }}><span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">📊</span><div className="grow"><div className="title">Статистика приложения</div><div className="xs muted">заходы, сметы, оплаты — видите только вы</div></div></Link>}
       {(me.access.estimateCount ?? 0) > 0 && <Link to="/calendar" style={{ display: 'block' }}>
         <Hero
           title={<>Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span></>}

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { get, patch, post, del } from '../api';
 import { prepareBrand } from '../photo';
@@ -35,6 +36,7 @@ export default function Settings() {
       <Referral />
 
       <Tariffs />
+      {me.isAdmin && <Link to="/admin/stats" className="btn block" style={{ marginTop: 12 }}>📊 Статистика приложения</Link>}
       {me.isAdmin && <AdminPromos />}
 
       <h2 className="section-title">ИИ-сметчик</h2>

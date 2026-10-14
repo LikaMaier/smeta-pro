@@ -15,6 +15,7 @@ import Projects from './pages/Projects';
 import ProjectPage from './pages/ProjectPage';
 import Finance from './pages/Finance';
 import Settings from './pages/Settings';
+import AdminStats from './pages/AdminStats';
 import Acts from './pages/Acts';
 import Masters from './pages/Masters';
 import Designer from './pages/Designer';
@@ -48,7 +49,7 @@ function titleOf(path: string): string {
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
     estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', new: 'Новая смета', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', new: 'Новая смета', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D', admin: 'Статистика',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[2] === 'acts') return 'Акты';
@@ -155,6 +156,7 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/notes" element={<Navigate to="/calendar" replace />} />
               <Route path="/assistant" element={<Assistant />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/admin/stats" element={<AdminStats />} />
               <Route path="/more" element={<More />} />
               <Route path="/tools" element={<Tools />} />
               <Route path="/new" element={<NewEstimate />} />

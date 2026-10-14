@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, plain, HttpError } from '../util';
 import { env } from '../env';
+import { statsData } from '../stats';
 import { botLink } from '../botInfo';
 
 /**
@@ -58,6 +59,12 @@ export async function promoRoutes(app: FastifyInstance) {
   });
 
   // ---- админка: только владелец приложения ----
+  app.get('/api/admin/stats', async (req) => {
+    if (!isAdmin(req.user)) throw new HttpError(403, 'Только для администратора');
+    const d = Number((req.query as any)?.days);
+    return plain(await statsData([0, 1, 7, 30, 90].includes(d) ? d : 0));
+  });
+
   app.get('/api/admin/promos', async (req) => {
     if (!isAdmin(req.user)) throw new HttpError(403, 'Только для администратора');
     const promos = await prisma.promoCode.findMany({ orderBy: { createdAt: 'desc' } });
