@@ -52,13 +52,14 @@ export interface FenceLine {
 
 /** Ориентировочные цены материалов (₽, 2026, средний уровень по РФ). Всегда помечаются «проверьте у поставщика». */
 const MAT = {
-  sheet: 1100, pipe6060: 340, pipe6040: 300, pipe4020: 150, pipe8080: 520, euro: 150, panel3d: 2600, panelGitter: 2900, postPanel: 1300,
-  rabica: 1900, welded: 3200, wire: 8, jalLamel: 330, jalPost: 2400, plankWood: 120, rancho: 160, dpk: 520, poly: 6800,
+  // по прайсу «Петрович» СПб на 13.10.2026: лист С8 0,45 1,2×2 цветной, трубы за метр, штакетник, рабица 2×10, столб 50×50
+  sheet: 1630, pipe6060: 352, pipe6040: 285, pipe4020: 142, pipe8080: 646, euro: 248, panel3d: 2600, panelGitter: 2900, postPanel: 1390,
+  rabica: 3044, welded: 3200, wire: 8, jalLamel: 330, jalPost: 2400, plankWood: 120, rancho: 160, dpk: 520, poly: 6800,
   section: 4500, concretePlate: 900, concretePost: 1700, brick: 28, block: 95, gabionMesh: 650, stone: 3200,
   concrete: 6200, rubble: 2300, screwPile: 2400, rebar: 85, screw: 3, cap: 150, slideKit: 26000, swingKit: 3500, wicketKit: 2500,
   automationSlide: 32000, primer: 900,
 };
-const NOTE = 'Примерная цена материала — проверьте у поставщика';
+const NOTE = 'Цена материала — по прайсу «Петрович», СПб, 13.10.2026 (или ориентир); проверьте у своего поставщика';
 const C = 'Заборы';
 
 export function fenceEstimate(i: FenceInput): { lines: FenceLine[]; summary: { label: string; value: number; unit: string }[]; warnings: string[] } {

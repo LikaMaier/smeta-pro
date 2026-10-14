@@ -8,6 +8,7 @@ import { checkEstimate } from '../../../shared/estimateCheck';
 import { payStages, DEFAULT_SCHEDULE } from '../../../shared/payments';
 import { useMe } from '../App';
 import { Offers } from '../components/Pay';
+import { BaseResults, baseCategory } from '../components/MaterialBase';
 import { PRICES } from '../../../shared/plans';
 import { Field, Fold, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS } from '../format';
@@ -704,7 +705,7 @@ export function CatalogPicker({ onPick }: { onPick: (item: any) => void }) {
         </select>
       )}
       <SearchBox value={q} onChange={setQ} placeholder="Найти работу или материал" />
-      <Load state={items} empty={(d) => (d.length ? null : <State title={q ? 'Ничего не найдено' : 'Справочник пуст'} text="Добавьте свои работы и материалы с ценами в разделе «Справочник»." />)}>
+      <Load state={items} empty={(d) => (d.length ? null : dq.trim().length >= 2 ? <div className="xs muted" style={{ margin: '4px 0' }}>В вашем справочнике не нашлось — смотрите прайс ниже.</div> : <State title="Справочник пуст" text="Добавьте свои работы и материалы с ценами в разделе «Справочник» или найдите материал в прайсе «Петровича»." />)}>
         {(list) => (
           <div className="list">
             {list.map((it) => (
@@ -717,6 +718,7 @@ export function CatalogPicker({ onPick }: { onPick: (item: any) => void }) {
           </div>
         )}
       </Load>
+      <BaseResults q={dq} onPick={(it, d) => { onPick({ name: it.name, unit: it.unit, price: it.price, type: 'material', category: baseCategory(it), params: {}, description: '', costPrice: null }); toast(`Добавлено: ${it.name.slice(0, 40)} — ${rub(it.price)}`); }} />
     </>
   );
 }

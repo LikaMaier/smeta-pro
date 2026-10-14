@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ShopLink from '../components/ShopLink';
 import { get, post, patch, del } from '../api';
 import { useMe } from '../App';
+import MaterialBase, { baseCategory, baseNote } from '../components/MaterialBase';
 import { Chips, Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, date, parseNum, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog } from '../tg';
@@ -29,6 +30,7 @@ export default function Catalog() {
   const [copyOpen, setCopyOpen] = useState(false);
   const [starterOpen, setStarterOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
+  const [baseOpen, setBaseOpen] = useState(false);
 
   const toggle = (id: string) => setSelected((s) => { const c = new Set(s); c.has(id) ? c.delete(id) : c.add(id); return c; });
   const currentList = lists.data?.find((l) => l.id === listId);
@@ -46,10 +48,17 @@ export default function Catalog() {
       </button>
 
       {!ro && (
-        <div className="grid2" style={{ marginBottom: 12 }}>
-          <button className="btn primary" onClick={() => setPriceOpen(true)}>📥 Прайс поставщика</button>
-          <button className="btn" onClick={() => setStarterOpen(true)}>Примерные цены</button>
-        </div>
+        <>
+          <button className="list-item panel" style={{ marginBottom: 8 }} onClick={() => setBaseOpen(true)}>
+            <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">🏪</span>
+            <div className="grow"><div className="title">База материалов «Петрович»</div><div className="xs muted">~47 000 позиций с ценами СПб — найти и добавить к себе</div></div>
+            <Icon.chevron className="chev" width={18} />
+          </button>
+          <div className="grid2" style={{ marginBottom: 12 }}>
+            <button className="btn primary" onClick={() => setPriceOpen(true)}>📥 Прайс поставщика</button>
+            <button className="btn" onClick={() => setStarterOpen(true)}>Примерные цены</button>
+          </div>
+        </>
       )}
       <SearchBox value={q} onChange={setQ} placeholder="Поиск по названию" />
       <Chips value={type} onChange={setType} options={[{ value: '', label: 'Все' }, ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))]} />
@@ -96,6 +105,10 @@ export default function Catalog() {
 
       <ItemSheet item={edit} onClose={() => setEdit(null)} categories={cats.data || []} readOnly={ro}
         onSaved={() => { setEdit(null); items.reload(); lists.reload(); cats.reload(); }} />
+
+      <Sheet open={baseOpen} onClose={() => setBaseOpen(false)} title="База материалов">
+        <MaterialBase onPick={(it, d) => { setBaseOpen(false); setEdit({ ...empty, priceListId: listId, name: it.name, unit: it.unit, price: String(it.price), type: 'material', category: baseCategory(it), notes: baseNote(it, d) }); }} />
+      </Sheet>
 
       <Sheet open={listsOpen} onClose={() => setListsOpen(false)} title="Прайс-листы">
         <PriceLists lists={lists.data || []} current={listId} readOnly={ro}
