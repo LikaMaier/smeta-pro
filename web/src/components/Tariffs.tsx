@@ -12,11 +12,11 @@ const PACK_TEXT: Record<string, string> = {
   design1: 'Премиальный 3D-проект одного объекта для заказчика: PDF без водяного знака (3D, план, фасады, узлы, ведомость) и 3D-ссылка, которую заказчик крутит пальцем. Включите его в смету — обычно это 3–5 тыс. ₽.',
 };
 
-/** Тарифы: Про / Бригада (3, 5 или 10 человек), «3D-Студия», разовые покупки; оплата ЮKassa (карта, СБП) и Telegram Stars */
+/** Тарифы: Про / Бригада (3, 5 или 10 человек) и 3D-проект для заказчика; оплата ЮKassa (карта, СБП) и Telegram Stars */
 export default function Tariffs() {
   const { me } = useMe();
   const plans = useLoad(() => get<any[]>('/plans'), [me.promo?.code, me.access.mode, me.plan?.tier]);
-  const [year, setYear] = useState(true);
+  const [yearSel, setYear] = useState<boolean | null>(null);
   const [seats, setSeats] = useState(5);
   const cur: Tier = me.plan?.tier || 'free';
   const paid = me.access.mode === 'subscription';
@@ -26,17 +26,16 @@ export default function Tariffs() {
     <>
       <h2 className="section-title">Тарифы</h2>
       {me.plan?.offer && <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Для вас скидка {me.plan.offer.pct}% на месяц «Про» — до {new Date(me.plan.offer.until).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.</div>}
-      <div className="seg" style={{ marginBottom: 8 }}>
-        <button className={`chip ${year ? 'on' : ''}`} onClick={() => setYear(true)}>На год · −30%</button>
-        <button className={`chip ${!year ? 'on' : ''}`} onClick={() => setYear(false)}>На месяц</button>
-      </div>
       <Load state={plans}>{(list) => {
         const proM = list.find((x) => x.code === 'pro_m');
         const firstDeal = proM?.price?.note === 'первый месяц';
-        const studio = list.find((x) => x.code === 'studio_m');
+        const year = yearSel ?? !firstDeal; // новичку сначала показываем первый месяц за 200 ₽, остальным — год
         return (
         <>
-          {year && firstDeal && <div className="xs muted" style={{ marginBottom: 6 }}>🎁 Первый месяц «Про» — {rub(proM.price.rub)}: переключитесь на «На месяц».</div>}
+          <div className="seg" style={{ marginBottom: 8 }}>
+            <button className={`chip ${!year ? 'on' : ''}`} onClick={() => setYear(false)}>{firstDeal ? `Первый месяц · ${rub(proM.price.rub)}` : 'На месяц'}</button>
+            <button className={`chip ${year ? 'on' : ''}`} onClick={() => setYear(true)}>На год · выгоднее</button>
+          </div>
           <div className="tariffs">
             {cur === 'lite' && paid && <div className="dz-warn">У вас тариф «Лайт» — он работает до {new Date(me.access.until).toLocaleDateString('ru-RU')}. Новых подписок «Лайт» больше нет: при переходе на «Про» оставшиеся дни пересчитаются.</div>}
             {(['pro', 'team'] as const).map((t) => {
@@ -53,7 +52,7 @@ export default function Tariffs() {
                   </div>
                   <div className="tariff-price">
                     {price < p.rubPrice && <s className="muted" style={{ marginRight: 6 }}>{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</s>}
-                    <b className="num">{rub(year ? Math.round(price / 12) : price)}</b><span className="muted"> в месяц{year ? ` · ${rub(price)} за год` : ''}</span>
+                    <b className="num">{rub(year ? Math.round(price / 12) : price)}</b><span className="muted">{!year && p.price?.note === 'первый месяц' ? ` за первый месяц, дальше ${rub(p.rubPrice)}` : ` в месяц${year ? ` · ${rub(price)} за год` : ''}`}</span>
                   </div>
                   <div className="xs muted">≈ {perDay(price, p.months)} ₽ в день{t === 'pro' ? ' — дешевле пачки саморезов' : ''}{year ? ` · экономия ${rub(Math.round((list.find((x) => x.tier === t && x.months === 1 && (t !== 'team' || (x.seats || 3) === seats))?.rubPrice || 0) * 12 - p.rubPrice))}` : ''}</div>
                   {p.price?.discountPct > 0 && p.price?.note && p.price.note !== 'первый месяц' && <span className="badge ok">−{p.price.discountPct}% {p.price.note}</span>}
@@ -72,7 +71,7 @@ export default function Tariffs() {
           {paid && <p className="xs muted">При смене тарифа или размера бригады оставшиеся дни пересчитываются по цене месяца.</p>}
 
           <h2 className="section-title">🧊 3D-проекты для заказчиков</h2>
-          <p className="small muted" style={{ marginTop: 0 }}>3D-конструктор и смета по модели — во всех тарифах. Готовый проект для заказчика — отдельный премиальный продукт: его можно включить в смету и заработать.</p>
+          <p className="small muted" style={{ marginTop: 0 }}>3D-конструктор и смета по модели — бесплатно. Готовый проект для заказчика — отдельно: включите его в смету и заработайте на нём.</p>
           <div className="list">
             {['design1'].map((c) => list.find((x) => x.code === c)).filter(Boolean).map((p: any) => (
               <div key={p.code} className="list-item" style={{ display: 'block', cursor: 'default' }}>
@@ -81,30 +80,13 @@ export default function Tariffs() {
                 <PayButtons p={p} />
               </div>
             ))}
-            {studio && (
-              <div className={`list-item ${me.plan?.studioUntil ? 'on' : ''}`} style={{ display: 'block', cursor: 'default' }}>
-                <div className="row between"><div className="title">✨ 3D-Студия — без ограничений</div>{me.plan?.studioUntil && <span className="badge ok">до {new Date(me.plan.studioUntil).toLocaleDateString('ru-RU')}</span>}</div>
-                <div className="xs muted">Для тех, кто продаёт навесы, беседки, бытовки и заборы: 3D-проекты и 3D-ссылки для всех заказчиков, без водяного знака. Окупается со 2-го проекта. «Бригаде» уже входит.</div>
-                <PayButtons p={studio} label={me.plan?.studioUntil ? 'Продлить' : undefined} />
-              </div>
-            )}
           </div>
 
-          <h2 className="section-title">Разово, без подписки</h2>
-          <div className="list">
-            {list.filter((p) => p.code === 'est10').map((p) => (
-              <div key={p.code} className="list-item" style={{ display: 'block', cursor: 'default' }}>
-                <div className="title">{p.title}</div>
-                <div className="xs muted">{PACK_TEXT[p.code]}{me.plan?.extraUntil && new Date(me.plan.extraUntil) > new Date() ? ` Купленные сметы действуют до ${new Date(me.plan.extraUntil).toLocaleDateString('ru-RU')}.` : ''}</div>
-                <PayButtons p={p} />
-              </div>
-            ))}
-          </div>
-          <p className="xs muted">Одну смету без пометки за {PRICES.estimate} ₽ можно оплатить прямо в смете.</p>
+          <p className="xs muted">Нужна всего одна смета без пометки? Оплатите её прямо в смете — {PRICES.estimate} ₽.</p>
         </>
         );
       }}</Load>
-      <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa. Или в Telegram Stars.' : 'Оплата в Telegram Stars; сумма в рублях примерная — зависит от того, где покупать звёзды.'} Доступ включается сразу после подтверждения платежа.</p>
+      <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa. Или в Telegram Stars.' : 'Оплата в Telegram Stars; сумма в рублях примерная — зависит от того, где покупать звёзды.'} Доступ включается сразу после подтверждения платежа. Без автосписаний — продлеваете, только когда сами захотите.</p>
       <PromoField />
       <TeamPanel />
     </>

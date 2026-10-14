@@ -26,13 +26,27 @@ export const studioActive = (u: any) => Boolean(u.studioUntil && new Date(u.stud
 const premiumUser = (u: any) => studioActive(u) || accessOf(u).tier === 'team';
 const projectOffer = (u: any) => {
   const sub = accessOf(u).mode === 'subscription' || accessOf(u).mode === 'team';
-  return `3D-проект для заказчика (PDF без водяного знака + 3D-ссылка) — ${sub ? PRICES.designPro : PRICES.design} ₽ за объект${sub ? '' : ` (с «Про» — ${PRICES.designPro} ₽)`}, или «3D-Студия» без ограничений — ${PRICES.studio} ₽ в месяц.`;
+  return `3D-проект для заказчика (PDF без водяного знака + 3D-ссылка) — ${sub ? PRICES.designPro : PRICES.design} ₽ за объект${sub ? '' : ` (с «Про» — ${PRICES.designPro} ₽)`}. Без ограничений — в тарифе «Бригада».`;
 };
+/** Кто оплатил «Про» до перехода на отдельные 3D-проекты (14.10.2026): до конца подписки — 5 чистых проектов в месяц, как обещали */
+const LEGACY_BEFORE = new Date('2026-10-14T08:45:00Z');
+async function legacyLeft(u: any) {
+  if (accessOf(u).mode !== 'subscription') return false;
+  const old = await prisma.payment.count({ where: { userId: u.id, createdAt: { lt: LEGACY_BEFORE }, planCode: { in: ['pro_m', 'pro_y', 'lite_m', 'lite_y'] } } });
+  if (!old) return false;
+  const used = await prisma.auditLog.count({ where: { userId: u.id, entity: 'design', action: 'share_legacy', createdAt: { gte: new Date(`${monthKey()}-01T00:00:00+03:00`) } } });
+  return used < 5;
+}
 /** Можно ли выдать чистый проект; при необходимости тратит купленный кредит и отмечает объект оплаченным */
 async function cleanProject(u: any, designId?: string | null): Promise<boolean> {
   if (premiumUser(u)) return true;
   const d = designId ? await prisma.design.findFirst({ where: { id: designId, userId: u.id, deletedAt: null }, select: { id: true, paidAt: true } }) : null;
   if (d?.paidAt) return true;
+  if (await legacyLeft(u)) {
+    if (d) await prisma.design.update({ where: { id: d.id }, data: { paidAt: new Date() } });
+    await audit(u.id, 'design', d?.id || '-', 'share_legacy');
+    return true;
+  }
   if ((u.extraDesigns || 0) > 0) {
     const took = await prisma.user.updateMany({ where: { id: u.id, extraDesigns: { gt: 0 } }, data: { extraDesigns: { decrement: 1 } } });
     if (took.count) {

@@ -417,9 +417,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <Sheet open={sheet === 'clean'} onClose={() => setSheet(null)} title="Смета без пометки">
         <p className="small" style={{ marginTop: 0 }}>Без «Сделано в СМЕТА PRO», с вашим логотипом и подписью — заказчик видит солидную смету от вашей фирмы.</p>
         <Offers target={initial.id} onPaid={() => { setSheet(null); reload(); }} items={[
-          { code: 'pro_m', title: '⭐ «Про» — все сметы без ограничений', text: 'Сметы без пометки, договор и акты, объекты и учёт денег.', best: true },
+          { code: 'pro_m', title: '⭐ «Про» — все сметы без пометки', text: 'Сметы без ограничений, договор и акты, объекты и учёт денег. Без автосписаний.', best: true },
           { code: 'est1', title: '📄 Только эта смета', text: 'Без пометки и с логотипом. Править и отправлять — сколько угодно.' },
-          { code: 'est10', title: `📦 10 смет на ${PRICES.packMonths} месяцев`, text: 'Если заказы бывают не каждый месяц.' },
         ]} />
       </Sheet>
       <Sheet open={sheet === 'contract'} onClose={() => setSheet(null)} title="Договор подряда">

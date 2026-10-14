@@ -49,6 +49,7 @@ model User {
   studioUntil       DateTime? // «3D-Студия»: 3D-проекты и 3D-ссылки без ограничений
   offerPct          Int? // персональная скидка на месяц «Про» (возврат)
   offerUntil        DateTime?
+  activateAt        DateTime? // воронка: подсказка «сделайте первую смету»
   trialWarnAt       DateTime? // воронка: «пробный закончится завтра»
   trialEndAt        DateTime? // «пробный закончился — первый месяц со скидкой»
   firstRemindAt     DateTime? // напоминание о первом месяце

@@ -25,10 +25,10 @@ export const DEFAULT_PLANS = [
     P(n === 3 ? 'team_m' : `team${n}_m`, `Бригада до ${n} чел. на 1 месяц`, 'team', 1, teamMonthRub(n), 5 + i * 2, { aiLimit: 1000, seats: n }),
     P(n === 3 ? 'team_y' : `team${n}_y`, `Бригада до ${n} чел. на 12 месяцев (−30%)`, 'team', 12, year(teamMonthRub(n)), 6 + i * 2, { aiLimit: 1000, seats: n }),
   ]),
+  // разово — только в нужный момент: смета без пометки (в смете) и 3D-проект для заказчика (в проектировщике)
   P('est1', 'Одна смета без пометки', 'pack', 0, PRICES.estimate, 18, { estimates: 1 }),
-  P('est10', `10 смет на ${PRICES.packMonths} месяцев`, 'pack', 0, PRICES.pack10, 19, { estimates: 10 }),
   P('design1', '3D-проект для заказчика', 'pack', 0, PRICES.design, 20, { designs: 1 }),
-  P('studio_m', '3D-Студия на 1 месяц', 'studio', 1, PRICES.studio, 21),
+  // «10 смет» и «3D-Студия» сняты с продажи, чтобы не было лишнего выбора; купленное работает до конца срока
 ];
 /** Разовые покупки и «3D-Студия» — не подписка «Про»/«Бригада» (для первой скидки и промокодов) */
 export const NOT_SUB = ['est1', 'est10', 'design1', 'studio_m'];
