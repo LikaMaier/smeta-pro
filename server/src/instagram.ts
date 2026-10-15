@@ -126,6 +126,23 @@ async function publishDue(bot: Bot, log: any) {
   }
 }
 
+/** Срочная публикация по просьбе владелицы: marketing/publish-now.json { "key": "...", "ids": [...] } — каждый ролик один раз */
+async function publishNow(bot: Bot, log: any) {
+  const f = path.join(ROOT, 'publish-now.json');
+  if (!fs.existsSync(f)) return;
+  let j: { key?: string; ids?: string[] };
+  try { j = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return; }
+  for (const id of j.ids || []) {
+    const it = queue().find((x) => x.id === id);
+    if (!it || !fs.existsSync(videoPath(it))) continue;
+    if (!(await kvClaim(`ig:now:${j.key}:${id}`, '1'))) continue;
+    const cur = await kvGet(`ig:item:${id}`);
+    if (cur === 'published' || cur === 'publishing') continue;
+    if (cur === null) await kvSet(`ig:item:${id}`, 'now');
+    await publishItem(bot, it, cur ?? 'now', log);
+  }
+}
+
 /** Захватить ролик и опубликовать; при ошибке — вернуть в расписание на завтра и сообщить */
 async function publishItem(bot: Bot, it: Item, from: string, log: any) {
   const claimed = await prisma.appKV.updateMany({ where: { key: `ig:item:${it.id}`, value: from }, data: { value: 'publishing' } });
@@ -292,6 +309,7 @@ export function startInstagram(bot: Bot, log: { error: (o: any, m?: string) => v
     try {
       await offerNew(bot, log);
       if (await igEnabled()) {
+        await publishNow(bot, log).catch((e) => log.error({ err: e }, 'ig now'));
         await publishDue(bot, log).catch((e) => log.error({ err: e }, 'ig due'));
         await refreshToken(log).catch((e) => log.error({ err: e }, 'ig token'));
         await checkComments(bot, log).then(() => prisma.appKV.deleteMany({ where: { key: 'ig:blocked' } })).catch(async (e) => {
