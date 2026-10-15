@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTI'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Italic.ttf'); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.cap { position: absolute; left: 22px; right: 22px; text-align: center; font-family: 'PT', 'Noto Color Emoji', sans-serif; font-weight: 700; color: #fff;
+  font-size: 34px; line-height: 1.16; -webkit-text-stroke: 7px #000; paint-order: stroke fill; letter-spacing: .2px; }
+.cap.big { font-size: 58px; line-height: 1.02; }
+.cap .y { color: #FFD43B; }
+#phone { position: absolute; left: 50%; top: 50%; width: 330px; height: 714px; margin: -320px 0 0 -165px; border-radius: 46px; background: #0b0f16;
+  box-shadow: 0 40px 90px rgba(0,0,0,.6), inset 0 0 0 3px #2c3442; padding: 12px; opacity: 0; }
+#phone .scr { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #0D2440; }
+#phone img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#tap { position: absolute; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.85); opacity: 0; }
+#end { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 0; color: #fff; text-align: center; font-family: 'PT'; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 30px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 10px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#fade, #flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+#fade { background: #000; } #flash { background: #fff6d6; }
+</style></head><body><div id="stage">
+<svg id="sv" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2340"/><stop offset=".6" stop-color="#8c4a4a"/><stop offset="1" stop-color="#d9874f"/></linearGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3d7a"/><stop offset=".7" stop-color="#e2735a"/><stop offset="1" stop-color="#ffc06b"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8743f"/><stop offset="1" stop-color="#5e331b"/></linearGradient>
+    <radialGradient id="lamp" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff2c4" stop-opacity=".85"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gold" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff3b0" stop-opacity=".95"/><stop offset=".5" stop-color="#ffd43b" stop-opacity=".45"/><stop offset="1" stop-color="#ffb000" stop-opacity="0"/></radialGradient>
+    <linearGradient id="scrG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#15365e"/><stop offset="1" stop-color="#0a1c33"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b4a66"/><stop offset=".5" stop-color="#05070d"/><stop offset="1" stop-color="#1c2638"/></linearGradient>
+    <radialGradient id="vigG" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
+    <filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="blur8" filterUnits="userSpaceOnUse" x="-200" y="-200" width="1000" height="1400"><feGaussianBlur stdDeviation="8"/></filter>
+    <clipPath id="paperClip"><path id="paperPathC" d=""/></clipPath>
+  </defs>
+  <g id="cam">
+    <rect x="-200" y="-200" width="940" height="1400" fill="url(#wall)"/>
+    <g id="window"></g>
+    <circle cx="430" cy="210" r="260" fill="url(#lamp)"/>
+    <g id="rays" opacity="0"></g>
+    <path d="M-200 690 L740 690 L740 1200 L-200 1200Z" fill="url(#wood)"/>
+    <path d="M-200 690 L740 690 L740 706 L-200 706Z" fill="#d18a50"/>
+    <g id="grain"></g>
+    <g id="props"></g>
+    <g id="paper"></g>
+    <g id="phoneC"></g>
+    <g id="stamp" opacity="0"></g>
+    <g id="sparks"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+</svg>
+<div id="dim" style="position:absolute;inset:0;background:rgba(5,10,20,.6);opacity:0"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="capA" class="cap" style="top:64px"></div>
+<div id="capB" class="cap" style="bottom:40px"></div>
+<div id="end"><div class="logo">СМЕТА PRO</div><div class="l2">Работы, материалы, цены<br>и PDF заказчику —<br><span style="color:#FFD43B">прямо в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">3 сметы в месяц — бесплатно</div></div>
+<div id="flash"></div><div id="fade"></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const E = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const eBack = (x) => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const st = { stroke: '#22140e', 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+
+// ---------------- таймлайн ----------------
+const T = { s1: [0, 6.2], mog: 4.0, phone: [6.2, 13.0], win: [13.0, 16.8], end: [16.8, 20] };
+window.DUR = 20;
+
+// ---------------- кухня заказчика ----------------
+(function buildRoom() {
+  const w = $('window');
+  E('rect', { x: 40, y: 150, width: 210, height: 300, rx: 8, fill: '#5b3628' }, w);
+  E('rect', { x: 54, y: 164, width: 182, height: 272, fill: 'url(#win)' }, w);
+  for (let i = 0; i < 7; i++) { const h = 40 + R(i) * 90; E('rect', { x: 54 + i * 27, y: 436 - h, width: 22, height: h, fill: '#3b2a4f', opacity: .85 }, w); }
+  E('path', { d: 'M145 164 L145 436 M54 300 L236 300', stroke: '#5b3628', 'stroke-width': 8 }, w);
+  E('path', { d: 'M30 140 Q60 300 40 470 L80 470 Q70 300 90 140Z M260 140 Q230 300 250 470 L210 470 Q220 300 200 140Z', fill: '#c9533f', opacity: .9 }, w);
+  // лампа
+  E('path', { d: 'M430 -10 L430 120', stroke: '#22140e', 'stroke-width': 3 }, w);
+  E('path', { d: 'M380 170 Q430 100 480 170Z', fill: '#ffcf6b', ...st }, w);
+  const g = $('grain');
+  for (let i = 0; i < 12; i++) E('path', { d: `M-200 ${730 + i * 22} Q 270 ${724 + i * 22 + R(i) * 12} 740 ${734 + i * 22}`, stroke: '#4a2814', 'stroke-width': 2, opacity: .25, fill: 'none' }, g);
+  const p = $('props');
+  // кружка
+  E('ellipse', { cx: 478, cy: 742, rx: 40, ry: 8, fill: 'rgba(0,0,0,.3)' }, p);
+  E('path', { d: 'M448 680 L452 740 Q478 752 504 740 L508 680Z', fill: '#e8e2d6', ...st }, p);
+  E('path', { d: 'M507 694 Q530 698 526 716 Q522 730 505 728', fill: 'none', ...st, 'stroke-width': 5 }, p);
+  E('ellipse', { cx: 478, cy: 680, rx: 30, ry: 7, fill: '#5a3420', ...st }, p);
+  // калькулятор у листочка
+  E('rect', { x: 18, y: 742, width: 70, height: 96, rx: 8, fill: '#3b3f4a', ...st, transform: 'rotate(-14 53 790)' }, p);
+  E('rect', { x: 28, y: 752, width: 50, height: 20, rx: 3, fill: '#a9c49a', transform: 'rotate(-14 53 790)' }, p);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) E('rect', { x: 28 + c * 18, y: 780 + r * 18, width: 13, height: 12, rx: 2, fill: '#d8d8d8', transform: 'rotate(-14 53 790)' }, p);
+  // таблички
+  for (const [x, txt, fill, col] of [[165, 'смета на листочке', '#efe6cf', '#5a4a3a'], [385, 'СМЕТА PRO', '#FFD43B', '#0a1a30']]) {
+    const tg = E('g', { class: 'tag' }, p);
+    const wdt = txt.length * 11.5 + 30;
+    E('rect', { x: x - wdt / 2, y: 800, width: wdt, height: 40, rx: 20, fill, ...st }, tg);
+    E('text', { x, y: 828, 'text-anchor': 'middle', 'font-family': 'PTN', 'font-size': 24, fill: col }, tg).textContent = txt;
+  }
+  for (let i = 0; i < 14; i++) E('path', { d: 'M0 0 L-46 -1100 L46 -1100Z', fill: '#fff1b0', opacity: .11, transform: `rotate(${-80 + i * 12})` }, $('rays'));
+  for (let i = 0; i < 18; i++) E('path', { d: 'M0 -9 L2.5 -2.5 L9 0 L2.5 2.5 L0 9 L-2.5 2.5 L-9 0 L-2.5 -2.5Z', fill: '#FFE27a', class: 'spk', 'data-i': i, opacity: 0 }, $('sparks'));
+})();
+
+// ---------------- листочек ----------------
+const P = {};
+(function buildPaper() {
+  const g = $('paper');
+  E('ellipse', { cx: 0, cy: 2, rx: 80, ry: 10, fill: 'rgba(0,0,0,.3)', filter: 'url(#blur2)' }, g);
+  P.body = E('g', {}, g);
+  const b = P.body;
+  // ножки
+  for (const s of [-1, 1]) { E('path', { d: `M${s * 28} -40 L${s * 30} -6`, ...st, 'stroke-width': 4, fill: 'none' }, b); E('ellipse', { cx: s * 36, cy: -5, rx: 14, ry: 7, fill: '#6b5a4a', ...st, 'stroke-width': 2.5 }, b); }
+  let d = 'M-82 -40'; const pts = [];
+  for (let i = 0; i <= 10; i++) pts.push([-82 + i * 16.4, -40 + (i % 2 ? -5 : 4)]);
+  for (let i = 0; i <= 12; i++) pts.push([82 + (i % 2 ? -6 : 5), -40 - i * 19.5]);
+  for (let i = 0; i <= 10; i++) pts.push([82 - i * 16.4, -274 + (i % 2 ? 6 : -4)]);
+  for (let i = 0; i <= 12; i++) pts.push([-82 + (i % 2 ? 6 : -5), -274 + i * 19.5]);
+  d = 'M' + pts.map((p) => p.join(' ')).join(' L') + 'Z';
+  $('paperPathC').setAttribute('d', d);
+  E('path', { d, fill: '#fbf5e3', ...st }, b);
+  const cl = E('g', { 'clip-path': 'url(#paperClip)' }, b);
+  for (let i = 0; i < 16; i++) E('path', { d: `M-90 ${-270 + i * 15} L90 ${-270 + i * 15}`, stroke: '#a9c3e6', 'stroke-width': 1.2 }, cl);
+  for (let i = 0; i < 12; i++) E('path', { d: `M${-90 + i * 15} -280 L${-90 + i * 15} -30`, stroke: '#a9c3e6', 'stroke-width': 1.2 }, cl);
+  E('path', { d: 'M-60 -280 L-60 -30', stroke: '#e58a8a', 'stroke-width': 1.6 }, cl);
+  E('circle', { cx: 46, cy: -84, r: 28, fill: 'none', stroke: '#9b6b3e', 'stroke-width': 5, opacity: .35 }, cl);
+  for (const [x1, y1, x2, y2] of [[-80, -200, 80, -150], [-30, -280, 10, -30], [40, -280, 70, -40]]) E('path', { d: `M${x1} ${y1} L${x2} ${y2}`, stroke: '#e9ddc0', 'stroke-width': 1.5 }, cl); // заломы
+  const lines = [['плитка — ?', -248], ['клей ~3 меш?', -226], ['работа ≈', -100], ['итого ≈ ??', -64]];
+  for (const [txt, y] of lines) E('text', { x: -54, y, 'font-family': 'PTI', 'font-size': 17, fill: '#3b4f8a' }, cl).textContent = txt;
+  E('path', { d: 'M-54 -232 L40 -218', stroke: '#3b4f8a', 'stroke-width': 2 }, cl);
+  E('path', { d: 'M-10 -74 q8 -10 16 0 q8 10 16 0 q8 -10 16 0', stroke: '#3b4f8a', 'stroke-width': 2, fill: 'none' }, cl);
+  // лицо
+  P.face = E('g', {}, b);
+  P.brows = E('path', { d: '', fill: 'none', ...st, 'stroke-width': 3.5 }, P.face);
+  P.eyes = [-1, 1].map((s) => E('ellipse', { cx: s * 22, cy: -168, rx: 8, ry: 10, fill: '#22140e' }, P.face));
+  [-1, 1].forEach((s) => E('circle', { cx: s * 22 - 3, cy: -172, r: 3, fill: '#fff' }, P.face));
+  P.mouth = E('path', { d: '', fill: 'none', ...st }, P.face);
+  P.sweat = [0, 1].map((i) => E('path', { d: 'M0 0 Q-6 10 0 14 Q6 10 0 0Z', fill: '#7cc6ff', stroke: '#2a5a8a', 'stroke-width': 1.5, opacity: 0 }, b));
+  // ручка с огрызком карандаша
+  P.arm = E('path', { d: '', fill: 'none', ...st, 'stroke-width': 4 }, b);
+  P.pencil = E('g', {}, b);
+  E('rect', { x: -4, y: -26, width: 8, height: 26, fill: '#ffb000', stroke: '#22140e', 'stroke-width': 1.5 }, P.pencil);
+  E('path', { d: 'M-4 0 L0 9 L4 0Z', fill: '#f0d0a0', stroke: '#22140e', 'stroke-width': 1.5 }, P.pencil);
+  E('path', { d: 'M88 -150 Q112 -140 110 -110', fill: 'none', ...st, 'stroke-width': 4 }, b);
+})();
+
+// ---------------- смартфон-качок ----------------
+const F = {};
+(function buildPhoneGuy() {
+  const g = $('phoneC');
+  F.glow = E('circle', { cx: 0, cy: -220, r: 230, fill: 'url(#gold)', opacity: 0 }, g);
+  E('ellipse', { cx: 0, cy: 2, rx: 95, ry: 12, fill: 'rgba(0,0,0,.35)', filter: 'url(#blur2)' }, g);
+  F.body = E('g', {}, g);
+  const b = F.body;
+  for (const s of [-1, 1]) { E('path', { d: `M${s * 32} -44 L${s * 34} -8`, ...st, stroke: '#0b0f16', 'stroke-width': 12, fill: 'none' }, b); E('path', { d: `M${s * 30 - 18} -8 Q${s * 34} -24 ${s * 34 + 22} -8 L${s * 34 + 24} 0 L${s * 30 - 20} 0Z`, fill: '#fff', ...st, 'stroke-width': 2.5 }, b); E('path', { d: `M${s * 30 - 20} -2 L${s * 34 + 24} -2`, stroke: '#3a8ff0', 'stroke-width': 3 }, b); }
+  // руки в боки
+  for (const s of [-1, 1]) { E('path', { d: `M${s * 80} -230 Q${s * 132} -196 ${s * 112} -150 Q${s * 100} -132 ${s * 82} -138`, fill: 'none', stroke: '#22140e', 'stroke-width': 24, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, b); E('path', { d: `M${s * 80} -230 Q${s * 132} -196 ${s * 112} -150 Q${s * 100} -132 ${s * 82} -138`, fill: 'none', stroke: '#1d2738', 'stroke-width': 17, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, b); E('circle', { cx: s * 86, cy: -140, r: 14, fill: '#fff', ...st, 'stroke-width': 2.5 }, b); }
+  E('rect', { x: -84, y: -400, width: 168, height: 360, rx: 30, fill: '#0b0f16', ...st }, b);
+  E('rect', { x: -84, y: -400, width: 168, height: 360, rx: 30, fill: 'none', stroke: '#ffd43b', 'stroke-width': 3, opacity: .0, class: 'rim' }, b);
+  E('rect', { x: -74, y: -390, width: 148, height: 340, rx: 22, fill: 'url(#scrG)' }, b);
+  E('rect', { x: -20, y: -386, width: 40, height: 9, rx: 4.5, fill: '#05070d' }, b);
+  E('text', { x: 0, y: -356, 'text-anchor': 'middle', 'font-family': 'PTN', 'font-size': 20, fill: '#FFD43B' }, b).textContent = 'СМЕТА PRO';
+  // лицо на экране
+  F.face = E('g', {}, b);
+  E('path', { d: 'M-58 -322 L58 -322 L54 -306 Q36 -284 12 -300 L0 -306 L-12 -300 Q-36 -284 -54 -306Z', fill: 'url(#glass)', ...st, 'stroke-width': 2.5 }, F.face);
+  E('path', { d: 'M-44 -316 L-30 -316 M20 -316 L34 -316', stroke: '#9fb3d6', 'stroke-width': 3, 'stroke-linecap': 'round' }, F.face);
+  F.mouth = E('path', { d: 'M-18 -276 Q4 -266 22 -282', fill: 'none', stroke: '#fff', 'stroke-width': 4, 'stroke-linecap': 'round' }, F.face);
+  F.brow = E('path', { d: 'M-56 -332 L-20 -328 M20 -328 L56 -336', stroke: '#fff', 'stroke-width': 4, 'stroke-linecap': 'round' }, F.face);
+  // строки сметы
+  for (let i = 0; i < 6; i++) { const y = -244 + i * 24; E('rect', { x: -62, y, width: 72 - R(i) * 20, height: 9, rx: 4, fill: '#cfe0f5', opacity: .8 }, b); E('rect', { x: 26, y, width: 36, height: 9, rx: 4, fill: '#FFD43B', opacity: .9 }, b); }
+  E('path', { d: 'M-62 -94 L62 -94', stroke: '#3a5a86', 'stroke-width': 2 }, b);
+  E('text', { x: -62, y: -72, 'font-family': 'PTN', 'font-size': 18, fill: '#fff' }, b).textContent = 'Итого';
+  E('rect', { x: 18, y: -86, width: 44, height: 14, rx: 5, fill: '#FFD43B' }, b);
+  // значок PDF сбоку
+  const pd = E('g', { transform: 'translate(70,-120) rotate(12)' }, b); F.pdfBadge = pd;
+  E('path', { d: 'M-22 -30 L12 -30 L24 -18 L24 30 L-22 30Z', fill: '#fff', ...st, 'stroke-width': 2.5 }, pd);
+  E('rect', { x: -18, y: -4, width: 38, height: 18, rx: 3, fill: '#e5484d' }, pd);
+  E('text', { x: 1, y: 10, 'text-anchor': 'middle', 'font-family': 'PTN', 'font-size': 15, fill: '#fff' }, pd).textContent = 'PDF';
+  // штамп «ПРИНЯТО»
+  const sp = $('stamp');
+  E('rect', { x: -110, y: -34, width: 220, height: 68, rx: 12, fill: 'rgba(255,255,255,.12)', stroke: '#2fbf71', 'stroke-width': 7 }, sp);
+  E('text', { x: 0, y: 18, 'text-anchor': 'middle', 'font-family': 'PTN', 'font-size': 50, fill: '#2fbf71', stroke: '#0b3b22', 'stroke-width': 1.5 }, sp).textContent = 'ПРИНЯТО ✓';
+})();
+
+// ---------------- подписи ----------------
+const CAPS = [
+  [0.0, 2.2, 'Заказчику принесли<br>две сметы 👀', ''],
+  [2.2, 4.0, 'Первая — на листочке:<br>«итого ≈ <span class="y">где-то так</span>»', ''],
+  [4.0, 6.2, 'Вторая — из <span class="y">СМЕТА PRO</span>', 'Я тебя<br><span class="y">могну</span> 😎'],
+  [13.0, 14.4, 'Работы, материалы, цены<br>и PDF — <span class="y">за 2 минуты</span>', ''],
+  [14.4, 16.8, 'Работы, материалы, цены<br>и PDF — <span class="y">за 2 минуты</span>', 'Замогал<br><span class="y">без качалки</span> 💪'],
+];
+const SCREENS = [['2dirs', 'Выбираю направление', 230, 520], ['3kinds', 'Вид работы', 165, 300], ['4form', 'Размеры — 2–3 цифры', 193, 274], ['5result', 'Работы и материалы<br>с ценами — <span class="y">готово</span>', 0, 0], ['8est', 'PDF заказчику —<br>одной кнопкой', 73, 143]];
+
+function caption(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } el.style.opacity = html ? 1 : 0; }
+
+window.render = function (t) {
+  const m = clamp((t - T.mog) / .55), mo = eBack(m);           // момент «могну»
+  const win = clamp((t - T.win[0]) / 1.0);
+  const inS1 = t < T.phone[0] || t >= T.win[0];
+  // камера: наезд → низкий ракурс на «могну» → общий план на победе
+  let sc = lerp(1.0, 1.08, ease(t / 4)), cx = 270, cy = 560;
+  sc = lerp(sc, 1.12, ease(m)); cx = lerp(cx, 290, ease(m)); cy = lerp(cy, 500, ease(m));
+  if (t >= T.win[0]) { sc = lerp(1.16, 1.04, ease(win)); cx = lerp(290, 275, ease(win)); cy = lerp(500, 520, ease(win)); }
+  const shake = t > T.mog && t < T.mog + .5 ? Math.sin(t * 70) * 6 * (1 - m) : 0;
+  $('cam').setAttribute('transform', `translate(270,${480 + shake * .5}) scale(${sc}) translate(${-cx + shake},${-cy})`);
+  // лучи и блёстки
+  const glow = Math.max(m * (t < T.phone[0] ? 1 : 0), win);
+  $('rays').setAttribute('opacity', glow); $('rays').setAttribute('transform', `translate(385,420) rotate(${t * 6})`);
+  F.glow.setAttribute('opacity', glow);
+  document.querySelectorAll('.rim').forEach((r) => r.setAttribute('opacity', glow));
+  document.querySelectorAll('.spk').forEach((s) => { const i = +s.dataset.i; const ph = (t * .7 + R(i)) % 1; const a = R(i * 3) * 6.28, rr = 120 + R(i * 5) * 160;
+    s.setAttribute('transform', `translate(${385 + Math.cos(a) * rr},${420 + Math.sin(a) * rr * 1.2 - ph * 40}) scale(${Math.sin(ph * Math.PI) * (.6 + R(i * 7))}) rotate(${t * 90})`); s.setAttribute('opacity', glow * Math.sin(ph * Math.PI)); });
+  // листочек: дышит, нервничает, сжимается
+  const shrink = lerp(1, .74, ease(m)) * (t >= T.win[0] ? lerp(1, .9, ease(win)) : 1);
+  const tilt = -4 * ease(m) + Math.sin(t * 2.1) * 1.5 + (m > 0 && m < 1 ? Math.sin(t * 50) * 2 : 0);
+  $('paper').setAttribute('transform', `translate(${lerp(165, 140, ease(m))},720) scale(${shrink})`);
+  P.body.setAttribute('transform', `rotate(${tilt} 0 -20) translate(0,${Math.sin(t * 2.4) * 2})`);
+  const worried = t > 2.2 ? 1 : 0;
+  P.brows.setAttribute('d', worried || m ? 'M-32 -192 L-12 -186 M12 -186 L32 -192' : 'M-32 -188 L-12 -190 M12 -190 L32 -188');
+  P.mouth.setAttribute('d', m > .2 ? 'M-16 -136 q5 -6 10 0 q5 6 10 0 q5 -6 10 0' : t > 2.2 ? 'M-12 -138 Q0 -132 12 -138' : 'M-12 -140 Q0 -132 12 -140');
+  const look = m > .1 ? 6 : 0; P.eyes.forEach((e, i) => { e.setAttribute('cx', (i ? 22 : -22) + look); e.setAttribute('ry', ((t + .4) % 2.7) < .1 ? 1 : (m > .2 ? 7 : 10)); });
+  P.sweat.forEach((s, i) => { const ph = ((t - T.mog) * .9 + i * .5) % 1; s.setAttribute('opacity', m > .3 ? 1 - ph : 0); s.setAttribute('transform', `translate(${i ? 60 : -66},${-210 + ph * 50})`); });
+  const wr = Math.sin(t * 7) * 6 * (t < T.mog ? 1 : .3);
+  P.arm.setAttribute('d', `M-82 -150 Q-110 ${-140 + wr} -104 ${-110 + wr}`);
+  P.pencil.setAttribute('transform', `translate(-104,${-108 + wr}) rotate(${-30 + wr * 2})`);
+  // смартфон: вырастает на «могну»
+  const grow = lerp(.86, 1.16, mo) * (t >= T.win[0] ? lerp(1, 1.06, ease(win)) : 1);
+  $('phoneC').setAttribute('transform', `translate(${lerp(390, 395, m)},722) scale(${grow})`);
+  F.body.setAttribute('transform', `translate(0,${Math.sin(t * 2) * 2}) rotate(${Math.sin(t * 1.3) * 1.2} 0 -40)`);
+  F.mouth.setAttribute('d', m > .2 || t >= T.win[0] ? 'M-22 -280 Q0 -262 24 -284' : 'M-18 -276 Q4 -270 22 -280');
+  F.brow.setAttribute('transform', m > .2 && (t % 1.4) < .25 ? 'translate(0,-5)' : '');
+  F.pdfBadge.setAttribute('transform', `translate(70,-120) rotate(${12 + Math.sin(t * 3) * 4}) scale(${t >= T.win[0] ? 1 + .15 * Math.sin(win * Math.PI) : 1})`);
+  const sk = clamp((t - T.win[0] - .5) / .35);
+  $('stamp').setAttribute('opacity', sk); $('stamp').setAttribute('transform', `translate(392,${722 - 150 * grow}) rotate(-12) scale(${lerp(2.2, 1, eOut(sk)) * .8})`);
+  document.querySelectorAll('.tag').forEach((g) => g.setAttribute('opacity', 1 - clamp((t - T.mog + .2) / .3)));
+  $('flash').style.opacity = clamp(1 - Math.abs(t - T.mog - .05) / .18) * .85;
+  // --- телефон с приложением ---
+  const phone = $('phone');
+  const pIn = clamp((t - T.phone[0]) / .45), pOut = clamp((T.phone[1] - t) / .35);
+  phone.style.opacity = t >= T.phone[0] - .01 && t < T.phone[1] ? Math.min(pIn, pOut) : 0;
+  $('dim').style.opacity = phone.style.opacity;
+  phone.style.transform = `scale(${lerp(.6, 1, eOut(pIn))}) rotate(${lerp(-8, 0, eOut(pIn))}deg)`;
+  if (t >= T.phone[0] && t < T.phone[1]) {
+    const span = (T.phone[1] - T.phone[0]) / SCREENS.length, u = (t - T.phone[0]) / span, i = Math.min(SCREENS.length - 1, Math.floor(u)), f = u - i;
+    const [cur, cap, tx, ty] = SCREENS[i], nxt = SCREENS[Math.min(SCREENS.length - 1, i + 1)][0];
+    const A = $('imA'), B = $('imB');
+    if (A._s !== cur) { A.src = `../sc/${cur}.png`; A._s = cur; }
+    if (B._s !== nxt) { B.src = `../sc/${nxt}.png`; B._s = nxt; }
+    const sw = i < SCREENS.length - 1 ? ease((f - .78) / .22) : 0;
+    A.style.transform = `translateX(${-sw * 100}%)`; B.style.transform = `translateX(${(1 - sw) * 100}%)`;
+    A.style.objectPosition = cur === '5result' ? `center ${Math.round(ease(f / .75) * 100)}%` : 'top';
+    const tap = $('tap'); const tk = (f - .55) / .2;
+    tap.style.opacity = tx && tk > 0 && tk < 1 ? Math.sin(tk * Math.PI) : 0; tap.style.left = tx + 'px'; tap.style.top = ty + 'px'; tap.style.transform = `scale(${.7 + tk * .5})`;
+    caption($('capA'), cap); caption($('capB'), ''); $('capA').style.transform = 'none'; $('capB').className = 'cap';
+  } else {
+    const c = CAPS.find(([a, b]) => t >= a && t < b) || [0, 0, '', ''];
+    caption($('capA'), c[2]); caption($('capB'), c[3]);
+    $('capB').className = 'cap big';
+    const k = clamp((t - c[0]) / .2); $('capA').style.transform = `scale(${.85 + .15 * eOut(k)})`;
+    $('capB').style.transform = `scale(${c[0] === T.mog ? lerp(1.6, 1, eOut(clamp((t - T.mog) / .3))) : .85 + .15 * eOut(k)}) rotate(${c[0] === T.mog ? -3 : 0}deg)`;
+  }
+  // --- финал ---
+  const en = clamp((t - T.end[0]) / .4);
+  $('end').style.opacity = en; $('end').style.transform = `scale(${.92 + .08 * eOut(en)})`;
+  if (en > 0) { caption($('capA'), ''); caption($('capB'), ''); }
+  let fd = 0; for (const c of [T.win[0]]) fd = Math.max(fd, 1 - Math.abs(t - c) / .2);
+  $('fade').style.opacity = clamp(fd) * .8;
+};
+window.READY = Promise.all([document.fonts.ready, ...SCREENS.map(([n]) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `../sc/${n}.png`; }))]).then(() => { window.render(0); window.OK = true; });
+</script></body></html>

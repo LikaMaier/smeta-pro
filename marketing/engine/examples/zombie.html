@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTR'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Regular.ttf'); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.cap { position: absolute; left: 22px; right: 22px; text-align: center; font-family: 'PT', 'Noto Color Emoji', sans-serif; font-weight: 700; color: #fff;
+  font-size: 34px; line-height: 1.16; -webkit-text-stroke: 7px #000; paint-order: stroke fill; letter-spacing: .2px; }
+.cap.big { font-size: 52px; line-height: 1.02; }
+.cap .y { color: #FFD43B; }
+.cap .g { color: #9dff7a; display: inline-block; }
+#note { position: absolute; left: 34px; right: 34px; top: 236px; background: rgba(245,247,250,.96); border-radius: 22px; padding: 14px 18px; font-family: 'PTR', sans-serif; color: #111; box-shadow: 0 18px 40px rgba(0,0,0,.45); opacity: 0; }
+#note .h { display: flex; align-items: center; gap: 10px; font-family: 'PT'; font-size: 17px; color: #555; }
+#note .ic { width: 30px; height: 30px; border-radius: 8px; background: #2aa3e0; display: grid; place-items: center; color: #fff; font-size: 17px; }
+#note .who { font-family: 'PT'; font-size: 22px; margin-top: 8px; }
+#note .txt { font-size: 22px; line-height: 1.25; margin-top: 2px; }
+#phone { position: absolute; left: 50%; top: 50%; width: 330px; height: 714px; margin: -320px 0 0 -165px; border-radius: 46px; background: #0b0f16;
+  box-shadow: 0 40px 90px rgba(0,0,0,.6), inset 0 0 0 3px #2c3442; padding: 12px; opacity: 0; }
+#phone .scr { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #0D2440; }
+#phone img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#tap { position: absolute; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.85); opacity: 0; }
+#end { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 0; color: #fff; text-align: center; font-family: 'PT'; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 30px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 10px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#fade { position: absolute; inset: 0; background: #000; pointer-events: none; opacity: 0; }
+</style></head><body><div id="stage">
+<svg id="sv" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070b1f"/><stop offset=".6" stop-color="#18264a"/><stop offset="1" stop-color="#2c3d5e"/></linearGradient>
+    <linearGradient id="dawn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a77c9"/><stop offset=".5" stop-color="#f3a07a"/><stop offset="1" stop-color="#ffd98a"/></linearGradient>
+    <radialGradient id="moonG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#f4f7d8"/><stop offset=".45" stop-color="#e8f0c0" stop-opacity=".9"/><stop offset=".5" stop-color="#cfe39a" stop-opacity=".25"/><stop offset="1" stop-color="#9fd07a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="sunG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff8d6"/><stop offset=".35" stop-color="#ffd27a" stop-opacity=".95"/><stop offset="1" stop-color="#ff9d4d" stop-opacity="0"/></radialGradient>
+    <linearGradient id="dirt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3340"/><stop offset="1" stop-color="#15121a"/></linearGradient>
+    <radialGradient id="winGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe59a" stop-opacity=".7"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>
+    <radialGradient id="vigG" cx=".5" cy=".5" r=".75"><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".7"/></radialGradient>
+    <filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="fogb" filterUnits="userSpaceOnUse" x="-400" y="-400" width="1400" height="1800"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <g id="cam">
+    <rect x="-200" y="-200" width="940" height="1400" fill="url(#night)"/>
+    <rect id="dawnR" x="-200" y="-200" width="940" height="1400" fill="url(#dawn)" opacity="0"/>
+    <g id="stars"></g>
+    <circle id="moon" cx="400" cy="230" r="120" fill="url(#moonG)"/>
+    <circle id="sun" cx="400" cy="560" r="200" fill="url(#sunG)" opacity="0"/>
+    <g id="far"></g>
+    <g id="fog1" opacity=".5"></g>
+    <path id="groundP" d="M-200 720 Q120 700 300 714 Q450 724 740 706 L740 1200 L-200 1200Z" fill="url(#dirt)"/>
+    <g id="props"></g>
+    <g id="guy"></g>
+    <g id="fog2" opacity=".45"></g>
+    <g id="birds" opacity="0"></g>
+  </g>
+  <rect id="vig" width="540" height="960" fill="url(#vigG)"/>
+</svg>
+<div id="note"><div class="h"><div class="ic">✈</div>Telegram · сейчас</div><div class="who">Заказчик</div><div class="txt">А можно подешевле? 🙏<br>И плитку другую</div></div>
+<div id="dim" style="position:absolute;inset:0;background:rgba(5,10,20,.6);opacity:0"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="capA" class="cap" style="top:64px"></div>
+<div id="capB" class="cap" style="bottom:40px"></div>
+<div id="end"><div class="logo">СМЕТА PRO</div><div class="l2">Правки заказчика —<br><span style="color:#FFD43B">смета пересчитается сама</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">3 сметы в месяц — бесплатно</div></div>
+<div id="fade"></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const E = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const eBack = (x) => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const mix = (c1, c2, k) => { const a = c1.match(/\w\w/g).map((h) => parseInt(h, 16)), b = c2.match(/\w\w/g).map((h) => parseInt(h, 16)); return '#' + a.map((v, i) => Math.round(lerp(v, b[i], k)).toString(16).padStart(2, '0')).join(''); };
+const st = { stroke: '#1a1420', 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+
+// ---------------- таймлайн ----------------
+const T = { s1: [0, 6.4], note: 2.4, pere: 4.4, phone: [6.4, 12.6], win: [12.6, 16.6], end: [16.6, 20] };
+window.DUR = 20;
+
+// ---------------- ночная стройка ----------------
+(function buildSite() {
+  for (let i = 0; i < 60; i++) E('circle', { cx: R(i) * 560 - 10, cy: R(i * 3) * 520 - 40, r: .8 + R(i * 7) * 1.8, fill: '#fff', class: 'star', 'data-i': i }, $('stars'));
+  const far = $('far');
+  for (let i = 0; i < 12; i++) { const w = 34 + R(i) * 40, h = 60 + R(i + 9) * 150; E('rect', { x: i * 50 - 20, y: 700 - h, width: w, height: h, fill: '#141a33', class: 'bld' }, far); }
+  const c = '#0f1428';
+  const cr = E('g', { transform: 'translate(430,700) scale(.8)', class: 'bld2' }, far);
+  E('path', { d: 'M0 0 L0 -420 M16 0 L16 -420', stroke: c, 'stroke-width': 6 }, cr);
+  for (let k = 0; k < 14; k++) E('path', { d: `M0 ${-k * 30} L16 ${-k * 30 - 30}`, stroke: c, 'stroke-width': 3 }, cr);
+  E('path', { d: 'M-260 -420 L120 -420 M-260 -406 L120 -406', stroke: c, 'stroke-width': 7 }, cr);
+  E('path', { d: 'M-200 -406 L-200 -300', stroke: c, 'stroke-width': 2 }, cr);
+  // бытовка
+  const p = $('props');
+  E('ellipse', { cx: 120, cy: 726, rx: 150, ry: 14, fill: 'rgba(0,0,0,.4)' }, p);
+  E('rect', { x: -10, y: 560, width: 250, height: 160, rx: 6, fill: '#3d5a7a', ...st }, p);
+  for (let i = 0; i < 12; i++) E('path', { d: `M${4 + i * 20} 566 L${4 + i * 20} 716`, stroke: '#30496a', 'stroke-width': 3 }, p);
+  E('rect', { x: -14, y: 552, width: 258, height: 14, rx: 4, fill: '#2b4260', ...st }, p);
+  E('circle', { cx: 80, cy: 625, r: 90, fill: 'url(#winGlow)', class: 'wglow' }, p);
+  E('rect', { x: 40, y: 594, width: 80, height: 58, rx: 4, fill: '#ffd36b', ...st, class: 'wlit' }, p);
+  E('path', { d: 'M80 594 L80 652 M40 623 L120 623', stroke: '#1a1420', 'stroke-width': 3 }, p);
+  E('rect', { x: 160, y: 600, width: 54, height: 120, rx: 3, fill: '#2b4260', ...st }, p);
+  E('circle', { cx: 204, cy: 662, r: 4, fill: '#c9d3de' }, p);
+  E('text', { x: 186, y: 590, 'text-anchor': 'middle', 'font-family': 'PTN', 'font-size': 16, fill: '#c9d3de' }, p).textContent = 'ПРОРАБ';
+  // ограждение
+  for (let i = 0; i < 6; i++) { const x = 330 + i * 40; E('path', { d: `M${x} 718 L${x} 650`, stroke: '#b0b8c4', 'stroke-width': 3 }, p); }
+  E('rect', { x: 326, y: 650, width: 214, height: 40, fill: 'none', stroke: '#b0b8c4', 'stroke-width': 2, opacity: .6 }, p);
+  for (let i = 0; i < 10; i++) E('path', { d: `M${326 + i * 22} 650 L${348 + i * 22} 690 M${348 + i * 22} 650 L${326 + i * 22} 690`, stroke: '#b0b8c4', 'stroke-width': 1, opacity: .4 }, p);
+  // скомканные листы
+  for (let i = 0; i < 9; i++) { const x = 30 + R(i * 4) * 480, y = 770 + R(i * 6) * 150, r = 12 + R(i) * 10; const g = E('g', { transform: `translate(${x},${y})`, class: 'ball' }, p);
+    E('path', { d: `M${-r} 0 L${-r * .6} ${-r * .8} L${r * .2} ${-r} L${r} ${-r * .3} L${r * .8} ${r * .6} L0 ${r * .8} L${-r * .8} ${r * .5}Z`, fill: '#e9e4d4', ...st, 'stroke-width': 2 }, g);
+    E('path', { d: `M${-r * .5} ${-r * .3} L${r * .3} ${r * .2} M${-r * .2} ${r * .4} L${r * .5} ${-r * .4}`, stroke: '#a39c88', 'stroke-width': 1.5 }, g); }
+  for (const id of ['fog1', 'fog2']) for (let i = 0; i < 7; i++) E('ellipse', { cx: R(i * 11 + id.length) * 600, cy: (id === 'fog1' ? 700 : 880) + R(i * 13) * 60, rx: 160 + R(i) * 120, ry: 34 + R(i * 3) * 24, fill: '#a8d8b0', opacity: .3, filter: 'url(#fogb)', class: 'fog', 'data-i': i }, $(id));
+  for (let i = 0; i < 4; i++) E('path', { d: 'M-12 0 Q-6 -8 0 0 Q6 -8 12 0', fill: 'none', stroke: '#2a2030', 'stroke-width': 3, class: 'bird', 'data-i': i }, $('birds'));
+})();
+
+// ---------------- прораб (зомби → человек) ----------------
+const G = {};
+(function buildGuy() {
+  const g = $('guy');
+  E('ellipse', { cx: 0, cy: 4, rx: 110, ry: 16, fill: 'rgba(0,0,0,.4)', filter: 'url(#blur2)' }, g);
+  G.body = E('g', {}, g);
+  const b = G.body;
+  // ноги
+  G.legs = [-1, 1].map((s) => { const l = E('g', {}, b); E('path', { d: `M${s * 26} -150 L${s * 30} -16`, stroke: '#1a1420', 'stroke-width': 40, 'stroke-linecap': 'round' }, l); E('path', { d: `M${s * 26} -150 L${s * 30} -16`, stroke: '#3a4a6a', 'stroke-width': 33, 'stroke-linecap': 'round' }, l); E('path', { d: `M${s * 30 - 26} -2 Q${s * 30 - 20} -30 ${s * 30 + 6} -28 Q${s * 30 + 32} -26 ${s * 30 + 34} -2Z`, fill: '#5a3a24', ...st }, l); return l; });
+  // туловище
+  G.shirt = E('path', { d: 'M-70 -300 Q-78 -200 -60 -140 L60 -140 Q78 -200 70 -300 Q0 -330 -70 -300Z', fill: '#8b93a3', ...st }, b);
+  E('path', { d: 'M-66 -296 Q-72 -210 -56 -144 L-18 -144 L-22 -312Z M66 -296 Q72 -210 56 -144 L18 -144 L22 -312Z', fill: '#ff7a1a', ...st }, b);
+  E('path', { d: 'M-66 -200 L-20 -200 M20 -200 L66 -200 M-62 -176 L-20 -176 M20 -176 L62 -176', stroke: '#e8f0ff', 'stroke-width': 7 }, b);
+  E('path', { d: 'M-60 -146 L60 -146 L58 -136 L-58 -136Z', fill: '#2b2b33' }, b);
+  // руки
+  G.arms = [-1, 1].map((s) => ({ s, o: E('path', { d: '', fill: 'none', stroke: '#1a1420', 'stroke-width': 30, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, b), i: E('path', { d: '', fill: 'none', stroke: '#8b93a3', 'stroke-width': 23, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, b), h: E('circle', { r: 17, ...st }, b) }));
+  // чековая лента калькулятора
+  G.tape = E('path', { d: '', fill: '#f4f1e6', ...st, 'stroke-width': 2 }, b);
+  G.tapeNums = E('g', {}, b);
+  // телефон в руке на победе
+  G.ph = E('g', { opacity: 0 }, b);
+  E('rect', { x: -18, y: -34, width: 36, height: 64, rx: 7, fill: '#0b0f16', ...st, 'stroke-width': 2.5 }, G.ph);
+  E('rect', { x: -14, y: -29, width: 28, height: 52, rx: 3, fill: '#3a8ff0' }, G.ph);
+  E('text', { x: 0, y: 2, 'text-anchor': 'middle', 'font-family': 'PTN', 'font-size': 9, fill: '#fff' }, G.ph).textContent = 'СМЕТА';
+  // голова
+  G.head = E('g', {}, b);
+  const h = G.head;
+  E('rect', { x: -16, y: -330, width: 32, height: 30, fill: '#000', opacity: 0 }, h);
+  G.neck = E('rect', { x: -16, y: -334, width: 32, height: 34, rx: 8, ...st }, h);
+  G.face = E('path', { d: 'M-62 -410 Q-66 -340 0 -326 Q66 -340 62 -410 Q60 -470 0 -472 Q-60 -470 -62 -410Z', ...st }, h);
+  G.ears = [-1, 1].map((s) => E('ellipse', { cx: s * 64, cy: -400, rx: 11, ry: 16, ...st }, h));
+  G.bags = [-1, 1].map((s) => E('ellipse', { cx: s * 24, cy: -392, rx: 20, ry: 9, fill: '#6b4a8a', opacity: .7 }, h));
+  G.eyeW = [-1, 1].map((s) => E('ellipse', { cx: s * 24, cy: -408, rx: s < 0 ? 17 : 12, ry: s < 0 ? 17 : 11, fill: '#f5f3e6', ...st, 'stroke-width': 2.5 }, h));
+  G.pup = [-1, 1].map((s) => E('circle', { cx: s * 24, cy: -406, r: s < 0 ? 4 : 3, fill: '#1a1420' }, h));
+  G.brows = E('path', { d: '', fill: 'none', ...st, 'stroke-width': 4 }, h);
+  E('path', { d: 'M-4 -394 Q2 -378 8 -386', fill: 'none', ...st, 'stroke-width': 2.5 }, h);
+  G.mouth = E('path', { d: '', ...st, 'stroke-width': 3 }, h);
+  G.stub = E('g', {}, h);
+  for (let i = 0; i < 16; i++) E('circle', { cx: -40 + R(i) * 80, cy: -352 + R(i * 3) * 18, r: 1.4, fill: '#2a2a2a', opacity: .5 }, G.stub);
+  // каска
+  const hat = E('g', { transform: 'rotate(-7 0 -460)' }, h); G.hat = hat;
+  E('path', { d: 'M-58 -452 Q-56 -514 0 -518 Q56 -514 58 -452Z', fill: '#ffb000', ...st }, hat);
+  E('rect', { x: -74, y: -458, width: 148, height: 14, rx: 7, fill: '#ffb000', ...st }, hat);
+  E('path', { d: 'M-8 -516 L-8 -456 M8 -516 L8 -456', stroke: '#e09a00', 'stroke-width': 6 }, hat);
+  E('path', { d: 'M-40 -494 Q-30 -508 -14 -510', stroke: '#fff', 'stroke-width': 5, 'stroke-linecap': 'round', fill: 'none', opacity: .7 }, hat);
+  E('path', { d: 'M52 -446 Q66 -440 62 -424 M56 -446 Q74 -446 72 -430', stroke: '#3a2a1a', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, h);
+})();
+
+// ---------------- подписи ----------------
+const SCREENS = [['4form', 'Поменял размеры —<br>итог пересчитан <span class="y">сам</span>', 193, 274], ['5result', '«А подешевле?»<br>Жмёшь <span class="y">Эконом</span>', 110, 442], ['6eco', 'Материалы подешевле —<br>смета <span class="y">уже пересчитана</span>', 0, 0], ['8est', 'Новый PDF —<br>заказчику', 73, 143]];
+const SYL = ['ПЕ-', 'РЕ-', 'СЧИ-', 'ТАТЬ…'];
+
+function caption(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } el.style.opacity = html ? 1 : 0; }
+
+window.render = function (t) {
+  const win = clamp((t - T.win[0]) / 1.4), cure = ease(clamp((t - T.win[0] - .2) / 1.2));
+  // камера: медленный наезд, тряска на «пересчитать»
+  let sc = lerp(1.0, 1.12, ease(t / 6.4)), cy = lerp(560, 540, ease(t / 6.4));
+  if (t >= T.win[0]) { sc = lerp(1.1, 1.0, ease(win)); cy = lerp(540, 560, ease(win)); }
+  const shake = t > T.pere && t < T.phone[0] ? Math.sin(t * 55) * 2.2 : 0;
+  $('cam').setAttribute('transform', `translate(270,${560}) scale(${sc}) translate(${-270 + shake},${-cy})`);
+  // ночь → рассвет
+  $('dawnR').setAttribute('opacity', cure);
+  $('moon').setAttribute('opacity', 1 - cure); $('moon').setAttribute('cy', 230 - cure * 80);
+  $('sun').setAttribute('opacity', cure); $('sun').setAttribute('cy', lerp(700, 470, cure));
+  document.querySelectorAll('.star').forEach((s) => s.setAttribute('opacity', (1 - cure) * (.5 + .5 * Math.sin(t * 3 + +s.dataset.i))));
+  document.querySelectorAll('.bld').forEach((s) => s.setAttribute('fill', mix('141a33', '8a5a7a', cure)));
+  $('groundP').setAttribute('opacity', 1); $('vig').setAttribute('opacity', 1 - cure * .5);
+  document.querySelectorAll('.wlit').forEach((s) => s.setAttribute('opacity', .6 + .4 * Math.sin(t * 9) * Math.sin(t * 3.1) * (1 - cure)));
+  document.querySelectorAll('.fog').forEach((f) => { const i = +f.dataset.i; const base = R(i * 11 + 7) * 700; f.setAttribute('cx', ((base - t * (14 + i * 5)) % 800 + 800) % 800 - 130); });
+  $('fog1').setAttribute('opacity', .5 * (1 - cure * .7)); $('fog2').setAttribute('opacity', .45 * (1 - cure));
+  $('birds').setAttribute('opacity', cure);
+  document.querySelectorAll('.bird').forEach((bd) => { const i = +bd.dataset.i; bd.setAttribute('transform', `translate(${(t - T.win[0]) * (40 + i * 8) + 60 + i * 50},${260 + i * 26 + Math.sin(t * 3 + i) * 8}) scale(${1 + Math.sin(t * 14 + i) * .25},1)`); });
+  // прораб
+  const z = 1 - cure; // 1 — зомби, 0 — человек
+  const step = Math.sin(t * 2.6);
+  $('guy').setAttribute('transform', `translate(${lerp(280, 300, ease(t / 6.4))},760) scale(.98)`);
+  G.body.setAttribute('transform', `rotate(${(step * 5 + 4) * z} 0 -20) translate(0,${Math.abs(step) * -6 * z + Math.sin(t * 2) * 2 * (1 - z)})`);
+  G.legs.forEach((l, i) => l.setAttribute('transform', `rotate(${(i ? step : -step) * 6 * z} ${i ? 26 : -26} -150)`));
+  const skin = mix('9cc48a', 'f2c29b', cure), skinD = mix('7da36c', 'e0a982', cure);
+  [G.face, G.neck, ...G.ears].forEach((e) => e.setAttribute('fill', skin));
+  G.arms.forEach(({ s, o, i, h }) => {
+    const sw = Math.sin(t * 2.6 + s) * 8 * z;
+    const zx = s * 104, zy = -286 + sw;              // руки вперёд (зомби)
+    const hx = s < 0 ? -84 : 60, hy = s < 0 ? -150 : -300; // человек: левая вниз, правая с телефоном
+    const ex = lerp(zx, hx, cure), ey = lerp(zy, hy, cure);
+    const mx = lerp(s * 104, s < 0 ? -96 : 98, cure), my = lerp(-296, s < 0 ? -220 : -230, cure);
+    const d = `M${s * 62} -292 Q${mx} ${my} ${ex} ${ey}`;
+    o.setAttribute('d', d); i.setAttribute('d', d); i.setAttribute('stroke', mix('8b93a3', '8b93a3', 0));
+    h.setAttribute('cx', ex); h.setAttribute('cy', ey); h.setAttribute('fill', skin);
+    if (s > 0) G.ph.setAttribute('transform', `translate(${ex - 4},${ey - 34}) rotate(-8)`);
+    if (s < 0) G.tapeEnd = [ex, ey];
+  });
+  G.ph.setAttribute('opacity', clamp((cure - .5) * 3));
+  // лента от левой руки до земли
+  const [tx, ty] = G.tapeEnd; const wv = Math.sin(t * 3) * 10;
+  G.tape.setAttribute('d', `M${tx - 6} ${ty + 10} Q${tx - 50 + wv} ${ty + 120} ${tx - 10} ${ty + 210} Q${tx + 40 - wv} ${ty + 280} ${tx + 90} -2 L${tx + 118} -2 Q${tx + 66 - wv} ${ty + 280} ${tx + 16} ${ty + 210} Q${tx - 24 + wv} ${ty + 120} ${tx + 14} ${ty + 10}Z`);
+  G.tape.setAttribute('opacity', z); G.tapeNums.setAttribute('opacity', 0);
+  // лицо
+  G.bags.forEach((b) => b.setAttribute('opacity', .7 * z));
+  G.eyeW.forEach((e, i) => { const big = i === 0; const blink = ((t + .3) % 3.3) < .1; e.setAttribute('rx', lerp(big ? 17 : 11, 12, cure)); e.setAttribute('ry', blink ? 1 : lerp(big ? 17 : 9, 13, cure)); });
+  G.pup.forEach((p, i) => { p.setAttribute('cx', (i ? 24 : -24) + lerp(Math.sin(t * 1.7 + i * 2) * 5, 0, cure)); p.setAttribute('cy', lerp(-404 + i * 3, -406, cure)); p.setAttribute('r', lerp(i ? 2.5 : 4, 5, cure)); });
+  G.brows.setAttribute('d', z > .5 ? 'M-42 -432 L-8 -426 M10 -424 L40 -436' : 'M-40 -432 Q-24 -440 -8 -432 M8 -432 Q24 -440 40 -432');
+  const groan = t > T.pere && t < T.phone[0] ? .6 + .4 * Math.abs(Math.sin(t * 8)) : .5;
+  G.mouth.setAttribute('d', z > .5 ? `M-22 -362 Q0 ${-362 + 10 * groan} 22 -364 Q0 ${-362 + 22 * groan} -22 -362Z` : 'M-24 -364 Q0 -340 24 -364 Q0 -352 -24 -364Z');
+  G.mouth.setAttribute('fill', z > .5 ? '#3a1a22' : '#fff');
+  G.stub.setAttribute('opacity', z);
+  G.head.setAttribute('transform', `rotate(${(Math.sin(t * 1.3) * 8 + 6) * z + Math.sin(t * 2) * 2 * (1 - z)} 0 -330)`);
+  // уведомление
+  const nIn = clamp((t - T.note) / .35), nOut = clamp((T.pere + .2 - t) / .3);
+  const note = $('note'); note.style.opacity = t < T.pere + .2 ? Math.min(nIn, nOut) : 0;
+  note.style.transform = `translateY(${lerp(-60, 0, eBack(nIn))}px) rotate(${t > T.note + .4 && t < T.note + .9 ? Math.sin(t * 60) * 1.5 : 0}deg)`;
+  // --- телефон с приложением ---
+  const phone = $('phone');
+  const pIn = clamp((t - T.phone[0]) / .45), pOut = clamp((T.phone[1] - t) / .35);
+  phone.style.opacity = t >= T.phone[0] - .01 && t < T.phone[1] ? Math.min(pIn, pOut) : 0;
+  $('dim').style.opacity = phone.style.opacity;
+  phone.style.transform = `scale(${lerp(.6, 1, eOut(pIn))}) rotate(${lerp(-8, 0, eOut(pIn))}deg)`;
+  const cA = $('capA'), cB = $('capB');
+  if (t >= T.phone[0] && t < T.phone[1]) {
+    const span = (T.phone[1] - T.phone[0]) / SCREENS.length, u = (t - T.phone[0]) / span, i = Math.min(SCREENS.length - 1, Math.floor(u)), f = u - i;
+    const [cur, cap, tx, ty] = SCREENS[i], nxt = SCREENS[Math.min(SCREENS.length - 1, i + 1)][0];
+    const A = $('imA'), B = $('imB');
+    if (A._s !== cur) { A.src = `../sc/${cur}.png`; A._s = cur; }
+    if (B._s !== nxt) { B.src = `../sc/${nxt}.png`; B._s = nxt; }
+    const sw = i < SCREENS.length - 1 ? ease((f - .78) / .22) : 0;
+    A.style.transform = `translateX(${-sw * 100}%)`; B.style.transform = `translateX(${(1 - sw) * 100}%)`;
+    const tap = $('tap'); const tk = (f - .5) / .2;
+    tap.style.opacity = tx && tk > 0 && tk < 1 ? Math.sin(tk * Math.PI) : 0; tap.style.left = tx + 'px'; tap.style.top = ty + 'px'; tap.style.transform = `scale(${.7 + tk * .5})`;
+    caption(cA, cap); caption(cB, ''); cA.style.transform = 'none';
+  } else if (t < T.phone[0]) {
+    let top = t < T.note ? 'POV: третью ночь<br>пересчитываешь смету 🧟' : t < T.pere ? '23:47. Только сел…' : t > 5.6 ? 'Стоп. Есть способ 📱' : '';
+    caption(cA, top); cA.style.transform = `scale(${.85 + .15 * eOut(clamp((t - (t < T.note ? 0 : t < T.pere ? T.note : 5.6)) / .2))})`;
+    if (t >= T.pere) {
+      const n = Math.min(SYL.length, Math.floor((t - T.pere) / .4) + 1);
+      cB.className = 'cap big';
+      caption(cB, SYL.slice(0, n).map((s, k) => `<span class="g" style="transform:translateY(${Math.sin(t * 9 + k) * 4}px) rotate(${Math.sin(t * 7 + k * 2) * 5}deg)">${s}</span>`).join(''));
+      cB.style.transform = `scale(${lerp(1.25, 1, eOut(((t - T.pere) % .4) / .25))})`;
+    } else { caption(cB, ''); }
+  } else {
+    caption(cA, 'Правки заказчика —<br>смета <span class="y">пересчитается сама</span>'); cA.style.transform = `scale(${.85 + .15 * eOut(clamp((t - T.win[0]) / .2))})`;
+    cB.className = 'cap big';
+    caption(cB, t > 14.0 ? 'Прораб снова<br><span class="y">человек</span> ☀️' : '');
+    cB.style.transform = `scale(${.8 + .2 * eOut(clamp((t - 14) / .3))})`;
+  }
+  // --- финал ---
+  const en = clamp((t - T.end[0]) / .4);
+  $('end').style.opacity = en; $('end').style.transform = `scale(${.92 + .08 * eOut(en)})`;
+  if (en > 0) { caption(cA, ''); caption(cB, ''); }
+  $('fade').style.opacity = clamp(1 - Math.abs(t - T.win[0]) / .2) * .8;
+};
+window.READY = Promise.all([document.fonts.ready, ...SCREENS.map(([n]) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `../sc/${n}.png`; }))]).then(() => { window.render(0); window.OK = true; });
+</script></body></html>
