@@ -240,6 +240,13 @@ export function attachInstagram(bot: Bot) {
     if (!isAdmin(ctx.from?.id)) return ctx.reply(`Эта команда только для владельца. Ваш Telegram ID: ${ctx.from?.id}`);
     if (!env.IG_APP_ID || !env.IG_APP_SECRET) return ctx.reply('Сначала добавьте в Railway переменные IG_APP_ID и IG_APP_SECRET (ID и секрет приложения Instagram из панели Meta).');
     const on = await igEnabled();
+    // состояние очереди роликов
+    const rows = await prisma.appKV.findMany({ where: { key: { startsWith: 'ig:item:' } } });
+    const st = new Map(rows.map((r) => [r.key.slice(8), r.value]));
+    const fmt = (v?: string) => !v ? 'новый' : v.startsWith('scheduled:') ? `выйдет ${slotText(Number(v.split(':')[1]))}` : ({ offered: 'ждёт кнопки «Опубликовать»', publishing: 'публикуется', published: '✅ опубликован', skipped: 'пропущен' } as any)[v] || v;
+    const q = queue().slice(-8).map((it) => `• ${it.title || it.id} — ${fmt(st.get(it.id))}`).join('\n');
+    const blocked = await kvGet('ig:blocked');
+    if (q) await ctx.reply(`🎬 Очередь роликов:\n${q}${blocked ? `\n\n⚠️ Instagram отвечает: «${blocked}». Публикация остановлена — проверьте приложение в панели Meta и войдите заново кнопкой ниже.` : ''}`);
     await ctx.reply(`${on ? '✅ Instagram подключён' + ((await kvGet('ig:username')) ? ` (@${await kvGet('ig:username')})` : '') + '. Переподключить:' : '📸 Подключите Instagram — нажмите кнопку, войдите в аккаунт и разрешите доступ:'}`,
       { reply_markup: await panelKb(ctx.from!.id) });
   };
@@ -287,7 +294,14 @@ export function startInstagram(bot: Bot, log: { error: (o: any, m?: string) => v
       if (await igEnabled()) {
         await publishDue(bot, log).catch((e) => log.error({ err: e }, 'ig due'));
         await refreshToken(log).catch((e) => log.error({ err: e }, 'ig token'));
-        await checkComments(bot, log).catch((e) => log.error({ err: e }, 'ig comments'));
+        await checkComments(bot, log).then(() => prisma.appKV.deleteMany({ where: { key: 'ig:blocked' } })).catch(async (e) => {
+          log.error({ err: e }, 'ig comments');
+          if (/blocked|expired|session|OAuth|permission/i.test(String(e?.message))) {
+            await kvSet('ig:blocked', String(e.message).slice(0, 200));
+            if (await kvClaim(`ig:blockedNote:${new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10)}`, '1'))
+              await notifyAll(bot, `⚠️ Instagram закрыл доступ приложению: «${e.message}». Ролики не публикуются. Откройте панель Meta (developers.facebook.com → ваше приложение) — там будет красное уведомление «Требуется действие», и войдите заново: напишите боту «инст» → «Войти через Instagram».`);
+          }
+        });
         await weeklyReport(bot).catch((e) => log.error({ err: e }, 'ig report'));
       }
     } finally { running = false; }
