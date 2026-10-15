@@ -26,6 +26,14 @@ export function createBot() {
     // Регистрируем сразу: так запоминаем, кто пригласил (ссылка t.me/бот?start=ref_…)
     const payload = String(ctx.match || '');
     // заявка с лендинга «ИИ для строительной фирмы»: t.me/бот?start=biz
+    // заявка с сайта «Газ в дом»: t.me/бот?start=gas
+    if (payload === 'gas') {
+      const f = ctx.from!;
+      const who = `${f.first_name || ''} ${f.last_name || ''}`.trim() + (f.username ? ` (@${f.username})` : '') + ` · id ${f.id}`;
+      for (const id of reportTo()) await ctx.api.sendMessage(Number(id), `🔥 <b>Заявка с сайта «Газ в дом»</b>\n${esc(who)}\n\nНапишите ему: <a href="tg://user?id=${f.id}">открыть чат</a>`, { parse_mode: 'HTML' }).catch(() => {});
+      await prisma.appKV.upsert({ where: { key: `biz:${f.id}` }, create: { key: `biz:${f.id}`, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
+      return ctx.reply('Здравствуйте! 🔥 Заявка на газ принята — свяжемся с вами в ближайшее время (с 9 до 21).\n\nЧтобы сразу назвать цену, ответьте одним сообщением:\n1) Населённый пункт или СНТ\n2) Площадь дома\n3) Газ уже подведён к границе участка или нужен газгольдер?\n4) Телефон для связи');
+    }
     if (payload === 'biz' || payload.startsWith('biz_')) {
       const f = ctx.from!;
       const who = `${f.first_name || ''} ${f.last_name || ''}`.trim() + (f.username ? ` (@${f.username})` : '') + ` · id ${f.id}`;
