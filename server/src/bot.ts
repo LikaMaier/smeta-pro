@@ -25,6 +25,14 @@ export function createBot() {
   bot.command('start', async (ctx) => {
     // Регистрируем сразу: так запоминаем, кто пригласил (ссылка t.me/бот?start=ref_…)
     const payload = String(ctx.match || '');
+    // заявка с лендинга «ИИ для строительной фирмы»: t.me/бот?start=biz
+    if (payload === 'biz' || payload.startsWith('biz_')) {
+      const f = ctx.from!;
+      const who = `${f.first_name || ''} ${f.last_name || ''}`.trim() + (f.username ? ` (@${f.username})` : '') + ` · id ${f.id}`;
+      for (const id of reportTo()) await ctx.api.sendMessage(Number(id), `🏗 <b>Заявка: ИИ для строительной фирмы</b>\n${esc(who)}${payload.length > 4 ? `\nПакет: ${esc(payload.slice(4))}` : ''}\n\nНапишите ему первой: <a href="tg://user?id=${f.id}">открыть чат</a>`, { parse_mode: 'HTML' }).catch(() => {});
+      await prisma.appKV.upsert({ where: { key: `biz:${f.id}` }, create: { key: `biz:${f.id}`, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
+      return ctx.reply('Здравствуйте! 👷 Заявка принята — свяжемся с вами в ближайшее время (обычно в течение пары часов, с 9 до 21).\n\nЧтобы подготовиться к разговору, ответьте одним сообщением:\n1) Как называется фирма и чем занимаетесь?\n2) Откуда сейчас приходят заказы?\n3) Что больше всего отнимает времени — заявки, сметы, КП, соцсети?');
+    }
     const u = ctx.from ? await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username, payload).catch((e) => { console.error('upsertUser', e); return null; }) : null;
     // ссылка блогера: t.me/бот?start=p_<КОД>
     if (u && payload.startsWith('p_') && u.promoCode) {
@@ -66,6 +74,17 @@ export function createBot() {
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
   attachInstagram(bot); // кнопки «Опубликовать» и ответы на комментарии — раньше ИИ-обработчика текста
   attachThreads(bot);
+  // ответы лидов с лендинга (сутки после /start biz) — пересылаем владелице, а не ИИ-сметчику
+  bot.on('message', async (ctx, next) => {
+    if (!ctx.from || reportTo().includes(String(ctx.from.id)) || ctx.message.text?.startsWith('/')) return next();
+    const kv = await prisma.appKV.findUnique({ where: { key: `biz:${ctx.from.id}` } }).catch(() => null);
+    if (!kv || Date.now() - Number(kv.value) > 864e5) return next();
+    for (const id of reportTo()) await ctx.forwardMessage(Number(id)).catch(() => {});
+    if (!(await prisma.appKV.findUnique({ where: { key: `biz-ack:${ctx.from.id}` } }).catch(() => null))) {
+      await prisma.appKV.create({ data: { key: `biz-ack:${ctx.from.id}`, value: '1' } }).catch(() => {});
+      await ctx.reply('Спасибо! Передала — скоро напишем вам здесь, в Telegram.');
+    }
+  });
 
   // Голос и текст для ИИ-сметчика: учитываем переключатель и подписку
   bot.on(['message:voice', 'message:text'], async (ctx, next) => {
