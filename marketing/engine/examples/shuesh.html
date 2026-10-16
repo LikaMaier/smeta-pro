@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<!-- Ролик «Да ты шуешь?»: енот-заказчик не верит, что смета будет за 2 минуты. Свои персонажи (медведь-прораб, енот-заказчик), мем — только фраза и «нейроглитч». -->
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.cap { position: absolute; left: 22px; right: 22px; text-align: center; font-family: 'PT', 'Noto Color Emoji', sans-serif; font-weight: 700; color: #fff;
+  font-size: 34px; line-height: 1.16; -webkit-text-stroke: 7px #000; paint-order: stroke fill; letter-spacing: .2px; }
+.cap.big { font-size: 64px; line-height: 1.0; }
+.cap .y { color: #FFD43B; }
+#phone { position: absolute; left: 50%; top: 50%; width: 330px; height: 714px; margin: -320px 0 0 -165px; border-radius: 46px; background: #0b0f16;
+  box-shadow: 0 40px 90px rgba(0,0,0,.6), inset 0 0 0 3px #2c3442; padding: 12px; opacity: 0; }
+#phone .scr { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #0D2440; }
+#phone img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#tap { position: absolute; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.85); opacity: 0; }
+#timer { position: absolute; left: 50%; transform: translateX(-50%); bottom: 24px; font-family: 'PTN'; font-size: 34px; color: #0a1a30; background: #FFD43B; padding: 4px 14px; border-radius: 14px; box-shadow: 0 5px 0 #b38b00; opacity: 0; }
+#notif { position: absolute; left: 30px; right: 30px; top: 250px; background: rgba(250,250,252,.97); border-radius: 22px; padding: 14px 18px; display: flex; gap: 14px; align-items: center;
+  font-family: 'PT', 'Noto Color Emoji'; color: #111; box-shadow: 0 16px 40px rgba(0,0,0,.45); opacity: 0; }
+#notif .ic { width: 58px; height: 58px; border-radius: 14px; background: #2AABEE; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+#notif .t1 { font-size: 19px; color: #555; } #notif .t2 { font-size: 24px; }
+#end { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 0; color: #fff; text-align: center; font-family: 'PT'; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 30px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 10px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#fade { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #000; }
+#scan { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, transparent 2px 5px); }
+</style></head><body><div id="stage">
+<svg id="sv" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b3550"/><stop offset=".55" stop-color="#7c6a74"/><stop offset="1" stop-color="#c79a74"/></linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8e8d93"/><stop offset="1" stop-color="#3f3e46"/></linearGradient>
+    <radialGradient id="lamp" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff2c4" stop-opacity=".9"/><stop offset=".4" stop-color="#ffcf7a" stop-opacity=".35"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>
+    <radialGradient id="furG" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#b3b5bf"/><stop offset="1" stop-color="#777a86"/></radialGradient>
+    <radialGradient id="bearG" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#b9794a"/><stop offset="1" stop-color="#7a4a26"/></radialGradient>
+    <linearGradient id="helm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd25a"/><stop offset="1" stop-color="#f29a00"/></linearGradient>
+    <radialGradient id="vigG" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
+    <filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="onlyR"><feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .8 0"/></filter>
+    <filter id="onlyC"><feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .8 0"/></filter>
+    <clipPath id="sl0"><rect id="slr0" x="-400" y="0" width="1400" height="40"/></clipPath>
+    <clipPath id="sl1"><rect id="slr1" x="-400" y="0" width="1400" height="30"/></clipPath>
+    <clipPath id="sl2"><rect id="slr2" x="-400" y="0" width="1400" height="22"/></clipPath>
+  </defs>
+  <g id="cam">
+    <rect x="-300" y="-300" width="1140" height="1400" fill="url(#wall)"/>
+    <g id="wallD"></g>
+    <path d="M-300 700 L840 700 L840 1300 L-300 1300Z" fill="url(#floor)"/>
+    <path d="M-300 700 L840 700 L840 712 L-300 712Z" fill="#b8b2ad"/>
+    <g id="props"></g>
+    <circle id="lampGlow" cx="270" cy="150" r="300" fill="url(#lamp)"/>
+    <g id="bulb"></g>
+    <g id="bear"></g>
+    <g id="enWrap">
+      <g id="glR" filter="url(#onlyR)" opacity="0"><use href="#enot"/></g>
+      <g id="glC" filter="url(#onlyC)" opacity="0"><use href="#enot"/></g>
+      <g id="enot"></g>
+      <g id="slices" opacity="0">
+        <g clip-path="url(#sl0)"><use id="su0" href="#enot"/></g>
+        <g clip-path="url(#sl1)"><use id="su1" href="#enot"/></g>
+        <g clip-path="url(#sl2)"><use id="su2" href="#enot"/></g>
+      </g>
+    </g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+</svg>
+<div id="scan"></div>
+<div id="dim" style="position:absolute;inset:0;background:rgba(5,10,20,.62);opacity:0"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="timer">0:00</div>
+<div id="notif"><div class="ic">📄</div><div><div class="t1">СМЕТА PRO · сейчас</div><div class="t2">Смета «Плитка, санузел».pdf</div></div></div>
+<div id="capA" class="cap" style="top:64px"></div>
+<div id="capB" class="cap" style="bottom:110px"></div>
+<div id="end"><div class="logo">СМЕТА PRO</div><div class="l2">Смета с работами и материалами —<br><span style="color:#FFD43B">за 2 минуты прямо в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">3 сметы в месяц — бесплатно</div></div>
+<div id="fade"></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const E = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const st = { stroke: '#22181a', 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+
+// ---------------- таймлайн ----------------
+const T = { s1: [0, 6.6], phone: [6.6, 15.0], win: [15.0, 19.6], end: [19.6, 22.6] };
+window.DUR = 22.6;
+const G1 = [3.9, 6.6], G2 = [16.6, 19.6]; // глитч «шуешь»
+
+// ---------------- фон: санузел в ремонте ----------------
+(function buildRoom() {
+  const w = $('wallD');
+  // недоделанная плитка на стене
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 9; c++) { if (r * 9 + c > 31 + (c % 3)) continue; const x = -40 + c * 70, y = 700 - (r + 1) * 52;
+    E('rect', { x: x + 2, y: y + 2, width: 66, height: 48, rx: 3, fill: (r + c) % 2 ? '#d5e3e8' : '#c9dade', opacity: .9 }, w); }
+  // голый бетон выше, трещины, розетка
+  E('path', { d: 'M60 300 l20 30 l-10 20 l26 34', stroke: '#4b4250', 'stroke-width': 2, fill: 'none' }, w);
+  E('rect', { x: 440, y: 330, width: 34, height: 34, rx: 5, fill: '#e8e3dc', ...st, 'stroke-width': 2 }, w);
+  E('path', { d: 'M450 347 h3 M461 347 h3', stroke: '#22181a', 'stroke-width': 3 }, w);
+  // провод с лампочкой
+  E('path', { d: 'M270 -40 L270 120', stroke: '#1a1416', 'stroke-width': 3 }, $('bulb'));
+  E('rect', { x: 262, y: 116, width: 16, height: 16, fill: '#3a3236' }, $('bulb'));
+  E('circle', { cx: 270, cy: 146, r: 18, fill: '#fff6d8' }, $('bulb'));
+  const p = $('props');
+  // стопка плитки, ведро, мешок
+  for (let i = 0; i < 6; i++) E('rect', { x: 400, y: 760 - i * 9, width: 110, height: 9, fill: i % 2 ? '#e3eef1' : '#cddfe4', ...st, 'stroke-width': 1.5 }, p);
+  E('path', { d: 'M-60 770 L-46 840 L18 840 L32 770Z', fill: '#e9e4dc', ...st }, p); E('ellipse', { cx: -14, cy: 770, rx: 46, ry: 10, fill: '#9a948c', ...st }, p);
+  E('path', { d: 'M-56 770 Q-14 720 28 770', fill: 'none', stroke: '#22181a', 'stroke-width': 3 }, p);
+  E('path', { d: 'M250 760 Q248 712 276 708 L326 708 Q348 712 344 760Z', fill: '#c8b48c', ...st }, p);
+  E('text', { x: 297, y: 744, 'font-family': 'PTN', 'font-size': 20, fill: '#5b4a2f', 'text-anchor': 'middle' }, p).textContent = 'КЛЕЙ';
+})();
+
+// ---------------- медведь-прораб ----------------
+const B = {};
+(function buildBear() {
+  const g = $('bear'); g.setAttribute('transform', 'translate(130,870) scale(1.25)');
+  E('ellipse', { cx: 0, cy: 4, rx: 100, ry: 16, fill: 'rgba(0,0,0,.3)', filter: 'url(#blur2)' }, g);
+  E('ellipse', { cx: -36, cy: -10, rx: 30, ry: 16, fill: '#6a3f20', ...st }, g); E('ellipse', { cx: 36, cy: -10, rx: 30, ry: 16, fill: '#6a3f20', ...st }, g);
+  E('ellipse', { cx: 0, cy: -110, rx: 80, ry: 100, fill: 'url(#bearG)', ...st }, g);
+  // жилет
+  E('path', { d: 'M-70 -160 Q-78 -60 -56 -30 L56 -30 Q78 -60 70 -160 Q40 -190 0 -190 Q-40 -190 -70 -160Z', fill: '#ff7a1a', ...st }, g);
+  E('path', { d: 'M-74 -110 L74 -110 M-72 -80 L72 -80', stroke: '#e9f4f4', 'stroke-width': 9 }, g);
+  E('path', { d: 'M0 -190 L0 -30', stroke: '#22181a', 'stroke-width': 2.5 }, g);
+  // рука с кружкой
+  B.arm = E('g', {}, g);
+  E('path', { d: 'M60 -150 Q110 -120 96 -84', fill: 'none', stroke: '#7a4a26', 'stroke-width': 30, 'stroke-linecap': 'round' }, B.arm);
+  E('rect', { x: 78, y: -112, width: 38, height: 44, rx: 6, fill: '#e94f4f', ...st }, B.arm);
+  E('path', { d: 'M116 -102 q16 0 16 12 q0 12 -16 12', fill: 'none', stroke: '#22181a', 'stroke-width': 4 }, B.arm);
+  B.steam = E('path', { d: '', fill: 'none', stroke: 'rgba(255,255,255,.6)', 'stroke-width': 4, 'stroke-linecap': 'round' }, B.arm);
+  // вторая рука с телефоном
+  B.arm2 = E('g', {}, g);
+  E('path', { d: 'M-62 -150 Q-108 -110 -84 -84', fill: 'none', stroke: '#7a4a26', 'stroke-width': 30, 'stroke-linecap': 'round' }, B.arm2);
+  E('rect', { x: -104, y: -128, width: 34, height: 56, rx: 7, fill: '#11151c', ...st }, B.arm2);
+  B.ph = E('rect', { x: -100, y: -123, width: 26, height: 44, rx: 4, fill: '#2a74c9' }, B.arm2);
+  // голова
+  B.head = E('g', {}, g);
+  const h = B.head;
+  E('circle', { cx: -50, cy: -262, r: 22, fill: '#8a5530', ...st }, h); E('circle', { cx: 50, cy: -262, r: 22, fill: '#8a5530', ...st }, h);
+  E('circle', { cx: -50, cy: -262, r: 11, fill: '#d29a6a' }, h); E('circle', { cx: 50, cy: -262, r: 11, fill: '#d29a6a' }, h);
+  E('ellipse', { cx: 0, cy: -222, rx: 70, ry: 62, fill: 'url(#bearG)', ...st }, h);
+  E('ellipse', { cx: 0, cy: -198, rx: 34, ry: 26, fill: '#e2b487', ...st, 'stroke-width': 2 }, h);
+  E('ellipse', { cx: 0, cy: -212, rx: 13, ry: 9, fill: '#22181a' }, h);
+  E('path', { d: 'M-12 -190 Q0 -180 12 -190', fill: 'none', stroke: '#22181a', 'stroke-width': 3, 'stroke-linecap': 'round' }, h);
+  B.eyes = [-26, 26].map((x) => E('ellipse', { cx: x, cy: -236, rx: 7, ry: 8, fill: '#160f10' }, h));
+  B.lids = [-26, 26].map((x) => E('path', { d: `M${x - 11} -247 L${x + 11} -247 L${x + 11} -238 L${x - 11} -238Z`, fill: '#8a5530', opacity: 0 }, h));
+  // каска
+  E('path', { d: 'M-66 -250 Q-64 -318 0 -322 Q64 -318 66 -250Z', fill: 'url(#helm)', ...st }, h);
+  E('path', { d: 'M-84 -250 L84 -250 Q86 -238 72 -238 L-72 -238 Q-86 -238 -84 -250Z', fill: '#f29a00', ...st }, h);
+  E('path', { d: 'M-10 -320 L-10 -252 M10 -320 L10 -252', stroke: '#e08600', 'stroke-width': 4 }, h);
+})();
+
+// ---------------- енот-заказчик ----------------
+const N = {};
+(function buildEnot() {
+  const g = $('enot');
+  E('ellipse', { cx: 0, cy: 4, rx: 90, ry: 14, fill: 'rgba(0,0,0,.3)', filter: 'url(#blur2)' }, g);
+  N.tail = E('g', {}, g);
+  E('path', { d: 'M50 -40 Q130 -50 150 -140 Q156 -170 132 -176 Q112 -120 46 -76Z', fill: '#8b8e99', ...st }, N.tail);
+  for (const [a, b] of [[60, -62], [92, -84], [118, -116], [136, -150]]) E('path', { d: `M${a - 8} ${b + 10} L${a + 12} ${b - 12}`, stroke: '#2b2a30', 'stroke-width': 12, 'stroke-linecap': 'round' }, N.tail);
+  E('ellipse', { cx: -30, cy: -8, rx: 26, ry: 14, fill: '#2b2a30', ...st }, g); E('ellipse', { cx: 30, cy: -8, rx: 26, ry: 14, fill: '#2b2a30', ...st }, g);
+  E('ellipse', { cx: 0, cy: -100, rx: 68, ry: 90, fill: 'url(#furG)', ...st }, g);
+  // пиджак и галстук
+  E('path', { d: 'M-64 -140 Q-74 -60 -50 -24 L50 -24 Q74 -60 64 -140 Q36 -172 0 -172 Q-36 -172 -64 -140Z', fill: '#3d5a8c', ...st }, g);
+  E('path', { d: 'M-24 -170 L0 -120 L24 -170Z', fill: '#f4f1ea', ...st, 'stroke-width': 2 }, g);
+  E('path', { d: 'M0 -150 L-9 -136 L0 -80 L9 -136Z', fill: '#d6303b', ...st, 'stroke-width': 2 }, g);
+  // папка
+  N.arm = E('g', {}, g);
+  E('rect', { x: -92, y: -126, width: 60, height: 82, rx: 4, fill: '#f0c445', ...st, transform: 'rotate(-8 -66 -85)' }, N.arm);
+  E('path', { d: 'M-60 -140 Q-92 -110 -70 -84', fill: 'none', stroke: '#3d5a8c', 'stroke-width': 26, 'stroke-linecap': 'round' }, N.arm);
+  E('circle', { cx: -70, cy: -84, r: 13, fill: '#2b2a30' }, N.arm);
+  // голова
+  N.head = E('g', {}, g);
+  const h = N.head;
+  E('path', { d: 'M-62 -230 L-58 -290 L-22 -262Z', fill: '#8b8e99', ...st }, h); E('path', { d: 'M62 -230 L58 -290 L22 -262Z', fill: '#8b8e99', ...st }, h);
+  E('path', { d: 'M-52 -244 L-52 -276 L-34 -258Z M52 -244 L52 -276 L34 -258Z', fill: '#e9d9cf' }, h);
+  E('ellipse', { cx: 0, cy: -215, rx: 72, ry: 58, fill: 'url(#furG)', ...st }, h);
+  E('path', { d: 'M-70 -214 Q-40 -248 0 -226 Q40 -248 70 -214 Q50 -194 26 -206 Q0 -196 -26 -206 Q-50 -194 -70 -214Z', fill: '#2b2a30' }, h);
+  E('path', { d: 'M-30 -258 Q0 -268 30 -258 Q0 -246 -30 -258Z', fill: '#efe9e1' }, h);
+  E('ellipse', { cx: 0, cy: -184, rx: 34, ry: 22, fill: '#efe9e1', ...st, 'stroke-width': 2 }, h);
+  E('ellipse', { cx: 0, cy: -196, rx: 10, ry: 7, fill: '#22181a' }, h);
+  N.mouth = E('path', { d: '', fill: '#5a1f2a', stroke: '#22181a', 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, h);
+  N.eyeW = [-30, 30].map((x) => E('circle', { cx: x, cy: -220, r: 13, fill: '#fff', ...st, 'stroke-width': 2 }, h));
+  N.pup = [-30, 30].map((x) => E('circle', { cx: x, cy: -220, r: 6, fill: '#111' }, h));
+  N.brow = [-30, 30].map((x) => E('path', { d: '', stroke: '#22181a', 'stroke-width': 5, 'stroke-linecap': 'round', fill: 'none' }, h));
+})();
+
+// ---------------- подписи ----------------
+const CAPS = [
+  [0.0, 2.2, 'Заказчик: «Смета нужна<br><span class="y">к утру.</span> С материалами»', ''],
+  [2.2, 3.9, 'Заказчик: «Смета нужна<br><span class="y">к утру.</span> С материалами»', 'Я: «Через <span class="y">2 минуты</span><br>пришлю»'],
+];
+const SCREENS = [['1home', 'Новая смета', 153, 102], ['2dirs', 'Направление — плитка', 220, 166], ['3kinds', 'Санузел целиком', 122, 217],
+  ['4form', 'Площадь — пара цифр', 190, 200], ['5result', 'Работы и материалы<br><span class="y">с ценами</span> — готово', 0, 0], ['8est', 'PDF заказчику —<br><span class="y">одной кнопкой</span>', 73, 141]];
+
+function caption(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } el.style.opacity = html ? 1 : 0; }
+function glitchText(el, on, t) {
+  if (!on) { el.style.textShadow = ''; return; }
+  const k = Math.floor(t * 20), dx = (R(k) - .5) * 12, dy = (R(k + 3) - .5) * 6;
+  el.style.textShadow = `${dx}px ${dy}px 0 rgba(255,40,80,.9), ${-dx}px ${-dy}px 0 rgba(40,230,255,.9)`;
+}
+
+window.render = function (t) {
+  const g1 = t >= G1[0] && t < G1[1], g2 = t >= G2[0] && t < G2[1];
+  const gl = g1 || g2, gk = Math.floor(t * 15);
+  const gAmt = gl ? (R(gk * 7) > .35 ? 1 : .3) : 0;
+  // --- камера ---
+  let cx = 270, cy = 480, s = 1;
+  if (t < G1[0]) { s = lerp(1.0, 1.12, ease(t / 3.9)); cx = lerp(270, t < 2.2 ? 330 : 230, ease((t % 2.2) / 1.2)); }
+  else if (t < T.phone[0]) { const k = eOut((t - G1[0]) / .25); s = lerp(1.12, 2.0, k); cx = lerp(230, 405, k); cy = lerp(480, 610, k); }
+  else if (t < G2[0]) { s = lerp(1.05, 1.0, ease((t - T.win[0]) / 1.6)); }
+  else { const k = eOut((t - G2[0]) / .3); s = lerp(1.0, 1.7, k); cx = lerp(270, 405, k); cy = lerp(480, 620, k); }
+  const shx = gl ? (R(gk) - .5) * 14 * gAmt : 0, shy = gl ? (R(gk + 1) - .5) * 8 * gAmt : 0;
+  $('cam').setAttribute('transform', `translate(${270 + shx},${480 + shy}) scale(${s}) translate(${-cx},${-cy - (s - 1) * 0})`);
+  // --- енот ---
+  const en = $('enWrap');
+  en.setAttribute('transform', `translate(405,870) scale(1.25)`);
+  N.tail.setAttribute('transform', `rotate(${Math.sin(t * 3) * 6} 50 -40)`);
+  const talking = (t < 2.2 && Math.sin(t * 20) > 0);
+  // голова: обычная / глитч (кручение, вытягивание)
+  let hr = Math.sin(t * 1.4) * 3, hsx = 1, hsy = 1;
+  if (g1) { hr += (R(gk + 9) - .5) * 30 * gAmt; hsy = 1 + (R(gk + 4) - .5) * .5 * gAmt; hsx = 1 + (R(gk + 5) - .5) * .3 * gAmt; }
+  if (g2) { const l = t - G2[0]; hr = l < 1.0 ? ease(l / 1.0) * 360 : (R(gk + 9) - .5) * 24 * gAmt; hsy = 1 + (R(gk + 4) - .5) * .4 * gAmt; }
+  if (t >= T.win[0] && t < G2[0]) hr = Math.sin(t * 1.4) * 3 - 6;
+  N.head.setAttribute('transform', `translate(0,-215) rotate(${hr}) scale(${hsx},${hsy}) translate(0,215)`);
+  // глаза: в глитче — разного размера, «нейро»
+  const big = gl ? [1 + R(gk * 3) * 1.4, .6 + R(gk * 5) * .5] : (t >= T.win[0] ? [1.25, 1.25] : [1, 1]);
+  N.eyeW.forEach((e, i) => e.setAttribute('r', 13 * big[i]));
+  N.pup.forEach((p, i) => { p.setAttribute('r', 6 * (gl ? big[1 - i] : 1)); const lx = t < 3.9 ? -3 : 0; p.setAttribute('cx', (i ? 30 : -30) + lx + (gl ? (R(gk + i) - .5) * 8 : 0)); });
+  N.brow.forEach((b, i) => { const x = i ? 30 : -30, sg = i ? 1 : -1; const up = gl ? 18 : (t > 2.2 && t < 3.9 ? 10 : 0); b.setAttribute('d', `M${x - 14 * sg} ${-240 - up + (talking ? 0 : 0)} Q${x} ${-248 - up} ${x + 14 * sg} ${-244 - up + (gl ? 6 : 0)}`); });
+  const mo = gl ? 10 + R(gk * 2) * 22 : talking ? 8 : (t > 2.2 && t < 3.9 ? 4 : 1.5);
+  N.mouth.setAttribute('d', `M-16 -170 Q0 ${-170 + mo * (gl ? 1.6 : 1)} 16 -170 Q0 ${-170 + mo * .3} -16 -170Z`);
+  N.arm.setAttribute('opacity', t >= T.win[0] ? 0 : 1);
+  // RGB-сдвиг и слайсы
+  $('glR').setAttribute('opacity', gl ? .75 * gAmt : 0); $('glC').setAttribute('opacity', gl ? .75 * gAmt : 0);
+  $('glR').setAttribute('transform', `translate(${gl ? -6 - R(gk) * 8 : 0},0)`); $('glC').setAttribute('transform', `translate(${gl ? 6 + R(gk + 2) * 8 : 0},0)`);
+  $('slices').setAttribute('opacity', gl && gAmt > .5 ? 1 : 0);
+  for (let i = 0; i < 3; i++) { $('slr' + i).setAttribute('y', -300 + R(gk * 3 + i) * 300); $('su' + i).setAttribute('x', (R(gk * 5 + i) - .5) * 60); }
+  $('scan').style.opacity = gl ? .8 : 0;
+  // --- медведь ---
+  const bt = t < 2.2 ? 0 : (t < 3.9 ? Math.sin(t * 20) > 0 ? 1 : 0 : 0);
+  B.head.setAttribute('transform', `rotate(${Math.sin(t * 1.2) * 2 + (t >= T.win[0] ? 4 : 0)} 0 -200)`);
+  B.lids.forEach((l) => l.setAttribute('opacity', (t >= T.win[0] || ((t + .5) % 3.3) < .12) ? 1 : 0)); // довольный прищур на победе
+  B.arm.setAttribute('transform', t >= T.win[0] ? `rotate(${-20 - Math.max(0, Math.sin((t - T.win[0]) * 2)) * 20} 60 -150)` : '');
+  B.steam.setAttribute('d', `M88 -118 q${Math.sin(t * 3) * 6} -14 0 -26 q${-Math.sin(t * 3) * 6} -12 0 -24 M104 -118 q${Math.cos(t * 3) * 6} -12 0 -22`);
+  B.arm2.setAttribute('opacity', t < T.phone[0] ? 1 : 0); B.ph.setAttribute('fill', bt ? '#5aa2ef' : '#2a74c9');
+  // --- телефон с приложением ---
+  const phone = $('phone');
+  const pIn = clamp((t - T.phone[0]) / .45), pOut = clamp((T.phone[1] - t) / .35);
+  const pOn = t >= T.phone[0] - .01 && t < T.phone[1] ? Math.min(pIn, pOut) : 0;
+  phone.style.opacity = pOn; $('dim').style.opacity = pOn; $('timer').style.opacity = pOn;
+  phone.style.transform = `scale(${lerp(.6, 1, eOut(pIn))}) rotate(${lerp(-8, 0, eOut(pIn))}deg)`;
+  if (t >= T.phone[0] && t < T.phone[1]) {
+    const span = (T.phone[1] - T.phone[0]) / SCREENS.length, u = (t - T.phone[0]) / span, i = Math.min(SCREENS.length - 1, Math.floor(u)), f = u - i;
+    const [cur, cap, tx, ty] = SCREENS[i], nxt = SCREENS[Math.min(SCREENS.length - 1, i + 1)][0];
+    const A = $('imA'), Bm = $('imB');
+    if (A._s !== cur) { A.src = `../sc/${cur}.png`; A._s = cur; }
+    if (Bm._s !== nxt) { Bm.src = `../sc/${nxt}.png`; Bm._s = nxt; }
+    const sw = i < SCREENS.length - 1 ? ease((f - .8) / .2) : 0;
+    A.style.transform = `translateX(${-sw * 100}%)`; Bm.style.transform = `translateX(${(1 - sw) * 100}%)`;
+    A.style.objectPosition = cur === '5result' ? `center ${Math.round(ease(f / .75) * 100)}%` : 'top';
+    const tap = $('tap'); const tk = (f - .55) / .2;
+    tap.style.opacity = tx && tk > 0 && tk < 1 ? Math.sin(tk * Math.PI) : 0; tap.style.left = tx + 'px'; tap.style.top = ty + 'px'; tap.style.transform = `scale(${.7 + tk * .5})`;
+    const sec = Math.floor(lerp(0, 118, (t - T.phone[0]) / (T.phone[1] - T.phone[0] - .3)));
+    $('timer').textContent = `⏱ ${Math.floor(Math.min(sec, 118) / 60)}:${String(Math.min(sec, 118) % 60).padStart(2, '0')}`;
+    caption($('capA'), cap); caption($('capB'), ''); $('capA').className = 'cap'; $('capA').style.transform = 'none';
+    glitchText($('capA'), false, t);
+  } else if (t < T.phone[0]) {
+    if (g1) { caption($('capA'), ''); caption($('capB'), 'Да ты<br><span class="y">шуешь?</span>'); $('capB').className = 'cap big'; }
+    else { const c = CAPS.find(([a, b]) => t >= a && t < b); caption($('capA'), c[2]); caption($('capB'), c[3]); $('capB').className = 'cap'; }
+    glitchText($('capB'), g1, t);
+    const k = clamp((t - (g1 ? G1[0] : t < 2.2 ? 0 : 2.2)) / .2); $('capB').style.transform = `scale(${.8 + .2 * eOut(k)}) skewX(${g1 ? (R(gk) - .5) * 12 : 0}deg)`;
+    $('capA').style.transform = `scale(${.85 + .15 * eOut(clamp(t / .2))})`;
+  } else if (t < T.end[0]) {
+    const l = t - T.win[0];
+    caption($('capA'), 'Через 2 минуты<br>PDF уже <span class="y">у заказчика</span>');
+    $('capA').style.transform = `scale(${.85 + .15 * eOut(l / .2)})`;
+    if (g2) { caption($('capB'), 'Он <span class="y">не шует</span> 😳'); $('capB').className = 'cap big'; } else caption($('capB'), '');
+    glitchText($('capB'), g2, t);
+    $('capB').style.transform = `scale(${.8 + .2 * eOut((t - G2[0]) / .2)}) skewX(${g2 ? (R(gk) - .5) * 10 : 0}deg)`;
+  }
+  // уведомление о PDF
+  const nIn = clamp((t - (T.win[0] + .4)) / .3), nOut = clamp((G2[0] + .2 - t) / .3);
+  $('notif').style.opacity = t < T.end[0] ? Math.min(nIn, nOut) : 0;
+  $('notif').style.transform = `translateY(${lerp(-40, 0, eOut(nIn))}px)`;
+  // --- финал ---
+  const ef = clamp((t - T.end[0]) / .4);
+  $('end').style.opacity = ef; $('end').style.transform = `scale(${.92 + .08 * eOut(ef)})`;
+  if (ef > 0) { caption($('capA'), ''); caption($('capB'), ''); }
+  const cuts = [T.win[0]]; let fd = 0; for (const c of cuts) fd = Math.max(fd, 1 - Math.abs(t - c) / .25);
+  $('fade').style.opacity = clamp(fd) * .9;
+};
+window.READY = Promise.all([document.fonts.ready, ...SCREENS.map(([n]) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `../sc/${n}.png`; }))]).then(() => { window.render(0); window.OK = true; });
+</script></body></html>

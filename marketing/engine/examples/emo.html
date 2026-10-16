@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<!-- Ролик «Эмо вернулось»: прораб-ёжик в 2007 (смета в тетрадке, слёзы) → 2026 (СМЕТА PRO). Тренд на возвращение эмо-стиля, свои персонажи, своя музыка. -->
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.cap { position: absolute; left: 22px; right: 22px; text-align: center; font-family: 'PT', 'Noto Color Emoji', sans-serif; font-weight: 700; color: #fff;
+  font-size: 34px; line-height: 1.16; -webkit-text-stroke: 7px #000; paint-order: stroke fill; letter-spacing: .2px; }
+.cap .y { color: #FFD43B; } .cap .p { color: #ff5fb4; }
+#phone { position: absolute; left: 50%; top: 50%; width: 330px; height: 714px; margin: -320px 0 0 -165px; border-radius: 46px; background: #0b0f16;
+  box-shadow: 0 40px 90px rgba(0,0,0,.6), inset 0 0 0 3px #2c3442; padding: 12px; opacity: 0; }
+#phone .scr { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #0D2440; }
+#phone img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#tap { position: absolute; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.85); opacity: 0; }
+#vhs { position: absolute; inset: 0; pointer-events: none; font-family: 'PTN', monospace; color: #fff; text-shadow: 2px 2px 0 #000, -1px 0 0 rgba(255,0,90,.7), 1px 0 0 rgba(0,220,255,.7); }
+#vhs .tl { position: absolute; left: 22px; top: 18px; font-size: 26px; letter-spacing: 1px; }
+#vhs .br { position: absolute; right: 22px; bottom: 26px; font-size: 30px; letter-spacing: 1px; text-align: right; }
+#scan { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 2px, transparent 2px 4px); }
+#end { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 0; color: #fff; text-align: center; font-family: 'PT'; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 30px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 10px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#fade, #flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; } #fade { background: #000; } #flash { background: #fff; }
+</style></head><body><div id="stage">
+<svg id="sv" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a1028"/><stop offset="1" stop-color="#3a1f47"/></linearGradient>
+    <linearGradient id="day" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9c2"/><stop offset="1" stop-color="#ffc98a"/></linearGradient>
+    <linearGradient id="winN" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1630"/><stop offset="1" stop-color="#25335a"/></linearGradient>
+    <linearGradient id="winD" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc8ff"/><stop offset="1" stop-color="#d8f1ff"/></linearGradient>
+    <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a5a36"/><stop offset="1" stop-color="#4a2c19"/></linearGradient>
+    <radialGradient id="lampN" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd59a" stop-opacity=".75"/><stop offset="1" stop-color="#ff9a5a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="sunG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fffbe8" stop-opacity=".95"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="face" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#f6dcb6"/><stop offset="1" stop-color="#d9ac7a"/></radialGradient>
+    <radialGradient id="vigG" cx=".5" cy=".5" r=".75"><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".65"/></radialGradient>
+    <filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="blur10" filterUnits="userSpaceOnUse" x="-200" y="-200" width="1000" height="1400"><feGaussianBlur stdDeviation="10"/></filter>
+  </defs>
+  <g id="cam">
+    <!-- 2007 -->
+    <g id="bg07">
+      <rect x="-200" y="-200" width="940" height="1400" fill="url(#night)"/>
+      <rect x="300" y="150" width="200" height="260" rx="6" fill="url(#winN)" stroke="#120a1a" stroke-width="10"/>
+      <path d="M400 150 L400 410 M300 280 L500 280" stroke="#120a1a" stroke-width="8"/>
+      <g id="rain"></g>
+      <g id="poster07"></g>
+      <circle cx="90" cy="560" r="230" fill="url(#lampN)"/>
+    </g>
+    <!-- 2026 -->
+    <g id="bg26" opacity="0">
+      <rect x="-200" y="-200" width="940" height="1400" fill="url(#day)"/>
+      <circle id="sun" cx="400" cy="250" r="260" fill="url(#sunG)"/>
+      <rect x="300" y="150" width="200" height="260" rx="6" fill="url(#winD)" stroke="#fff4e0" stroke-width="10"/>
+      <path d="M400 150 L400 410 M300 280 L500 280" stroke="#fff4e0" stroke-width="8"/>
+      <g id="clouds"></g>
+      <g id="rays" opacity=".5"></g>
+      <g id="plant"></g>
+    </g>
+    <g id="ezh"></g>
+    <path d="M-200 690 L740 690 L740 1200 L-200 1200Z" fill="url(#desk)"/>
+    <path d="M-200 682 L740 682 L740 702 L-200 702Z" fill="#a8744a"/>
+    <g id="desk07"></g>
+    <g id="desk26" opacity="0"></g>
+    <g id="arms"></g>
+    <g id="papers"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+</svg>
+<div id="scan"></div>
+<div id="vhs"><div class="tl" id="vtl">▶ PLAY</div><div class="br" id="vbr">03:14<br>15.10.2007</div></div>
+<div id="dim" style="position:absolute;inset:0;background:rgba(5,10,20,.6);opacity:0"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="capA" class="cap" style="top:64px"></div>
+<div id="capB" class="cap" style="bottom:110px"></div>
+<div id="end"><div class="logo">СМЕТА PRO</div><div class="l2">Смета с работами и материалами —<br><span style="color:#FFD43B">за 2 минуты прямо в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">3 сметы в месяц — бесплатно</div></div>
+<div id="flash"></div><div id="fade"></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const E = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const st = { stroke: '#1a1014', 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+
+// ---------------- таймлайн ----------------
+const T = { s07: [0, 7.0], s26: [7.0, 8.6], phone: [8.6, 16.0], win: [16.0, 19.8], end: [19.8, 22.8] };
+window.DUR = 22.8;
+const SLUMP = 5.4; // голова падает на тетрадку
+
+// ---------------- декор ----------------
+(function buildDecor() {
+  for (let i = 0; i < 40; i++) E('path', { d: 'M0 0 L-4 18', stroke: '#9fb4e8', 'stroke-width': 2, opacity: .55, class: 'drop', 'data-i': i }, $('rain'));
+  // постер на стене 2007: сердце со звездой (своё)
+  const p = $('poster07');
+  E('rect', { x: 40, y: 170, width: 150, height: 200, fill: '#111', stroke: '#ff3fa4', 'stroke-width': 4, transform: 'rotate(-4 115 270)' }, p);
+  E('path', { d: 'M115 320 C60 280 70 220 115 250 C160 220 170 280 115 320Z', fill: '#ff3fa4', transform: 'rotate(-4 115 270)' }, p);
+  E('path', { d: 'M115 200 l6 14 l15 1 l-12 9 l4 15 l-13 -8 l-13 8 l4 -15 l-12 -9 l15 -1Z', fill: '#fff', transform: 'rotate(-4 115 270)' }, p);
+  for (let i = 0; i < 3; i++) E('ellipse', { cx: 330 + i * 70, cy: 210 + (i % 2) * 40, rx: 34, ry: 14, fill: '#fff', opacity: .9, class: 'cloud', 'data-i': i }, $('clouds'));
+  for (let i = 0; i < 9; i++) E('path', { d: 'M0 0 L-30 -900 L30 -900Z', fill: '#fff8de', opacity: .25, transform: `translate(400,250) rotate(${-150 + i * 22})` }, $('rays'));
+  const pl = $('plant');
+  E('path', { d: 'M60 690 L72 600 L128 600 L140 690Z', fill: '#e86a3a', ...st }, pl);
+  for (const [a, l] of [[-30, 120], [-5, 150], [20, 130], [45, 100], [-55, 90]]) E('path', { d: `M100 600 q${a * .4} ${-l * .5} ${a} ${-l}`, stroke: '#3e9a4a', 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round' }, pl);
+  // стол 2007: тетрадь, калькулятор, кипа бумаг, раскладушка
+  const d = $('desk07');
+  E('path', { d: 'M150 712 L380 700 L392 830 L160 846Z', fill: '#f4f1e6', ...st }, d);
+  E('path', { d: 'M270 706 L276 838', stroke: '#c9c2b0', 'stroke-width': 3 }, d);
+  for (let i = 0; i < 6; i++) { E('path', { d: `M170 ${730 + i * 18} L262 ${726 + i * 18}`, stroke: '#9bb7d6', 'stroke-width': 1.5 }, d); E('path', { d: `M284 ${724 + i * 18} L382 ${719 + i * 18}`, stroke: '#9bb7d6', 'stroke-width': 1.5 }, d); }
+  const sc = ['СМЕТА?', '4×22=88', '88+..=?', 'ИТОГО: ???'];
+  sc.forEach((s, i) => { const t = E('text', { x: 178 + (i % 2) * 110, y: 748 + Math.floor(i / 2) * 44, 'font-family': 'PTN', 'font-size': 20, fill: '#34306a', transform: `rotate(-3 ${178 + (i % 2) * 110} 748)` }, d); t.textContent = s; });
+  E('path', { d: 'M286 790 L370 774 M290 774 L366 794', stroke: '#d6303b', 'stroke-width': 3 }, d);
+  E('rect', { x: 412, y: 712, width: 92, height: 128, rx: 10, fill: '#5b5f6b', ...st, transform: 'rotate(8 458 776)' }, d);
+  E('rect', { x: 424, y: 724, width: 68, height: 26, fill: '#a8c49a', transform: 'rotate(8 458 776)' }, d);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) E('rect', { x: 426 + c * 23, y: 760 + r * 24, width: 17, height: 17, rx: 3, fill: '#d9dbe0', transform: 'rotate(8 458 776)' }, d);
+  for (let i = 0; i < 7; i++) E('rect', { x: 18 + R(i) * 10, y: 800 - i * 10, width: 110, height: 70, fill: i % 2 ? '#ece6d6' : '#f6f2e8', ...st, 'stroke-width': 1.5, transform: `rotate(${(R(i * 3) - .5) * 14} 70 ${830 - i * 10})` }, d);
+  // телефон-раскладушка
+  const fp = E('g', { id: 'flip', transform: 'translate(392,870) rotate(-12)' }, d);
+  E('rect', { x: -26, y: -40, width: 52, height: 74, rx: 10, fill: '#c8ccd6', ...st }, fp);
+  $('flipS') || E('rect', { id: 'flipS', x: -18, y: -32, width: 36, height: 30, rx: 3, fill: '#2a3550' }, fp);
+  E('path', { d: 'M-12 -22 h24 v14 h-24z M-12 -22 l12 9 l12 -9', fill: 'none', stroke: '#fff', 'stroke-width': 2, id: 'flipM', opacity: 0 }, fp);
+  // стол 2026: кружка, ноутбук закрыт
+  const d2 = $('desk26');
+  E('rect', { x: 50, y: 720, width: 170, height: 16, rx: 4, fill: '#b9c0cc', ...st }, d2);
+  E('rect', { x: 400, y: 700, width: 52, height: 62, rx: 8, fill: '#ff5fb4', ...st }, d2);
+  E('path', { d: 'M452 712 q20 0 20 16 q0 16 -20 16', fill: 'none', stroke: '#1a1014', 'stroke-width': 5 }, d2);
+  E('path', { d: 'M412 728 l10 0 m-5 -5 l0 10', stroke: '#fff', 'stroke-width': 3 }, d2);
+  // летящие листы
+  for (let i = 0; i < 6; i++) { const g = E('g', { class: 'fly', 'data-i': i, opacity: 0 }, $('papers')); E('rect', { x: -40, y: -28, width: 80, height: 56, fill: '#f6f2e8', ...st, 'stroke-width': 2 }, g); E('path', { d: 'M-30 -12 h50 M-30 0 h40 M-30 12 h55', stroke: '#9bb7d6', 'stroke-width': 2 }, g); }
+})();
+
+// ---------------- ёжик-прораб (эмо) ----------------
+const Z = {};
+(function buildEzh() {
+  const z = $('ezh');
+  Z.root = z;
+  // тело в чёрной толстовке
+  E('path', { d: 'M-120 260 Q-130 120 -60 90 L60 90 Q130 120 120 260Z', fill: '#16141c', ...st }, z);
+  Z.tee = E('path', { d: 'M-36 92 L0 140 L36 92Z', fill: '#ff3fa4', ...st, 'stroke-width': 2 }, z);
+  Z.head = E('g', {}, z);
+  const h = Z.head;
+  // иголки
+  for (let i = 0; i < 15; i++) { const a = -170 + i * 11.5, r1 = 82, r2 = 140 + (i % 2) * 18, rad = (x) => x * Math.PI / 180;
+    const p = (r, d) => `${Math.cos(rad(a + d)) * r} ${Math.sin(rad(a + d)) * r - 10}`;
+    E('path', { d: `M${p(r1, -9)} L${p(r2, 0)} L${p(r1, 9)}Z`, fill: i % 3 ? '#5a3d2b' : '#6e4c36', ...st, 'stroke-width': 2.5 }, h); }
+  E('circle', { cx: -78, cy: -40, r: 18, fill: '#d9ac7a', ...st }, h); E('circle', { cx: 78, cy: -40, r: 18, fill: '#d9ac7a', ...st }, h);
+  E('ellipse', { cx: 0, cy: 0, rx: 88, ry: 82, fill: 'url(#face)', ...st }, h);
+  E('ellipse', { cx: 0, cy: 38, rx: 36, ry: 26, fill: '#f3dcc0' }, h);
+  E('ellipse', { cx: 0, cy: 24, rx: 13, ry: 10, fill: '#1a1014' }, h);
+  Z.blush = E('g', { opacity: 0 }, h);
+  E('ellipse', { cx: -50, cy: 34, rx: 14, ry: 8, fill: '#ff8fa0', opacity: .7 }, Z.blush); E('ellipse', { cx: 54, cy: 34, rx: 14, ry: 8, fill: '#ff8fa0', opacity: .7 }, Z.blush);
+  // видимый глаз (правый), с подводкой
+  Z.eye = E('g', {}, h);
+  E('ellipse', { cx: 34, cy: -6, rx: 17, ry: 20, fill: '#fff', stroke: '#000', 'stroke-width': 5 }, Z.eye);
+  Z.pup = E('ellipse', { cx: 34, cy: -2, rx: 9, ry: 11, fill: '#111' }, Z.eye);
+  E('circle', { cx: 37, cy: -7, r: 3, fill: '#fff' }, Z.eye);
+  E('path', { d: 'M52 -10 L64 -18', stroke: '#000', 'stroke-width': 4, 'stroke-linecap': 'round' }, Z.eye);
+  Z.lidUp = E('path', { d: '', fill: '#d9ac7a', stroke: '#000', 'stroke-width': 4 }, h);
+  Z.happyEye = E('path', { d: 'M18 -4 Q34 -22 50 -4', fill: 'none', stroke: '#000', 'stroke-width': 6, 'stroke-linecap': 'round', opacity: 0 }, h);
+  Z.tear = E('path', { d: 'M0 0 Q-7 12 0 18 Q7 12 0 0Z', fill: '#9fd3ff', stroke: '#2a5a8a', 'stroke-width': 1.5, opacity: 0 }, h);
+  Z.mouth = E('path', { d: '', fill: 'none', stroke: '#1a1014', 'stroke-width': 4, 'stroke-linecap': 'round' }, h);
+  // эмо-чёлка на левый глаз с розовой прядью
+  E('path', { d: 'M70 -62 Q20 -100 -40 -84 Q-92 -66 -96 -10 Q-92 30 -64 52 Q-66 18 -44 6 Q-20 -6 2 -30 Q30 -56 70 -62Z', fill: '#121016', ...st }, h);
+  E('path', { d: 'M40 -70 Q0 -84 -40 -64 Q-70 -44 -76 0 Q-60 -36 -30 -48 Q2 -60 40 -70Z', fill: '#ff3fa4' }, h);
+  // наушники 2026
+  Z.phones = E('g', { opacity: 0 }, h);
+  E('path', { d: 'M-92 -10 Q-96 -120 0 -124 Q96 -120 92 -10', fill: 'none', stroke: '#2b2b33', 'stroke-width': 12 }, Z.phones);
+  E('rect', { x: -110, y: -34, width: 30, height: 56, rx: 12, fill: '#ff3fa4', ...st }, Z.phones); E('rect', { x: 80, y: -34, width: 30, height: 56, rx: 12, fill: '#ff3fa4', ...st }, Z.phones);
+  // руки на столе
+  const a = $('arms');
+  Z.armL = E('g', {}, a); Z.armR = E('g', {}, a);
+  E('path', { d: 'M0 0 Q-20 40 -10 90', fill: 'none', stroke: '#16141c', 'stroke-width': 44, 'stroke-linecap': 'round' }, Z.armL);
+  for (let i = 0; i < 3; i++) E('path', { d: `M${-26} ${30 + i * 22} l40 0`, stroke: '#ff3fa4', 'stroke-width': 7 }, Z.armL);
+  E('circle', { cx: -10, cy: 100, r: 20, fill: '#d9ac7a', ...st }, Z.armL);
+  E('path', { d: 'M0 0 Q20 40 10 90', fill: 'none', stroke: '#16141c', 'stroke-width': 44, 'stroke-linecap': 'round' }, Z.armR);
+  for (let i = 0; i < 3; i++) E('path', { d: `M${-14} ${30 + i * 22} l40 0`, stroke: '#ff3fa4', 'stroke-width': 7 }, Z.armR);
+  Z.pen = E('path', { d: 'M10 100 L40 40', stroke: '#2a4fd6', 'stroke-width': 7, 'stroke-linecap': 'round' }, Z.armR);
+  Z.sp = E('g', { opacity: 0 }, Z.armR);
+  E('rect', { x: -14, y: 40, width: 50, height: 88, rx: 9, fill: '#11151c', ...st }, Z.sp); E('rect', { x: -9, y: 46, width: 40, height: 76, rx: 5, fill: '#2a74c9' }, Z.sp);
+  E('circle', { cx: 10, cy: 104, r: 20, fill: '#d9ac7a', ...st }, Z.armR);
+})();
+
+// ---------------- подписи ----------------
+const CAPS = [
+  [0.0, 2.3, '<span class="p">2007.</span> Прораб<br>считает смету', ''],
+  [2.3, 4.5, 'Третью ночь. В тетрадке.<br>Калькулятор и слёзы 🖤', ''],
+  [4.5, 7.0, 'Заказчик: «А давай плитку<br><span class="y">побольше?</span>»', ''],
+  [5.6, 7.0, 'Заказчик: «А давай плитку<br><span class="y">побольше?</span>»', 'Пересчитывать<br>всё <span class="p">с нуля…</span>'],
+  [7.0, 8.6, '<span class="y">2026.</span> Эмо вернулось.<br>Бумажки — <span class="y">нет.</span>', ''],
+  [16.0, 17.6, 'Чёлка осталась.<br><span class="y">Тоска — нет.</span> 🖤', ''],
+  [17.6, 19.8, 'Чёлка осталась.<br><span class="y">Тоска — нет.</span> 🖤', 'Смета за <span class="y">2 минуты</span>,<br>а не за три ночи'],
+];
+const SCREENS = [['2dirs', 'Направление — плитка', 220, 166], ['4form', 'Размеры — <span class="y">2–3 цифры</span>', 190, 200], ['5result', 'Работы и материалы<br><span class="y">с ценами</span> — сами', 0, 0],
+  ['6eco', 'Плитку подешевле?<br><span class="y">Эконом</span> — пересчиталось', 110, 443], ['8est', 'PDF заказчику —<br><span class="y">одной кнопкой</span>', 73, 141]];
+
+function caption(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } el.style.opacity = html ? 1 : 0; }
+
+window.render = function (t) {
+  const is07 = t < T.s26[0];
+  $('bg07').setAttribute('opacity', is07 ? 1 : 0); $('bg26').setAttribute('opacity', is07 ? 0 : 1);
+  $('desk07').setAttribute('opacity', is07 ? 1 : 0); $('desk26').setAttribute('opacity', is07 ? 0 : 1);
+  $('sv').style.filter = is07 ? 'saturate(.75) contrast(1.08) hue-rotate(-8deg)' : 'none';
+  $('scan').style.opacity = is07 ? 1 : 0;
+  // VHS-плашка
+  const vOn = t < T.phone[0] || (t >= T.win[0] && t < T.end[0]);
+  $('vhs').style.opacity = vOn ? 1 : 0;
+  $('vtl').textContent = is07 ? (Math.floor(t * 2) % 2 ? '▶ PLAY' : '▶ PLAY ●') : '▶ PLAY';
+  $('vbr').innerHTML = is07 ? `03:${String(14 + Math.floor(t / 3)).padStart(2, '0')}<br>15.10.2007` : `12:00<br>16.10.2026`;
+  // камера
+  let s, cy = 480;
+  if (is07) { s = t < SLUMP ? lerp(1.0, 1.15, ease(t / SLUMP)) : lerp(1.15, 1.25, eOut((t - SLUMP) / .4)); cy = lerp(480, 560, ease(t / 7)); }
+  else if (t < T.phone[0]) s = lerp(1.15, 1.05, ease((t - 7) / 1.6));
+  else s = lerp(1.0, 1.1, ease((t - T.win[0]) / 3.8));
+  const jit = is07 && t > SLUMP && t < SLUMP + .35 ? Math.sin(t * 90) * 4 : 0;
+  $('cam').setAttribute('transform', `translate(270,480) scale(${s}) translate(${-270 + jit},${-cy})`);
+  // дождь / облака / солнце
+  document.querySelectorAll('.drop').forEach((d) => { const i = +d.dataset.i; const x = 300 + R(i) * 200, y = 150 + ((t * (300 + R(i * 3) * 200) + R(i * 7) * 260) % 260); d.setAttribute('transform', `translate(${x},${y})`); });
+  document.querySelectorAll('.cloud').forEach((c) => { const i = +c.dataset.i; c.setAttribute('cx', 300 + ((R(i) * 200 + t * (8 + i * 4)) % 220)); });
+  $('rays').setAttribute('transform', `rotate(${t * 3} 400 250)`);
+  // ёжик
+  const br = Math.sin(t * 2) * 3;
+  let hx = 270, hy = 470 + br, hr = 0;
+  if (is07 && t > SLUMP) { const k = eOut((t - SLUMP) / .35); hy = lerp(470, 600, k); hr = lerp(0, -14, k); }
+  if (!is07 && t >= T.win[0]) { hr = Math.sin((t - T.win[0]) * 4.2) * 7; hy = 470 + Math.abs(Math.sin((t - T.win[0]) * 4.2)) * -10; }
+  Z.root.setAttribute('transform', `translate(${hx},${hy}) scale(1.3)`);
+  Z.head.setAttribute('transform', `rotate(${hr})`);
+  const sad = is07;
+  const blink = ((t + .7) % 3.1) < .12;
+  Z.eye.setAttribute('opacity', sad || t < T.win[0] ? (blink ? 0 : 1) : 0);
+  Z.lidUp.setAttribute('d', sad ? 'M16 -14 Q34 -32 52 -14 L52 -10 Q34 -20 16 -10Z' : 'M0 0');
+  Z.happyEye.setAttribute('opacity', !sad && t >= T.win[0] ? 1 : 0);
+  Z.blush.setAttribute('opacity', !sad ? 1 : 0);
+  Z.phones.setAttribute('opacity', !sad && t >= T.win[0] ? 1 : 0);
+  Z.mouth.setAttribute('d', sad ? (t > SLUMP ? 'M-20 62 Q0 46 20 62' : 'M-16 60 Q0 52 16 60') : 'M-24 52 Q0 76 24 52');
+  const tk = ((t - 2.3) % 1.6) / 1.6;
+  Z.tear.setAttribute('opacity', sad && t > 2.3 ? 1 : 0); Z.tear.setAttribute('transform', `translate(40,${12 + tk * 50})`);
+  Z.pup.setAttribute('cy', sad ? 4 : -2);
+  // руки: 2007 — ручка строчит; 2026 — смартфон
+  const wr = sad && t < SLUMP ? Math.sin(t * 24) * 4 : 0;
+  Z.armL.setAttribute('transform', `translate(${hx - 70},${(sad && t > SLUMP ? 640 : 600) + (hy - 470) * .3})`);
+  Z.armR.setAttribute('transform', `translate(${hx + 70 + wr},${600 + (hy - 470) * .2}) rotate(${sad ? -10 : -30})`);
+  Z.pen.setAttribute('opacity', sad ? 1 : 0); Z.sp.setAttribute('opacity', sad ? 0 : 1);
+  // раскладушка: SMS от заказчика
+  const sms = is07 && t > 4.5 && t < SLUMP + .6;
+  $('flipS').setAttribute('fill', sms && Math.floor(t * 6) % 2 ? '#7fd0ff' : '#2a3550'); $('flipM').setAttribute('opacity', sms ? 1 : 0);
+  $('flip').setAttribute('transform', `translate(${392 + (sms ? Math.sin(t * 70) * 3 : 0)},870) rotate(-12)`);
+  // листы разлетаются
+  document.querySelectorAll('.fly').forEach((g) => { const i = +g.dataset.i, l = t - SLUMP;
+    if (!is07 || l < 0) { g.setAttribute('opacity', 0); return; }
+    const vx = (R(i) - .5) * 520, vy = -380 - R(i * 3) * 300; const x = 270 + vx * l, y = 760 + vy * l + 420 * l * l;
+    g.setAttribute('opacity', 1); g.setAttribute('transform', `translate(${x},${y}) rotate(${(R(i * 5) - .5) * 600 * l})`); });
+  // телефон
+  const phone = $('phone');
+  const pIn = clamp((t - T.phone[0]) / .45), pOut = clamp((T.phone[1] - t) / .35);
+  const pOn = t >= T.phone[0] - .01 && t < T.phone[1] ? Math.min(pIn, pOut) : 0;
+  phone.style.opacity = pOn; $('dim').style.opacity = pOn;
+  phone.style.transform = `scale(${lerp(.6, 1, eOut(pIn))}) rotate(${lerp(8, 0, eOut(pIn))}deg)`;
+  if (t >= T.phone[0] && t < T.phone[1]) {
+    const span = (T.phone[1] - T.phone[0]) / SCREENS.length, u = (t - T.phone[0]) / span, i = Math.min(SCREENS.length - 1, Math.floor(u)), f = u - i;
+    const [cur, cap, tx, ty] = SCREENS[i], nxt = SCREENS[Math.min(SCREENS.length - 1, i + 1)][0];
+    const A = $('imA'), Bm = $('imB');
+    if (A._s !== cur) { A.src = `../sc/${cur}.png`; A._s = cur; }
+    if (Bm._s !== nxt) { Bm.src = `../sc/${nxt}.png`; Bm._s = nxt; }
+    const sw = i < SCREENS.length - 1 ? ease((f - .8) / .2) : 0;
+    A.style.transform = `translateX(${-sw * 100}%)`; Bm.style.transform = `translateX(${(1 - sw) * 100}%)`;
+    A.style.objectPosition = cur === '5result' ? `center ${Math.round(ease(f / .75) * 100)}%` : 'top';
+    const tp = $('tap'); const tk2 = (f - .5) / .22;
+    tp.style.opacity = tx && tk2 > 0 && tk2 < 1 ? Math.sin(tk2 * Math.PI) : 0; tp.style.left = tx + 'px'; tp.style.top = ty + 'px'; tp.style.transform = `scale(${.7 + tk2 * .5})`;
+    caption($('capA'), cap); caption($('capB'), ''); $('capA').style.transform = 'none';
+  } else {
+    const cs = CAPS.filter(([a, b]) => t >= a && t < b); const c = cs[cs.length - 1] || [0, 0, '', ''];
+    caption($('capA'), c[2]); caption($('capB'), c[3]);
+    const k = clamp((t - c[0]) / .2); $('capA').style.transform = `scale(${.85 + .15 * eOut(k)})`;
+    $('capB').style.transform = `scale(${.85 + .15 * eOut(k)})`;
+  }
+  // финал
+  const en = clamp((t - T.end[0]) / .4);
+  $('end').style.opacity = en; $('end').style.transform = `scale(${.92 + .08 * eOut(en)})`;
+  if (en > 0) { caption($('capA'), ''); caption($('capB'), ''); }
+  // вспышка 2007 → 2026 и затемнения
+  $('flash').style.opacity = clamp(1 - Math.abs(t - T.s26[0]) / .22);
+  let fd = 0; for (const c of [T.win[0]]) fd = Math.max(fd, 1 - Math.abs(t - c) / .25);
+  $('fade').style.opacity = clamp(fd) * .9;
+};
+window.READY = Promise.all([document.fonts.ready, ...SCREENS.map(([n]) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `../sc/${n}.png`; }))]).then(() => { window.render(0); window.OK = true; });
+</script></body></html>
