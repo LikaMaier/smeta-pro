@@ -293,6 +293,7 @@ model Estimate {
   approvedAt     DateTime?
   customerComment String?
   sectionCoefs   Json? // { "Название раздела": 1.15 }
+  showVariants   Boolean        @default(false) // показать заказчику итог в трёх вариантах материалов
   paySchedule    Json? // [{ title, pct }]
   purchased      Json? // ключи материалов, отмеченных как купленные
   paidAt         DateTime? // смета оплачена отдельно (99 ₽): без пометки, с логотипом

@@ -1,4 +1,9 @@
 import { toKop, fromKop, pctOfKop } from './money';
+import { pickVariant, type Tier } from './materialTiers';
+
+/** Раздел «По желанию…» — позиции на выбор заказчика: показываются, но в итог не входят */
+export const isOptionalSection = (c?: string | null) => /^\s*по желанию/i.test(c || '');
+export const OPTIONAL_SECTION = 'По желанию';
 
 /**
  * Расчёт итогов сметы. Порядок применения (един для всего приложения):
@@ -58,6 +63,8 @@ export interface EstimateTotals {
   roundAdjust: number;
   total: number;
   revenueExTax: number;
+  /** сумма позиций «по желанию» (в итог не входят) */
+  optionalTotal: number;
   directCost: number;
   linesWithoutCost: number;
   plannedProfit: number;
@@ -101,7 +108,9 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
   const matKop = lines.map((l, i) => Math.round(Number(l.qty) * toKop(posNum(l.matPrice) * ks[i])));
   const amountsKop = lines.map((_, i) => workKop[i] + matKop[i]);
   const secMap = new Map<string, { a: number; w: number; m: number }>();
-  const subtotalKop = amountsKop.reduce((a, b) => a + b, 0);
+  const opt = lines.map((l) => isOptionalSection(l.category));
+  const subtotalKop = amountsKop.reduce((a, b, i) => a + (opt[i] ? 0 : b), 0);
+  const optionalKop = amountsKop.reduce((a, b, i) => a + (opt[i] ? b : 0), 0);
   let worksKop = 0, materialsKop = 0, otherKop = 0;
   const catMap = new Map<string, number>();
   const costGroups = { materials: 0, equipment: 0, labor: 0, other: 0 };
@@ -110,6 +119,12 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
 
   lines.forEach((l, i) => {
     const a = amountsKop[i];
+    if (opt[i]) { // «по желанию»: только в своём разделе, в подытоги и себестоимость не идёт
+      const sm = secMap.get(l.category || '') || { a: 0, w: 0, m: 0 };
+      sm.a += a; sm.w += l.type === 'material' ? 0 : workKop[i]; sm.m += l.type === 'material' ? a : matKop[i];
+      secMap.set(l.category || '', sm);
+      return;
+    }
     // материал внутри строки работы — в подытог материалов; строка-материал целиком — материалы
     const w = l.type === 'material' ? 0 : workKop[i];
     const m = l.type === 'material' ? a : matKop[i];
@@ -162,6 +177,7 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
     roundAdjust: fromKop(roundKop),
     total: fromKop(totalKop),
     revenueExTax: fromKop(revenueExTaxKop),
+    optionalTotal: fromKop(optionalKop),
     directCost: fromKop(directCostKop),
     linesWithoutCost: withoutCost,
     plannedProfit: fromKop(profitKop),
@@ -174,4 +190,16 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
       other: fromKop(costGroups.other),
     },
   };
+}
+
+/** Итог сметы, если все материалы взять эконом / стандарт / премиум (класс — по правилам materialTiers) */
+export function variantTotals(lines: (LineInput & { name: string })[], p: EstimateParams = {}): Record<Tier, number> | null {
+  const hasMat = lines.some((l) => !isOptionalSection(l.category) && ((l.type === 'material' && Number(l.price) > 0) || posNum(l.matPrice) > 0));
+  if (!hasMat) return null;
+  const at = (t: Tier) => calcEstimate(lines.map((l) => {
+    if (l.type === 'material' && Number(l.price) > 0) return { ...l, price: pickVariant(l.name, Number(l.price), t).price };
+    if (posNum(l.matPrice) > 0) return { ...l, matPrice: pickVariant(`${l.name} (материал)`, posNum(l.matPrice), t).price };
+    return l;
+  }), p).total;
+  return { eco: at('eco'), std: at('std'), prem: at('prem') };
 }

@@ -3,7 +3,7 @@ import ShopLink from '../components/ShopLink';
 import { materialVariants, currentTier } from '../../../shared/materialTiers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { get, post, put, del } from '../api';
-import { calcEstimate } from '../../../shared/estimate';
+import { calcEstimate, variantTotals, isOptionalSection, OPTIONAL_SECTION } from '../../../shared/estimate';
 import { checkEstimate } from '../../../shared/estimateCheck';
 import { forgottenFor, WORK_COEFS, coefTag, PACK_UNIT } from '../../../shared/forgotten';
 import { payStages, DEFAULT_SCHEDULE } from '../../../shared/payments';
@@ -18,7 +18,7 @@ import { normName } from '../../../shared/names';
 
 type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; matPrice: string; coef: string; composition: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
 type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string; customerDetails: string; workStart: string; workEnd: string; warrantyMonths: string;
-  sectionCoefs: Record<string, number>; paySchedule: { title: string; pct: string }[];
+  sectionCoefs: Record<string, number>; paySchedule: { title: string; pct: string }[]; showVariants: boolean;
   discountPct: string; markupPct: string; taxPct: string; lossReservePct: string; delivery: string; extraCosts: string; roundAdjust: string };
 
 let seq = 0;
@@ -26,13 +26,13 @@ const key = () => `l${Date.now()}_${seq++}`;
 const toL = (l: any): L => ({ k: key(), id: l.id, name: l.name, qty: String(l.qty ?? ''), unit: l.unit || 'шт', price: String(l.price ?? ''), matPrice: l.matPrice == null || Number(l.matPrice) === 0 ? '' : String(l.matPrice), coef: l.coef == null || Number(l.coef) === 1 ? '' : String(l.coef), composition: l.composition || '', costPrice: l.costPrice == null ? '' : String(l.costPrice), type: l.type || 'work', category: l.category || '', note: l.note || '', catalogItemId: l.catalogItemId, unconfirmed: l.unconfirmed });
 const toH = (e: any): H => ({ title: e.title, customer: e.customer || '', address: e.address || '', date: dateInput(e.date), status: e.status, projectId: e.projectId, notes: e.notes || '', paymentTerms: e.paymentTerms || '', validDays: String(e.validDays ?? 14),
   customerDetails: e.customerDetails || '', workStart: e.workStart ? dateInput(e.workStart) : '', workEnd: e.workEnd ? dateInput(e.workEnd) : '', warrantyMonths: String(e.warrantyMonths ?? 12),
-  sectionCoefs: (e.sectionCoefs && typeof e.sectionCoefs === 'object' ? e.sectionCoefs : {}), paySchedule: Array.isArray(e.paySchedule) ? e.paySchedule.map((x: any) => ({ title: x.title, pct: String(x.pct) })) : [],
+  sectionCoefs: (e.sectionCoefs && typeof e.sectionCoefs === 'object' ? e.sectionCoefs : {}), showVariants: Boolean(e.showVariants), paySchedule: Array.isArray(e.paySchedule) ? e.paySchedule.map((x: any) => ({ title: x.title, pct: String(x.pct) })) : [],
   discountPct: String(e.discountPct || 0), markupPct: String(e.markupPct || 0), taxPct: String(e.taxPct || 0), lossReservePct: String(e.lossReservePct || 0), delivery: String(e.delivery || 0), extraCosts: String(e.extraCosts || 0), roundAdjust: String(e.roundAdjust || 0) });
 const payload = (h: H, lines: L[]) => ({
   title: h.title.trim() || 'Без названия', customer: h.customer || null, address: h.address || null, date: h.date || undefined, status: h.status, projectId: h.projectId || null, notes: h.notes || null,
   paymentTerms: h.paymentTerms || null, validDays: Math.max(1, Math.round(parseNum(h.validDays)) || 14),
   customerDetails: h.customerDetails || null, workStart: h.workStart || null, workEnd: h.workEnd || null, warrantyMonths: Math.max(0, Math.min(120, Math.round(parseNum(h.warrantyMonths)))),
-  sectionCoefs: Object.keys(h.sectionCoefs).length ? h.sectionCoefs : null,
+  sectionCoefs: Object.keys(h.sectionCoefs).length ? h.sectionCoefs : null, showVariants: h.showVariants,
   paySchedule: h.paySchedule.filter((x) => x.title.trim() && parseNum(x.pct) > 0).length ? h.paySchedule.filter((x) => x.title.trim() && parseNum(x.pct) > 0).map((x) => ({ title: x.title.trim(), pct: parseNum(x.pct) })) : null,
   discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts), roundAdjust: parseNum(h.roundAdjust),
   lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name.trim(), qty: parseNum(l.qty), unit: l.unit || 'шт', price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), coef: l.coef === '' ? 1 : (parseNum(l.coef) > 0 ? parseNum(l.coef) : 1), composition: l.composition.trim() || null, costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category || null, note: l.note || null, catalogItemId: l.catalogItemId || null, unconfirmed: Boolean(l.unconfirmed) })),
@@ -152,6 +152,11 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const totals = useMemo(() => calcEstimate(
     lines.map((l) => ({ qty: parseNum(l.qty), price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), coef: l.coef === '' ? 1 : parseNum(l.coef), costPrice: l.costPrice === '' ? null : parseNum(l.costPrice), type: l.type, category: l.category })),
     { discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts), roundAdjust: parseNum(h.roundAdjust), sectionCoefs: h.sectionCoefs },
+  ), [lines, h]);
+
+  const variants = useMemo(() => variantTotals(
+    lines.map((l) => ({ name: l.name, qty: parseNum(l.qty), price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), coef: l.coef === '' ? 1 : parseNum(l.coef), type: l.type, category: l.category })),
+    { discountPct: parseNum(h.discountPct), markupPct: parseNum(h.markupPct), taxPct: parseNum(h.taxPct), lossReservePct: parseNum(h.lossReservePct), delivery: parseNum(h.delivery), extraCosts: parseNum(h.extraCosts), sectionCoefs: h.sectionCoefs },
   ), [lines, h]);
 
   /** Подобрать скидку так, чтобы итог стал ровно target (налог начисляется сверху) */
@@ -389,6 +394,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <h2 className="section-title">Итог</h2>
       <div className="panel">
         <div className="dim"><div className="dim-value num">{rub(totals.total)}</div><div className="dim-label">Итого заказчику · работы {rub(totals.worksSubtotal)} · материалы {rub(totals.materialsSubtotal)}</div></div>
+        {totals.optionalTotal > 0 && <div className="xs muted" style={{ marginTop: 4 }}>+ по желанию заказчика {rub(totals.optionalTotal)} — не входит в итог</div>}
+        {h.showVariants && variants && <div className="xs" style={{ marginTop: 4 }}>Варианты: эконом {rub(variants.eco)} · стандарт {rub(variants.std)} · премиум {rub(variants.prem)}</div>}
         <Fold id="est-total" title="Как получилась сумма" summary={[totals.markup > 0 && 'наценка', totals.discount > 0 && 'скидка', totals.tax > 0 && 'налог'].filter(Boolean).join(', ') || 'без наценок'}>
         <table className="breakdown">
           <tbody>
@@ -561,6 +568,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           </div>
           <p className="xs muted">Порядок: подытог → резерв → наценка → скидка → доставка и доп. расходы → налог. Коэффициенты строк и разделов применяются к ценам.</p>
           <div className="panel stack">
+            <div className="row between"><div className="title" style={{ fontWeight: 700 }}>Три варианта для заказчика</div>
+              <input type="checkbox" id="showVariants" checked={h.showVariants} disabled={readOnly || !variants} onChange={(e) => setHead({ showVariants: e.target.checked })} aria-label="Показать заказчику три варианта" style={{ width: 22, height: 22 }} /></div>
+            {variants ? <div className="xs">Эконом <b className="num">{rub(variants.eco)}</b> · Стандарт <b className="num">{rub(variants.std)}</b> · Премиум <b className="num">{rub(variants.prem)}</b></div> : <div className="xs muted">Появится, когда в смете будут материалы с ценой.</div>}
+            <div className="xs muted">Работы те же, меняется класс материалов. Включите галочку — заказчик увидит все три итога в PDF и по ссылке и выберет сам.</div>
+          </div>
+          <div className="panel stack">
             <div className="title" style={{ fontWeight: 700 }}>Надбавки на работы</div>
             <div className="row wrap" style={{ gap: 6 }}>
               {WORK_COEFS.map((c) => <button key={c.id} className={`chip ${coefOn(c) ? 'on' : ''}`} disabled={readOnly} onClick={() => toggleCoef(c)}>{c.label} ×{String(c.k).replace('.', ',')}</button>)}
@@ -638,6 +651,11 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             </Field>
             <Field label="Примечание"><input className="input" value={current.note} onChange={(e) => setLine(current.k, { note: e.target.value })} readOnly={readOnly} /></Field>
             <datalist id="sections">{[...new Set(lines.map((x) => x.category).filter(Boolean))].map((c) => <option key={c} value={c} />)}</datalist>
+            {!readOnly && (
+              <button className={`btn sm block ${isOptionalSection(current.category) ? '' : 'ghost'}`} onClick={() => setLine(current.k, { category: isOptionalSection(current.category) ? current.category.replace(/^\s*по желанию:?\s*/i, '') : `${OPTIONAL_SECTION}${current.category ? `: ${current.category}` : ''}` })}>
+                {isOptionalSection(current.category) ? '↩ Вернуть в основную смету' : '☑ Сделать «по желанию» — заказчик решит сам, в итог не входит'}
+              </button>
+            )}
             {current.unconfirmed && <label className="row small"><input type="checkbox" checked={!current.unconfirmed} onChange={() => setLine(current.k, { unconfirmed: false })} />Позиция уточнена</label>}
             {!readOnly && (
               <div className="row wrap">

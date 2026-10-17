@@ -27,7 +27,9 @@ export function estimatePage(d: any, m: PageMeta) {
   const date = new Date(e.date);
   const validTo = new Date(date.getTime() + (e.validDays ?? 14) * 864e5);
   const rows = groups.map(([cat, items]) => `
-    ${cat ? `<div class="cat"><span>${esc(cat)}</span><b>${money(items.reduce((s: number, i: any) => s + i.amount, 0))}</b></div>` : ''}
+    ${cat ? (/^\s*по желанию/i.test(cat)
+      ? `<label class="cat opt"><span><input type="checkbox" class="optc" data-sum="${items.reduce((s: number, i: any) => s + i.amount, 0)}"> ${esc(cat)} <small class="muted">— не входит в итог, отметьте, чтобы добавить</small></span><b>${money(items.reduce((s: number, i: any) => s + i.amount, 0))}</b></label>`
+      : `<div class="cat"><span>${esc(cat)}</span><b>${money(items.reduce((s: number, i: any) => s + i.amount, 0))}</b></div>`) : ''}
     ${items.map((l: any) => `<div class="line"><div class="ln"><div>${esc(l.name)}${l.composition?.length ? ', в составе:' : ''}</div>${l.composition?.length ? `<ul>${l.composition.map((c: string) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}${l.note ? `<small>${esc(l.note)}</small>` : ''}<small>${qty(l.qty)} ${esc(l.unit)} × ${money(l.price)}${d.split && l.unitMat && l.unitWork ? ` (работа ${money(l.unitWork)} + материал ${money(l.unitMat)})` : ''}</small></div><b>${money(l.amount)}</b></div>`).join('')}
   `).join('');
   const sum = (label: string, v: number, neg = false) => (v ? `<div class="sum"><span>${label}</span><span>${neg ? '−' : ''}${money(v)}</span></div>` : '');
@@ -43,8 +45,8 @@ export function estimatePage(d: any, m: PageMeta) {
     <h1>${esc(e.title)}</h1>
     ${e.customer ? `<div class="kv"><span>Заказчик</span><b>${esc(e.customer)}</b></div>` : ''}
     ${e.address ? `<div class="kv"><span>Адрес</span><b>${esc(e.address)}</b></div>` : ''}
-    <div class="total">${money(t.total)}</div>
-    <div class="muted small">итого к оплате</div>
+    <div class="total" id="tot">${money(t.total)}</div>
+    <div class="muted small" id="totl">итого к оплате</div>
   </div>
   ${m.designUrl ? `<a class="btn main" href="${esc(m.designUrl)}">🧊 Посмотреть объект в 3D и чертежи</a>` : ''}
   <div class="card">${rows}
@@ -52,10 +54,12 @@ export function estimatePage(d: any, m: PageMeta) {
       ${sum('Работы', t.works)}${sum('Материалы', t.materials)}${sum('Техника, услуги и прочее', t.other)}
       ${sum('Накладные и непредвиденные расходы', t.overhead)}${sum('Доставка', t.delivery)}${sum('Дополнительные расходы', t.extraCosts)}
       ${sum(`Скидка ${t.discountPct}%`, t.discount, true)}${sum(`Налог ${t.taxPct}%`, t.tax)}${t.roundAdjust ? `<div class="sum"><span>Округление</span><span>${money(t.roundAdjust)}</span></div>` : ''}
-      <div class="sum grand"><span>Итого</span><span>${money(t.total)}</span></div>
+      <div class="sum grand"><span>Итого</span><span id="tot2">${money(t.total)}</span></div>
+      ${t.optional ? `<div class="sum"><span>По желанию (отметьте галочкой — посчитаем)</span><span>+ ${money(t.optional)}</span></div>` : ''}
       ${d.paid ? `<div class="sum"><span>Получено</span><span>${money(d.paid)}</span></div><div class="sum grand2"><span>Всего к оплате</span><span>${money(d.toPay)}</span></div>` : ''}
     </div>
   </div>
+  ${d.variants ? `<div class="card"><h2>Варианты по классу материалов</h2>${[['eco', 'Эконом'], ['std', 'Стандарт'], ['prem', 'Премиум']].map(([k, l]) => `<div class="sum"><span>${l}</span><span>${money(d.variants[k])}</span></div>`).join('')}<p class="muted small">Работы те же — меняется класс материалов. Скажите исполнителю, какой вариант удобнее.</p></div>` : ''}
   ${d.stages?.length ? `<div class="card"><h2>График оплаты</h2>${d.stages.map((x: any) => `<div class="sum"><span>${esc(x.title)} · ${x.pct}%</span><span>${money(x.amount)}${x.status === 'paid' ? ' ✓' : ''}</span></div>`).join('')}</div>` : ''}
   ${e.paymentTerms ? `<div class="card"><h2>Условия оплаты</h2><p class="pre">${esc(e.paymentTerms)}</p></div>` : ''}
   ${e.notes ? `<div class="card"><h2>Примечания</h2><p class="pre">${esc(e.notes)}</p></div>` : ''}
@@ -75,6 +79,14 @@ export function estimatePage(d: any, m: PageMeta) {
   </div>
   ${m.hideBrand ? (m.company ? `<div class="foot">${esc(m.company)}</div>` : '') : `<div class="foot">Смета подготовлена в ${bot ? `<a href="${bot}">СМЕТА PRO</a>` : 'СМЕТА PRO'} — сметы и учёт объектов для строителей в Telegram</div>`}
   <script>
+    const BASE = ${Number(t.total) || 0};
+    const fmt = (v) => (Math.round(v * 100) / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
+    document.querySelectorAll('.optc').forEach((c) => c.addEventListener('change', () => {
+      let add = 0; document.querySelectorAll('.optc').forEach((x) => { if (x.checked) add += Number(x.dataset.sum) || 0; });
+      document.getElementById('tot').textContent = fmt(BASE + add);
+      document.getElementById('tot2').textContent = fmt(BASE + add);
+      document.getElementById('totl').textContent = add ? 'итого с выбранными позициями по желанию' : 'итого к оплате';
+    }));
     const msg = (t, bad) => { const m = document.getElementById('msg'); m.textContent = t; m.className = 'msg ' + (bad ? 'bad' : 'good'); };
     const call = async (path, body) => {
       const r = await fetch('/s/${token}/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -128,6 +140,7 @@ main{max-width:640px;margin:0 auto;padding:16px}
 .in{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;margin-top:6px}
 details{margin-top:12px}summary{cursor:pointer;color:var(--muted);padding:6px 0}
 .ok{color:var(--ok);font-weight:800;font-size:19px}
+.cat b{white-space:nowrap}.cat.opt{cursor:pointer;align-items:center}.cat.opt input{width:18px;height:18px;vertical-align:-3px;accent-color:var(--accent)}.cat.opt small{font-weight:400}
 .msg{margin-top:10px;font-size:14px}.msg.good{color:var(--ok)}.msg.bad{color:var(--bad)}
 .foot{text-align:center;color:var(--muted);font-size:12px;padding:8px 0 24px}.foot a{color:var(--accent-text)}
 </style></head><body><main>${body}</main></body></html>`;

@@ -23,6 +23,13 @@ from reportlab.platypus import Image, KeepTogether, PageBreak, Paragraph, Simple
 FONT_DIRS = [os.environ.get("PDF_FONT_DIR", ""), "/usr/share/fonts/truetype/dejavu", os.path.join(os.path.dirname(__file__), "fonts")]
 
 
+
+def is_opt(cat):
+    return bool(cat) and str(cat).strip().lower().startswith("по желанию")
+
+
+OPT_NOTE = " — не входит в итог"
+
 def find_font(name):
     for d in FONT_DIRS:
         p = os.path.join(d, name)
@@ -199,7 +206,7 @@ def modern_items(d, W, with_paid=False):
     n = 0
     for cat, items in groups:
         if cat:
-            rows.append([Paragraph(esc(cat), S["cat"]), "", "", "", "", Paragraph(money(sum(float(i.get("amount") or 0) for i in items)), S["headr"])])
+            rows.append([Paragraph(esc(cat) + (OPT_NOTE if is_opt(cat) else ""), S["cat"]), "", "", "", "", Paragraph(money(sum(float(i.get("amount") or 0) for i in items)), S["headr"])])
             style += [("SPAN", (0, len(rows) - 1), (4, len(rows) - 1)), ("TOPPADDING", (0, len(rows) - 1), (-1, len(rows) - 1), 7)]
         for l in items:
             n += 1
@@ -239,6 +246,11 @@ def modern_items(d, W, with_paid=False):
         tr.append([Paragraph("Округление", S["labelr"]), Paragraph(money(t.get("roundAdjust")), S["labelr"])])
     gi = len(tr)
     tr.append([Paragraph(t.get("totalLabel") or "Итого", S["totalr"]), Paragraph(money(t.get("total")), S["totalr"])])
+    if t.get("optional"):
+        tr.append([Paragraph("По желанию заказчика (не входит в итог)", S["labelr"]), Paragraph("+ " + money(t.get("optional")), S["labelr"])])
+    for lbl, key in (("Вариант «эконом»", "eco"), ("Вариант «стандарт»", "std"), ("Вариант «премиум»", "prem")):
+        if (d.get("variants") or {}).get(key):
+            tr.append([Paragraph(lbl + " — по классу материалов", S["labelr"]), Paragraph(money(d["variants"][key]), S["labelr"])])
     if with_paid and d.get("paid"):
         tr.append([Paragraph("Получено", S["labelr"]), Paragraph(money(d.get("paid")), S["labelr"])])
         tr.append([Paragraph("Всего к оплате", S["totalr"]), Paragraph(money(d.get("toPay")), S["totalr"])])
@@ -300,7 +312,7 @@ def classic_items(d, W, with_paid=False):
     for cat in order:
         items = [l for l in lines if (l.get("category") or "") == cat]
         if many:
-            rows.append([Paragraph(esc(cat or "Прочие работы").upper(), C_SEC)] + [""] * (ncol - 1))
+            rows.append([Paragraph(esc(cat or "Прочие работы").upper() + (OPT_NOTE if is_opt(cat) else ""), C_SEC)] + [""] * (ncol - 1))
             i = len(rows) - 1
             style += [("SPAN", (0, i), (-1, i)), ("BACKGROUND", (0, i), (-1, i), CSEC)]
         for l in items:
@@ -346,6 +358,11 @@ def classic_items(d, W, with_paid=False):
     if t.get("roundAdjust"):
         tot.append(("Округление:", rub_r(t.get("roundAdjust")), False))
     tot.append((t.get("totalLabel", "Сметная стоимость") + ":", rub_r(t.get("total")), True))
+    if t.get("optional"):
+        tot.append(("По желанию заказчика (не входит в итог):", "+ " + rub_r(t.get("optional")), False))
+    for lbl, key in (("Вариант «эконом»", "eco"), ("Вариант «стандарт»", "std"), ("Вариант «премиум»", "prem")):
+        if (d.get("variants") or {}).get(key):
+            tot.append((lbl + " (по классу материалов):", rub_r(d["variants"][key]), False))
     if with_paid and d.get("paid") is not None:
         tot.append(("Получено:", rub_r(d.get("paid") or 0), False))
         tot.append(("Всего к оплате:", rub_r(d.get("toPay")), True))

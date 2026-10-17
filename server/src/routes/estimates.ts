@@ -46,6 +46,7 @@ const headerSchema = z.object({
   workEnd: z.coerce.date().nullable().optional(),
   warrantyMonths: z.coerce.number().int().min(0).max(120).optional(),
   sectionCoefs: z.record(z.string().max(100), z.coerce.number().min(0.01).max(100)).nullable().optional(),
+  showVariants: z.boolean().optional(),
   paySchedule: z.array(z.object({ title: z.string().trim().min(1).max(200), pct: z.coerce.number().min(0).max(100) })).max(10).nullable().optional(),
   purchased: z.array(z.string().max(400)).max(2000).nullable().optional(),
 });

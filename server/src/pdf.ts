@@ -8,6 +8,7 @@ import { num } from './util';
 import { estimateTotals } from './routes/estimates';
 import { brandPath } from './brand';
 import { payStages } from '../../shared/payments';
+import { variantTotals } from '../../shared/estimate';
 
 const DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../pdf');
 const SCRIPT = path.join(DIR, 'estimate_pdf.py');
@@ -49,7 +50,13 @@ export function pdfData(e: any, user: any, number: number, free = false, paid: n
       overhead: Math.round((t.reserve + t.markup) * 100) / 100, // резерв и наценка — одной строкой «накладные»
       delivery: t.delivery, extraCosts: t.extraCosts, discount: t.discount, discountPct: num(e.discountPct),
       tax: t.tax, taxPct: num(e.taxPct), roundAdjust: t.roundAdjust, total: t.total,
+      optional: t.optionalTotal || 0,
     },
+    // три варианта по классу материалов (если исполнитель включил)
+    variants: e.showVariants ? variantTotals(
+      e.lines.map((l: any) => ({ name: l.name, qty: num(l.qty), price: num(l.price), matPrice: l.matPrice == null ? null : num(l.matPrice), coef: l.coef == null ? 1 : num(l.coef), type: l.type, category: l.category })),
+      { discountPct: num(e.discountPct), markupPct: num(e.markupPct), taxPct: num(e.taxPct), lossReservePct: num(e.lossReservePct), delivery: num(e.delivery), extraCosts: num(e.extraCosts), sectionCoefs: (e.sectionCoefs as any) || null },
+    ) : null,
   };
 }
 

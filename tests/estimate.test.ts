@@ -86,3 +86,17 @@ test('округление итога: прибавляется после на�
   assert.equal(t.tax, 6000);
   assert.equal(t.roundAdjust, -1000);
 });
+
+test('позиции «по желанию» не входят в итог, но считаются отдельно', async () => {
+  const { calcEstimate, variantTotals } = await import('../shared/estimate');
+  const base = [{ qty: 10, price: 100, type: 'work', category: 'Работы' }, { qty: 2, price: 500, type: 'material', category: 'Работы' }];
+  const a = calcEstimate(base, { taxPct: 10 });
+  const b = calcEstimate([...base, { qty: 5, price: 300, type: 'work', category: 'По желанию: тёплый пол' }], { taxPct: 10 });
+  assert.equal(b.total, a.total);
+  assert.equal(b.optionalTotal, 1500);
+  assert.equal(b.sections.find((s) => s.name.startsWith('По желанию'))!.amount, 1500);
+  const v = variantTotals([{ name: 'Укладка', qty: 10, price: 100, type: 'work' }, { name: 'Ламинат 33 класс', qty: 10, price: 1000, type: 'material' }]);
+  assert.ok(v && v.eco < v.std && v.std < v.prem);
+  assert.equal(v!.std, 11000);
+  assert.equal(variantTotals([{ name: 'Укладка', qty: 1, price: 100, type: 'work' }]), null);
+});
