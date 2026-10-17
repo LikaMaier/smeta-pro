@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<!-- Ролик «Белка улетает в ураган»: формат «внезапно сбежать из неловкой ситуации». Свои персонажи: белка-прораб и гусь-заказчик. Мем — только ситуация «улетел в ураган». -->
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.cap { position: absolute; left: 22px; right: 22px; text-align: center; font-family: 'PT', 'Noto Color Emoji', sans-serif; font-weight: 700; color: #fff;
+  font-size: 34px; line-height: 1.16; -webkit-text-stroke: 7px #000; paint-order: stroke fill; letter-spacing: .2px; }
+.cap.big { font-size: 60px; line-height: 1.0; }
+.cap .y { color: #FFD43B; }
+#phone { position: absolute; left: 50%; top: 50%; width: 330px; height: 714px; margin: -320px 0 0 -165px; border-radius: 46px; background: #0b0f16;
+  box-shadow: 0 40px 90px rgba(0,0,0,.6), inset 0 0 0 3px #2c3442; padding: 12px; opacity: 0; }
+#phone .scr { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #0D2440; }
+#phone img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#tap { position: absolute; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.85); opacity: 0; }
+#timer { position: absolute; left: 50%; transform: translateX(-50%); bottom: 24px; font-family: 'PTN'; font-size: 34px; color: #0a1a30; background: #FFD43B; padding: 4px 14px; border-radius: 14px; box-shadow: 0 5px 0 #b38b00; opacity: 0; }
+#end { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 0; color: #fff; text-align: center; font-family: 'PT'; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 30px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 10px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#fade { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #fff; }
+</style></head><body><div id="stage">
+<svg id="sv" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fa8d8"/><stop offset=".6" stop-color="#f6c98a"/><stop offset="1" stop-color="#f7a868"/></linearGradient>
+    <linearGradient id="skyS" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d3346"/><stop offset=".6" stop-color="#5d5a66"/><stop offset="1" stop-color="#8c7a6a"/></linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b58a5a"/><stop offset="1" stop-color="#6b4a2e"/></linearGradient>
+    <radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff4c8"/><stop offset=".35" stop-color="#ffd27a" stop-opacity=".7"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>
+    <radialGradient id="sqG" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#e3954a"/><stop offset="1" stop-color="#a95a1f"/></radialGradient>
+    <radialGradient id="tailG" cx=".4" cy=".4" r=".8"><stop offset="0" stop-color="#f0a85c"/><stop offset="1" stop-color="#b8611f"/></radialGradient>
+    <radialGradient id="gsG" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d4d6dc"/></radialGradient>
+    <linearGradient id="helm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd25a"/><stop offset="1" stop-color="#f29a00"/></linearGradient>
+    <radialGradient id="vigG" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+    <filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="blur6"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+  <g id="cam">
+    <rect x="-300" y="-400" width="1140" height="1500" fill="url(#sky)"/>
+    <rect id="skyStorm" x="-300" y="-400" width="1140" height="1500" fill="url(#skyS)" opacity="0"/>
+    <circle id="sunC" cx="120" cy="330" r="200" fill="url(#sun)"/>
+    <g id="clouds"></g>
+    <g id="tornado" opacity="0"></g>
+    <g id="house"></g>
+    <path d="M-300 720 Q270 700 840 720 L840 1300 L-300 1300Z" fill="url(#ground)"/>
+    <g id="props"></g>
+    <g id="squirrel"></g>
+    <g id="goose"></g>
+    <g id="hatFly"></g>
+    <g id="leaves"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+</svg>
+<div id="dim" style="position:absolute;inset:0;background:rgba(5,10,20,.62);opacity:0"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="timer">0:00</div>
+<div id="capA" class="cap" style="top:64px"></div>
+<div id="capB" class="cap" style="bottom:110px"></div>
+<div id="end"><div class="logo">СМЕТА PRO</div><div class="l2">Смета с работами и материалами —<br><span style="color:#FFD43B">за 2 минуты прямо в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">3 сметы в месяц — бесплатно</div></div>
+<div id="fade"></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const E = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const eIn = (x) => Math.pow(clamp(x), 2.2);
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const st = { stroke: '#22181a', 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+
+// ---------------- таймлайн ----------------
+const T = { s1: [0, 2.6], storm: [2.6, 6.2], phone: [6.2, 14.6], win: [14.6, 18.4], end: [18.4, 21.4] };
+window.DUR = 21.4;
+const LIFT = 3.3, GONE = 5.3, HAT = 16.0;
+
+// ---------------- фон: стройплощадка, каркас дома ----------------
+(function buildSite() {
+  const c = $('clouds');
+  for (const [x, y, s] of [[60, 160, 1], [380, 110, 1.3], [470, 260, .8], [200, 60, .9]]) {
+    const g = E('g', { transform: `translate(${x},${y}) scale(${s})` }, c);
+    for (const [dx, dy, r] of [[0, 0, 34], [36, -14, 40], [76, 0, 32], [36, 10, 36]]) E('circle', { cx: dx, cy: dy, r, fill: '#fff7ea', opacity: .85 }, g);
+  }
+  const h = $('house');
+  // фундамент и каркас из брусьев
+  E('rect', { x: 210, y: 690, width: 300, height: 30, fill: '#9a9894', ...st }, h);
+  for (let i = 0; i < 6; i++) E('rect', { x: 216 + i * 56, y: 470, width: 14, height: 222, fill: '#e2b679', ...st, 'stroke-width': 2 }, h);
+  E('rect', { x: 210, y: 462, width: 300, height: 14, fill: '#d6a564', ...st, 'stroke-width': 2 }, h);
+  E('rect', { x: 210, y: 580, width: 300, height: 10, fill: '#d6a564', ...st, 'stroke-width': 2 }, h);
+  // стропила
+  E('path', { d: 'M200 466 L360 360 L520 466', fill: 'none', stroke: '#22181a', 'stroke-width': 18, 'stroke-linejoin': 'round' }, h);
+  E('path', { d: 'M200 466 L360 360 L520 466', fill: 'none', stroke: '#e2b679', 'stroke-width': 12, 'stroke-linejoin': 'round' }, h);
+  E('path', { d: 'M360 362 L360 466 M280 414 L280 466 M440 414 L440 466', stroke: '#c9955a', 'stroke-width': 8 }, h);
+  const p = $('props');
+  // штабель досок, мешок, тачка, конус
+  for (let i = 0; i < 5; i++) E('rect', { x: -40, y: 790 - i * 12, width: 150, height: 12, rx: 2, fill: i % 2 ? '#e8c08a' : '#d9ac70', ...st, 'stroke-width': 1.6 }, p);
+  E('path', { d: 'M490 800 L510 740 L530 800Z', fill: '#ff7a1a', ...st }, p);
+  E('path', { d: 'M497 780 L523 780', stroke: '#fff', 'stroke-width': 6 }, p);
+})();
+
+// торнадо — стопка вращающихся эллипсов в небе справа
+const TOR = [];
+(function buildTornado() {
+  const g = $('tornado');
+  for (let i = 0; i < 14; i++) TOR.push(E('ellipse', { cx: 0, cy: 0, rx: 10, ry: 8, fill: 'none', stroke: i % 2 ? '#9aa0ae' : '#c6cad3', 'stroke-width': 9, opacity: .8 }, g));
+})();
+
+// листья и мусор, летящие с ветром
+const LV = [];
+(function buildLeaves() {
+  const g = $('leaves');
+  for (let i = 0; i < 46; i++) {
+    const k = i % 4, e = E('g', {}, g);
+    if (k === 0) E('path', { d: 'M0 -8 Q10 0 0 8 Q-10 0 0 -8Z', fill: '#e8a23a', ...st, 'stroke-width': 1.5 }, e);
+    else if (k === 1) E('path', { d: 'M0 -7 Q9 0 0 7 Q-9 0 0 -7Z', fill: '#c9542c', ...st, 'stroke-width': 1.5 }, e);
+    else if (k === 2) E('rect', { x: -12, y: -3, width: 24, height: 6, fill: '#e2b679', ...st, 'stroke-width': 1.5 }, e); // щепка
+    else E('path', { d: 'M-40 0 L40 0', stroke: 'rgba(255,255,255,.55)', 'stroke-width': 3, 'stroke-linecap': 'round' }, e); // струя ветра
+    LV.push(e);
+  }
+})();
+
+// ---------------- белка-прораб ----------------
+const S = {};
+(function buildSquirrel() {
+  const g = $('squirrel');
+  S.shadow = E('ellipse', { cx: 0, cy: 4, rx: 80, ry: 13, fill: 'rgba(0,0,0,.3)', filter: 'url(#blur2)' }, g);
+  S.body = E('g', {}, g);
+  const b = S.body;
+  S.tail = E('g', {}, b);
+  E('path', { d: 'M24 -40 Q120 -50 118 -170 Q114 -270 30 -262 Q-6 -256 6 -232 Q70 -226 66 -160 Q60 -96 6 -70Z', fill: 'url(#tailG)', ...st }, S.tail);
+  E('path', { d: 'M40 -230 Q96 -210 92 -150 M60 -110 Q90 -130 100 -170', fill: 'none', stroke: '#8f4a16', 'stroke-width': 3, 'stroke-linecap': 'round' }, S.tail);
+  E('ellipse', { cx: -26, cy: -8, rx: 24, ry: 12, fill: '#8f4a16', ...st }, b); E('ellipse', { cx: 26, cy: -8, rx: 24, ry: 12, fill: '#8f4a16', ...st }, b);
+  E('ellipse', { cx: 0, cy: -84, rx: 56, ry: 76, fill: 'url(#sqG)', ...st }, b);
+  E('ellipse', { cx: 0, cy: -72, rx: 34, ry: 52, fill: '#f6dcb4' }, b);
+  // жилет
+  E('path', { d: 'M-50 -128 Q-58 -60 -40 -28 L-18 -28 L-18 -132Z M50 -128 Q58 -60 40 -28 L18 -28 L18 -132Z', fill: '#ff7a1a', ...st }, b);
+  E('path', { d: 'M-54 -92 L-18 -92 M18 -92 L54 -92', stroke: '#e9f4f4', 'stroke-width': 8 }, b);
+  // руки
+  S.armL = E('g', {}, b); S.armR = E('g', {}, b);
+  E('path', { d: 'M-44 -120 Q-74 -96 -58 -70', fill: 'none', stroke: '#b8611f', 'stroke-width': 20, 'stroke-linecap': 'round' }, S.armL);
+  E('path', { d: 'M44 -120 Q74 -96 58 -70', fill: 'none', stroke: '#b8611f', 'stroke-width': 20, 'stroke-linecap': 'round' }, S.armR);
+  S.phone = E('g', { opacity: 0 }, S.armR);
+  E('rect', { x: 44, y: -98, width: 28, height: 46, rx: 6, fill: '#11151c', ...st }, S.phone);
+  E('rect', { x: 48, y: -94, width: 20, height: 36, rx: 3, fill: '#4f9be8' }, S.phone);
+  // голова
+  S.head = E('g', {}, b);
+  const h = S.head;
+  E('path', { d: 'M-42 -222 L-50 -272 L-16 -246Z', fill: '#c56f2a', ...st }, h); E('path', { d: 'M42 -222 L50 -272 L16 -246Z', fill: '#c56f2a', ...st }, h);
+  E('path', { d: 'M-50 -272 l-6 -12 M-50 -272 l4 -13 M50 -272 l6 -12 M50 -272 l-4 -13', stroke: '#8f4a16', 'stroke-width': 4, 'stroke-linecap': 'round' }, h);
+  E('ellipse', { cx: 0, cy: -196, rx: 58, ry: 50, fill: 'url(#sqG)', ...st }, h);
+  E('ellipse', { cx: -30, cy: -176, rx: 18, ry: 13, fill: '#f6dcb4' }, h); E('ellipse', { cx: 30, cy: -176, rx: 18, ry: 13, fill: '#f6dcb4' }, h);
+  E('ellipse', { cx: 0, cy: -180, rx: 8, ry: 6, fill: '#22181a' }, h);
+  S.mouth = E('path', { d: '', fill: '#5a1f2a', stroke: '#22181a', 'stroke-width': 2.5 }, h);
+  S.teeth = E('rect', { x: -6, y: -168, width: 12, height: 9, rx: 1.5, fill: '#fff', stroke: '#22181a', 'stroke-width': 1.5 }, h);
+  S.eyeW = [-22, 22].map((x) => E('ellipse', { cx: x, cy: -206, rx: 12, ry: 14, fill: '#fff', ...st, 'stroke-width': 2 }, h));
+  S.pup = [-22, 22].map((x) => E('circle', { cx: x, cy: -204, r: 6.5, fill: '#111' }, h));
+  S.brow = [-22, 22].map(() => E('path', { d: '', stroke: '#22181a', 'stroke-width': 4.5, 'stroke-linecap': 'round', fill: 'none' }, h));
+  S.sweat = E('g', { opacity: 0 }, h);
+  for (const [x, y, s] of [[58, -224, 1], [68, -196, .7], [-60, -214, .8]]) E('path', { d: `M${x} ${y} q${-7 * s} ${12 * s} 0 ${16 * s} q${7 * s} ${-4 * s} 0 ${-16 * s}Z`, fill: '#8fd3ff', stroke: '#2a6fa8', 'stroke-width': 1.5 }, S.sweat);
+  // каска
+  S.helm = E('g', {}, h);
+  E('path', { d: 'M-52 -226 Q-50 -284 0 -288 Q50 -284 52 -226Z', fill: 'url(#helm)', ...st }, S.helm);
+  E('path', { d: 'M-66 -226 L66 -226 Q68 -216 56 -216 L-56 -216 Q-68 -216 -66 -226Z', fill: '#f29a00', ...st }, S.helm);
+  E('path', { d: 'M-8 -286 L-8 -228 M8 -286 L8 -228', stroke: '#e08600', 'stroke-width': 4 }, S.helm);
+})();
+
+// ---------------- гусь-заказчик ----------------
+const G = {};
+(function buildGoose() {
+  const g = $('goose');
+  E('ellipse', { cx: 0, cy: 4, rx: 80, ry: 13, fill: 'rgba(0,0,0,.3)', filter: 'url(#blur2)' }, g);
+  E('path', { d: 'M-30 -30 L-34 0 L-14 0 Z M24 -30 L20 0 L40 0Z', fill: '#f39a1e', ...st }, g);
+  E('ellipse', { cx: 0, cy: -90, rx: 70, ry: 66, fill: 'url(#gsG)', ...st }, g);
+  E('path', { d: 'M60 -110 Q96 -120 92 -80 Q80 -70 58 -76Z', fill: '#e6e8ec', ...st }, g); // хвост
+  // пиджак-жилетка и галстук
+  E('path', { d: 'M-58 -120 Q-66 -70 -48 -40 L48 -40 Q66 -70 58 -120 Q30 -138 0 -138 Q-30 -138 -58 -120Z', fill: '#3d5a8c', ...st }, g);
+  E('path', { d: 'M0 -134 L-8 -120 L0 -72 L8 -120Z', fill: '#d6303b', ...st, 'stroke-width': 2 }, g);
+  // крыло с папкой
+  G.wing = E('g', {}, g);
+  E('rect', { x: -96, y: -120, width: 52, height: 70, rx: 4, fill: '#f0c445', ...st, transform: 'rotate(-10 -70 -85)' }, G.wing);
+  E('path', { d: 'M-50 -116 Q-96 -100 -70 -66 Q-50 -80 -44 -100Z', fill: '#e6e8ec', ...st }, G.wing);
+  // шея и голова
+  G.neck = E('g', {}, g);
+  E('path', { d: 'M-18 -140 Q-24 -210 -6 -246 L22 -246 Q12 -210 18 -140Z', fill: 'url(#gsG)', ...st }, G.neck);
+  G.head = E('g', {}, G.neck);
+  const h = G.head;
+  E('ellipse', { cx: 6, cy: -262, rx: 36, ry: 30, fill: 'url(#gsG)', ...st }, h);
+  G.beak = E('path', { d: '', fill: '#f39a1e', ...st }, h);
+  G.eyeW = [-8, 18].map((x) => E('ellipse', { cx: x, cy: -270, rx: 8, ry: 9, fill: '#fff', ...st, 'stroke-width': 2 }, h));
+  G.pup = [-8, 18].map((x) => E('circle', { cx: x, cy: -269, r: 4, fill: '#111' }, h));
+  G.brow = [-8, 18].map(() => E('path', { d: '', stroke: '#22181a', 'stroke-width': 4, 'stroke-linecap': 'round', fill: 'none' }, h));
+  // котелок — отдельно, чтобы улетел
+  G.hat = E('g', {}, h);
+  E('ellipse', { cx: 6, cy: -286, rx: 38, ry: 7, fill: '#1d1d24', ...st }, G.hat);
+  E('path', { d: 'M-18 -287 Q-20 -326 6 -328 Q32 -326 30 -287Z', fill: '#2a2a33', ...st }, G.hat);
+  E('path', { d: 'M-18 -294 L30 -294', stroke: '#8a3b3b', 'stroke-width': 5 }, G.hat);
+})();
+// летящий котелок (копия)
+const HF = E('g', { opacity: 0 }, $('hatFly'));
+E('ellipse', { cx: 0, cy: 0, rx: 38, ry: 7, fill: '#1d1d24', ...st }, HF);
+E('path', { d: 'M-24 -1 Q-26 -40 0 -42 Q26 -40 24 -1Z', fill: '#2a2a33', ...st }, HF);
+E('path', { d: 'M-24 -8 L24 -8', stroke: '#8a3b3b', 'stroke-width': 5 }, HF);
+
+// ---------------- подписи и экраны ----------------
+const SCREENS = [['2dirs', 'Направление', 220, 166], ['3kinds', 'Вид работ', 122, 217], ['4form', 'Размеры — <span class="y">пара цифр</span>', 190, 200],
+  ['5result', 'Работы и материалы<br><span class="y">с ценами</span> — сами', 0, 0], ['8est', 'PDF заказчику —<br><span class="y">одной кнопкой</span>', 73, 141]];
+
+function caption(el, html, cls = 'cap') { if (el._h !== html) { el.innerHTML = html; el._h = html; } el.style.opacity = html ? 1 : 0; el.className = cls; }
+const pop = (el, t0, t) => { el.style.transform = `scale(${.82 + .18 * eOut((t - t0) / .2)})`; };
+
+window.render = function (t) {
+  // --- сила ветра ---
+  const storm = t >= T.storm[0] && t < T.phone[0] ? clamp((t - T.storm[0]) / .8) * clamp((T.phone[0] - t) / .3 + .2) : 0;
+  const breeze = t >= T.win[0] && t < T.end[0] ? clamp((t - (HAT - .6)) / .5) * clamp((HAT + 1.6 - t) / .6) * .8 : 0;
+  const wind = Math.max(storm, breeze);
+  $('skyStorm').setAttribute('opacity', storm * .85);
+  $('sunC').setAttribute('opacity', 1 - storm * .8);
+  // --- камера ---
+  let cx = 270, cy = 480, s = 1;
+  if (t < T.storm[0]) { s = lerp(1.0, 1.08, ease(t / 2.6)); cx = lerp(270, t < 1.3 ? 300 : 240, ease((t % 1.3) / .9)); cy = lerp(480, 530, ease(t / 2.6)); }
+  else if (t < T.phone[0]) { const k = ease((t - LIFT) / 2); s = lerp(1.08, .92, k); cx = lerp(240, 300, k); cy = lerp(530, 430, k); }
+  else if (t < T.end[0]) { const l = t - T.win[0]; s = lerp(1.08, 1.0, ease(l / 1.4)); cx = lerp(262, 272, ease(l / 3)); cy = 500;
+    if (t > HAT - .2) { const k = ease((t - HAT + .2) / .8); cy = lerp(cy, 470, k); s = lerp(s, .98, k); } }
+  const sh = wind * 7, shx = (R(Math.floor(t * 24)) - .5) * sh, shy = (R(Math.floor(t * 24) + 1) - .5) * sh * .6;
+  $('cam').setAttribute('transform', `translate(${270 + shx},${480 + shy}) scale(${s}) translate(${-cx},${-cy})`);
+  // --- облака, торнадо ---
+  $('clouds').setAttribute('transform', `translate(${-t * 6 - storm * (t - T.storm[0]) * 60},0)`);
+  const tor = t >= T.storm[0] && t < T.phone[0] ? clamp((t - T.storm[0] - .3) / .9) : 0;
+  $('tornado').setAttribute('opacity', tor * .9);
+  $('tornado').setAttribute('transform', `translate(430,-40)`);
+  TOR.forEach((e, i) => { const y = i * 34, w = 30 + i * i * 1.6; e.setAttribute('cx', Math.sin(t * 7 + i * .7) * (8 + i * 2)); e.setAttribute('cy', 520 - y * 1.1 - 60); e.setAttribute('rx', 160 - i * 9 + Math.sin(t * 9 + i) * 6); e.setAttribute('ry', 14 + (14 - i) * .6); });
+  // --- листья ---
+  LV.forEach((e, i) => {
+    const sp = 500 + R(i) * 500, y0 = -100 + R(i + 50) * 950, ph = R(i + 9) * 1200;
+    const x = 880 - ((t * sp + ph) % 1200), y = y0 + Math.sin(t * 3 + i) * 30;
+    e.setAttribute('transform', `translate(${x},${y}) rotate(${t * 400 * (R(i + 3) - .5)})`);
+    e.setAttribute('opacity', wind > .05 ? Math.min(1, wind * 1.3) : 0);
+  });
+  // --- белка ---
+  const sq = $('squirrel');
+  if (t < T.phone[0]) {
+    let x = 150, y = 870, sc = 1.15, rot = 0;
+    const lf = clamp((t - LIFT) / (GONE - LIFT));
+    if (t > T.storm[0] && t < LIFT) { rot = Math.sin(t * 30) * 4 * storm; x += Math.sin(t * 40) * 3; } // дрожит, держится
+    if (lf > 0) { const k = eIn(lf); x = lerp(150, 480, k) + Math.sin(lf * 14) * 60 * (1 - k * .5); y = lerp(870, 40, k); sc = lerp(1.15, .25, k); rot = lf * 900; }
+    sq.setAttribute('transform', `translate(${x},${y}) rotate(${rot} 0 -120) scale(${sc})`);
+    sq.style.opacity = lf >= 1 ? 0 : 1;
+    S.shadow.setAttribute('opacity', lf > 0 ? 0 : 1);
+    S.tail.setAttribute('transform', `rotate(${Math.sin(t * (storm ? 22 : 2.5)) * (storm ? 18 : 5) - storm * 25} 24 -40)`);
+    S.sweat.setAttribute('opacity', t > 1.0 ? 1 : 0); S.sweat.setAttribute('transform', `translate(0,${(t * 30) % 12})`);
+    S.phone.setAttribute('opacity', 0);
+    S.helm.setAttribute('transform', lf > 0 ? `translate(0,${-lf * 40}) rotate(${lf * 40})` : '');
+    S.armL.setAttribute('transform', lf > 0 ? `rotate(${Math.sin(t * 25) * 50 + 60} -44 -120)` : ''); S.armR.setAttribute('transform', lf > 0 ? `rotate(${-Math.sin(t * 25) * 50 - 60} 44 -120)` : '');
+    const panic = t > 1.0;
+    S.eyeW.forEach((e) => { e.setAttribute('rx', panic ? 15 : 12); e.setAttribute('ry', panic ? 17 : 14); });
+    S.pup.forEach((p, i) => { p.setAttribute('r', panic ? 4 : 6.5); p.setAttribute('cx', (i ? 22 : -22) + (t < 1 ? 4 : Math.sin(t * 12) * 3)); });
+    S.brow.forEach((b, i) => { const xx = i ? 22 : -22, sg = i ? 1 : -1; b.setAttribute('d', panic ? `M${xx - 12 * sg} ${-226} Q${xx} ${-236} ${xx + 12 * sg} ${-230}` : `M${xx - 12 * sg} ${-226} L${xx + 12 * sg} ${-226}`); });
+    S.mouth.setAttribute('d', panic ? 'M-12 -164 Q0 -150 12 -164 Q0 -170 -12 -164Z' : 'M-8 -166 Q0 -160 8 -166');
+  } else if (t < T.win[0]) { sq.style.opacity = 0;
+  } else {
+    // вернулась: спокойная, с телефоном, ветер не берёт
+    const l = t - T.win[0];
+    sq.style.opacity = 1; S.shadow.setAttribute('opacity', 1);
+    sq.setAttribute('transform', `translate(150,870) scale(1.15)`);
+    S.helm.setAttribute('transform', ''); S.armL.setAttribute('transform', ''); S.armR.setAttribute('transform', `rotate(${-20} 44 -120)`);
+    S.phone.setAttribute('opacity', 1);
+    S.tail.setAttribute('transform', `rotate(${Math.sin(t * 3) * 6 - breeze * 10} 24 -40)`);
+    S.sweat.setAttribute('opacity', 0);
+    S.eyeW.forEach((e) => { e.setAttribute('rx', 12); e.setAttribute('ry', 14); });
+    S.pup.forEach((p, i) => { p.setAttribute('r', 6.5); p.setAttribute('cx', (i ? 22 : -22) + 4); });
+    S.brow.forEach((b, i) => { const xx = i ? 22 : -22, sg = i ? 1 : -1; b.setAttribute('d', `M${xx - 12 * sg} ${-228} Q${xx} ${-234} ${xx + 12 * sg} ${-228}`); });
+    S.mouth.setAttribute('d', 'M-16 -166 Q0 -148 16 -166 Q0 -160 -16 -166Z');
+  }
+  // --- гусь ---
+  const gs = $('goose');
+  gs.setAttribute('transform', `translate(410,880) scale(1.12)`);
+  gs.style.opacity = t >= T.phone[0] && t < T.win[0] ? 0 : 1;
+  const talk = t < 2.2 && Math.sin(t * 22) > 0;
+  const shock = (t > LIFT && t < T.phone[0]) || (t > HAT - .1 && t < T.end[0]);
+  const happy = t >= T.win[0] && t < HAT - .1;
+  G.neck.setAttribute('transform', `rotate(${Math.sin(t * 1.6) * 3 + (shock ? -6 : 0) + (t > LIFT && t < T.phone[0] ? Math.sin(t * 2) * 6 : 0)} 0 -140)`);
+  const bo = talk ? 9 : shock ? 12 : 2;
+  G.beak.setAttribute('d', `M-28 -262 Q-62 -262 -66 ${-256 + bo * .2} Q-50 ${-252 + bo} -28 ${-248 + bo * .4}Z M-28 -262 Q-56 -268 -62 -262`);
+  G.eyeW.forEach((e) => { e.setAttribute('rx', shock ? 10 : 8); e.setAttribute('ry', shock ? 12 : 9); });
+  G.pup.forEach((p, i) => { p.setAttribute('cx', (i ? 18 : -8) - 3 + (t > LIFT && t < T.phone[0] ? 3 : 0)); p.setAttribute('cy', t > LIFT && t < T.phone[0] ? -273 : -269); p.setAttribute('r', shock ? 3 : 4); });
+  G.brow.forEach((b, i) => { const xx = i ? 18 : -8; const up = shock ? 8 : happy ? 3 : 0; b.setAttribute('d', `M${xx - 8} ${-284 - up} L${xx + 8} ${-282 - up + (talk ? -3 : 0)}`); });
+  G.wing.setAttribute('transform', talk ? `rotate(${Math.sin(t * 8) * 6} -50 -110)` : '');
+  // котелок улетает
+  const hk = clamp((t - HAT) / 1.6);
+  G.hat.style.opacity = hk > 0 ? 0 : 1;
+  if (hk > 0 && t < T.end[0]) {
+    const k = eIn(hk); HF.setAttribute('opacity', 1);
+    HF.setAttribute('transform', `translate(${lerp(417, 700, k) + Math.sin(hk * 9) * 20},${lerp(560, 80, k)}) rotate(${hk * 720}) scale(${lerp(1.12, .6, k)})`);
+  } else HF.setAttribute('opacity', 0);
+  // --- телефон ---
+  const phone = $('phone');
+  const pIn = clamp((t - T.phone[0]) / .45), pOut = clamp((T.phone[1] - t) / .35);
+  const pOn = t >= T.phone[0] - .01 && t < T.phone[1] ? Math.min(pIn, pOut) : 0;
+  phone.style.opacity = pOn; $('dim').style.opacity = pOn; $('timer').style.opacity = pOn;
+  phone.style.transform = `scale(${lerp(.6, 1, eOut(pIn))}) rotate(${lerp(-8, 0, eOut(pIn))}deg)`;
+  const A = $('capA'), Bc = $('capB');
+  if (t >= T.phone[0] && t < T.phone[1]) {
+    const span = (T.phone[1] - T.phone[0]) / SCREENS.length, u = (t - T.phone[0]) / span, i = Math.min(SCREENS.length - 1, Math.floor(u)), f = u - i;
+    const [cur, cap, tx, ty] = SCREENS[i], nxt = SCREENS[Math.min(SCREENS.length - 1, i + 1)][0];
+    const iA = $('imA'), iB = $('imB');
+    if (iA._s !== cur) { iA.src = `../sc/${cur}.png`; iA._s = cur; }
+    if (iB._s !== nxt) { iB.src = `../sc/${nxt}.png`; iB._s = nxt; }
+    const sw = i < SCREENS.length - 1 ? ease((f - .8) / .2) : 0;
+    iA.style.transform = `translateX(${-sw * 100}%)`; iB.style.transform = `translateX(${(1 - sw) * 100}%)`;
+    iA.style.objectPosition = cur === '5result' ? `center ${Math.round(ease(f / .75) * 100)}%` : 'top';
+    const tap = $('tap'); const tk = (f - .55) / .2;
+    tap.style.opacity = tx && tk > 0 && tk < 1 ? Math.sin(tk * Math.PI) : 0; tap.style.left = tx + 'px'; tap.style.top = ty + 'px'; tap.style.transform = `scale(${.7 + tk * .5})`;
+    const sec = Math.floor(lerp(0, 118, (t - T.phone[0]) / (T.phone[1] - T.phone[0] - .3)));
+    $('timer').textContent = `⏱ ${Math.floor(Math.min(sec, 118) / 60)}:${String(Math.min(sec, 118) % 60).padStart(2, '0')}`;
+    caption(A, t < T.phone[0] + 1.2 ? 'Прораб <span class="y">со СМЕТА PRO</span>:' : cap); A.style.transform = 'none';
+    caption(Bc, '');
+  } else if (t < T.phone[0]) {
+    if (t < T.storm[0]) {
+      caption(A, 'Заказчик: «Ну что,<br><span class="y">сколько будет стоить?</span><br>Прямо сейчас скажите»'); pop(A, 0, t);
+      caption(Bc, t > 1.2 ? 'Прораб без сметы:' : ''); pop(Bc, 1.2, t);
+    } else {
+      caption(A, 'Прораб без сметы:'); A.style.transform = 'none';
+      caption(Bc, t > LIFT - .2 ? '*улетает<br><span class="y">в ураган</span>* 🌪️' : '', 'cap big');
+      const k = (t - LIFT + .2); Bc.style.transform = `scale(${.8 + .2 * eOut(k / .2)}) rotate(${Math.sin(t * 9) * 3}deg)`;
+    }
+  } else if (t < T.end[0]) {
+    caption(A, 'Смета с ценами —<br><span class="y">за 2 минуты</span>, без паники'); pop(A, T.win[0], t);
+    caption(Bc, t > HAT + .3 ? 'Теперь в ураган улетает<br>только <span class="y">шляпа заказчика</span> 🎩' : ''); pop(Bc, HAT + .3, t);
+  }
+  // --- финал ---
+  const ef = clamp((t - T.end[0]) / .4);
+  $('end').style.opacity = ef; $('end').style.transform = `scale(${.92 + .08 * eOut(ef)})`;
+  if (ef > 0) { caption(A, ''); caption(Bc, ''); }
+  let fd = 0; for (const c of [T.win[0]]) fd = Math.max(fd, 1 - Math.abs(t - c) / .25);
+  $('fade').style.opacity = clamp(fd) * .7;
+};
+window.READY = Promise.all([document.fonts.ready, ...SCREENS.map(([n]) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `../sc/${n}.png`; }))]).then(() => { window.render(0); window.OK = true; });
+</script></body></html>
