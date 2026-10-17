@@ -41,7 +41,7 @@ export default function Home() {
       <button className="tile wide home-new" onClick={() => nav(canCreate ? '/new' : '/settings')}>
         <span className="home-new-plus" aria-hidden="true">+</span>
         Новая смета
-        <small>{!me.access.active && me.access.freeEstimateLeft ? `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}` : 'выберите направление — смета соберётся сама'}</small>
+        <small>{!me.access.active && me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'сметы бесплатно — без ограничений' : `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}`) : 'выберите направление — смета соберётся сама'}</small>
       </button>
 
 

@@ -4,14 +4,19 @@
  * Объекты, финансы, записная книжка, договоры и ИИ — по подписке (уровни — shared/plans.ts).
  * Просмотр (GET) доступен всегда: данные не теряются.
  */
-/** Сколько смет можно сделать без подписки — каждый месяц (по Москве) */
+/** Сколько смет можно сделать без подписки — каждый месяц (по Москве), когда действует лимит */
 export const FREE_ESTIMATES = 3;
+/** Стартовый период (набор аудитории): сметы бесплатно без ограничений — с пометкой «Сделано в СМЕТА PRO».
+ *  Вернуть лимит — поставить false. */
+export const FREE_UNLIMITED = true;
+/** Лимит смет в месяц, который реально действует сейчас */
+export const FREE_PER_MONTH = FREE_UNLIMITED ? 100000 : FREE_ESTIMATES;
 
 /**
  * Бесплатные сметы: первые FREE_ESTIMATES каждого месяца + купленные раньше пакеты (сверх месячных, по порядку).
  * freeIds — сметы, которые бесплатный пользователь может редактировать; left — сколько ещё можно создать сейчас.
  */
-export function freeAllowance(list: { id: string; createdAt: Date | string; paidAt?: Date | string | null }[], extra: number, nowMonth: string, monthOf: (d: Date) => string) {
+export function freeAllowance(list: { id: string; createdAt: Date | string; paidAt?: Date | string | null }[], extra: number, nowMonth: string, monthOf: (d: Date) => string, perMonthLimit = FREE_ESTIMATES) {
   const sorted = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const perMonth: Record<string, number> = {};
   const freeIds: string[] = [];
@@ -21,11 +26,11 @@ export function freeAllowance(list: { id: string; createdAt: Date | string; paid
     if (e.paidAt) { freeIds.push(e.id); packIds.push(e.id); continue; } // оплачена отдельно — в лимит не входит
     const m = monthOf(new Date(e.createdAt));
     perMonth[m] = (perMonth[m] || 0) + 1;
-    if (perMonth[m] <= FREE_ESTIMATES) freeIds.push(e.id);
+    if (perMonth[m] <= perMonthLimit) freeIds.push(e.id);
     else if (packUsed < extra) { packUsed++; freeIds.push(e.id); packIds.push(e.id); }
   }
   const thisMonth = perMonth[nowMonth] || 0;
-  const left = Math.max(0, FREE_ESTIMATES - thisMonth) + Math.max(0, extra - packUsed);
+  const left = Math.max(0, perMonthLimit - thisMonth) + Math.max(0, extra - packUsed);
   return { thisMonth, left, freeIds, packIds };
 }
 export interface FreeCtx { estimateCount: number; freeEstimateIds: string[]; limit?: number }

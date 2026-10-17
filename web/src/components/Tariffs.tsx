@@ -9,6 +9,7 @@ import { PayButtons, rub } from './Pay';
 const TIER_ICON: Record<string, string> = { lite: '🔹', pro: '⭐', team: '👷' };
 const PACK_TEXT: Record<string, string> = {
   est10: `10 смет без пометки, с вашим логотипом. Действуют ${PRICES.packMonths} месяцев — удобно, если заказы бывают не каждый месяц.`,
+  studio_m: 'Все 3D-проекты и 3D-ссылки для заказчиков без ограничений на месяц — выгодно, если объектов больше двух.',
   design1: 'Премиальный 3D-проект одного объекта для заказчика: PDF без водяного знака (3D, план, фасады, узлы, ведомость) и 3D-ссылка, которую заказчик крутит пальцем. Включите его в смету — обычно это 3–5 тыс. ₽.',
 };
 
@@ -29,7 +30,7 @@ export default function Tariffs() {
       <Load state={plans}>{(list) => {
         const proM = list.find((x) => x.code === 'pro_m');
         const firstDeal = proM?.price?.note === 'первый месяц';
-        const year = yearSel ?? !firstDeal; // новичку сначала показываем первый месяц за 200 ₽, остальным — год
+        const year = yearSel ?? !firstDeal; // новичку сначала показываем первый месяц со скидкой, остальным — год
         return (
         <>
           <div className="seg" style={{ marginBottom: 8 }}>
@@ -73,10 +74,10 @@ export default function Tariffs() {
           <h2 className="section-title">🧊 3D-проекты для заказчиков</h2>
           <p className="small muted" style={{ marginTop: 0 }}>3D-конструктор и смета по модели — бесплатно. Готовый проект для заказчика — отдельно: включите его в смету и заработайте на нём.</p>
           <div className="list">
-            {['design1'].map((c) => list.find((x) => x.code === c)).filter(Boolean).map((p: any) => (
+            {['design1', 'studio_m'].map((c) => list.find((x) => x.code === c)).filter(Boolean).map((p: any) => (
               <div key={p.code} className="list-item" style={{ display: 'block', cursor: 'default' }}>
-                <div className="row between"><div className="title">{p.title} — за объект</div>{p.price?.note && <span className="badge ok">{p.price.note}</span>}</div>
-                <div className="xs muted">{PACK_TEXT.design1}{me.plan?.extraDesigns ? ` Куплено и не использовано: ${me.plan.extraDesigns}.` : ''}</div>
+                <div className="row between"><div className="title">{p.code === 'design1' ? `${p.title} — за объект` : p.title}</div>{p.price?.note && <span className="badge ok">{p.price.note}</span>}</div>
+                <div className="xs muted">{PACK_TEXT[p.code]}{p.code === 'design1' && me.plan?.extraDesigns ? ` Куплено и не использовано: ${me.plan.extraDesigns}.` : ''}{p.code === 'studio_m' && me.plan?.studioUntil ? ` Активна до ${new Date(me.plan.studioUntil).toLocaleDateString('ru-RU')}.` : ''}</div>
                 <PayButtons p={p} />
               </div>
             ))}

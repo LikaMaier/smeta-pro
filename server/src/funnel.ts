@@ -49,18 +49,18 @@ export function startFunnel(bot: any, log: { error: (o: any, m?: string) => void
       for (const u of await prisma.user.findMany({ where: { trialWarnAt: null, trialEndsAt: { gt: now, lte: new Date(now.getTime() + D) }, createdAt: { lte: new Date(now.getTime() - 12 * H) }, ...noSub }, take: 50 })) {
         if (isAdmin(u) || (await hadSub(u.id)) || !(await claim(u.id, 'trialWarnAt'))) continue;
         const d = await done(u.id);
-        await send(u, `⏳ <b>Завтра закончится пробный «Про».</b>\n${d ? `За эти дни: ${d}. ` : ''}Дальше — 3 сметы в месяц бесплатно, с пометкой «Сделано в СМЕТА PRO».\n\n«Про» — ${PRICES.pro} ₽ в месяц, а <b>первый месяц — всего ${PRICES.proFirst} ₽</b>: сметы без ограничений, ваш логотип, договор и акты.`, `Первый месяц за ${PRICES.proFirst} ₽`);
+        await send(u, `⏳ <b>Завтра закончится пробный «Про».</b>\n${d ? `За эти дни: ${d}. ` : ''}Дальше сметы остаются бесплатными и без ограничений — с пометкой «Сделано в СМЕТА PRO».\n\n«Про» — ${PRICES.pro} ₽ в месяц, а <b>первый месяц — всего ${PRICES.proFirst} ₽</b>: сметы без ограничений, ваш логотип, договор и акты.`, `Первый месяц за ${PRICES.proFirst} ₽`);
       }
       // 2. пробный закончился (последние 3 дня)
       for (const u of await prisma.user.findMany({ where: { trialEndAt: null, trialEndsAt: { lte: now, gt: new Date(now.getTime() - 3 * D) }, ...noSub }, take: 50 })) {
         if (isAdmin(u) || (await hadSub(u.id)) || !(await claim(u.id, 'trialEndAt'))) continue;
         const d = await done(u.id);
-        await send(u, `🔓 <b>Пробный «Про» закончился.</b>\n${d ? `Вы успели: ${d}. Всё сохранено. ` : ''}Бесплатно остаются 3 сметы в месяц.\n\n🎁 Для вас <b>первый месяц «Про» — ${PRICES.proFirst} ₽</b> вместо ${PRICES.pro} ₽. Или разово: одна смета без пометки — ${PRICES.estimate} ₽.`, `Первый месяц за ${PRICES.proFirst} ₽`);
+        await send(u, `🔓 <b>Пробный «Про» закончился.</b>\n${d ? `Вы успели: ${d}. Всё сохранено. ` : ''}Сметы остаются бесплатными и без ограничений.\n\n🎁 Для вас <b>первый месяц «Про» — ${PRICES.proFirst} ₽</b> вместо ${PRICES.pro} ₽. Или разово: одна смета без пометки — ${PRICES.estimate} ₽.`, `Первый месяц за ${PRICES.proFirst} ₽`);
       }
       // 3. напоминание через 5 дней после окончания пробного
       for (const u of await prisma.user.findMany({ where: { firstRemindAt: null, trialEndAt: { lte: new Date(now.getTime() - 5 * D), gt: new Date(now.getTime() - 60 * D) }, ...noSub }, take: 50 })) {
         if (isAdmin(u) || (await hadSub(u.id)) || !(await claim(u.id, 'firstRemindAt'))) continue;
-        await send(u, `👷 Первый месяц «Про» за <b>${PRICES.proFirst} ₽</b> всё ещё ваш.\nЭто меньше 7 ₽ в день — дешевле пачки саморезов. Дальше — ${PRICES.pro} ₽ в месяц, без автосписаний: продлеваете, только когда сами захотите. Сметы без ограничений, PDF с вашим логотипом, договор, акты и учёт денег по объектам.`, 'Оформить за ' + PRICES.proFirst + ' ₽');
+        await send(u, `👷 Первый месяц «Про» за <b>${PRICES.proFirst} ₽</b> всё ещё ваш.\nЭто ≈ 3 ₽ в день — дешевле пачки саморезов. Дальше — ${PRICES.pro} ₽ в месяц, без автосписаний: продлеваете, только когда сами захотите. Сметы без ограничений, PDF с вашим логотипом, договор, акты и учёт денег по объектам.`, 'Оформить за ' + PRICES.proFirst + ' ₽');
       }
       // 4. две оплаты помесячно — предложить год
       for (const u of await prisma.user.findMany({ where: { yearNudgeAt: null, plan: 'pro', subscriptionUntil: { gt: now } }, take: 100 })) {

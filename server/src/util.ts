@@ -1,4 +1,4 @@
-import { freeAllowance } from '../../shared/access';
+import { freeAllowance, FREE_PER_MONTH } from '../../shared/access';
 import { TIERS, can, FEATURE_MSG, monthKey, type Tier, type Feature } from '../../shared/plans';
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { FastifyReply } from 'fastify';
@@ -91,13 +91,13 @@ export async function useAi(u: AccessUser & { id: string }, n = 1) {
   if (!ok.count) throw new HttpError(429, `Лимит ИИ на этот месяц исчерпан (${limit} запросов). ${tier === 'team' ? 'Он обновится 1-го числа.' : 'Тариф «Бригада» — 1000 запросов.'}`, 'ai_limit');
 }
 
-/** Данные для бесплатного режима: 3 сметы в месяц + купленные раньше пакеты.
+/** Данные для бесплатного режима: сметы в месяц (сейчас без лимита — FREE_PER_MONTH) + купленные раньше пакеты.
  *  estimateCount — создано в этом месяце, limit — сколько можно всего в этом месяце (estimateCount + остаток). */
 export async function freeCtx(userId: string, _extra?: number) {
   const u = await prisma.user.findUnique({ where: { id: userId }, select: { extraEstimates: true, extraUntil: true } });
   // купленные сметы действуют до extraUntil (пакет — полгода); старые покупки без срока — бессрочно
   const more = u && (!u.extraUntil || u.extraUntil > new Date()) ? u.extraEstimates : 0;
   const list = await prisma.estimate.findMany({ where: { userId, isTemplate: false }, select: { id: true, createdAt: true, paidAt: true } }); // удалённые тоже считаются
-  const a = freeAllowance(list, Math.max(0, more), monthKey(), (d) => monthKey(d));
+  const a = freeAllowance(list, Math.max(0, more), monthKey(), (d) => monthKey(d), FREE_PER_MONTH);
   return { estimateCount: a.thisMonth, freeEstimateIds: a.freeIds, paidEstimateIds: a.packIds, limit: a.thisMonth + a.left };
 }

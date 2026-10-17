@@ -11,7 +11,7 @@ import { botLink } from '../botInfo';
  * Блогеру — процент со всех оплат приведённых им людей (считаем в админке, выплачиваете вы).
  */
 import { normCode } from '../../../shared/promo';
-import { PRICES } from '../../../shared/plans';
+import { PRICES, FOUNDER, LAUNCH_ENDS } from '../../../shared/plans';
 export { normCode };
 const PACKS = ['est1', 'est10', 'design1', 'studio_m']; // не подписка «Про»/«Бригада»
 
@@ -31,12 +31,17 @@ const rubToStars = (rub: number) => Math.max(1, Math.round(rub / 2.46));
 /** Цена тарифа для пользователя: первый месяц «Про», промокод блогера, персональная скидка возврата, 3D-проект дешевле с подпиской.
  *  Из скидок берётся одна — самая выгодная для человека. */
 export async function priceFor(user: PriceUser, plan: { code: string; months: number; starsPrice: number; rubPrice: number }) {
-  const base = { stars: plan.starsPrice, rub: plan.rubPrice, discountPct: 0, promo: null as string | null, note: null as string | null };
+  let base = { stars: plan.starsPrice, rub: plan.rubPrice, discountPct: 0, promo: null as string | null, note: null as string | null };
   const now = new Date();
+  // цена основателя: оплатил в стартовый период — стартовые цены остаются навсегда
+  const founder = LAUNCH_ENDS ? (await prisma.payment.count({ where: { userId: user.id, status: 'paid', createdAt: { lt: new Date(LAUNCH_ENDS) } } })) > 0 : false;
+  const fp = founder ? FOUNDER[plan.code] : undefined;
+  if (fp && fp < base.rub) base = { ...base, rub: fp, stars: rubToStars(fp), note: 'цена основателя' };
   // 3D-проект: с «Про» или «Бригадой» — дешевле
   if (plan.code === 'design1') {
     const sub = (user.subscriptionUntil && user.subscriptionUntil > now) || (user.teamUntil && user.teamUntil > now);
-    return sub ? { ...base, rub: PRICES.designPro, stars: rubToStars(PRICES.designPro), note: 'цена с подпиской' } : base;
+    const sp = Math.min(PRICES.designPro, founder ? FOUNDER.design1_sub : Infinity);
+    return sub && sp < base.rub ? { ...base, rub: sp, stars: rubToStars(sp), note: 'цена с подпиской' } : base;
   }
   if (plan.months === 0 || plan.code === 'studio_m') return base;
   const options = [base];
