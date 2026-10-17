@@ -34,6 +34,11 @@ export function createBot() {
       return ctx.reply('Здравствуйте! 👷 Заявка принята — свяжемся с вами в ближайшее время (обычно в течение пары часов, с 9 до 21).\n\nЧтобы подготовиться к разговору, ответьте одним сообщением:\n1) Как называется фирма и чем занимаетесь?\n2) Откуда сейчас приходят заказы?\n3) Что больше всего отнимает времени — заявки, сметы, КП, соцсети?');
     }
     const u = ctx.from ? await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username, payload).catch((e) => { console.error('upsertUser', e); return null; }) : null;
+    // поддержка: t.me/бот?start=help (кнопка «Поддержка» в приложении)
+    if (payload === 'help' && ctx.from) {
+      await prisma.appKV.upsert({ where: { key: `sup:${ctx.from.id}` }, create: { key: `sup:${ctx.from.id}`, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
+      return ctx.reply('💬 Поддержка СМЕТА PRO. Напишите вопрос или предложение одним сообщением — можно со скриншотом. Ответим здесь, в этом чате (обычно в течение пары часов, с 9 до 21 по Москве).');
+    }
     // ссылка блогера: t.me/бот?start=p_<КОД>
     if (u && payload.startsWith('p_') && u.promoCode) {
       const pr = await prisma.promoCode.findFirst({ where: { code: u.promoCode } });
@@ -72,8 +77,24 @@ export function createBot() {
   });
 
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
+  bot.command(['help', 'support'], async (ctx) => {
+    if (ctx.from) await prisma.appKV.upsert({ where: { key: `sup:${ctx.from.id}` }, create: { key: `sup:${ctx.from.id}`, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
+    return ctx.reply('💬 Поддержка СМЕТА PRO. Напишите вопрос одним сообщением — ответим здесь, в этом чате.');
+  });
   attachInstagram(bot); // кнопки «Опубликовать» и ответы на комментарии — раньше ИИ-обработчика текста
   attachThreads(bot);
+  // ответ администратора на вопрос в поддержку: ответить (reply) на сообщение бота с вопросом → уходит пользователю
+  bot.on('message:text', async (ctx, next) => {
+    const rt = ctx.message.reply_to_message;
+    if (!rt || !ctx.from || !reportTo().includes(String(ctx.from.id))) return next();
+    const kv = await prisma.appKV.findUnique({ where: { key: `sup:reply:${ctx.from.id}:${rt.message_id}` } }).catch(() => null);
+    if (!kv) return next();
+    try {
+      await ctx.api.sendMessage(Number(kv.value), `💬 <b>Ответ поддержки СМЕТА PRO</b>\n\n${esc(ctx.message.text)}\n\n<i>Можно ответить здесь же.</i>`, { parse_mode: 'HTML', reply_markup: appKb() });
+      await prisma.appKV.upsert({ where: { key: `sup:${kv.value}` }, create: { key: `sup:${kv.value}`, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
+      await ctx.reply('✅ Ответ отправлен пользователю');
+    } catch (e: any) { await ctx.reply(`⚠️ Не отправилось: ${e.message}`); }
+  });
   // ответы лидов с лендинга (сутки после /start biz) — пересылаем владелице, а не ИИ-сметчику
   bot.on('message', async (ctx, next) => {
     if (!ctx.from || reportTo().includes(String(ctx.from.id)) || ctx.message.text?.startsWith('/')) return next();
@@ -83,6 +104,29 @@ export function createBot() {
     if (!(await prisma.appKV.findUnique({ where: { key: `biz-ack:${ctx.from.id}` } }).catch(() => null))) {
       await prisma.appKV.create({ data: { key: `biz-ack:${ctx.from.id}`, value: '1' } }).catch(() => {});
       await ctx.reply('Спасибо! Передала — скоро напишем вам здесь, в Telegram.');
+    }
+  });
+
+  // Вопросы в поддержку: после «Поддержка»/help (сутки) или если ИИ-сметчик не подключён — всё, что пишут боту, доходит до владелицы
+  bot.on('message', async (ctx, next) => {
+    if (!ctx.from || reportTo().includes(String(ctx.from.id)) || ctx.message.text?.startsWith('/') || (ctx.message as any).successful_payment) return next();
+    const sup = await prisma.appKV.findUnique({ where: { key: `sup:${ctx.from.id}` } }).catch(() => null);
+    const fresh = sup && Date.now() - Number(sup.value) < 864e5;
+    if (!fresh && aiConfigured()) return next();
+    const f = ctx.from;
+    const who = `${esc(`${f.first_name || ''} ${f.last_name || ''}`.trim())}${f.username ? ` (@${esc(f.username)})` : ''}`;
+    const body = ctx.message.text || ctx.message.caption || '';
+    for (const id of reportTo()) {
+      const m = await ctx.api.sendMessage(Number(id), `💬 <b>Вопрос в поддержку</b> от ${who} · <a href="tg://user?id=${f.id}">чат</a>\n\n${esc(body) || '<i>[вложение — ниже]</i>'}\n\n<i>Ответьте на это сообщение (свайп влево) — ответ уйдёт пользователю от имени бота.</i>`, { parse_mode: 'HTML' }).catch(() => null);
+      if (m) await prisma.appKV.upsert({ where: { key: `sup:reply:${id}:${m.message_id}` }, create: { key: `sup:reply:${id}:${m.message_id}`, value: String(f.id) }, update: { value: String(f.id) } }).catch(() => {});
+      if (!ctx.message.text) await ctx.forwardMessage(Number(id)).catch(() => {});
+    }
+    // подтверждение — не чаще раза в 3 часа
+    const ackKey = `sup:ack:${f.id}`;
+    const ack = await prisma.appKV.findUnique({ where: { key: ackKey } }).catch(() => null);
+    if (!ack || Date.now() - Number(ack.value) > 3 * 3600e3) {
+      await prisma.appKV.upsert({ where: { key: ackKey }, create: { key: ackKey, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
+      await ctx.reply('Спасибо! Сообщение получили — ответим здесь, в этом чате (обычно в течение пары часов, с 9 до 21 по Москве).\n\nА смету можно собрать прямо сейчас 👇', { reply_markup: appKb() });
     }
   });
 
@@ -159,7 +203,7 @@ export function welcomeText(u: any) {
     return `С возвращением, ${name}! 👋\nОбъекты ждут, сметы скучают.\n\n<i>${status}</i>\n\nОткрывайте 👇`;
   }
   return `👷 Привет, ${name}! Это <b>СМЕТА PRO</b> — карманный сметчик, который не уходит на перекур.\n\n` +
-    '📐 <b>Смета за 5 минут</b> — из вашего прайса, шаблонов и 30+ калькуляторов. Excel можно отпускать в отпуск.\n' +
+    '📐 <b>Смета за 2 минуты</b> — работы и материалы с ценами уже есть, плюс 30+ калькуляторов. Excel можно отпускать в отпуск.\n' +
     '📄 <b>PDF, договор и акт</b> заказчику — в один тап, с вашим логотипом.\n' +
     '🧊 <b>3D-проекты</b>: навесы, беседки, заборы с воротами, план участка с септиком, электрика и сантехника квартиры. Заказчик крутит модель пальцем и перестаёт спрашивать «а как это будет выглядеть?».\n' +
     '💰 <b>Деньги по объектам</b>: сколько получили, сколько потратили и сколько осталось вам, а не только поставщику бетона.\n' +
@@ -172,13 +216,13 @@ export function welcomeText(u: any) {
 // Видно до нажатия «Старт» (до 512 знаков) и в профиле бота (до 120 знаков)
 export const BOT_DESCRIPTION =
   'СМЕТА PRO — карманный сметчик для строителей, прорабов и бригад.\n\n' +
-  '📐 Смета за 5 минут из вашего прайса и калькуляторов\n' +
+  '📐 Смета за 2 минуты: работы и материалы с ценами\n' +
   '📄 PDF, договор и акт заказчику в один тап\n' +
   '🧊 3D навесов, заборов и плана участка — заказчик крутит пальцем\n' +
   '💰 Прибыль по каждому объекту, а не «вроде что-то заработали»\n' +
   '⏰ Напоминания про оплату, бетон и технику\n\n' +
   '🎁 Сметы — бесплатно и без ограничений. Нажмите «Старт» — Excel не обидится.';
-export const BOT_SHORT = 'Сметы за 5 минут, 3D для заказчика и прибыль по объектам. сметы — бесплатно.';
+export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказчика и прибыль по объектам. Сметы — бесплатно.';
 
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);

@@ -556,7 +556,11 @@ def build(d):
             canvas.setFillColor(GOLD)
             canvas.setFont("DV-B", 8)
             bot = d.get("bot")
-            canvas.drawCentredString(A4[0] / 2, 4.5 * mm, "Сделано в СМЕТА PRO — сметы для строителей в Telegram" + (f": @{bot}" if bot else ""))
+            mark = "Сделано в СМЕТА PRO — смета за 2 минуты бесплатно, в Telegram" + (f": @{bot}" if bot else "")
+            canvas.drawCentredString(A4[0] / 2, 4.5 * mm, mark)
+            if bot:  # кликабельная ссылка на бота с меткой «pdf» — видно в сводке, сколько пришло из смет
+                w = canvas.stringWidth(mark, "DV-B", 8)
+                canvas.linkURL(f"https://t.me/{bot}?start=pdf", (A4[0] / 2 - w / 2, 3.5 * mm, A4[0] / 2 + w / 2, 8 * mm), relative=0)
         canvas.restoreState()
 
     doc.build(els, onFirstPage=footer, onLaterPages=footer)

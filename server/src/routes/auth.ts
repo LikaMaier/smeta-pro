@@ -8,6 +8,7 @@ import { TIERS, monthKey } from '../../../shared/plans';
 import { applyPromo, findPromo } from './promo';
 import { verifyInitData, signSession } from '../auth';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
+import { channelTag } from '../../../shared/promo';
 import { compositionFor } from '../../../shared/compositions';
 import { brandUrl } from './brand';
 
@@ -39,6 +40,9 @@ export async function upsertUser(tgId: number, firstName?: string, username?: st
     },
     include: { priceLists: true },
   });
+  // метка рекламного канала: t.me/бот?start=card, ?start=vk, ?start=chat_prorab … — для сводки «откуда пришли»
+  const src = channelTag(startPayload);
+  if (src) await prisma.appKV.create({ data: { key: `src:${user.id}`, value: src } }).catch(() => {});
   if (promo) {
     await applyPromo(user.id, promo, true).catch(() => {});
     Object.assign(user, await prisma.user.findUniqueOrThrow({ where: { id: user.id } }));
@@ -77,6 +81,7 @@ export async function meView(user: any) {
     weeklyDigest: user.weeklyDigest ?? true, docStyle: user.docStyle || 'classic', designPrices: user.designPrices || null,
     pay: { yookassa: Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY), receipt: env.YOOKASSA_RECEIPT },
     refLink: botLink(`ref_${user.id}`),
+    supportLink: botLink('help'),
   });
 }
 

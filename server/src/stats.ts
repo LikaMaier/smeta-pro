@@ -30,7 +30,7 @@ async function period(from: Date, to: Date, skip: string[]) {
   const notAdmin = { notIn: skip };
   const range = { gte: from, lt: to };
   const [newUsers, seen, estimates, designs, checkouts, payments] = await Promise.all([
-    prisma.user.findMany({ where: { createdAt: range, id: notAdmin }, select: { firstName: true, username: true, promoCode: true, referredById: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.user.findMany({ where: { createdAt: range, id: notAdmin }, select: { id: true, firstName: true, username: true, promoCode: true, referredById: true }, orderBy: { createdAt: 'asc' } }),
     prisma.userDay.findMany({ where: { lastAt: range, userId: notAdmin }, select: { userId: true, opens: true, firstAt: true } }),
     prisma.estimate.findMany({ where: { createdAt: range, userId: notAdmin, isTemplate: false }, select: { userId: true } }),
     prisma.design.count({ where: { createdAt: range, userId: notAdmin } }),
@@ -67,7 +67,14 @@ export async function buildReport(from: Date, to: Date) {
   L.push(`📊 <b>СМЕТА PRO — сводка ${hhmm(to)}</b>`);
   L.push(`<i>с ${dm(from) === dm(to) ? hhmm(from) : `${dm(from)} ${hhmm(from)}`} до ${hhmm(to)}</i>`, '');
   L.push(`👤 Новые пользователи: <b>${p.newUsers.length}</b>`);
-  for (const u of p.newUsers.slice(0, 10)) L.push(`   • ${who(u)}${u.promoCode ? ` — промокод ${esc(u.promoCode)}` : u.referredById ? ' — по приглашению' : ''}`);
+  const srcRows = p.newUsers.length ? await prisma.appKV.findMany({ where: { key: { in: p.newUsers.map((u: any) => `src:${u.id}`) } } }) : [];
+  const src = new Map(srcRows.map((r) => [r.key.slice(4), r.value]));
+  for (const u of p.newUsers.slice(0, 10)) L.push(`   • ${who(u)}${u.promoCode ? ` — промокод ${esc(u.promoCode)}` : u.referredById ? ' — по приглашению' : src.get(u.id) ? ` — из «${esc(src.get(u.id)!)}»` : ''}`);
+  if (src.size) {
+    const by = new Map<string, number>();
+    for (const v of src.values()) by.set(v, (by.get(v) || 0) + 1);
+    L.push(`   📍 Каналы: ${[...by].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${esc(k)} — ${n}`).join(', ')}`);
+  }
   if (p.newUsers.length > 10) L.push(`   … и ещё ${p.newUsers.length - 10}`);
   L.push(`📱 Заходили в приложение: <b>${p.visitors}</b> чел.`);
   L.push(`🧾 Создано смет: <b>${p.estimates}</b>${p.estimates ? ` (у ${p.estimators} чел.)` : ''}`);
