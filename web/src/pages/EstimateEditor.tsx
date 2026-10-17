@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { get, post, put, del } from '../api';
 import { calcEstimate } from '../../../shared/estimate';
 import { checkEstimate } from '../../../shared/estimateCheck';
+import { forgottenFor, WORK_COEFS, coefTag, PACK_UNIT } from '../../../shared/forgotten';
 import { payStages, DEFAULT_SCHEDULE } from '../../../shared/payments';
 import { useMe } from '../App';
 import { Offers } from '../components/Pay';
@@ -175,6 +176,43 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     change(); haptic('light');
   };
 
+  // «Часто забывают» — подсказки недостающих позиций
+  const [hiddenTips, setHiddenTips] = useState<Set<string>>(new Set());
+  const tips = useMemo(() => forgottenFor(lines.map((l) => ({ name: l.name, category: l.category })), 12).filter((t) => !hiddenTips.has(t.name)).slice(0, 6), [lines, hiddenTips]);
+  const addTip = (t: ReturnType<typeof forgottenFor>[number]) => {
+    const it: any = catMap.get(normName(t.name));
+    const type = t.starterCategory === 'Аренда техники' ? 'equipment' : t.starterCategory === 'Доставка' || t.name.startsWith('Вывоз') ? 'service' : 'work';
+    addLines([{ name: it?.name || t.name, unit: it?.unit || t.unit, price: String(it ? it.price : t.price), matPrice: it && itemMat(it) ? String(itemMat(it)) : '', type: it?.type || type,
+      category: t.category || it?.category || '', composition: it?.description || '', catalogItemId: it?.id || null, note: it ? '' : 'Примерная цена — проверьте', unconfirmed: true }]);
+    toast(`Добавлено: ${t.name} — проверьте количество`);
+  };
+  /** Быстрый коэффициент на все работы: включить / выключить */
+  const coefOn = (c: { label: string; k: number }) => { const w = lines.filter((l) => l.type === 'work' && l.name.trim()); return w.length > 0 && w.every((l) => l.note.includes(coefTag(c))); };
+  const toggleCoef = (c: { label: string; k: number }) => {
+    const on = coefOn(c), tag = coefTag(c);
+    setLines((ls) => ls.map((l) => {
+      if (l.type !== 'work' || !l.name.trim()) return l;
+      const cur = l.coef === '' ? 1 : parseNum(l.coef) || 1;
+      const has = l.note.includes(tag);
+      if (on && has) { const k = Math.round((cur / c.k) * 10000) / 10000; return { ...l, coef: Math.abs(k - 1) < 1e-6 ? '' : String(k), note: l.note.replace(new RegExp(`;?\\s*${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').replace(/^;\s*/, '').trim() }; }
+      if (!on && !has) return { ...l, coef: String(Math.round(cur * c.k * 10000) / 10000), note: [l.note, tag].filter(Boolean).join('; ') };
+      return l;
+    }));
+    change(); toast(on ? `Коэффициент «${c.label}» снят` : `Работы × ${String(c.k).replace('.', ',')} — ${c.label.toLowerCase()}`);
+  };
+  /** Материалы — до целых упаковок (мешки, листы, рулоны…) */
+  const roundPacks = () => {
+    let n = 0;
+    setLines((ls) => ls.map((l) => {
+      if (l.type !== 'material' || !PACK_UNIT.test(l.unit)) return l;
+      const q = parseNum(l.qty);
+      if (!(q > 0) || Number.isInteger(q)) return l;
+      n++; return { ...l, qty: String(Math.ceil(q - 1e-9)) };
+    }));
+    change(); setSheet(null);
+    setTimeout(() => toast(n ? `Округлено до целых упаковок: ${n} поз.` : 'Все материалы уже в целых упаковках'), 0);
+  };
+
   const [pdfBusy, setPdfBusy] = useState(false);
   const FILE_OK: Record<string, string> = {
     pdf: 'PDF отправлен вам в чат бота — перешлите заказчику',
@@ -316,6 +354,19 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
       )}
 
+      {!readOnly && tips.length > 0 && (
+        <div className="panel" style={{ marginTop: 12 }}>
+          <div className="row between"><b>💡 Часто забывают</b><span className="xs muted">нажмите, чтобы добавить</span></div>
+          <div className="row wrap" style={{ marginTop: 8, gap: 6 }}>
+            {tips.map((t) => (
+              <span key={t.name} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingRight: 4 }}>
+                <button style={{ background: 'none', border: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', padding: 0, textAlign: 'left' }} onClick={() => addTip(t)} title={t.why}>+ {t.name} <span className="muted">· {rub(t.price)}/{t.unit}</span></button>
+                <button aria-label={`Скрыть: ${t.name}`} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: '0 4px', fontSize: 16 }} onClick={() => setHiddenTips((x) => new Set(x).add(t.name))}>×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {!readOnly && (
         <div className="grid2" style={{ marginTop: 12 }}>
           <button className="btn primary" onClick={() => setSheet('add')}><Icon.book width={18} />Из справочника</button>
@@ -510,6 +561,13 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           </div>
           <p className="xs muted">Порядок: подытог → резерв → наценка → скидка → доставка и доп. расходы → налог. Коэффициенты строк и разделов применяются к ценам.</p>
           <div className="panel stack">
+            <div className="title" style={{ fontWeight: 700 }}>Надбавки на работы</div>
+            <div className="row wrap" style={{ gap: 6 }}>
+              {WORK_COEFS.map((c) => <button key={c.id} className={`chip ${coefOn(c) ? 'on' : ''}`} disabled={readOnly} onClick={() => toggleCoef(c)}>{c.label} ×{String(c.k).replace('.', ',')}</button>)}
+            </div>
+            <div className="xs muted">Умножает цену всех работ (материалы не меняются). В смете у позиций появится пометка, например «зимние работы ×1,15». Нажмите ещё раз — снимется.</div>
+          </div>
+          <div className="panel stack">
             <div className="title" style={{ fontWeight: 700 }}>Итог ровной суммой</div>
             <div className="xs muted">Сейчас: {rub(totals.total)}{totals.roundAdjust ? ` (округление ${rub(totals.roundAdjust)})` : ''}. Цены позиций не меняются — в смете будет строка «Округление».</div>
             <div className="row wrap">
@@ -612,7 +670,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           </button>}
           <button className="list-item" onClick={() => nav(`/estimates/${initial.id}/acts`)}><div className="grow"><div className="title">Акты выполненных работ, КС-2, КС-3</div><div className="xs muted">Промежуточные акты по частям и остаток работ</div></div></button>
           <button className="list-item" onClick={() => nav(`/estimates/${initial.id}/purchase`)}><div className="grow"><div className="title">Ведомость закупки материалов</div><div className="xs muted">Что купить, с отметками и отправкой поставщику</div></div></button>
-          <button className="list-item" onClick={() => setSheet('params')}><div className="grow"><div className="title">Поднять цены на %</div><div className="xs muted">Подорожали материалы — пересчитать всё разом</div></div></button>
+          <button className="list-item" disabled={readOnly} onClick={roundPacks}><div className="grow"><div className="title">Округлить материалы до упаковок</div><div className="xs muted">7,3 мешка → 8: мешки, листы, рулоны, банки — целыми</div></div></button>
+          <button className="list-item" onClick={() => setSheet('params')}><div className="grow"><div className="title">Надбавки и «Поднять цены на %»</div><div className="xs muted">Зимние, срочно, высота, стеснённо — в один тап</div></div></button>
           <button className="list-item" onClick={() => setSheet('history')}><div className="grow title">История изменений</div></button>
           <button className="list-item" disabled={readOnly} onClick={async () => {
             if (!(await confirmDialog('Удалить смету? Её можно будет восстановить по запросу в поддержку.'))) return;

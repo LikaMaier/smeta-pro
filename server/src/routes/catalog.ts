@@ -254,6 +254,27 @@ export async function catalogRoutes(app: FastifyInstance, opts: { bot?: any } = 
     return plain(await prisma.priceHistory.findMany({ where: { itemId: id }, orderBy: { changedAt: 'desc' }, take: 100 }));
   });
 
+  // Цены под регион: примерные (ещё не исправленные вами) цены справочника × коэффициент региона.
+  // Исходная цена хранится в params.basePrice — повторный выбор региона пересчитывает от неё, а не накапливает.
+  app.get('/api/items/region', async (req) => {
+    const kv = await prisma.appKV.findUnique({ where: { key: `region:${req.user.id}` } });
+    return kv ? JSON.parse(kv.value) : { id: 'spb', coef: 1 };
+  });
+  app.post('/api/items/region', async (req) => {
+    const { id, coef } = z.object({ id: z.string().max(20), coef: z.number().min(0.5).max(2) }).parse(req.body);
+    const items = await prisma.catalogItem.findMany({ where: { userId: req.user.id, deletedAt: null, notes: { startsWith: 'Примерная цена' } }, select: { id: true, price: true, params: true } });
+    const now = new Date();
+    const ops = items.map((i) => {
+      const p: any = (i.params as any) || {};
+      const base = Number(p.basePrice) > 0 ? Number(p.basePrice) : Number(i.price);
+      const price = base >= 100 ? Math.round((base * coef) / 10) * 10 : Math.round(base * coef * 100) / 100;
+      return prisma.catalogItem.update({ where: { id: i.id }, data: { price, priceUpdatedAt: now, params: { ...p, basePrice: base, region: id } } });
+    });
+    for (let k = 0; k < ops.length; k += 100) await prisma.$transaction(ops.slice(k, k + 100));
+    await prisma.appKV.upsert({ where: { key: `region:${req.user.id}` }, create: { key: `region:${req.user.id}`, value: JSON.stringify({ id, coef }) }, update: { value: JSON.stringify({ id, coef }) } });
+    return { ok: true, updated: items.length };
+  });
+
   // Добавить стартовый набор работ с ориентировочными ценами (только выбранные разделы, без дублей)
   app.post('/api/items/import-starter', async (req) => {
     const { priceListId, categories } = z.object({ priceListId: z.string(), categories: z.array(z.string()).min(1) }).parse(req.body);

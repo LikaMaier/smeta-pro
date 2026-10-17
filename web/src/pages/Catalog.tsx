@@ -31,6 +31,7 @@ export default function Catalog() {
   const [starterOpen, setStarterOpen] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
   const [baseOpen, setBaseOpen] = useState(false);
+  const [regionOpen, setRegionOpen] = useState(false);
 
   const toggle = (id: string) => setSelected((s) => { const c = new Set(s); c.has(id) ? c.delete(id) : c.add(id); return c; });
   const currentList = lists.data?.find((l) => l.id === listId);
@@ -52,6 +53,11 @@ export default function Catalog() {
           <button className="list-item panel" style={{ marginBottom: 8 }} onClick={() => setBaseOpen(true)}>
             <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">🏪</span>
             <div className="grow"><div className="title">База материалов «Петрович»</div><div className="xs muted">~47 000 позиций с ценами СПб — найти и добавить к себе</div></div>
+            <Icon.chevron className="chev" width={18} />
+          </button>
+          <button className="list-item panel" style={{ marginBottom: 8 }} onClick={() => setRegionOpen(true)}>
+            <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">📍</span>
+            <div className="grow"><div className="title">Цены под мой регион</div><div className="xs muted">Примерные цены рассчитаны по Петербургу — пересчитайте под свой город</div></div>
             <Icon.chevron className="chev" width={18} />
           </button>
           <div className="grid2" style={{ marginBottom: 12 }}>
@@ -101,6 +107,7 @@ export default function Catalog() {
       )}
 
       <PriceImportSheet open={priceOpen} priceListId={listId} onClose={() => setPriceOpen(false)} onDone={() => { setPriceOpen(false); items.reload(); lists.reload(); cats.reload(); }} />
+      <RegionSheet open={regionOpen} onClose={() => setRegionOpen(false)} onDone={() => { setRegionOpen(false); items.reload(); }} />
       <StarterSheet open={starterOpen} onClose={() => setStarterOpen(false)} priceListId={listId} onDone={() => { setStarterOpen(false); items.reload(); lists.reload(); cats.reload(); }} />
 
       <ItemSheet item={edit} onClose={() => setEdit(null)} categories={cats.data || []} readOnly={ro}
@@ -375,6 +382,41 @@ function PriceImportSheet({ open, priceListId, onClose, onDone }: { open: boolea
         )}
         <button className="btn ghost block" disabled={busy} onClick={async () => { try { await post('/items/export/send', { priceListId }); toast('Справочник отправлен вам в чат бота — поменяйте цены и загрузите сюда'); } catch (e: any) { toast(e.message, true); } }}>📤 Скачать мой справочник в Excel</button>
         <p className="xs muted" style={{ margin: 0 }}>Сопоставление — по названию (регистр, «х/×», кавычки и лишние пробелы не важны). Чтобы цена из прайса попадала в мастера, назовите позицию в справочнике так же, как в прайсе (или наоборот). Старые цены сохраняются в истории позиции.</p>
+      </div>
+    </Sheet>
+  );
+}
+
+const REGIONS = [
+  { id: 'msk', label: 'Москва и область', coef: 1.2 },
+  { id: 'spb', label: 'Петербург и Ленобласть', coef: 1 },
+  { id: 'big', label: 'Город-миллионник', coef: 0.9 },
+  { id: 'city', label: 'Другой город', coef: 0.8 },
+  { id: 'small', label: 'Малый город, посёлок', coef: 0.7 },
+  { id: 'north', label: 'Север, Дальний Восток', coef: 1.3 },
+];
+/** Пересчёт примерных цен справочника под регион (от исходных цен Петербурга) */
+function RegionSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const cur = useLoad(() => (open ? get<any>('/items/region') : Promise.resolve(null)), [open]);
+  const [busy, setBusy] = useState(false);
+  const pick = async (r: typeof REGIONS[number]) => {
+    setBusy(true);
+    try { const res = await post<any>('/items/region', { id: r.id, coef: r.coef }); toast(`Пересчитано цен: ${res.updated} — ${r.label}`); onDone(); }
+    catch (e: any) { toast(e.message, true); } finally { setBusy(false); }
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Цены под мой регион">
+      <div className="stack">
+        <p className="small muted" style={{ margin: 0 }}>Пересчитываются только примерные цены, которые вы ещё не меняли. Ваши собственные расценки не трогаем. Можно выбрать регион заново в любой момент.</p>
+        <div className="list">
+          {REGIONS.map((r) => (
+            <button key={r.id} className="list-item" disabled={busy} onClick={() => pick(r)}>
+              <div className="grow"><div className="title">{r.label}</div><div className="xs muted">{r.coef === 1 ? 'исходные цены' : `цены × ${String(r.coef).replace('.', ',')}`}</div></div>
+              {cur.data?.id === r.id && <span className="badge ok">сейчас</span>}
+            </button>
+          ))}
+        </div>
       </div>
     </Sheet>
   );
