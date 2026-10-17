@@ -44,9 +44,15 @@ export const TIERS: Record<Tier, TierInfo> = {
 
 /** Бригада: 3 человека в базовой цене, каждый следующий — доплата в месяц */
 export const TEAM_BASE_SEATS = 3;
-export const TEAM_BASE_RUB = 1490;
-export const SEAT_RUB = 290;
+export const TEAM_BASE_RUB = 590; // стартовая цена (было 1490 ₽ + 290 ₽ за человека)
+export const SEAT_RUB = 99;
 export const teamMonthRub = (seats: number) => TEAM_BASE_RUB + Math.max(0, seats - TEAM_BASE_SEATS) * SEAT_RUB;
+// цена основателя для «Бригады» — по стартовым ценам (год −30%, как в billing.ts)
+for (const n of [3, 5, 10]) {
+  const m = teamMonthRub(n), code = n === 3 ? 'team' : `team${n}`;
+  FOUNDER[`${code}_m`] = m;
+  FOUNDER[`${code}_y`] = Math.round((m * 12 * 0.7) / 10) * 10;
+}
 /** Кому из участников достаётся оплаченное место: первым вступившим (владелец занимает одно место) */
 export function teamSeatHolders<T extends { id: string; joined: number }>(members: T[], seats: number): Set<string> {
   return new Set([...members].sort((a, b) => a.joined - b.joined).slice(0, Math.max(0, seats - 1)).map((m) => m.id));

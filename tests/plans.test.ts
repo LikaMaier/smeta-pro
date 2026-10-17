@@ -21,9 +21,9 @@ test('лимиты тарифов', () => {
   assert.equal(TIERS.pro.ai, 300);
   assert.equal(TIERS.team.ai, 1000);
   assert.equal(TIERS.team.seats, 3);
-  assert.equal(teamMonthRub(3), 1490);
-  assert.equal(teamMonthRub(5), 2070);
-  assert.equal(teamMonthRub(10), 3520);
+  assert.equal(teamMonthRub(3), 590);
+  assert.equal(teamMonthRub(5), 788);
+  assert.equal(teamMonthRub(10), 1283);
   assert.equal(seatsOf({ teamSeats: 0 }), 5); // старые подписки «Бригада» — 5 мест
   assert.equal(seatsOf({ teamSeats: 10 }), 10);
 });
