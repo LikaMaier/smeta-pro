@@ -60,7 +60,9 @@ test('поиск видов работ по синонимам', () => {
   assert.ok(ids('септик').includes('m-septic:bio'), 'станция биоочистки по слову «септик»');
   assert.ok(ids('топас').includes('m-septic:bio'));
   assert.ok(ids('ванная').includes('m-tile:bath'));
-  assert.ok(ids('ламинат').includes('m-floor:none'));
+  assert.ok(ids('ламинат').includes('m-floor:cover-laminate'));
+  assert.ok(ids('балкон').includes('m-balcony:warm'));
+  assert.ok(ids('муж на час').includes('m-handy'));
   assert.ok(ids('гипсокартон потолок').includes('m-gkl:ceil1'));
   assert.ok(ids('газоблок').includes('m-mason:gas'));
   assert.ok(ids('крыша').length >= 4);

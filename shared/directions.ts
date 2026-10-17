@@ -33,10 +33,20 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export const DIRECTIONS: Direction[] = [
   { id: 'finish', icon: '🎨', title: 'Отделка', text: 'Штукатурка, покраска, обои, потолки', kinds: [
     master('m-finish', 'Комната под ключ', 'Стены, потолок, откосы — по размерам комнаты'),
+    master('m-stretch', 'Натяжные потолки', 'Полотно, профиль, светильники, обходы труб'),
     ...fromMaster('m-gkl', 'kind'),
   ] },
   { id: 'tile', icon: '🧱', title: 'Плитка', text: 'Санузел, пол, стены, фартук', kinds: fromMaster('m-tile', 'obj') },
-  { id: 'floor', icon: '🪵', title: 'Полы', text: 'Стяжка, наливной, лаги, покрытие', kinds: fromMaster('m-floor', 'base') },
+  { id: 'floor', icon: '🪵', title: 'Полы', text: 'Ламинат, кварцвинил, паркет, стяжка', kinds: [
+    ...([['laminate', 'Ламинат'], ['spc', 'Кварцвинил (SPC)'], ['parquet', 'Паркетная доска'], ['lino', 'Линолеум'], ['carpet', 'Ковролин']] as const).map(([c, t]) => ({
+      id: `m-floor:cover-${c}`, title: t, text: 'Укладка на готовое основание: подложка, плинтус, пороги', to: `/calculators/m-floor?set=base:none,cover:${c}`,
+    })),
+    ...fromMaster('m-floor', 'base', ['cps', 'semi', 'self', 'joists'], { cps: 'Стяжка ЦПС', semi: 'Полусухая стяжка', self: 'Наливной пол', joists: 'Лаги + фанера' }),
+  ] },
+  { id: 'windows', icon: '🪟', title: 'Окна и двери', text: 'Окна, откосы, подоконники, двери', kinds: fromMaster('m-windows', 'kind', undefined, { windows: 'Пластиковые окна', interior: 'Межкомнатные двери', entrance: 'Входная дверь', all: 'Окна и двери вместе' }) },
+  { id: 'balcony', icon: '🌇', title: 'Балкон и лоджия', text: 'Остекление, утепление, отделка', kinds: fromMaster('m-balcony', 'glaze', undefined, { warm: 'Тёплый балкон под ключ', cold: 'Холодное остекление', none: 'Утепление и отделка' }) },
+  { id: 'demo', icon: '🔨', title: 'Демонтаж', text: 'Плитка, стяжка, перегородки, вывоз', kinds: fromMaster('m-demo', 'obj', undefined, { flat: 'Квартира под ремонт', bath: 'Санузел', room: 'Комната', custom: 'Выберу сам' }) },
+  { id: 'climate', icon: '❄️', title: 'Кондиционеры', text: 'Сплит-системы, трассы, вытяжки', kinds: [master('m-ac', 'Кондиционеры и вентиляция', 'Монтаж сплит-систем, трассы, помпы, вытяжки')] },
   { id: 'electric', icon: '⚡', title: 'Электрика', text: 'Проводка, щит, розетки, свет', kinds: [
     ...fromMaster('m-electric', 'obj', undefined, { flat: 'Электрика в квартире', house: 'Электрика в частном доме' }),
     { id: 'mep-e', icon: '📐', title: 'По плану комнат (3D)', text: 'Точки по ПУЭ, трассы, щит, чертёж и смета', to: '/mep' },
@@ -65,8 +75,12 @@ export const DIRECTIONS: Direction[] = [
     { id: 'fence', icon: '🚧', title: 'Забор и ворота', text: '17 видов заборов, ворота, калитки', to: '/calculators/fence-pro' },
     { id: 'fence3d', icon: '📐', title: 'Забор в 3D', text: 'Модель, чертёж, PDF и смета', to: '/fence' },
     ...fromMaster('m-paving', 'cover', ['tile', 'paver', 'granite', 'asphalt', 'rubble'], { tile: 'Тротуарная плитка', paver: 'Брусчатка', granite: 'Гранитная плитка', asphalt: 'Асфальт', rubble: 'Площадка из щебня' }),
+    ...fromMaster('m-gates', 'gate', ['sliding', 'swing'], { sliding: 'Откатные ворота', swing: 'Распашные ворота' }),
+    master('m-gates', 'Козырьки, лестницы, перила', 'Металлоконструкции, сварка, покраска'),
+    master('m-yard', 'Ливнёвка, газон, освещение', 'Лотки, ливнеприёмники, газон, фонари, посадки, полив'),
     ...tpl('tko'),
   ] },
+  { id: 'house', icon: '🏠', title: 'Дома и бани', text: 'Каркасный дом, баня из каркаса или бруса', kinds: fromMaster('m-house', 'type', undefined, { house: 'Каркасный дом', bathf: 'Баня каркасная', bathb: 'Баня из бруса' }) },
   { id: 'build', icon: '🏡', title: 'Постройки', text: 'Навесы, бытовки, гаражи, беседки — 3D', kinds: [
     { id: 'd-canopy', icon: '🚗', title: 'Навес', text: 'Для машины, террасы, двора', to: '/designer?preset=car' },
     { id: 'd-bytovka', icon: '🏠', title: 'Бытовка / хозблок', text: 'Каркасная, утеплённая, с окнами', to: '/designer?preset=bytovka' },
@@ -74,6 +88,7 @@ export const DIRECTIONS: Direction[] = [
     { id: 'd-garage', icon: '🚙', title: 'Гараж', text: 'Каркасный из профиля', to: '/designer?preset=garage' },
     { id: 'd-all', icon: '📐', title: 'Все постройки', text: 'Теплицы, дровники, пергола, ангары', to: '/designer' },
   ] },
+  { id: 'handy', icon: '🧰', title: 'Мелкий ремонт', text: 'Повесить, собрать, заменить', kinds: [master('m-handy', 'Мастер на час', 'Полки, карнизы, мебель, смесители, розетки, люстры')] },
 ];
 
 export const getDirection = (id: string | null | undefined) => DIRECTIONS.find((d) => d.id === id) || null;
@@ -161,6 +176,19 @@ const KEYWORDS: Record<string, string> = {
   'd-gazebo': 'беседка барбекю мангал',
   'd-garage': 'гараж мастерская бокс',
   'd-all': 'постройки теплица дровник пергола ангар склад терраса козырек',
+  'm-stretch': 'натяжной потолок натяжные потолки полотно глянец матовый теневой парящий светильники',
+  'm-floor:cover-laminate': 'ламинат укладка пол покрытие', 'm-floor:cover-spc': 'кварцвинил spc виниловый ламинат', 'm-floor:cover-parquet': 'паркет паркетная доска',
+  'm-floor:cover-lino': 'линолеум', 'm-floor:cover-carpet': 'ковролин ковер',
+  'm-windows:windows': 'окна пластиковые пвх стеклопакет откосы подоконник отлив замена окон', 'm-windows:interior': 'двери межкомнатные установка наличники доборы',
+  'm-windows:entrance': 'дверь входная металлическая железная', 'm-windows:all': 'окна двери',
+  'm-balcony:warm': 'балкон лоджия теплый утепление остекление пвх обшивка вагонка', 'm-balcony:cold': 'балкон лоджия остекление холодное алюминий раздвижное',
+  'm-balcony:none': 'балкон лоджия отделка утепление',
+  'm-demo:flat': 'демонтаж снос разборка вывоз мусора квартира черновой', 'm-demo:bath': 'демонтаж санузел ванная плитка', 'm-demo:room': 'демонтаж комната обои', 'm-demo:custom': 'демонтаж перегородки стяжка',
+  'm-ac': 'кондиционер сплит система климат вентиляция вытяжка трасса',
+  'm-house:house': 'каркасный дом строительство дома под ключ коробка', 'm-house:bathf': 'баня каркасная парилка', 'm-house:bathb': 'баня из бруса сруб парилка печь',
+  'm-gates:sliding': 'ворота откатные автоматика', 'm-gates:swing': 'ворота распашные', 'm-gates': 'козырек лестница перила сварка металлоконструкции',
+  'm-yard': 'ливневка лотки водоотвод газон освещение фонари полив посадка деревья благоустройство',
+  'm-handy': 'мастер на час муж на час мелкий ремонт повесить полку карниз собрать мебель смеситель розетка люстра',
 };
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9\s-]/g, ' ');
 /** Поиск вида работ по словам: название, направление и синонимы; совпадение по началу слова */
