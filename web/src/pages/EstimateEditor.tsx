@@ -192,6 +192,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     title: h.title, customer: h.customer, address: h.address, total: totals.total,
     lines: lines.filter((l) => l.name.trim()).map((l) => ({ name: l.name, qty: parseNum(l.qty), price: parseNum(l.price), matPrice: l.matPrice === '' ? null : parseNum(l.matPrice), unit: l.unit, note: l.note, unconfirmed: l.unconfirmed })),
     paySchedule: h.paySchedule.filter((x) => x.title.trim()).map((x) => ({ title: x.title, pct: parseNum(x.pct) })),
+    params: { delivery: parseNum(h.delivery), lossReservePct: parseNum(h.lossReservePct), taxPct: parseNum(h.taxPct), extraCosts: parseNum(h.extraCosts) },
   }), [h, lines, totals.total]);
   /** Перед отправкой заказчику — проверка; при замечаниях показываем их и даём отправить всё равно */
   const guard = (fn: () => void) => { if (issues.length) { setPending(() => fn); setSheet('check'); } else fn(); };
@@ -503,7 +504,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             <Field label="Наценка" hint="На подытог и резерв"><NumInput value={h.markupPct} onChange={(v) => setHead({ markupPct: v })} unit="%" /></Field>
             <Field label="Скидка" hint="После наценки"><NumInput value={h.discountPct} onChange={(v) => setHead({ discountPct: v })} unit="%" /></Field>
             <Field label="Резерв на потери" hint="От суммы материалов"><NumInput value={h.lossReservePct} onChange={(v) => setHead({ lossReservePct: v })} unit="%" /></Field>
-            <Field label="Налог" hint="Начисляется сверху"><NumInput value={h.taxPct} onChange={(v) => setHead({ taxPct: v })} unit="%" /></Field>
+            <Field label="Налог" hint="Сверху. Самозанятый — 4% (физлица) или 6% (фирмы); НДС 20% — только на ОСН"><NumInput value={h.taxPct} onChange={(v) => setHead({ taxPct: v })} unit="%" /></Field>
             <Field label="Доставка"><NumInput value={h.delivery} onChange={(v) => setHead({ delivery: v })} unit="₽" /></Field>
             <Field label="Доп. расходы"><NumInput value={h.extraCosts} onChange={(v) => setHead({ extraCosts: v })} unit="₽" /></Field>
           </div>
