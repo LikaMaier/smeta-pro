@@ -1,4 +1,6 @@
-import { Bot, InlineKeyboard } from 'grammy';
+import { Bot, InlineKeyboard, InputFile } from 'grammy';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { env } from './env';
 import { prisma, accessOf } from './util';
 import { can, TIERS } from '../../shared/plans';
@@ -34,6 +36,7 @@ export function createBot() {
       return ctx.reply('Здравствуйте! 👷 Заявка принята — свяжемся с вами в ближайшее время (обычно в течение пары часов, с 9 до 21).\n\nЧтобы подготовиться к разговору, ответьте одним сообщением:\n1) Как называется фирма и чем занимаетесь?\n2) Откуда сейчас приходят заказы?\n3) Что больше всего отнимает времени — заявки, сметы, КП, соцсети?');
     }
     const u = ctx.from ? await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username, payload).catch((e) => { console.error('upsertUser', e); return null; }) : null;
+    if (payload === 'guide') return sendGuide(ctx).catch(() => {});
     // поддержка: t.me/бот?start=help (кнопка «Поддержка» в приложении)
     if (payload === 'help' && ctx.from) {
       await prisma.appKV.upsert({ where: { key: `sup:${ctx.from.id}` }, create: { key: `sup:${ctx.from.id}`, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
@@ -52,7 +55,28 @@ export function createBot() {
       } catch (e: any) { await ctx.reply(`Не получилось вступить в бригаду: ${e.message}`); }
     }
     await ctx.reply(welcomeText(u), { parse_mode: 'HTML', reply_markup: appKb() });
+    // новичку — пошаговая инструкция в картинках (один раз)
+    if (u && ctx.from && Date.now() - new Date(u.createdAt).getTime() < 5 * 60e3) {
+      const first = await prisma.appKV.create({ data: { key: `guide:${ctx.from.id}`, value: '1' } }).then(() => true).catch(() => false);
+      if (first) await sendGuide(ctx).catch((e) => console.error('guide', e));
+    }
   });
+  bot.command(['guide', 'kak'], (ctx) => sendGuide(ctx).catch(() => ctx.reply('Не получилось отправить инструкцию, попробуйте ещё раз.')));
+  bot.hears(/^(как начать|инструкция|как пользоваться)\??$/i, (ctx) => sendGuide(ctx).catch(() => {}));
+
+  /** «Как сделать первую смету — 4 шага»: альбом с настоящими экранами; file_id кэшируем после первой отправки */
+  async function sendGuide(ctx: any) {
+    const cached = await prisma.appKV.findUnique({ where: { key: 'guide:fileids' } }).catch(() => null);
+    const ids: string[] | null = cached ? JSON.parse(cached.value) : null;
+    const caption = '📖 <b>Как сделать первую смету — 4 шага</b>\n\n1. «Новая смета»\n2. Что делаете: например, плитка → санузел\n3. Площадь — работы и материалы с ценами посчитаются сами\n4. «PDF клиенту» — и смета у заказчика\n\nВопрос? Просто напишите его сюда — ответим.';
+    const media = [1, 2, 3, 4].map((n, i) => ({ type: 'photo' as const, media: ids?.[i] || new InputFile(path.join(GUIDE_DIR, `guide-${n}.jpg`)), ...(i === 0 ? { caption, parse_mode: 'HTML' as const } : {}) }));
+    const sent = await ctx.replyWithMediaGroup(media);
+    if (!ids) {
+      const fresh = sent.map((m: any) => m.photo?.[m.photo.length - 1]?.file_id).filter(Boolean);
+      if (fresh.length === 4) await prisma.appKV.upsert({ where: { key: 'guide:fileids' }, create: { key: 'guide:fileids', value: JSON.stringify(fresh) }, update: { value: JSON.stringify(fresh) } }).catch(() => {});
+    }
+    await ctx.reply('Попробуйте прямо сейчас — первая смета займёт пару минут 👇', { reply_markup: appKb() });
+  }
 
   // ID для настройки администратора
   // Сводка для администратора: /stats — за сегодня, /stats 7 — за 7 дней
@@ -192,6 +216,8 @@ export function createBot() {
 }
 
 /** Приветствие после «Старт»: новичку — что умеем, вернувшемуся — коротко и его статус */
+const GUIDE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../assets/guide');
+
 export function welcomeText(u: any) {
   const name = esc(u?.firstName || 'мастер');
   const isNew = !u || Date.now() - new Date(u.createdAt).getTime() < 5 * 60e3;
@@ -227,7 +253,7 @@ export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказч
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);
   if (me?.username) botInfo.username = me.username;
-  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }]);
+  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }, { command: 'guide', description: 'Как сделать первую смету' }, { command: 'help', description: 'Поддержка' }]);
   // Тексты, которые видно до нажатия «Старт» и в профиле бота
   await bot.api.setMyDescription(BOT_DESCRIPTION).catch(() => {});
   await bot.api.setMyShortDescription(BOT_SHORT).catch(() => {});

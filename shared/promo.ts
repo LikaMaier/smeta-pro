@@ -4,6 +4,6 @@ export const normCode = (s: string) => s.trim().toUpperCase().replace(/[^A-ZА-�
 /** Метка рекламного канала из ссылки запуска бота (?start=card, vk, chat_prorab…); служебные ref_/p_/team_/biz/help — не метки */
 export function channelTag(payload?: string | null) {
   const p = (payload || '').trim();
-  if (!/^[A-Za-z0-9_-]{2,40}$/.test(p) || /^(ref_|p_|team_|biz)/.test(p) || p === 'help') return null;
+  if (!/^[A-Za-z0-9_-]{2,40}$/.test(p) || /^(ref_|p_|team_|biz)/.test(p) || p === 'help' || p === 'guide') return null;
   return p.toLowerCase();
 }
