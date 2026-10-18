@@ -7,7 +7,7 @@ import { calcEstimate } from '../shared/estimate';
 import { COUNT_UNIT } from '../shared/masters';
 
 test('готовые сметы: собираются, у всех позиций есть цена, штучное — целым числом, итог разумный', () => {
-  assert.ok(READY_TEMPLATES.length >= 50);
+  assert.ok(READY_TEMPLATES.length >= 60);
   for (const t of READY_TEMPLATES) {
     const ls = t.lines;
     assert.ok(ls.length >= 4, `${t.id}: мало позиций`);

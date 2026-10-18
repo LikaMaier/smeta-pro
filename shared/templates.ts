@@ -161,5 +161,5 @@ for (const t of TEMPLATES) t.group ||= GROUP_OF[t.id] || 'Участок';
 // готовые сметы под ключ от мастеров (квартира, санузел, кровля, дом, баня…)
 TEMPLATES.push(...(READY_TEMPLATES as unknown as EstimateTemplate[]));
 
-export const TEMPLATE_GROUPS = ['Квартира', 'Полы и стены', 'Инженерия', 'Дом', 'Участок'];
+export const TEMPLATE_GROUPS = ['Квартира', 'Коммерция', 'Полы и стены', 'Инженерия', 'Дом', 'Участок'];
 export const getTemplate = (id: string) => TEMPLATES.find((t) => t.id === id);

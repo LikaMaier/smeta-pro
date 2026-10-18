@@ -260,7 +260,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       if (!tpl) throw notFound('Шаблон');
       const e = await prisma.estimate.create({
         data: {
-          userId: req.user.id, title: body.title || tpl.title, projectId: body.projectId || null, customer: body.customer || null,
+          userId: req.user.id, title: body.title || tpl.title, source: 'template', projectId: body.projectId || null, customer: body.customer || null,
           lines: { create: await priceTemplateLines(req.user.id, tpl.lines) },
         },
         include: { lines: { orderBy: { position: 'asc' } } },

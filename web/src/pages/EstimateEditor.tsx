@@ -62,6 +62,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [raise, setRaise] = useState({ pct: '', scope: 'all' });
   const [grouped, setGrouped] = useState(() => initial.lines.some((l: any) => l.category));
   const [restore, setRestore] = useState<any>(null);
+  const [savedTpl, setSavedTpl] = useState(false);
   const saving = useRef(false);
   // из «Новой сметы → Другое»: сразу поиск по справочнику
   useEffect(() => { if (new URLSearchParams(location.search).get('add') === '1' && !initial.lines.length) setSheet('add'); }, []); // eslint-disable-line
@@ -383,6 +384,13 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <button className="btn block save-prices" style={{ marginTop: 8 }} onClick={() => { setSkip(new Set(fresh.filter((x) => /Примерная цена/.test(x.l.note)).map((x) => x.l.k))); setSheet('prices'); }}>
           💾 Запомнить мои расценки · {fresh.length}<small>новые и изменённые цены → в справочник, для следующих смет</small>
         </button>
+      )}
+      {!readOnly && initial.source === 'template' && !initial.isTemplate && !savedTpl && (
+        <div className="panel" style={{ marginTop: 12 }}>
+          <b>📋 Смета из готового шаблона</b>
+          <div className="xs muted" style={{ margin: '4px 0 8px' }}>Поправьте количество и цены под себя — и сохраните как свой шаблон: в следующий раз такая смета будет готова за 10 секунд, с вашими ценами.</div>
+          <button className="btn sm block" onClick={() => action(async () => { await post(`/estimates/${initial.id}/save-as-template`, {}); setSavedTpl(true); }, 'Сохранено в «Мои шаблоны» — они в «Новой смете»')}>💾 Сохранить как мой шаблон</button>
+        </div>
       )}
       {!readOnly && (
         <div className="grid2" style={{ marginTop: 8 }}>

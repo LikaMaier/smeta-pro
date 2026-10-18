@@ -4,6 +4,16 @@
  * Комплексные (квартира, санузел) — несколько мастеров подряд, одинаковые строки складываются.
  */
 import { MASTERS } from './masters';
+import { STARTER_PRICES } from './starterPrices';
+const SP = new Map(STARTER_PRICES.map((p) => [p.name, p]));
+/** Работа из справочника: цена и единица оттуда (ошибка, если названия нет) */
+const W = (category: string, name: string, qty: number): ReadyLine => {
+  const s = SP.get(name);
+  if (!s) throw new Error(`Нет в справочнике: ${name}`);
+  return { name, qty, unit: s.unit, type: s.category === 'Аренда техники' ? 'equipment' : 'work', category, price: s.price };
+};
+const MAT = (category: string, name: string, qty: number, unit: string, price: number): ReadyLine =>
+  ({ name, qty, unit, type: 'material', category: `${category}: материалы`, price, note: 'Ориентировочная цена — проверьте у поставщика' });
 
 type T = 'work' | 'material' | 'equipment' | 'service' | 'other';
 export interface ReadyLine { name: string; qty: number; unit: string; type: T; category: string; price?: number; composition?: string; note?: string }
@@ -21,8 +31,10 @@ export function masterLines(id: string, values: Record<string, any> = {}): Ready
   return m.build(v).lines.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, type: l.type as T, category: l.category, price: l.price, composition: l.composition, note: l.note }));
 }
 
+/** Работы, которые разные мастера считают каждый у себя (люстры есть и в электрике, и в натяжных потолках) — оставляем одну строку */
+const ONCE = ['Монтаж люстры', 'Опрессовка системы'];
 /** Несколько мастеров подряд: одинаковые позиции складываются, доставка — не больше 3 рейсов */
-function combo(parts: [string, Record<string, any>][]): ReadyLine[] {
+function combo(parts: [string, Record<string, any>][], extra: ReadyLine[] = []): ReadyLine[] {
   const out: ReadyLine[] = [];
   for (const [id, v] of parts) {
     for (const l of masterLines(id, v)) {
@@ -31,14 +43,23 @@ function combo(parts: [string, Record<string, any>][]): ReadyLine[] {
       else out.push({ ...l });
     }
   }
+  for (const l of extra) out.push({ ...l });
   for (const l of out) if (/^Доставка материалов/.test(l.name)) l.qty = Math.min(l.qty, 3);
+  // дубли между разделами: оставляем строку с большим количеством
+  for (const name of ONCE) {
+    const same = out.filter((l) => l.name === name && l.type === 'work');
+    if (same.length > 1) {
+      const keep = same.reduce((a, b) => (b.qty > a.qty ? b : a));
+      for (const l of same) if (l !== keep) out.splice(out.indexOf(l), 1);
+    }
+  }
   return out;
 }
 
 const one = (id: string, group: string, title: string, description: string, master: string, v: Record<string, any> = {}): ReadyTemplate =>
   ({ id, group, title, description, get lines() { return masterLines(master, v); } } as ReadyTemplate);
-const many = (id: string, group: string, title: string, description: string, parts: [string, Record<string, any>][]): ReadyTemplate =>
-  ({ id, group, title, description, get lines() { return combo(parts); } } as ReadyTemplate);
+const many = (id: string, group: string, title: string, description: string, parts: [string, Record<string, any>][], extra: () => ReadyLine[] = () => []): ReadyTemplate =>
+  ({ id, group, title, description, get lines() { return combo(parts, extra()); } } as ReadyTemplate);
 
 export const READY_TEMPLATES: ReadyTemplate[] = [
   // ---------- Квартира под ключ ----------
@@ -90,6 +111,60 @@ export const READY_TEMPLATES: ReadyTemplate[] = [
   one('demo-flat', 'Квартира', 'Демонтаж квартиры 45 м²', 'Плитка, обои, полы, двери, сантехника, вынос мусора', 'm-demo', { obj: 'flat' }),
   one('demo-bath', 'Квартира', 'Демонтаж санузла', 'Плитка, сантехника, вынос и вывоз мусора', 'm-demo', { obj: 'bath' }),
   one('handy-move', 'Квартира', 'Мастер на час: заезд в новую квартиру', 'Полки, карнизы, телевизор, мебель, люстры', 'm-handy', { hang: 6, cornice: 3, tv: 1, furn: 3, lamps: 3 }),
+
+  // ---------- Коммерция ----------
+  many('office-60', 'Коммерция', 'Офис 60 м² под ключ', 'Перегородки ГКЛ, электрика и интернет, Армстронг, коммерческий линолеум, кондиционеры', [
+    ['m-gkl', { kind: 'part', len: 12, h: 2.8, doors: 3 }],
+    ['m-electric', { obj: 'flat', area: 60, rooms: 4, wall: 'gkl', stove: 'no' }],
+    ['m-finish', { L: 7.5, W: 4, H: 2.8, rooms: 2, walls: 'paint', level: 'putty', ceil: 'none' }],
+    ['m-ac', { s35: 2 }],
+    ['m-windows', { kind: 'interior', wn: 0, di: 3, demo: 'no' }],
+  ], () => [
+    W('Потолки', 'Монтаж подвесного потолка Армстронг', 60), W('Потолки', 'Монтаж светильника-панели 600×600', 14),
+    MAT('Потолки', 'Потолок Армстронг (плита + подвесная система)', 63, 'м²', 520), MAT('Потолки', 'Светильник-панель 600×600 LED', 14, 'шт', 1300),
+    W('Полы', 'Укладка коммерческого линолеума со сваркой швов', 60), MAT('Полы', 'Линолеум коммерческий (+7%)', 64, 'м²', 950),
+    W('Слаботочка', 'Прокладка слаботочной сети (интернет, СКС)', 120), W('Слаботочка', 'Монтаж розетки RJ45', 10),
+    MAT('Слаботочка', 'Кабель UTP cat.5e', 130, 'м', 28), MAT('Слаботочка', 'Розетка RJ45', 10, 'шт', 350),
+    W('Безопасность', 'Монтаж аварийного освещения (светильник «Выход»)', 3), MAT('Безопасность', 'Светильник «Выход» с аккумулятором', 3, 'шт', 1500),
+  ]),
+  many('shop-40', 'Коммерция', 'Магазин 40 м² под ключ', 'Отделка, керамогранит, освещение, витринный вход, вывеска, видеонаблюдение', [
+    ['m-electric', { obj: 'flat', area: 40, rooms: 2, wall: 'brick', stove: 'no', spots: 12 }],
+    ['m-finish', { L: 8, W: 5, H: 3, rooms: 1, walls: 'paint', level: 'plaster', ceil: 'none' }],
+    ['m-windows', { kind: 'entrance', wn: 0, de: 1 }],
+  ], () => [
+    W('Полы', 'Укладка керамогранита 60×60 на пол', 40), MAT('Полы', 'Керамогранит 60×60 (+8%)', 44, 'м²', 1400), MAT('Полы', 'Клей для керамогранита C2 (25 кг)', 12, 'меш', 1210),
+    W('Потолки', 'Монтаж потолка Грильято', 40), MAT('Потолки', 'Потолок Грильято (комплект)', 42, 'м²', 1100),
+    W('Фасад и вход', 'Монтаж вывески', 1), W('Безопасность', 'Монтаж видеокамеры', 4), MAT('Безопасность', 'Видеокамера + регистратор (комплект на 4)', 1, 'компл', 18000),
+    W('Оборудование', 'Подключение торгового и кухонного оборудования', 4),
+    W('Безопасность', 'Монтаж аварийного освещения (светильник «Выход»)', 2), MAT('Безопасность', 'Светильник «Выход» с аккумулятором', 2, 'шт', 1500),
+  ]),
+  many('cafe-80', 'Коммерция', 'Кафе 80 м²: зал и кухня', 'Кухня в плитке с трапами, вытяжной зонт и вентиляция, жироуловитель, зал, санузел', [
+    ['m-tile', { obj: 'bath', floor: 20, walls: 50, drain: 'yes', hydro: 'yes' }],
+    ['m-plumb', { toilets: 0, install: 1, sinks: 3, baths: 0, kitchen: 2, washer: 'no', dish: 'yes', rail: 'no' }],
+    ['m-electric', { obj: 'flat', area: 80, rooms: 4, stove: 'yes', spots: 20 }],
+    ['m-finish', { L: 10, W: 5.5, H: 3, rooms: 1, walls: 'decor', level: 'plaster', ceil: 'none' }],
+    ['m-ac', { s35: 0, s7: 2, fans: 2 }],
+  ], () => [
+    W('Кухня', 'Монтаж кухонного зонта', 1), W('Кухня', 'Монтаж воздуховода', 15), W('Кухня', 'Монтаж вентиляционного выхода на кровлю', 1),
+    MAT('Кухня', 'Зонт вытяжной нержавеющий', 1, 'шт', 38000), MAT('Кухня', 'Воздуховод оцинкованный с фасонными частями', 15, 'м', 1800),
+    W('Кухня', 'Монтаж приточной установки', 1), MAT('Кухня', 'Приточная установка', 1, 'шт', 95000),
+    W('Кухня', 'Монтаж жироуловителя', 1), MAT('Кухня', 'Жироуловитель под мойку', 1, 'шт', 22000),
+    W('Кухня', 'Монтаж производственной мойки', 2), W('Кухня', 'Подключение торгового и кухонного оборудования', 6),
+    W('Зал', 'Укладка керамогранита 60×60 на пол', 55), MAT('Зал', 'Керамогранит 60×60 (+8%)', 60, 'м²', 1400), MAT('Зал', 'Клей для керамогранита C2 (25 кг)', 16, 'меш', 1210),
+    W('Зал', 'Монтаж потолка Грильято', 55), MAT('Зал', 'Потолок Грильято (комплект)', 58, 'м²', 1100),
+    W('Безопасность', 'Монтаж противопожарной двери', 1), MAT('Безопасность', 'Дверь противопожарная EI60', 1, 'шт', 24000),
+    W('Безопасность', 'Монтаж аварийного освещения (светильник «Выход»)', 4), MAT('Безопасность', 'Светильник «Выход» с аккумулятором', 4, 'шт', 1500),
+  ]),
+  many('salon-50', 'Коммерция', 'Салон красоты 50 м²', 'Перегородки, мойки для мастеров, электрика под оборудование, отделка, кондиционер', [
+    ['m-gkl', { kind: 'part', len: 8, h: 2.8, doors: 2, board: 'moist' }],
+    ['m-plumb', { toilets: 0, install: 1, sinks: 3, baths: 0, kitchen: 0, washer: 'yes', rail: 'no' }],
+    ['m-electric', { obj: 'flat', area: 50, rooms: 4, wall: 'gkl', stove: 'no', spots: 16 }],
+    ['m-finish', { L: 6, W: 4, H: 2.8, rooms: 2, walls: 'paint', level: 'putty', ceil: 'stretch' }],
+    ['m-ac', { s35: 1, fans: 1 }],
+  ], () => [
+    W('Полы', 'Укладка керамогранита 60×60 на пол', 50), MAT('Полы', 'Керамогранит 60×60 (+8%)', 54, 'м²', 1400), MAT('Полы', 'Клей для керамогранита C2 (25 кг)', 14, 'меш', 1210),
+    W('Фасад и вход', 'Монтаж вывески', 1),
+  ]),
 
   // ---------- Полы, стены, потолки ----------
   one('laminate-50', 'Полы и стены', 'Ламинат 50 м² с выравниванием', 'Наливной пол, подложка, ламинат, плинтус, пороги', 'm-floor', { area: 50, per: 45, rooms: 4, base: 'self', cover: 'laminate' }),
