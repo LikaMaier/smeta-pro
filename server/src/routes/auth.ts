@@ -67,7 +67,7 @@ export async function meView(user: any) {
   const aiWish = Boolean(await prisma.auditLog.findFirst({ where: { userId: user.id, entity: 'ai', action: { in: ['wish', 'wish_notified'] } }, select: { id: true } }));
   return plain({
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
-    companyName: user.companyName, contacts: user.contacts, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
+    companyName: user.companyName, contacts: user.contacts, requisites: (user as any).requisites || null, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
     aiAvailable: Boolean(env.AI_PROVIDER), aiWish,
     promo: user.promoCode ? await findPromo(user.promoCode).then((p) => (p ? { code: p.code, discountPct: p.discountPct } : null)) : null,
     access: { ...acc, freeEstimateLeft: free.estimateCount < free.limit, freeLeft: Math.max(0, free.limit - free.estimateCount), freeLimit: free.limit, freeEstimateIds: free.freeEstimateIds, paidEstimateIds: free.paidEstimateIds, estimateCount: free.estimateCount },
@@ -129,10 +129,17 @@ export async function authRoutes(app: FastifyInstance) {
       theme: z.enum(THEME_IDS as [string, ...string[]]).optional(),
       companyName: z.string().max(200).nullable().optional(),
       contacts: z.string().max(500).nullable().optional(),
+      requisites: z.object({
+        name: z.string().max(200).optional(), inn: z.string().regex(/^(\d{10}|\d{12})?$/, 'ИНН — 10 или 12 цифр').optional(), kpp: z.string().regex(/^(\d{9})?$/, 'КПП — 9 цифр').optional(),
+        ogrn: z.string().regex(/^(\d{13}|\d{15})?$/, 'ОГРН — 13 цифр, ОГРНИП — 15').optional(), address: z.string().max(300).optional(),
+        bank: z.string().max(200).optional(), bik: z.string().regex(/^(\d{9})?$/, 'БИК — 9 цифр').optional(),
+        rs: z.string().regex(/^(\d{20})?$/, 'Расчётный счёт — 20 цифр').optional(), ks: z.string().regex(/^(\d{20})?$/, 'Корр. счёт — 20 цифр').optional(),
+        head: z.string().max(120).optional(), vat: z.boolean().optional(),
+      }).nullable().optional(),
       designPrices: z.record(z.string().max(40), z.number().positive().max(1e8)).nullable().optional(),
     }).parse(req.body);
-    const { designPrices, ...rest } = body;
-    const user = await prisma.user.update({ where: { id: req.user.id }, data: { ...rest, ...(body.theme ? { themeChosen: true } : {}), ...(designPrices !== undefined ? { designPrices: designPrices === null ? Prisma.DbNull : designPrices } : {}) } });
+    const { designPrices, requisites, ...rest } = body;
+    const user = await prisma.user.update({ where: { id: req.user.id }, data: { ...rest, ...(requisites !== undefined ? { requisites: requisites === null ? Prisma.DbNull : requisites } : {}), ...(body.theme ? { themeChosen: true } : {}), ...(designPrices !== undefined ? { designPrices: designPrices === null ? Prisma.DbNull : designPrices } : {}) } });
     return meView(user);
   });
 }

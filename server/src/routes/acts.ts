@@ -4,6 +4,30 @@ import { prisma, plain, notFound, audit, num, HttpError, accessOf, docsOk, needD
 import { loadEstimate, estimateTotals, estimateNumber } from './estimates';
 import { pdfData, renderPdf, renderKs, signedPath, checkSig, fileName } from '../pdf';
 import { progress, buildAct, lineKey, priceFactor, ActItem } from '../../../shared/acts';
+import { payStages } from '../../../shared/payments';
+import { brandPath } from '../brand';
+
+/** Реквизиты исполнителя одной строкой: «ИП Петров И. С., ИНН …, ОГРНИП …, адрес» */
+export function reqLine(user: any) {
+  const r = (user.requisites || {}) as any;
+  const name = r.name || user.companyName || [user.firstName, user.username ? `@${user.username}` : ''].filter(Boolean).join(' ');
+  const og = r.ogrn ? `${String(r.ogrn).length === 15 ? 'ОГРНИП' : 'ОГРН'} ${r.ogrn}` : '';
+  return [name, r.inn ? `ИНН ${r.inn}` : '', r.kpp ? `КПП ${r.kpp}` : '', og, r.address || ''].filter(Boolean).join(', ');
+}
+/** Следующий номер документа (счёт, акт скрытых работ): счётчик в AppKV */
+async function nextNo(key: string) {
+  const cur = await prisma.appKV.findUnique({ where: { key } });
+  const n = (Number(cur?.value) || 0) + 1;
+  await prisma.appKV.upsert({ where: { key }, create: { key, value: String(n) }, update: { value: String(n) } });
+  return n;
+}
+const DOCS = ['ks6a', 'aosr', 'invoice'] as const;
+type Doc = typeof DOCS[number];
+const docParams = z.object({
+  line: z.coerce.number().int().min(0).max(5000).optional(), from: z.string().regex(DAY).optional(), to: z.string().regex(DAY).optional(),
+  next: z.string().max(300).optional(), project: z.string().max(300).optional(),
+  stage: z.coerce.number().int().min(-1).max(20).optional(), amount: z.coerce.number().min(0).max(1e10).optional(), number: z.string().max(20).optional(),
+});
 
 /**
  * Акты выполненных работ по смете (в т.ч. промежуточные) и формы КС-2, КС-3.
@@ -51,8 +75,8 @@ async function actDoc(act: any, user: any, form: Form) {
     return { subtotal, tax, total: Math.round((subtotal + tax) * 100) / 100 };
   };
   const base = {
-    company: user.companyName || [user.firstName, user.username ? `@${user.username}` : ''].filter(Boolean).join(' '),
-    contacts: user.contacts || '', customer: e.customer, customerDetails: e.customerDetails || '', title: e.title, address: e.address,
+    company: reqLine(user),
+    contacts: (user.requisites as any)?.inn ? '' : user.contacts || '', customer: e.customer, customerDetails: e.customerDetails || '', title: e.title, address: e.address,
     number: String(act.number), date: new Date(act.date).toISOString().slice(0, 10),
     periodFrom: act.periodFrom ? new Date(act.periodFrom).toISOString().slice(0, 10) : null,
     contractNo: String(estNo), taxPct, estimateTotal: t.total,
@@ -160,6 +184,97 @@ export async function actRoutes(app: FastifyInstance, opts: { bot?: any } = {}) 
     const form = z.enum(FORMS).parse((req.params as any).form);
     const a = await loadAct(req.user.id, (req.params as any).id);
     return { url: signedPath(`/files/acts/${a.id}.pdf`, `act-${form}`, a.id) };
+  });
+
+  // ---- Документы по смете: журнал КС-6а, акт освидетельствования скрытых работ, счёт на оплату ----
+  async function estDoc(e: any, user: any, kind: Doc, p: z.infer<typeof docParams>) {
+    const today = new Date().toISOString().slice(0, 10);
+    const estNo = await estimateNumber(e.userId, e);
+    const base = { form: kind, company: reqLine(user), contacts: user.contacts || '', customer: e.customer, customerDetails: e.customerDetails || '', title: e.title, address: e.address, date: today, contractNo: String(estNo) };
+    const { t, lines } = estimateRows(e);
+    if (kind === 'ks6a') {
+      const acts = await actsOf(e.id);
+      const rows = lines.map((l: any) => {
+        const price = l.qty ? Math.round((l.amount / l.qty) * 100) / 100 : 0;
+        const byAct = acts.map((a) => { const it = (a.items as ActItem[]).filter((i) => i.key === l.key); return { qty: it.reduce((s, i) => s + i.qty, 0), amount: Math.round(it.reduce((s, i) => s + i.amount, 0) * 100) / 100 }; });
+        return { name: l.name, unit: l.unit, price, qty: l.qty, amount: l.amount, byAct, doneQty: Math.round(byAct.reduce((s, x) => s + x.qty, 0) * 1000) / 1000, doneAmount: Math.round(byAct.reduce((s, x) => s + x.amount, 0) * 100) / 100 };
+      }).filter((r: any) => r.amount > 0);
+      const shown = acts.slice(-6); // в ширину листа помещается 6 актов
+      return { ...base, number: String(acts.length || 1), periodTo: today, estimateSubtotal: t.subtotal, doneSubtotal: Math.round(acts.reduce((s, a) => s + num(a.subtotal), 0) * 100) / 100,
+        acts: shown.map((a) => ({ number: String(a.number), date: new Date(a.date).toISOString().slice(0, 10), subtotal: num(a.subtotal) })),
+        rows: rows.map((r: any) => ({ ...r, byAct: r.byAct.slice(-6) })) };
+    }
+    if (kind === 'aosr') {
+      const l = e.lines[p.line ?? 0];
+      if (!l) throw new HttpError(400, 'Выберите скрытую работу из сметы');
+      const mats = e.lines.filter((x: any) => x.type === 'material' && (x.category || '').replace(/: материалы$/, '') === (l.category || '')).map((x: any) => x.name);
+      const number = p.number || String(await nextNo(`aosr:${e.id}`));
+      return { ...base, contractor: reqLine(user), number, work: `${l.name} — ${String(num(l.qty)).replace('.', ',')} ${l.unit}`, materials: mats.slice(0, 8).join('; '),
+        from: p.from || null, to: p.to || today, next: p.next || '', project: p.project || '' };
+    }
+    // счёт на оплату: весь итог, этап графика оплат или своя сумма
+    const r = (user.requisites || {}) as any;
+    if (!r.inn || !r.rs || !r.bik) throw new HttpError(400, 'Заполните реквизиты для счёта в Настройках: ИНН, банк, БИК и расчётный счёт', 'requisites_required');
+    const schedule = Array.isArray(e.paySchedule) ? e.paySchedule : null;
+    const stages = schedule ? payStages(t.total, schedule) : [];
+    const st = p.stage != null && p.stage >= 0 ? stages[p.stage] : null;
+    const amount = Math.round((p.amount || (st ? st.amount : t.total)) * 100) / 100;
+    const what = st ? `${st.title} (${st.pct}%)` : p.amount ? 'Оплата' : 'Оплата работ';
+    const vatPct = r.vat ? num(e.taxPct) : 0;
+    const tax = vatPct ? Math.round((amount * vatPct / (100 + vatPct)) * 100) / 100 : 0;
+    const number = p.number || String(await nextNo(`inv:${user.id}`));
+    return { ...base, number, req: r, basis: `Договор подряда № ${estNo}, смета № ${estNo} «${e.title}»`,
+      items: [{ name: `${what} по договору подряда № ${estNo}: ${e.title}`, qty: 1, unit: 'усл.', price: amount, amount }],
+      subtotal: amount, tax, taxPct: vatPct, vatIncluded: Boolean(vatPct), total: amount, signPath: brandPath(user.signFile),
+      note: 'Оплата по счёту означает согласие с условиями договора. Уведомление об оплате обязательно.' };
+  }
+  const docName = (kind: Doc, d: any) => fileName(`${kind === 'ks6a' ? 'КС-6а' : kind === 'aosr' ? `Акт скрытых работ № ${d.number}` : `Счёт № ${d.number}`} — ${d.title || ''}`, 'pdf');
+
+  app.post('/api/estimates/:id/doc/:kind/send', async (req) => {
+    needDocs(req.user);
+    const kind = z.enum(DOCS).parse((req.params as any).kind);
+    const e = await loadEstimate(req.user.id, (req.params as any).id);
+    if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
+    const d = await estDoc(e, req.user, kind, docParams.parse(req.body || {}));
+    const buf = await renderKs(d);
+    const { InputFile } = await import('grammy');
+    const cap = kind === 'ks6a' ? 'Журнал учёта выполненных работ КС-6а: все позиции сметы и объёмы по актам нарастающим итогом.'
+      : kind === 'aosr' ? `Акт освидетельствования скрытых работ № ${d.number}. Впишите представителей сторон, распечатайте и подпишите до того, как работы закроют следующим слоем.`
+      : `Счёт на оплату № ${d.number} на ${num(d.total).toLocaleString('ru-RU')} ₽ — перешлите заказчику.`;
+    await opts.bot.api.sendDocument(Number(req.user.tgId), new InputFile(buf, docName(kind, d)), { caption: cap });
+    await audit(req.user.id, 'estimate', e.id, `doc_${kind}`, { number: d.number });
+    return { ok: true, number: d.number };
+  });
+
+  app.get('/api/estimates/:id/doc/:kind/link', async (req) => {
+    needDocs(req.user);
+    const kind = z.enum(DOCS).parse((req.params as any).kind);
+    const e = await loadEstimate(req.user.id, (req.params as any).id);
+    const p = docParams.parse(req.query || {});
+    if (kind === 'invoice') {
+      const r = (req.user as any).requisites || {};
+      if (!r.inn || !r.rs || !r.bik) throw new HttpError(400, 'Заполните реквизиты для счёта в Настройках: ИНН, банк, БИК и расчётный счёт', 'requisites_required');
+    }
+    // номер выдаём сразу, чтобы при открытии ссылки он не менялся
+    if (kind === 'invoice' && !p.number) p.number = String(await nextNo(`inv:${req.user.id}`));
+    if (kind === 'aosr' && !p.number) p.number = String(await nextNo(`aosr:${e.id}`));
+    const extra = Buffer.from(JSON.stringify(p)).toString('base64url');
+    return { url: `${signedPath(`/files/docs/${e.id}.pdf`, `doc-${kind}`, e.id)}&p=${extra}` };
+  });
+
+  app.get('/files/docs/:file', async (req, reply) => {
+    const id = String((req.params as any).file).replace(/\.pdf$/, '');
+    const { kind, exp, sig, p } = req.query as any;
+    const k = String(kind || '').replace(/^doc-/, '') as Doc;
+    if (!DOCS.includes(k) || !checkSig(`doc-${k}`, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте документ из приложения заново' });
+    const e = await prisma.estimate.findFirst({ where: { id, deletedAt: null }, include: { lines: { orderBy: { position: 'asc' } }, user: true } });
+    if (!e) return reply.status(404).send({ error: 'Смета не найдена' });
+    if (!docsOk(e.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });
+    let params = {};
+    try { params = docParams.parse(JSON.parse(Buffer.from(String(p || ''), 'base64url').toString() || '{}')); } catch { /* без параметров */ }
+    const d = await estDoc(e, e.user, k, params);
+    const buf = await renderKs(d);
+    return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(docName(k, d))}`).send(buf);
   });
 
   app.get('/files/acts/:file', async (req, reply) => {

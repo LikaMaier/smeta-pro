@@ -18,6 +18,7 @@ model User {
   username          String?
   companyName       String?
   contacts          String?
+  requisites        Json? // реквизиты для счёта и документов: { name, inn, kpp, ogrn, address, bank, bik, rs, ks, head, vat }
   designPrices      Json?
   aiEnabled         Boolean   @default(false)
   theme             String    @default("blueprint")

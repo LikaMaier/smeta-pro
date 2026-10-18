@@ -65,8 +65,8 @@ export function freeWriteAllowed(method: string, url: string, ctx: FreeCtx): boo
 export const needsEstimateCtx = (url: string) => url === '/api/estimates' || url.startsWith('/api/estimates/');
 
 /** Только с «Про»: объекты и деньги (запись), акты, договор, Excel. «Лайт» — сметы для заказчика. */
-const PRO_ONLY_WRITE = [/^\/api\/projects(\/|$)/, /^\/api\/ops(\/|$)/, /^\/api\/estimates\/[^/]+\/acts$/, /^\/api\/acts\//, /^\/api\/estimates\/[^/]+\/file\/(act|contract|xlsx|xlsxown)\/send$/];
-const PRO_ONLY_READ = [/^\/api\/estimates\/[^/]+\/file\/(act|contract|xlsx|xlsxown)\/link$/, /^\/api\/projects\/[^/]+\/xlsx\/link$/, /^\/api\/acts\/[^/]+\/link\//];
+const PRO_ONLY_WRITE = [/^\/api\/projects(\/|$)/, /^\/api\/ops(\/|$)/, /^\/api\/estimates\/[^/]+\/acts$/, /^\/api\/acts\//, /^\/api\/estimates\/[^/]+\/file\/(act|contract|xlsx|xlsxown)\/send$/, /^\/api\/estimates\/[^/]+\/doc\//];
+const PRO_ONLY_READ = [/^\/api\/estimates\/[^/]+\/file\/(act|contract|xlsx|xlsxown)\/link$/, /^\/api\/projects\/[^/]+\/xlsx\/link$/, /^\/api\/acts\/[^/]+\/link\//, /^\/api\/estimates\/[^/]+\/doc\//];
 export function proOnly(method: string, url: string) {
   return (method === 'GET' ? PRO_ONLY_READ : PRO_ONLY_WRITE).some((r) => r.test(url));
 }

@@ -63,6 +63,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [grouped, setGrouped] = useState(() => initial.lines.some((l: any) => l.category));
   const [restore, setRestore] = useState<any>(null);
   const [savedTpl, setSavedTpl] = useState(false);
+  const [docKind, setDocKind] = useState<null | 'invoice' | 'aosr'>(null);
   const saving = useRef(false);
   // из «Новой сметы → Другое»: сразу поиск по справочнику
   useEffect(() => { if (new URLSearchParams(location.search).get('add') === '1' && !initial.lines.length) setSheet('add'); }, []); // eslint-disable-line
@@ -456,8 +457,17 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт</button>
           <button className="btn" disabled={pdfBusy} onClick={() => sendFile('xlsx')}>📊 Excel</button>
         </div>
-        <p className="xs muted" style={{ marginBottom: 0 }}>В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!['pro', 'team'].includes(me.access.tier || '') && ' Договор, акт и Excel — в тарифе «Про».'}</p>
+        <div className="grid3" style={{ marginTop: 8 }}>
+          <button className="btn" disabled={pdfBusy} onClick={() => setDocKind('invoice')}>🧾 Счёт</button>
+          <button className="btn" disabled={pdfBusy} onClick={() => setDocKind('aosr')}>🕳 Скрытые работы</button>
+          <button className="btn" disabled={pdfBusy} onClick={() => action(async () => { await post(`/estimates/${initial.id}/doc/ks6a/send`, {}); }, 'Журнал КС-6а отправлен вам в чат бота')}>📒 КС-6а</button>
+        </div>
+        <button className="btn block" style={{ marginTop: 8 }} onClick={() => nav(`/estimates/${initial.id}/acts`)}>📑 Акты по частям, КС-2 и КС-3</button>
+        <p className="xs muted" style={{ marginBottom: 0 }}>В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!['pro', 'team'].includes(me.access.tier || '') && ' Договор, акты, КС и счёт — в тарифе «Про».'}</p>
       </Fold>
+      <Sheet open={!!docKind} onClose={() => setDocKind(null)} title={docKind === 'invoice' ? 'Счёт на оплату' : 'Акт освидетельствования скрытых работ'}>
+        {docKind && <DocForm kind={docKind} id={initial.id} lines={lines} schedule={h.paySchedule} total={totals.total} hasReq={Boolean(me.requisites?.inn && me.requisites?.rs)} save={async () => { if (dirty) await save(); }} onDone={() => setDocKind(null)} />}
+      </Sheet>
 
       <Fold id="est-own" title="🔒 Для себя: прибыль" summary={<span className={totals.plannedProfit < 0 ? 'neg' : ''}>{rub(totals.plannedProfit)}</span>}>
         <table className="breakdown"><tbody>
@@ -877,6 +887,77 @@ function SectionForm({ name, coef, onSave }: { name: string; coef?: number; onSa
       </Field>
       <div className="seg">{['1.1', '1.15', '1.2', '1.3'].map((x) => <button key={x} className={`chip ${k === x ? 'on' : ''}`} onClick={() => setK(x)}>×{x.replace('.', ',')}</button>)}<button className="chip" onClick={() => setK('')}>без</button></div>
       <button className="btn primary block" onClick={() => onSave(v.trim(), parseNum(k) > 0 ? parseNum(k) : 1)}>Сохранить</button>
+    </div>
+  );
+}
+
+/** Параметры счёта (весь итог, этап графика, своя сумма) и акта скрытых работ (работа, даты, что дальше) */
+function DocForm({ kind, id, lines, schedule, total, hasReq, save, onDone }: { kind: 'invoice' | 'aosr'; id: string; lines: L[]; schedule: { title: string; pct: string }[]; total: number; hasReq: boolean; save: () => Promise<void>; onDone: () => void }) {
+  const toast = useToast();
+  const nav = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const stages = schedule.filter((x) => x.title.trim() && parseNum(x.pct) > 0);
+  const [stage, setStage] = useState(stages.length ? 0 : -1);
+  const [amount, setAmount] = useState('');
+  const hidden = lines.map((l, i) => ({ l, i })).filter(({ l }) => l.name.trim() && l.type === 'work');
+  const guess = hidden.find(({ l }) => /гидроизол|армир|стяжк|утепл|закладн|грунтов|опалуб|проклад|штроб|пароизол|подушк|фундамент/i.test(l.name));
+  const [line, setLine] = useState(guess ? guess.i : hidden[0]?.i ?? 0);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [next, setNext] = useState('');
+  const params = kind === 'invoice' ? { stage: amount ? -1 : stage, ...(amount ? { amount: parseNum(amount) } : {}) } : { line, ...(from ? { from } : {}), to, ...(next ? { next } : {}) };
+  const run = async (how: 'send' | 'open') => {
+    setBusy(true);
+    try {
+      await save();
+      if (how === 'send') { const r = await post(`/estimates/${id}/doc/${kind}/send`, params); toast(kind === 'invoice' ? `Счёт № ${r.number} отправлен вам в чат бота` : `Акт № ${r.number} отправлен вам в чат бота`); }
+      else {
+        const q = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString();
+        const { url } = await get(`/estimates/${id}/doc/${kind}/link?${q}`);
+        const full = new URL(url, location.origin).toString();
+        if (tg?.openLink) tg.openLink(full); else window.open(full, '_blank');
+      }
+      haptic('success'); onDone();
+    } catch (e: any) { if (e.code !== 'subscription_required' && e.code !== 'plan_required') toast(e.message, true); } finally { setBusy(false); }
+  };
+  if (kind === 'invoice' && !hasReq) return (
+    <div className="stack">
+      <p className="small" style={{ margin: 0 }}>Для счёта нужны реквизиты: ИНН, банк, БИК и расчётный счёт. Заполните один раз — дальше счёт делается в один тап.</p>
+      <button className="btn primary block" onClick={() => nav('/settings')}>Заполнить реквизиты</button>
+    </div>
+  );
+  return (
+    <div className="stack">
+      {kind === 'invoice' ? (
+        <>
+          <Field label="На какую сумму">
+            <select className="select" value={stage} onChange={(e) => { setStage(Number(e.target.value)); setAmount(''); }}>
+              {stages.map((x, i) => <option key={i} value={i}>{x.title} — {x.pct}% · {rub(Math.round(total * parseNum(x.pct)) / 100)}</option>)}
+              <option value={-1}>Весь итог сметы · {rub(total)}</option>
+            </select>
+          </Field>
+          <Field label="Или своя сумма" hint="Например, доплата за материалы"><NumInput value={amount} onChange={setAmount} unit="₽" placeholder="—" /></Field>
+          <p className="xs muted" style={{ margin: 0 }}>Номер счёта ставится сам, по порядку. Основание — договор подряда по этой смете.</p>
+        </>
+      ) : (
+        <>
+          <Field label="Какие работы закрываются" hint="То, что потом не увидеть: гидроизоляция, армирование, проводка в штробах, утепление">
+            <select className="select" value={line} onChange={(e) => setLine(Number(e.target.value))}>
+              {hidden.map(({ l, i }) => <option key={i} value={i}>{l.name}</option>)}
+            </select>
+          </Field>
+          <div className="grid2">
+            <Field label="Начало работ"><input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+            <Field label="Окончание"><input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+          </div>
+          <Field label="Разрешается дальше" hint="Например: укладка плитки"><input className="input" value={next} onChange={(e) => setNext(e.target.value)} placeholder="Следующие работы" /></Field>
+          <p className="xs muted" style={{ margin: 0 }}>Форма по приказу Минстроя России № 344/пр. Материалы подставятся из сметы. Представителей сторон впишите от руки при подписании.</p>
+        </>
+      )}
+      <div className="grid2">
+        <button className="btn primary" disabled={busy} onClick={() => run('send')}>{busy ? 'Готовлю…' : 'В Telegram'}</button>
+        <button className="btn" disabled={busy} onClick={() => run('open')}>Открыть</button>
+      </div>
     </div>
   );
 }

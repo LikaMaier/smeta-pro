@@ -53,6 +53,7 @@ export default function Settings() {
         <Field label="Компания или имя мастера"><input className="input" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="ИП Иванов Иван Иванович" /></Field>
         <Field label="Контакты и реквизиты" hint="Попадут в смету, договор и акт: телефон, ИНН/ОГРНИП, адрес, банк"><textarea className="textarea" style={{ minHeight: 96 }} value={contacts} onChange={(e) => setContacts(e.target.value)} placeholder={'+7 900 000-00-00, Telegram @…\nИНН 000000000000, ОГРНИП …\nр/с … в банке …'} /></Field>
         <button className="btn primary block" onClick={async () => { try { setMe(await patch('/me', { companyName: company || null, contacts: contacts || null })); toast('Сохранено'); } catch (e: any) { toast(e.message, true); } }}>Сохранить</button>
+        <Requisites />
         <Field label="Вид сметы в PDF">
           <div className="seg">
             {[['classic', 'Классический — таблица с рамками'], ['modern', 'Современный']].map(([v, t]) => (
@@ -135,6 +136,39 @@ function Referral() {
         <button className="btn primary" onClick={share}>Пригласить</button>
         <button className="btn" onClick={async () => { try { await navigator.clipboard.writeText(d?.link || ''); toast('Ссылка скопирована'); } catch { toast('Не удалось скопировать', true); } }} disabled={!d?.link}>Скопировать</button>
       </div>
+    </div>
+  );
+}
+
+/** Реквизиты для счёта, КС-2/КС-3 и акта скрытых работ */
+const REQ_FIELDS: [string, string, string, string?][] = [
+  ['name', 'Наименование', 'ИП Петров Иван Сергеевич / ООО «Ремстрой»'], ['inn', 'ИНН', '10 или 12 цифр', 'numeric'], ['kpp', 'КПП (для ООО)', '9 цифр', 'numeric'],
+  ['ogrn', 'ОГРН / ОГРНИП', '13 или 15 цифр', 'numeric'], ['address', 'Юридический адрес', 'г. …, ул. …'], ['bank', 'Банк', 'ПАО Сбербанк, г. Москва'],
+  ['bik', 'БИК', '9 цифр', 'numeric'], ['rs', 'Расчётный счёт', '20 цифр', 'numeric'], ['ks', 'Корр. счёт', '20 цифр', 'numeric'], ['head', 'Подписант (ФИО)', 'Петров И. С.'],
+];
+function Requisites() {
+  const { me, setMe } = useMe();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [r, setR] = useState<Record<string, any>>(() => ({ ...(me.requisites || {}) }));
+  const filled = Boolean(me.requisites?.inn && me.requisites?.rs);
+  if (!open) return (
+    <button className="list-item" style={{ border: '1px solid var(--line)', borderRadius: 12 }} onClick={() => setOpen(true)}>
+      <div className="grow"><div className="title">🏦 Реквизиты для счёта и КС-2</div><div className="xs muted">{filled ? `${me.requisites!.name || ''} · ИНН ${me.requisites!.inn}` : 'ИНН, банк, расчётный счёт — для счёта на оплату, КС-2, КС-3, актов'}</div></div>
+    </button>
+  );
+  return (
+    <div className="panel stack" style={{ background: 'var(--bg)' }}>
+      <b>🏦 Реквизиты</b>
+      {REQ_FIELDS.map(([k, label, ph, mode]) => (
+        <Field key={k} label={label}><input className="input" inputMode={mode as any} value={r[k] || ''} placeholder={ph} onChange={(e) => setR({ ...r, [k]: mode ? e.target.value.replace(/\D/g, '') : e.target.value })} /></Field>
+      ))}
+      <label className="row small"><input type="checkbox" checked={Boolean(r.vat)} onChange={(e) => setR({ ...r, vat: e.target.checked })} />Работаю с НДС (в счёте будет «в том числе НДС»)</label>
+      <button className="btn primary block" onClick={async () => {
+        const clean = Object.fromEntries(Object.entries(r).filter(([, v]) => v !== '' && v != null));
+        try { setMe(await patch('/me', { requisites: Object.keys(clean).length ? clean : null })); toast('Реквизиты сохранены'); setOpen(false); } catch (e: any) { toast(e.message, true); }
+      }}>Сохранить реквизиты</button>
+      <p className="xs muted" style={{ margin: 0 }}>Попадут в счёт на оплату, КС-2, КС-3, журнал КС-6а и акт скрытых работ. Заказчик видит их только в документах.</p>
     </div>
   );
 }

@@ -35,7 +35,7 @@ import { Offers } from './components/Pay';
 import { PRICES } from '../../shared/plans';
 
 export interface Me {
-  id: string; firstName?: string; companyName?: string | null; contacts?: string | null;
+  id: string; firstName?: string; companyName?: string | null; contacts?: string | null; requisites?: Record<string, any> | null;
   aiEnabled: boolean; aiAvailable: boolean; aiWish?: boolean; promo?: { code: string; discountPct: number } | null; isAdmin: boolean; supportLink?: string; refLink?: string; theme?: string; designPrices?: Record<string, number> | null; pay?: { yookassa: boolean; receipt: boolean };
   access: { active: boolean; mode: 'trial' | 'subscription' | 'team' | 'expired' | 'free' | 'admin'; tier?: 'free' | 'lite' | 'pro' | 'team'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeLimit?: number; freeEstimateIds?: string[]; paidEstimateIds?: string[]; estimateCount?: number };
   plan?: { tier: 'free' | 'lite' | 'pro' | 'team'; label: string; aiLimit: number; aiUsed: number; extraDesigns: number; extraUntil?: string | null; studioUntil?: string | null; offer?: { pct: number; until: string } | null; team: 'owner' | 'member' | null };

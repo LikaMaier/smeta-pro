@@ -78,4 +78,6 @@ test('старожилы без лимита, новички — 3 сметы, �
   assert.equal(proOnly('GET', '/api/estimates/x1/file/contract/link'), true);
   assert.equal(proOnly('GET', '/api/estimates/x1/file/pdf/link'), false);
   assert.equal(proOnly('PUT', '/api/estimates/x1'), false);
+  assert.equal(proOnly('POST', '/api/estimates/x1/doc/invoice/send'), true);
+  assert.equal(proOnly('GET', '/api/estimates/x1/doc/aosr/link'), true);
 });
