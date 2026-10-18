@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<!-- Ролик «Всеобщий калькулятор»: формат «загадочный незнакомец, который есть на всех семейных фото» (мем рунета, октябрь 2026),
+     обыгран своими персонажами: лис-прораб и калькулятор с глазами, который появляется на каждом снимке. -->
+<style>
+@font-face { font-family: 'PT'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Web-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'PTN'; src: url('file:///home/claude/smeta-pro/server/pdf/fonts/PT_Sans-Narrow-Web-Bold.ttf'); font-weight: 700; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 540px; height: 960px; overflow: hidden; background: #000; }
+#stage { position: relative; width: 540px; height: 960px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.cap { position: absolute; left: 22px; right: 22px; text-align: center; font-family: 'PT', 'Noto Color Emoji', sans-serif; font-weight: 700; color: #fff;
+  font-size: 36px; line-height: 1.16; -webkit-text-stroke: 7px #000; paint-order: stroke fill; letter-spacing: .2px; }
+.cap .y { color: #FFD43B; }
+#phone { position: absolute; left: 50%; top: 50%; width: 330px; height: 714px; margin: -320px 0 0 -165px; border-radius: 46px; background: #0b0f16;
+  box-shadow: 0 40px 90px rgba(0,0,0,.6), inset 0 0 0 3px #2c3442; padding: 12px; opacity: 0; }
+#phone .scr { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #0D2440; }
+#phone img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#tap { position: absolute; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.35); border: 3px solid rgba(255,255,255,.85); opacity: 0; }
+#timer { position: absolute; left: 50%; transform: translateX(-50%); bottom: 24px; font-family: 'PTN'; font-size: 34px; color: #0a1a30; background: #FFD43B; padding: 4px 14px; border-radius: 14px; box-shadow: 0 5px 0 #b38b00; opacity: 0; }
+#end { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 40%, #16365e, #0a1a30 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 0; color: #fff; text-align: center; font-family: 'PT'; }
+#end .logo { font-family: 'PTN'; font-size: 92px; color: #FFD43B; -webkit-text-stroke: 3px #08162a; paint-order: stroke fill; line-height: .9; }
+#end .l2 { font-size: 30px; padding: 0 30px; line-height: 1.2; }
+#end .bot { margin-top: 10px; background: #FFD43B; color: #0a1a30; font-family: 'PTN'; font-size: 46px; padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 0 #b38b00; }
+#end .sm { font-size: 22px; color: #9fc8f5; }
+#fade { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #fff; }
+</style></head><body><div id="stage">
+<svg id="sv" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <radialGradient id="page" cx=".5" cy=".45" r=".8"><stop offset="0" stop-color="#3f6b52"/><stop offset="1" stop-color="#1f3a2b"/></radialGradient>
+    <radialGradient id="lampG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe9b0" stop-opacity=".35"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>
+    <linearGradient id="helm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd25a"/><stop offset="1" stop-color="#f29a00"/></linearGradient>
+    <radialGradient id="foxG" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#ff9a3c"/><stop offset="1" stop-color="#d9601a"/></radialGradient>
+    <linearGradient id="seaSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4fb0ea"/><stop offset="1" stop-color="#bfe6f7"/></linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c8fc9"/><stop offset="1" stop-color="#4cc0d8"/></linearGradient>
+    <radialGradient id="vigG" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+    <filter id="sh"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#000" flood-opacity=".45"/></filter>
+    <filter id="sepia"><feColorMatrix type="matrix" values=".9 .25 .05 0 .02  .2 .85 .05 0 .01  .15 .2 .7 0 0  0 0 0 1 0"/></filter>
+    <clipPath id="ph"><rect x="16" y="16" width="348" height="340"/></clipPath>
+  </defs>
+  <g id="cam">
+    <rect x="-400" y="-500" width="1340" height="1900" fill="url(#page)"/>
+    <circle cx="270" cy="380" r="520" fill="url(#lampG)"/>
+    <g id="album"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+</svg>
+<div id="dim" style="position:absolute;inset:0;background:rgba(5,10,20,.66);opacity:0"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="timer">0:00</div>
+<div id="capA" class="cap" style="top:52px"></div>
+<div id="capB" class="cap" style="bottom:70px"></div>
+<div id="end"><div class="logo">СМЕТА PRO</div><div class="l2">Работы и материалы с ценами —<br><span style="color:#FFD43B">без калькулятора и бумажек</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">Сметы — бесплатно</div></div>
+<div id="fade"></div>
+</div>
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const E = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const lerp = (a, b, k) => a + (b - a) * k;
+const st = { stroke: '#22181a', 'stroke-width': 2.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+
+// ---------------- таймлайн ----------------
+const T = { hook: [0, 2.3], photos: [2.3, 8.6], twist: [8.6, 10.2], phone: [10.2, 17.0], vac: [17.0, 20.8], end: [20.8, 23.8] };
+window.DUR = 23.8;
+// фото: появление, подпись на снимке, подпись сверху, где калькулятор (в координатах фото), положение на странице
+const PH = [
+  { t: -1, label: 'Свадьба, 2015', cap: '2015. Свадьба.<br><span class="y">И он.</span>', calc: [300, 236], pos: [270, 470, -3] },
+  { t: 2.3, label: 'Море, 2018', cap: '2018. Море.<br><span class="y">И он.</span>', calc: [282, 262], pos: [276, 478, 4] },
+  { t: 4.4, label: 'Новый год, 2021', cap: '2021. Новый год.<br><span class="y">И ОН.</span>', calc: [262, 300], pos: [264, 466, -4] },
+  { t: 6.5, label: 'Первое сентября, 2024', cap: '2024. Первое сентября.<br><span class="y">Ну конечно.</span>', calc: [306, 216], pos: [272, 474, 2] },
+  { t: 17.0, label: 'Отпуск, 2026', cap: '', calc: [300, 158], pos: [270, 470, -2] },
+];
+
+// ---------------- персонажи ----------------
+// лис-прораб: ноги в (0,0), рост ~200
+function fox(p, o = {}) {
+  const g = E('g', { transform: `translate(${o.x || 0},${o.y || 0}) scale(${o.s || 1})` }, p);
+  E('path', { d: 'M40 -30 Q100 -60 86 -120 Q70 -80 30 -60Z', fill: 'url(#foxG)', ...st }, g); // хвост
+  E('path', { d: 'M86 -120 Q84 -100 74 -92 Q80 -112 86 -120Z', fill: '#fff' }, g);
+  E('rect', { x: -28, y: -40, width: 18, height: 40, rx: 6, fill: '#2e3140', ...st }, g); E('rect', { x: 10, y: -40, width: 18, height: 40, rx: 6, fill: '#2e3140', ...st }, g);
+  E('path', { d: 'M-46 -40 Q-52 -110 -30 -128 L30 -128 Q52 -110 46 -40Z', fill: o.suit ? '#2b3550' : (o.shirt || '#ff7a1a'), ...st }, g);
+  if (o.suit) { E('path', { d: 'M-14 -128 L0 -100 L14 -128Z', fill: '#fff' }, g); E('path', { d: 'M-6 -118 L0 -104 L6 -118 L0 -122Z', fill: '#d6303b' }, g); }
+  else E('path', { d: 'M-46 -84 L46 -84', stroke: '#e9f4f4', 'stroke-width': 7 }, g);
+  // руки
+  const aL = o.armL || 'M-40 -118 Q-60 -90 -50 -66', aR = o.armR || 'M40 -118 Q60 -90 50 -66';
+  E('path', { d: aL, fill: 'none', stroke: o.suit ? '#2b3550' : '#d9601a', 'stroke-width': 14, 'stroke-linecap': 'round' }, g);
+  E('path', { d: aR, fill: 'none', stroke: o.suit ? '#2b3550' : '#d9601a', 'stroke-width': 14, 'stroke-linecap': 'round' }, g);
+  // голова
+  const h = E('g', { transform: 'translate(0,-160)' }, g);
+  E('path', { d: 'M-40 -20 L-50 -70 L-14 -38Z M40 -20 L50 -70 L14 -38Z', fill: 'url(#foxG)', ...st }, h);
+  E('path', { d: 'M-42 -28 L-46 -56 L-24 -38Z M42 -28 L46 -56 L24 -38Z', fill: '#3a2018' }, h);
+  E('path', { d: 'M-48 -6 Q-46 -46 0 -48 Q46 -46 48 -6 Q40 22 0 40 Q-40 22 -48 -6Z', fill: 'url(#foxG)', ...st }, h);
+  E('path', { d: 'M-40 6 Q-20 0 0 14 Q20 0 40 6 Q30 26 0 40 Q-30 26 -40 6Z', fill: '#fff' }, h);
+  E('ellipse', { cx: 0, cy: 18, rx: 7, ry: 5, fill: '#22181a' }, h);
+  if (o.glasses) { E('path', { d: 'M-34 -14 L34 -14', stroke: '#111', 'stroke-width': 4 }, h); E('rect', { x: -32, y: -16, width: 26, height: 16, rx: 6, fill: '#111' }, h); E('rect', { x: 6, y: -16, width: 26, height: 16, rx: 6, fill: '#111' }, h); }
+  else if (o.happy) { E('path', { d: 'M-26 -6 Q-18 -16 -10 -6 M10 -6 Q18 -16 26 -6', stroke: '#22181a', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, h); }
+  else { E('ellipse', { cx: -18, cy: -8, rx: 5, ry: 6, fill: '#22181a' }, h); E('ellipse', { cx: 18, cy: -8, rx: 5, ry: 6, fill: '#22181a' }, h); E('path', { d: 'M-26 -20 L-10 -18 M26 -20 L10 -18', stroke: '#22181a', 'stroke-width': 3 }, h); }
+  E('path', { d: o.happy || o.glasses ? 'M-10 26 Q0 34 10 26' : 'M-8 28 L8 28', stroke: '#22181a', 'stroke-width': 3, fill: 'none', 'stroke-linecap': 'round' }, h);
+  if (o.veil) { E('path', { d: 'M-40 -40 Q0 -60 40 -40 Q70 20 60 90 L-60 90 Q-70 20 -40 -40Z', fill: '#fff', opacity: .55 }, h); E('circle', { cx: -30, cy: -36, r: 7, fill: '#ff9cb5', ...st, 'stroke-width': 1.5 }, h); }
+  else if (o.bows) { E('circle', { cx: -40, cy: -30, r: 12, fill: '#fff', ...st }, h); E('circle', { cx: 40, cy: -30, r: 12, fill: '#fff', ...st }, h); }
+  else if (!o.nohelm) {
+    E('path', { d: 'M-40 -30 Q-38 -76 0 -78 Q38 -76 40 -30Z', fill: 'url(#helm)', ...st }, h);
+    E('path', { d: 'M-52 -30 L52 -30 Q53 -22 44 -22 L-44 -22 Q-53 -22 -52 -30Z', fill: '#f29a00', ...st }, h);
+  }
+  if (o.santa) { E('path', { d: 'M-40 -30 Q-10 -90 40 -60 L44 -30Z', fill: '#d6303b', ...st }, h); E('circle', { cx: 46, cy: -60, r: 8, fill: '#fff' }, h); E('path', { d: 'M-46 -30 L48 -30', stroke: '#fff', 'stroke-width': 10, 'stroke-linecap': 'round' }, h); }
+  return g;
+}
+// калькулятор с глазами; o.at = [x,y] центр
+const CALCS = [];
+function calc(p, o = {}) {
+  const g = E('g', { transform: `translate(${o.x},${o.y}) scale(${o.s || 1}) rotate(${o.r || 0})` }, p);
+  E('rect', { x: -32, y: -44, width: 64, height: 88, rx: 8, fill: '#3a3f4c', ...st }, g);
+  E('rect', { x: -25, y: -37, width: 50, height: 22, rx: 3, fill: '#b8d39a', ...st, 'stroke-width': 1.5 }, g);
+  E('text', { x: 21, y: -20, 'font-family': 'PTN', 'font-size': 15, fill: '#1d2a14', 'text-anchor': 'end' }, g).textContent = o.disp || '48 2?0';
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) E('rect', { x: -25 + c * 13, y: -8 + r * 12, width: 10, height: 9, rx: 2, fill: c === 3 ? '#f29a00' : '#d9dbe2' }, g);
+  // глаза на дисплее сверху — смотрят прямо в камеру
+  const eyes = E('g', {}, g);
+  for (const x of [-11, 11]) { E('ellipse', { cx: x, cy: -58, rx: 9, ry: 10, fill: '#fff', ...st, 'stroke-width': 2 }, eyes); }
+  const pups = [-11, 11].map((x) => E('circle', { cx: x, cy: -57, r: 4.5, fill: '#120d0e' }, eyes));
+  if (o.glasses) { E('path', { d: 'M-24 -58 L24 -58', stroke: '#111', 'stroke-width': 3 }, g); E('rect', { x: -22, y: -66, width: 20, height: 14, rx: 5, fill: '#111' }, g); E('rect', { x: 2, y: -66, width: 20, height: 14, rx: 5, fill: '#111' }, g); }
+  if (o.hat) { E('path', { d: 'M-12 -66 L0 -100 L12 -66Z', fill: '#4dabf7', ...st }, g); E('circle', { cx: 0, cy: -100, r: 5, fill: '#FFD43B' }, g); }
+  if (o.paper) { const pp = E('g', { transform: 'translate(38,4) rotate(8)' }, g); E('rect', { x: 0, y: -30, width: 46, height: 60, fill: '#f6f2e8', ...st, 'stroke-width': 2 }, pp);
+    E('text', { x: 23, y: -16, 'font-family': 'PTN', 'font-size': 11, fill: '#d6303b', 'text-anchor': 'middle' }, pp).textContent = 'СМЕТА';
+    for (let l = 0; l < 4; l++) E('path', { d: `M6 ${-4 + l * 8} L${40 - l * 5} ${-4 + l * 8}`, stroke: '#7c8fb5', 'stroke-width': 1.5 }, pp); }
+  // ручки
+  E('path', { d: o.arms || 'M-32 0 L-46 14 M32 0 L46 14', stroke: '#3a3f4c', 'stroke-width': 5, 'stroke-linecap': 'round' }, g);
+  CALCS.push({ pups });
+  return g;
+}
+
+// ---------------- фото ----------------
+const PG = [];
+(function buildPhotos() {
+  const alb = $('album');
+  PH.forEach((ph, i) => {
+    const g = E('g', { filter: 'url(#sh)' }, alb);
+    E('rect', { x: 0, y: 0, width: 380, height: 440, fill: '#fbf8f1' }, g);
+    const inner = E('g', { 'clip-path': 'url(#ph)' }, g);
+    const sc = E('g', { filter: i < 4 ? 'url(#sepia)' : '' }, inner);
+    if (i === 0) { // свадьба
+      E('rect', { x: 0, y: 0, width: 380, height: 380, fill: '#f6c9d2' }, sc);
+      for (let k = 0; k < 12; k++) E('circle', { cx: 20 + k * 30, cy: 34 + Math.sin(k) * 8, r: 9, fill: ['#fff', '#ff9cb5', '#ffd43b'][k % 3], ...st, 'stroke-width': 1.5 }, sc);
+      E('rect', { x: 0, y: 270, width: 380, height: 110, fill: '#e09aa9' }, sc);
+      E('rect', { x: 210, y: 262, width: 160, height: 18, fill: '#fff', ...st }, sc); // стол
+      calc(sc, { x: 300, y: 236, s: .8, disp: '???' });
+      // торт перед калькулятором частично
+      E('rect', { x: 236, y: 214, width: 44, height: 48, fill: '#fff', ...st }, sc); E('rect', { x: 244, y: 190, width: 28, height: 26, fill: '#fff', ...st }, sc);
+      E('path', { d: 'M236 230 Q258 240 280 230', stroke: '#ff9cb5', 'stroke-width': 4, fill: 'none' }, sc);
+      fox(sc, { x: 100, y: 352, s: .95, suit: true, happy: true, armR: 'M40 -118 Q66 -96 82 -110' });
+      fox(sc, { x: 186, y: 352, s: .88, nohelm: true, veil: true, happy: true, shirt: '#fff', armL: 'M-40 -118 Q-64 -96 -80 -110' });
+    } else if (i === 1) { // море
+      E('rect', { x: 0, y: 0, width: 380, height: 380, fill: 'url(#seaSky)' }, sc);
+      E('circle', { cx: 300, cy: 70, r: 34, fill: '#fff3b0' }, sc);
+      E('rect', { x: 0, y: 170, width: 380, height: 70, fill: 'url(#sea)' }, sc);
+      E('path', { d: 'M0 240 Q190 226 380 240 L380 380 L0 380Z', fill: '#f2d59c' }, sc);
+      E('path', { d: 'M220 300 L340 300 L330 316 L230 316Z M210 316 L350 316 M226 316 L222 340 M334 316 L338 340', fill: '#4dabf7', ...st }, sc); // шезлонг
+      calc(sc, { x: 282, y: 262, s: .8, r: -8, disp: 'ERR' });
+      E('path', { d: 'M60 360 L60 120', stroke: '#8a5a3a', 'stroke-width': 5 }, sc);
+      E('path', { d: 'M-10 130 Q60 70 130 130Z', fill: '#ff6b6b', ...st }, sc);
+      fox(sc, { x: 130, y: 352, s: .95, shirt: '#69db7c', glasses: true, armR: 'M40 -118 Q66 -120 70 -150' });
+      E('path', { d: 'M196 -14 L206 -40', transform: 'translate(-130,0)', stroke: 'none' }, sc);
+    } else if (i === 2) { // новый год
+      E('rect', { x: 0, y: 0, width: 380, height: 380, fill: '#1d2b55' }, sc);
+      E('rect', { x: 0, y: 300, width: 380, height: 80, fill: '#7a5236' }, sc);
+      for (let k = 0; k < 3; k++) E('path', { d: `M${250 - 70 + k * 12} ${250 - k * 70} L250 ${130 - k * 70} L${250 + 70 - k * 12} ${250 - k * 70}Z`, fill: '#2f9e58', ...st }, sc);
+      E('path', { d: 'M250 50 l6 14 l15 1 l-12 9 l4 15 l-13 -8 l-13 8 l4 -15 l-12 -9 l15 -1Z', fill: '#FFD43B', ...st, 'stroke-width': 1.5 }, sc);
+      for (let k = 0; k < 14; k++) E('circle', { cx: 200 + (k * 37) % 100, cy: 110 + (k * 53) % 140, r: 5, fill: ['#ff6b6b', '#FFD43B', '#4dabf7'][k % 3] }, sc);
+      E('rect', { x: 196, y: 290, width: 40, height: 34, fill: '#d6303b', ...st }, sc); E('rect', { x: 300, y: 296, width: 34, height: 28, fill: '#4dabf7', ...st }, sc);
+      calc(sc, { x: 262, y: 300, s: .8, hat: true, disp: '51 ?07' });
+      fox(sc, { x: 110, y: 352, s: .95, santa: true, nohelm: true, happy: true, armR: 'M40 -118 Q66 -120 70 -150' });
+      E('path', { d: 'M180 190 l4 -12 M180 190 l12 -4 M180 190 l-10 -8 M180 190 l10 10', stroke: '#FFD43B', 'stroke-width': 3 }, sc);
+    } else if (i === 3) { // школа
+      E('rect', { x: 0, y: 0, width: 380, height: 380, fill: '#9fd0ef' }, sc);
+      E('rect', { x: 0, y: 60, width: 380, height: 220, fill: '#e8c9a0', ...st }, sc);
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) E('rect', { x: 20 + c * 74, y: 90 + r * 80, width: 44, height: 54, fill: '#cfe8f7', ...st, 'stroke-width': 2 }, sc);
+      E('rect', { x: 0, y: 280, width: 380, height: 100, fill: '#b9b9b9' }, sc);
+      calc(sc, { x: 306, y: 216, s: .82, paper: false, disp: '46 8??', arms: 'M-32 0 L-46 14 M32 0 L50 -6' });
+      const pp = E('g', { transform: 'translate(326,214) rotate(6)' }, sc); E('rect', { x: 0, y: -26, width: 40, height: 52, fill: '#f6f2e8', ...st, 'stroke-width': 2 }, pp);
+      E('text', { x: 20, y: -12, 'font-family': 'PTN', 'font-size': 10, fill: '#d6303b', 'text-anchor': 'middle' }, pp).textContent = 'СМЕТА';
+      for (let l = 0; l < 3; l++) E('path', { d: `M5 ${-2 + l * 8} L${34 - l * 5} ${-2 + l * 8}`, stroke: '#7c8fb5', 'stroke-width': 1.5 }, pp);
+      fox(sc, { x: 110, y: 352, s: .95, happy: true, armR: 'M40 -118 Q60 -100 74 -96' });
+      fox(sc, { x: 200, y: 352, s: .6, nohelm: true, bows: true, happy: true, shirt: '#2b3550', armL: 'M-40 -118 Q-60 -130 -60 -150' });
+      E('circle', { cx: 162, cy: 248, r: 12, fill: '#ff6b6b', ...st, 'stroke-width': 1.5 }, sc); E('circle', { cx: 176, cy: 240, r: 11, fill: '#fff', ...st, 'stroke-width': 1.5 }, sc); E('circle', { cx: 168, cy: 228, r: 11, fill: '#FFD43B', ...st, 'stroke-width': 1.5 }, sc);
+    } else { // отпуск 2026
+      E('rect', { x: 0, y: 0, width: 380, height: 380, fill: 'url(#seaSky)' }, sc);
+      E('circle', { cx: 80, cy: 70, r: 34, fill: '#fff3b0' }, sc);
+      E('rect', { x: 0, y: 190, width: 380, height: 60, fill: 'url(#sea)' }, sc);
+      E('path', { d: 'M0 250 Q190 236 380 250 L380 380 L0 380Z', fill: '#f2d59c' }, sc);
+      // пальмы и гамак справа
+      for (const px of [250, 360]) { E('path', { d: `M${px} 330 Q${px + 6} 200 ${px - 4} 100`, stroke: '#8a5a3a', 'stroke-width': 9, fill: 'none' }, sc);
+        for (let k = 0; k < 5; k++) E('path', { d: `M${px - 4} 100 q${-50 + k * 25} ${-30 + Math.abs(k - 2) * 12} ${-70 + k * 35} ${10 + Math.abs(k - 2) * 14}`, stroke: '#2f9e58', 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round' }, sc); }
+      E('path', { d: 'M250 150 Q305 205 360 150', stroke: '#fff', 'stroke-width': 3, fill: 'none' }, sc);
+      E('path', { d: 'M256 156 Q305 210 354 156 Q305 186 256 156Z', fill: '#ff922b', ...st, 'stroke-width': 2 }, sc);
+      calc(sc, { x: 300, y: 158, s: .62, r: -70, glasses: true, disp: '—', arms: 'M-32 0 L-50 -20 M32 0 L46 14' });
+      fox(sc, { x: 120, y: 352, s: 1.0, shirt: '#ff6b6b', glasses: true, armL: 'M-40 -118 Q-66 -130 -70 -160', armR: 'M40 -118 Q66 -130 70 -160' });
+      E('path', { d: 'M160 360 l20 -30 l20 30Z', fill: '#d6303b', ...st }, sc); // ведёрко
+    }
+    // подпись
+    E('text', { x: 190, y: 408, 'font-family': 'PTN', 'font-size': 30, fill: '#2a3550', 'text-anchor': 'middle', transform: 'rotate(-1 190 408)' }, g).textContent = ph.label;
+    // уголки альбома
+    for (const [x, y, r] of [[0, 0, 0], [380, 0, 90], [380, 440, 180], [0, 440, 270]]) E('path', { d: 'M-8 -8 L34 -8 L-8 34Z', fill: '#1a1a1a', opacity: .75, transform: `translate(${x},${y}) rotate(${r})` }, g);
+    // красный кружок вокруг калькулятора
+    const circ = E('ellipse', { cx: ph.calc[0], cy: ph.calc[1] - 10, rx: i === 4 ? 66 : 54, ry: i === 4 ? 50 : 70, fill: 'none', stroke: '#ff2a2a', 'stroke-width': 7, 'stroke-linecap': 'round', pathLength: 100, 'stroke-dasharray': '100 100', 'stroke-dashoffset': 100 }, g);
+    PG.push({ g, circ });
+  });
+})();
+// координаты точки фото i на странице (без учёта поворота — он мал)
+const onPage = (i, x, y) => [PH[i].pos[0] - 190 + x, PH[i].pos[1] - 220 + y];
+
+// ---------------- экраны ----------------
+const SCREENS = [['4form', 'Размеры — <span class="y">пара цифр</span>', 190, 200], ['5result', 'Работы и материалы<br><span class="y">с ценами</span> — сами', 0, 0],
+  ['6eco', '«А подешевле?» —<br><span class="y">Эконом</span>, итог пересчитан', 110, 442], ['8est', 'PDF заказчику —<br><span class="y">одной кнопкой</span>', 73, 141]];
+
+function caption(el, html, cls = 'cap') { if (el._h !== html) { el.innerHTML = html; el._h = html; } el.style.opacity = html ? 1 : 0; el.className = cls; }
+const pop = (el, t0, t) => { el.style.transform = `scale(${.82 + .18 * eOut((t - t0) / .2)})`; };
+const CIRC_D = .9; // когда после появления фото рисуется кружок
+
+window.render = function (t) {
+  // --- фото: въезд, стопка ---
+  let top = 0;
+  PH.forEach((ph, i) => {
+    const k = ph.t < 0 ? 1 : eOut((t - ph.t) / .55);
+    const vis = ph.t < 0 || t >= ph.t;
+    const hide = i < 4 && t >= T.vac[0] + .6; // к отпуску старые фото уходят под новое
+    const [x, y, r] = ph.pos;
+    PG[i].g.setAttribute('opacity', vis && !(hide && i < 3) ? 1 : 0);
+    PG[i].g.setAttribute('transform', `translate(${x - 190 + (1 - k) * 520},${y - 220 - (1 - k) * 120}) rotate(${r + (1 - k) * 25} 190 220)`);
+    if (vis) top = i;
+    const c0 = (ph.t < 0 ? .9 : ph.t + CIRC_D), cd = clamp((t - c0) / .45);
+    PG[i].circ.setAttribute('stroke-dashoffset', 100 - cd * 100);
+    PG[i].circ.setAttribute('opacity', i === 4 ? (t >= 18.7 ? 1 : 0) : 1);
+  });
+  // глаза калькуляторов — чуть «следят»
+  CALCS.forEach((c, i) => c.pups.forEach((p, k) => p.setAttribute('transform', `translate(${Math.sin(t * 1.7 + i) * 1.5},${Math.cos(t * 1.3 + i) * 1})`)));
+  // --- камера ---
+  let s = 1, cx = 270, cy = 470;
+  if (t < T.photos[0]) { // крючок: общий план → наезд на калькулятор
+    const [px, py] = onPage(0, ...PH[0].calc); const k = ease((t - .6) / 1.3);
+    s = lerp(1.0, 1.8, k); cx = lerp(270, px - 70, k); cy = lerp(470, py - 10, k);
+  } else if (t < T.twist[0]) {
+    const i = Math.min(3, 1 + Math.floor((t - T.photos[0]) / 2.1)), l = t - PH[i].t;
+    const [px, py] = onPage(i, ...PH[i].calc); const k = ease((l - 1.2) / .7);
+    s = lerp(1.0, 1.35, k); cx = lerp(270, lerp(270, px, .5), k); cy = lerp(470, lerp(470, py, .5), k);
+  } else if (t < T.phone[0]) { // разворот: крупно глаза калькулятора на последнем фото
+    const [px, py] = onPage(3, ...PH[3].calc); const k = ease((t - T.twist[0]) / 1.0);
+    s = lerp(1.35, 3.0, k); cx = lerp(lerp(270, px, .5), px, k); cy = lerp(lerp(470, py, .5), py - 40, k);
+  } else if (t >= T.vac[0] && t < T.end[0]) { // отпуск: сначала лис, потом панорама вправо к гамаку
+    const l = t - T.vac[0]; const [fx, fy] = onPage(4, 130, 230), [hx, hy] = onPage(4, ...PH[4].calc);
+    const k = ease((l - 1.6) / .8);
+    s = lerp(lerp(1.0, 1.4, ease(l / .9)), 1.7, k); cx = lerp(lerp(270, fx, ease(l / .9)), hx - 40, k); cy = lerp(lerp(470, fy, ease(l / .9)), hy + 40, k);
+  }
+  $('cam').setAttribute('transform', `translate(270,480) scale(${s}) translate(${-cx},${-cy})`);
+  // --- телефон ---
+  const inPhone = t >= T.phone[0] && t < T.phone[1];
+  const phone = $('phone');
+  const pIn = clamp((t - T.phone[0]) / .45), pOut = clamp((T.phone[1] - t) / .35);
+  const pOn = inPhone ? Math.min(pIn, pOut) : 0;
+  phone.style.opacity = pOn; $('dim').style.opacity = pOn; $('timer').style.opacity = pOn;
+  phone.style.transform = `scale(${lerp(.6, 1, eOut(pIn))}) rotate(${lerp(-8, 0, eOut(pIn))}deg)`;
+  const A = $('capA'), Bc = $('capB');
+  if (inPhone) {
+    const span = (T.phone[1] - T.phone[0]) / SCREENS.length, u = (t - T.phone[0]) / span, i = Math.min(SCREENS.length - 1, Math.floor(u)), f = u - i;
+    const [scr, cap, tx, ty] = SCREENS[i], nxt = SCREENS[Math.min(SCREENS.length - 1, i + 1)][0];
+    const iA = $('imA'), iB = $('imB');
+    if (iA._s !== scr) { iA.src = `../sc/${scr}.png`; iA._s = scr; }
+    if (iB._s !== nxt) { iB.src = `../sc/${nxt}.png`; iB._s = nxt; }
+    const sw = i < SCREENS.length - 1 ? ease((f - .8) / .2) : 0;
+    iA.style.transform = `translateX(${-sw * 100}%)`; iB.style.transform = `translateX(${(1 - sw) * 100}%)`;
+    iA.style.objectPosition = scr === '5result' ? `center ${Math.round(ease(f / .75) * 100)}%` : 'top';
+    const tap = $('tap'); const tk = (f - .55) / .2;
+    tap.style.opacity = tx && tk > 0 && tk < 1 ? Math.sin(tk * Math.PI) : 0; tap.style.left = tx + 'px'; tap.style.top = ty + 'px'; tap.style.transform = `scale(${.7 + tk * .5})`;
+    const sec = Math.min(118, Math.floor(lerp(0, 118, (t - T.phone[0]) / (T.phone[1] - T.phone[0] - .3))));
+    $('timer').textContent = `⏱ ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    caption(A, t < T.phone[0] + 1.1 ? 'А в 2026 прораб завёл<br><span class="y">СМЕТА PRO</span>' : cap); pop(A, t < T.phone[0] + 1.1 ? T.phone[0] : T.phone[0] + i * span, t);
+    caption(Bc, '');
+  } else if (t < T.photos[0]) {
+    caption(A, 'В каждом альбоме прораба<br>есть <span class="y">ОН</span> 👀'); pop(A, 0, t);
+    caption(Bc, t > 1.2 ? '2015. Свадьба. <span class="y">И он.</span>' : ''); pop(Bc, 1.2, t);
+  } else if (t < T.twist[0]) {
+    const i = Math.min(3, 1 + Math.floor((t - T.photos[0]) / 2.1));
+    caption(A, ''); caption(Bc, PH[i].cap); pop(Bc, PH[i].t, t);
+  } else if (t < T.phone[0]) {
+    caption(A, 'Откуда он — никто не знает.'); pop(A, T.twist[0], t);
+    caption(Bc, t > T.twist[0] + .5 ? 'Но смету считал<br><span class="y">только он</span> 🫥' : ''); pop(Bc, T.twist[0] + .5, t);
+  } else if (t < T.end[0]) {
+    caption(A, '');
+    caption(Bc, '');
+    if (t < 18.7) { caption(A, '2026. Отпуск.<br><span class="y">Без него</span> 🥹'); pop(A, T.vac[0] + .3, t); }
+    else { caption(A, 'Он тоже<br><span class="y">в отпуске</span> 🏖'); pop(A, 18.7, t); }
+  }
+  // --- финал ---
+  const ef = clamp((t - T.end[0]) / .4);
+  $('end').style.opacity = ef; $('end').style.transform = `scale(${.92 + .08 * eOut(ef)})`;
+  if (ef > 0) { caption(A, ''); caption(Bc, ''); }
+  // вспышка «фотоаппарата» при каждом новом фото
+  let fd = 0; for (const c of [PH[1].t, PH[2].t, PH[3].t, PH[4].t]) if (t >= c) fd = Math.max(fd, 1 - (t - c) / .25);
+  $('fade').style.opacity = clamp(fd) * .55;
+};
+window.READY = Promise.all([document.fonts.ready, ...SCREENS.map(([n]) => new Promise((r) => { const i = new Image(); i.onload = i.onerror = r; i.src = `../sc/${n}.png`; }))]).then(() => { window.render(0); window.OK = true; });
+</script></body></html>
