@@ -7,6 +7,8 @@ import { progress, buildAct, lineKey, priceFactor, ActItem } from '../../../shar
 import { payStages } from '../../../shared/payments';
 import { brandPath } from '../brand';
 
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 /** Реквизиты исполнителя одной строкой: «ИП Петров И. С., ИНН …, ОГРНИП …, адрес» */
 export function reqLine(user: any) {
   const r = (user.requisites || {}) as any;
@@ -35,7 +37,6 @@ const docParams = z.object({
  */
 const FORMS = ['act', 'ks2', 'ks3'] as const;
 type Form = typeof FORMS[number];
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function estimateRows(e: any) {
   const t = estimateTotals(e);
