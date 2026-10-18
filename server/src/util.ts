@@ -97,7 +97,7 @@ export async function freeCtx(userId: string, _extra?: number) {
   const u = await prisma.user.findUnique({ where: { id: userId }, select: { extraEstimates: true, extraUntil: true } });
   // купленные сметы действуют до extraUntil (пакет — полгода); старые покупки без срока — бессрочно
   const more = u && (!u.extraUntil || u.extraUntil > new Date()) ? u.extraEstimates : 0;
-  const list = await prisma.estimate.findMany({ where: { userId, isTemplate: false }, select: { id: true, createdAt: true, paidAt: true } }); // удалённые тоже считаются
+  const list = await prisma.estimate.findMany({ where: { userId, isTemplate: false }, select: { id: true, createdAt: true, paidAt: true, madeOnPro: true } }); // удалённые тоже считаются
   const a = freeAllowance(list, Math.max(0, more), monthKey(), (d) => monthKey(d), FREE_PER_MONTH);
   return { estimateCount: a.thisMonth, freeEstimateIds: a.freeIds, paidEstimateIds: a.packIds, limit: a.thisMonth + a.left };
 }

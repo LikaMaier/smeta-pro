@@ -30,6 +30,23 @@ export interface LineInput {
   costPrice?: number | null;  // себестоимость единицы (вся строка)
   type?: LineType | string;
   category?: string | null;
+  /** материал покупает заказчик сам: в сумму исполнителя не входит (у строки работы — только часть «материал») */
+  byCustomer?: boolean | null;
+  /** группа вариантов на выбор заказчика (плитка A / B / C): в итог идёт только выбранный */
+  choiceGroup?: string | null;
+  chosen?: boolean | null;
+}
+
+/** Индексы строк-вариантов, которые НЕ выбраны (в каждой группе выбран один: отмеченный, иначе первый) */
+export function unchosenAlternatives(lines: { choiceGroup?: string | null; chosen?: boolean | null }[]): Set<number> {
+  const groups = new Map<string, number[]>();
+  lines.forEach((l, i) => { const g = (l.choiceGroup || '').trim(); if (g) groups.set(g, [...(groups.get(g) || []), i]); });
+  const off = new Set<number>();
+  for (const idx of groups.values()) {
+    const pick = idx.find((i) => lines[i].chosen) ?? idx[0];
+    idx.forEach((i) => { if (i !== pick) off.add(i); });
+  }
+  return off;
 }
 
 export interface EstimateParams {
@@ -65,6 +82,12 @@ export interface EstimateTotals {
   revenueExTax: number;
   /** сумма позиций «по желанию» (в итог не входят) */
   optionalTotal: number;
+  /** материалы, которые покупает заказчик (справочно, в итог не входят) */
+  customerMaterials: number;
+  /** по строке: сумма материала, который покупает заказчик */
+  lineCustomer: number[];
+  /** строка — невыбранный вариант (в итог не входит) */
+  lineOff: boolean[];
   directCost: number;
   linesWithoutCost: number;
   plannedProfit: number;
@@ -106,11 +129,16 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
   const ks = lines.map((l) => lineCoef(l, p.sectionCoefs));
   const workKop = lines.map((l, i) => Math.round(Number(l.qty) * toKop(Number(l.price) * ks[i])));
   const matKop = lines.map((l, i) => Math.round(Number(l.qty) * toKop(posNum(l.matPrice) * ks[i])));
+  // материал заказчика: строка-материал целиком (цена в price), у работы — часть «материал»
+  const custKop = lines.map((l, i) => (!l.byCustomer ? 0 : l.type === 'material' ? workKop[i] + matKop[i] : matKop[i]));
+  lines.forEach((l, i) => { if (!l.byCustomer) return; if (l.type === 'material') workKop[i] = 0; matKop[i] = 0; });
+  const offSet = unchosenAlternatives(lines);
   const amountsKop = lines.map((_, i) => workKop[i] + matKop[i]);
   const secMap = new Map<string, { a: number; w: number; m: number }>();
-  const opt = lines.map((l) => isOptionalSection(l.category));
+  const opt = lines.map((l, i) => isOptionalSection(l.category) || offSet.has(i));
   const subtotalKop = amountsKop.reduce((a, b, i) => a + (opt[i] ? 0 : b), 0);
-  const optionalKop = amountsKop.reduce((a, b, i) => a + (opt[i] ? b : 0), 0);
+  const optionalKop = amountsKop.reduce((a, b, i) => a + (opt[i] && !offSet.has(i) ? b : 0), 0);
+  const customerKop = custKop.reduce((a, b, i) => a + (opt[i] ? 0 : b), 0);
   let worksKop = 0, materialsKop = 0, otherKop = 0;
   const catMap = new Map<string, number>();
   const costGroups = { materials: 0, equipment: 0, labor: 0, other: 0 };
@@ -119,6 +147,7 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
 
   lines.forEach((l, i) => {
     const a = amountsKop[i];
+    if (offSet.has(i)) return; // невыбранный вариант — нигде не считается
     if (opt[i]) { // «по желанию»: только в своём разделе, в подытоги и себестоимость не идёт
       const sm = secMap.get(l.category || '') || { a: 0, w: 0, m: 0 };
       sm.a += a; sm.w += l.type === 'material' ? 0 : workKop[i]; sm.m += l.type === 'material' ? a : matKop[i];
@@ -136,6 +165,7 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
     secMap.set(sec, sm);
     const cat = l.category || 'Без категории';
     catMap.set(cat, (catMap.get(cat) || 0) + a);
+    if (l.byCustomer && l.type === 'material') return; // материал заказчика — не наши затраты
     if (l.costPrice != null && l.costPrice !== ('' as any)) {
       const c = lineAmountKop(l.qty, Number(l.costPrice));
       directCostKop += c;
@@ -178,6 +208,9 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
     total: fromKop(totalKop),
     revenueExTax: fromKop(revenueExTaxKop),
     optionalTotal: fromKop(optionalKop),
+    customerMaterials: fromKop(customerKop),
+    lineCustomer: custKop.map(fromKop),
+    lineOff: lines.map((_, i) => offSet.has(i)),
     directCost: fromKop(directCostKop),
     linesWithoutCost: withoutCost,
     plannedProfit: fromKop(profitKop),
@@ -194,7 +227,7 @@ export function calcEstimate(lines: LineInput[], p: EstimateParams = {}): Estima
 
 /** Итог сметы, если все материалы взять эконом / стандарт / премиум (класс — по правилам materialTiers) */
 export function variantTotals(lines: (LineInput & { name: string })[], p: EstimateParams = {}): Record<Tier, number> | null {
-  const hasMat = lines.some((l) => !isOptionalSection(l.category) && ((l.type === 'material' && Number(l.price) > 0) || posNum(l.matPrice) > 0));
+  const hasMat = lines.some((l) => !isOptionalSection(l.category) && !l.byCustomer && ((l.type === 'material' && Number(l.price) > 0) || posNum(l.matPrice) > 0));
   if (!hasMat) return null;
   const at = (t: Tier) => calcEstimate(lines.map((l) => {
     if (l.type === 'material' && Number(l.price) > 0) return { ...l, price: pickVariant(l.name, Number(l.price), t).price };
@@ -203,3 +236,10 @@ export function variantTotals(lines: (LineInput & { name: string })[], p: Estima
   }), p).total;
   return { eco: at('eco'), std: at('std'), prem: at('prem') };
 }
+
+/** Строка сметы из базы / формы → вход расчёта (числа уже приведены вызывающим) */
+export const calcLine = (l: any, num: (v: any) => number = Number): LineInput & { name: string } => ({
+  name: l.name, qty: num(l.qty), price: num(l.price), matPrice: l.matPrice == null || l.matPrice === '' ? null : num(l.matPrice),
+  coef: l.coef == null || l.coef === '' ? 1 : num(l.coef) || 1, costPrice: l.costPrice == null || l.costPrice === '' ? null : num(l.costPrice),
+  type: l.type, category: l.category, byCustomer: Boolean(l.byCustomer), choiceGroup: l.choiceGroup || null, chosen: Boolean(l.chosen),
+});

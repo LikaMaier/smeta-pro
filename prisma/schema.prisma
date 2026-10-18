@@ -72,6 +72,7 @@ model User {
   addressBook Contact[]
   aiSessions AiSession[]
   workActs   WorkAct[]
+  reviews    Review[]
   designs    Design[]
 
   @@index([teamOwnerId])
@@ -297,6 +298,10 @@ model Estimate {
   paySchedule    Json? // [{ title, pct }]
   purchased      Json? // ключи материалов, отмеченных как купленные
   paidAt         DateTime? // смета оплачена отдельно (99 ₽): без пометки, с логотипом
+  madeOnPro      Boolean        @default(false) // создана при активной подписке — остаётся доступной навсегда
+  parentId       String? // доп. соглашение: основная смета
+  addendumNo     Int? // номер доп. соглашения (1, 2…)
+  rooms          Json? // обмеры: [{ name, a, b, h, openings: [{ w, h, n, kind }] }]
   acts           WorkAct[]
   deletedAt      DateTime?
   createdAt      DateTime       @default(now())
@@ -305,6 +310,23 @@ model Estimate {
 
   @@index([shareToken])
   @@index([userId, deletedAt])
+  @@index([parentId])
+}
+
+// Отзыв заказчика о мастере (после акта / окончания работ)
+model Review {
+  id         String   @id @default(cuid())
+  userId     String // мастер
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  estimateId String?
+  rating     Int
+  text       String?
+  name       String?
+  hidden     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@unique([estimateId])
 }
 
 model EstimateLine {
@@ -325,6 +347,10 @@ model EstimateLine {
   catalogItemId String?
   note          String?
   unconfirmed   Boolean  @default(false) // для черновиков ИИ: позиция требует уточнения
+  byCustomer    Boolean  @default(false) // материал покупает заказчик: в сумму исполнителя не входит
+  choiceGroup   String? // группа вариантов на выбор заказчика («Плитка в ванной»)
+  chosen        Boolean  @default(false) // выбранный вариант в группе
+  photo         String? // фото позиции (id файла в data/photos/lp)
 
   @@index([estimateId])
 }

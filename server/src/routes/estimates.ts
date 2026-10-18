@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma, plain, notFound, audit, num, HttpError, accessOf, freeCtx } from '../util';
-import { calcEstimate } from '../../../shared/estimate';
+import { calcEstimate, calcLine } from '../../../shared/estimate';
 import { runImport, pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind } from '../pdf';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { getTemplate } from '../../../shared/templates';
@@ -27,6 +27,15 @@ const lineSchema = z.object({
   catalogItemId: z.string().nullable().optional(),
   note: z.string().max(1000).nullable().optional(),
   unconfirmed: z.boolean().optional(),
+  byCustomer: z.boolean().optional(),
+  choiceGroup: z.string().trim().max(100).nullable().optional(),
+  chosen: z.boolean().optional(),
+  photo: z.string().regex(/^[A-Za-z0-9_-]{16,40}$/).nullable().optional(),
+});
+
+const roomSchema = z.object({
+  name: z.string().trim().max(60), a: nonneg.max(1000), b: nonneg.max(1000), h: nonneg.max(100),
+  openings: z.array(z.object({ kind: z.enum(['window', 'door', 'other']).default('window'), w: nonneg.max(100), h: nonneg.max(100), n: z.coerce.number().int().min(1).max(100).default(1) })).max(30).default([]),
 });
 
 const headerSchema = z.object({
@@ -49,18 +58,19 @@ const headerSchema = z.object({
   showVariants: z.boolean().optional(),
   paySchedule: z.array(z.object({ title: z.string().trim().min(1).max(200), pct: z.coerce.number().min(0).max(100) })).max(10).nullable().optional(),
   purchased: z.array(z.string().max(400)).max(2000).nullable().optional(),
+  rooms: z.array(roomSchema).max(60).nullable().optional(),
 });
 
 /** Json-поля: null → очистить в базе (Prisma требует DbNull) */
 export function jsonFields<T extends Record<string, any>>(o: T): T {
   const r: any = { ...o };
-  for (const k of ['sectionCoefs', 'paySchedule', 'purchased']) if (r[k] === null) r[k] = Prisma.DbNull;
+  for (const k of ['sectionCoefs', 'paySchedule', 'purchased', 'rooms']) if (r[k] === null) r[k] = Prisma.DbNull;
   return r;
 }
 
 export function estimateTotals(e: any) {
   return calcEstimate(
-    (e.lines || []).map((l: any) => ({ qty: num(l.qty), price: num(l.price), matPrice: l.matPrice == null ? null : num(l.matPrice), coef: l.coef == null ? 1 : num(l.coef), costPrice: l.costPrice == null ? null : num(l.costPrice), type: l.type, category: l.category })),
+    (e.lines || []).map((l: any) => calcLine(l, num)),
     { discountPct: num(e.discountPct), markupPct: num(e.markupPct), taxPct: num(e.taxPct), lossReservePct: num(e.lossReservePct), delivery: num(e.delivery), extraCosts: num(e.extraCosts), roundAdjust: num(e.roundAdjust), sectionCoefs: (e.sectionCoefs as any) || null },
   );
 }
@@ -81,10 +91,12 @@ async function checkProject(userId: string, projectId?: string | null) {
 
 async function cloneEstimate(userId: string, src: any, overrides: any) {
   const { id, createdAt, updatedAt, lines, project, acts, shareToken, sharedAt, viewedAt, approvedAt, customerComment, purchased, ...rest } = src;
-  for (const k of ['sectionCoefs', 'paySchedule', 'budget']) if (rest[k] === null) delete rest[k];
+  for (const k of ['sectionCoefs', 'paySchedule', 'budget', 'rooms']) if (rest[k] === null) delete rest[k];
+  delete rest.parentId; delete rest.addendumNo; delete rest.paidAt;
+  const owner = await prisma.user.findUnique({ where: { id: userId } });
   return prisma.estimate.create({
     data: {
-      ...rest, ...overrides, userId,
+      ...rest, madeOnPro: Boolean(owner && accessOf(owner).active), ...overrides, userId,
       lines: { create: lines.map(({ id: _i, estimateId: _e, ...l }: any) => l) },
     },
     include: { lines: { orderBy: { position: 'asc' } } },
@@ -209,7 +221,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     const title = String(parsed.title || fname?.replace(/\.xlsx$/i, '') || 'Смета из Excel').slice(0, 200);
     const e = await prisma.estimate.create({
       data: {
-        userId: req.user.id, title, projectId: projectId || null, source: 'import',
+        userId: req.user.id, madeOnPro: accessOf(req.user).active, title, projectId: projectId || null, source: 'import',
         lines: { create: lines.map(({ id: _i, ...l }: any, i: number) => ({ ...l, position: i })) },
       },
       include: { lines: { orderBy: { position: 'asc' } } },
@@ -261,7 +273,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       if (!tpl) throw notFound('Шаблон');
       const e = await prisma.estimate.create({
         data: {
-          userId: req.user.id, title: body.title || tpl.title, projectId: body.projectId || null, customer: body.customer || null,
+          userId: req.user.id, madeOnPro: accessOf(req.user).active, title: body.title || tpl.title, projectId: body.projectId || null, customer: body.customer || null,
           lines: { create: await priceTemplateLines(req.user.id, tpl.lines) },
         },
         include: { lines: { orderBy: { position: 'asc' } } },
@@ -281,7 +293,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       return view(e);
     }
     const { fromId, templateId, ...data } = body;
-    const e = await prisma.estimate.create({ data: { ...jsonFields(data), title: data.title || 'Новая смета', userId: req.user.id }, include: { lines: true } });
+    const e = await prisma.estimate.create({ data: { ...jsonFields(data), title: data.title || 'Новая смета', userId: req.user.id, madeOnPro: accessOf(req.user).active }, include: { lines: true } });
     await audit(req.user.id, 'estimate', e.id, 'create');
     return view(e);
   });

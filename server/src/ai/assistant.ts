@@ -1,4 +1,4 @@
-import { prisma, num, HttpError, audit, requireFeature, useAi } from '../util';
+import { prisma, num, HttpError, audit, requireFeature, useAi, accessOf } from '../util';
 import { env } from '../env';
 import { chatJson, aiConfigured } from './openai';
 import { AI_SCHEMA, AiReply, buildDraft, calculatorsForPrompt } from '../../../shared/aiDraft';
@@ -92,7 +92,7 @@ export async function createEstimateFromDraft(user: any) {
   ].filter(Boolean).join('\n');
   const e = await prisma.estimate.create({
     data: {
-      userId: user.id, title: firstUser.slice(0, 60), source: 'ai', notes: notes || null,
+      userId: user.id, madeOnPro: accessOf(user).active, title: firstUser.slice(0, 60), source: 'ai', notes: notes || null,
       lines: { create: draft.lines.map((l: any, i: number) => ({ position: i, name: l.name, qty: l.qty, unit: l.unit, type: l.type, category: l.category, price: l.price, costPrice: l.costPrice, catalogItemId: l.catalogItemId, note: l.note, unconfirmed: l.unconfirmed })) },
     },
   });

@@ -142,7 +142,7 @@ export async function actRoutes(app: FastifyInstance, opts: { bot?: any } = {}) 
   });
 
   app.post('/api/acts/:id/send/:form', async (req) => {
-    paidOnly(req.user);
+    // уже сделанный акт — доступен и без подписки
     const form = z.enum(FORMS).parse((req.params as any).form);
     const a = await loadAct(req.user.id, (req.params as any).id);
     if (!opts.bot) throw new HttpError(503, 'Бот не подключён — отправить файл в чат нельзя', 'bot_not_configured');
@@ -156,7 +156,7 @@ export async function actRoutes(app: FastifyInstance, opts: { bot?: any } = {}) 
   });
 
   app.get('/api/acts/:id/link/:form', async (req) => {
-    paidOnly(req.user);
+    // уже сделанный акт — доступен и без подписки
     const form = z.enum(FORMS).parse((req.params as any).form);
     const a = await loadAct(req.user.id, (req.params as any).id);
     return { url: signedPath(`/files/acts/${a.id}.pdf`, `act-${form}`, a.id) };
@@ -169,7 +169,6 @@ export async function actRoutes(app: FastifyInstance, opts: { bot?: any } = {}) 
     if (!FORMS.includes(form) || !checkSig(`act-${form}`, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте документ из приложения заново' });
     const a = await prisma.workAct.findFirst({ where: { id, deletedAt: null }, include: { user: true } });
     if (!a) return reply.status(404).send({ error: 'Акт не найден' });
-    if (!accessOf(a.user).active) return reply.status(402).send({ error: 'Доступно по подписке' });
     const f = await render(a, a.user, form);
     return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(f.name)}`).send(f.buf);
   });
