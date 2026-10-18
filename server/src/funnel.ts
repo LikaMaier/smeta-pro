@@ -47,7 +47,7 @@ export function startFunnel(bot: any, log: { error: (o: any, m?: string) => void
   const sendTo = (u: { tgId: bigint }, text: string, extra: any = {}) =>
     bot.api.sendMessage(Number(u.tgId), text, { parse_mode: 'HTML', ...extra }).catch((e: any) => log.error({ err: e }, 'funnel send'));
   const FREE_LINE = `Дальше бесплатно — ${FREE_ESTIMATES} сметы в месяц с пометкой «Сделано в СМЕТА PRO». Все ваши сметы и данные сохранятся.`;
-  const OFFER_LINE = `🔹 <b>«Лайт»</b> — сметы без ограничений и с вашим логотипом: первый месяц <b>${PRICES.liteFirst} ₽</b>, дальше ${PRICES.lite} ₽.\n⭐ <b>«Про»</b> — плюс договор, акты, Excel, объекты и учёт денег: первый месяц <b>${PRICES.proFirst} ₽</b>, дальше ${PRICES.pro} ₽.\nБез автосписаний.`;
+  const OFFER_LINE = `🔹 <b>«Лайт»</b> — сметы без ограничений и с вашим логотипом: первый месяц <b>${PRICES.liteFirst} ₽</b>, дальше ${PRICES.lite} ₽.\n⭐ <b>«Про»</b> — плюс договор, акты, Excel, учёт денег и 3D-проект для заказчика каждый месяц: первый месяц <b>${PRICES.proFirst} ₽</b>, дальше ${PRICES.pro} ₽.\nБез автосписаний.`;
 
   const tick = async () => {
     const now = new Date();

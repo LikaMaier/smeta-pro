@@ -24,7 +24,7 @@ import { TIERS, PRICES, can, monthKey } from '../../../shared/plans';
  *  Без оплаты — черновой PDF с водяным знаком: бесплатно 1 всего, с подпиской — несколько в месяц. */
 export const studioActive = (u: any) => Boolean(u.studioUntil && new Date(u.studioUntil) > new Date());
 const premiumUser = (u: any) => studioActive(u) || accessOf(u).tier === 'team';
-const projectOffer = (_u: any) => `3D-проект для заказчика (PDF без водяного знака + 3D-ссылка) — ${PRICES.design} ₽ за объект, первый — всего ${PRICES.designFirst} ₽. Без ограничений — в тарифе «Бригада» или «3D-Студии».`;
+const projectOffer = (_u: any) => `3D-проект для заказчика (PDF без водяного знака + 3D-ссылка) — ${PRICES.design} ₽ за объект, первый — всего ${PRICES.designFirst} ₽. В «Про» — 1 проект в месяц бесплатно, без ограничений — в «Бригаде» или «3D-Студии».`;
 /** Кто оплатил «Про» до перехода на отдельные 3D-проекты (14.10.2026): до конца подписки — 5 чистых проектов в месяц, как обещали */
 const LEGACY_BEFORE = new Date('2026-10-14T08:45:00Z');
 async function legacyLeft(u: any) {
@@ -43,6 +43,16 @@ async function cleanProject(u: any, designId?: string | null): Promise<boolean> 
     if (d) await prisma.design.update({ where: { id: d.id }, data: { paidAt: new Date() } });
     await audit(u.id, 'design', d?.id || '-', 'share_legacy');
     return true;
+  }
+  // «Про» (оплаченная подписка): 1 чистый 3D-проект в месяц бесплатно — тратится на конкретный объект
+  const free = TIERS[accessOf(u).tier].freeDesigns || 0;
+  if (d && free > 0 && accessOf(u).mode === 'subscription') {
+    const used = await prisma.auditLog.count({ where: { userId: u.id, entity: 'design', action: 'share_pro_month', createdAt: { gte: new Date(`${monthKey()}-01T00:00:00+03:00`) } } });
+    if (used < free) {
+      await prisma.design.update({ where: { id: d.id }, data: { paidAt: new Date() } });
+      await audit(u.id, 'design', d.id, 'share_pro_month');
+      return true;
+    }
   }
   if ((u.extraDesigns || 0) > 0) {
     const took = await prisma.user.updateMany({ where: { id: u.id, extraDesigns: { gt: 0 } }, data: { extraDesigns: { decrement: 1 } } });

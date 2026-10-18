@@ -38,8 +38,10 @@ export class Builder {
     if (!(qty > 0)) return this;
     const type = s.category === 'Аренда техники' ? 'equipment' : s.category === 'Доставка' || name.startsWith('Вывоз') ? 'service' : 'work';
     const k = (opts.k || 1) * (type === 'work' ? this.k : 1);
+    // штучные работы (шт, компл, рейс…) — целым числом: «4,5 распредкоробки» не бывает
+    const q = COUNT_UNIT.test(s.unit) ? Math.ceil(r2(qty) - 1e-9) : r2(qty);
     return this.push({
-      name, qty: r2(qty), unit: s.unit, type, price: Math.round(s.price * k), category: this.section,
+      name, qty: q, unit: s.unit, type, price: Math.round(s.price * k), category: this.section,
       composition: COMPOSITIONS[name]?.join('\n'), note: [opts.note, type === 'work' && this.k !== 1 ? this.kNote : ''].filter(Boolean).join('; ') || undefined,
     });
   }

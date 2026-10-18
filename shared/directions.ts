@@ -27,49 +27,58 @@ const master = (id: string, title?: string, text?: string): WorkKind => {
   const m = M.get(id)!;
   return { id, title: title || m.trade, text: text || m.description, to: `/calculators/${id}` };
 };
-const tpl = (id: string): WorkKind[] => { const t = T.get(id); return t ? [{ id: `t:${id}`, title: t.title, text: `Шаблон · ${t.description}`, template: id }] : []; };
+const tpl = (id: string): WorkKind[] => { const t = T.get(id); if (!t) throw new Error(`Нет шаблона ${id}`); return [{ id: `t:${id}`, icon: '📋', title: t.title, text: `Готовая смета · ${t.description}`, template: id }]; };
+const tpls = (...ids: string[]) => ids.flatMap(tpl);
+const d3 = (preset: string, icon: string, title: string, text: string): WorkKind => ({ id: `d-${preset}`, icon, title, text: `3D · ${text}`, to: `/designer?preset=${preset}` });
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const DIRECTIONS: Direction[] = [
+  { id: 'turnkey', icon: '🔑', title: 'Ремонт под ключ', text: 'Квартира, санузел, комната — готовые сметы', kinds: [
+    ...tpls('flat1-turnkey', 'flat2-turnkey', 'newbuild-45', 'bath-turnkey', 'shower-room', 'toilet-room', 'room-cosmetic', 'room-paint', 'kitchen-apron', 'demo-flat', 'handy-move'),
+  ] },
   { id: 'finish', icon: '🎨', title: 'Отделка', text: 'Штукатурка, покраска, обои, потолки', kinds: [
     master('m-finish', 'Комната под ключ', 'Стены, потолок, откосы — по размерам комнаты'),
     master('m-stretch', 'Натяжные потолки', 'Полотно, профиль, светильники, обходы труб'),
     ...fromMaster('m-gkl', 'kind'),
+    ...tpls('room-cosmetic', 'room-paint', 'stretch-flat', 'gkl-partition', 'gkl-ceil2'),
   ] },
-  { id: 'tile', icon: '🧱', title: 'Плитка', text: 'Санузел, пол, стены, фартук', kinds: fromMaster('m-tile', 'obj') },
+  { id: 'tile', icon: '🧱', title: 'Плитка', text: 'Санузел, пол, стены, фартук', kinds: [...fromMaster('m-tile', 'obj'), ...tpls('bath-turnkey', 'shower-room', 'toilet-room', 'kitchen-apron')] },
   { id: 'floor', icon: '🪵', title: 'Полы', text: 'Ламинат, кварцвинил, паркет, стяжка', kinds: [
     ...([['laminate', 'Ламинат'], ['spc', 'Кварцвинил (SPC)'], ['parquet', 'Паркетная доска'], ['lino', 'Линолеум'], ['carpet', 'Ковролин']] as const).map(([c, t]) => ({
       id: `m-floor:cover-${c}`, title: t, text: 'Укладка на готовое основание: подложка, плинтус, пороги', to: `/calculators/m-floor?set=base:none,cover:${c}`,
     })),
     ...fromMaster('m-floor', 'base', ['cps', 'semi', 'self', 'joists'], { cps: 'Стяжка ЦПС', semi: 'Полусухая стяжка', self: 'Наливной пол', joists: 'Лаги + фанера' }),
+    ...tpls('laminate-50', 'spc-40', 'screed-100', 'warm-floor-80'),
   ] },
-  { id: 'windows', icon: '🪟', title: 'Окна и двери', text: 'Окна, откосы, подоконники, двери', kinds: fromMaster('m-windows', 'kind', undefined, { windows: 'Пластиковые окна', interior: 'Межкомнатные двери', entrance: 'Входная дверь', all: 'Окна и двери вместе' }) },
-  { id: 'balcony', icon: '🌇', title: 'Балкон и лоджия', text: 'Остекление, утепление, отделка', kinds: fromMaster('m-balcony', 'glaze', undefined, { warm: 'Тёплый балкон под ключ', cold: 'Холодное остекление', none: 'Утепление и отделка' }) },
-  { id: 'demo', icon: '🔨', title: 'Демонтаж', text: 'Плитка, стяжка, перегородки, вывоз', kinds: fromMaster('m-demo', 'obj', undefined, { flat: 'Квартира под ремонт', bath: 'Санузел', room: 'Комната', custom: 'Выберу сам' }) },
-  { id: 'climate', icon: '❄️', title: 'Кондиционеры', text: 'Сплит-системы, трассы, вытяжки', kinds: [master('m-ac', 'Кондиционеры и вентиляция', 'Монтаж сплит-систем, трассы, помпы, вытяжки')] },
+  { id: 'windows', icon: '🪟', title: 'Окна и двери', text: 'Окна, откосы, подоконники, двери', kinds: [...fromMaster('m-windows', 'kind', undefined, { windows: 'Пластиковые окна', interior: 'Межкомнатные двери', entrance: 'Входная дверь', all: 'Окна и двери вместе' }), ...tpls('windows-flat', 'doors-4', 'door-entrance')] },
+  { id: 'balcony', icon: '🌇', title: 'Балкон и лоджия', text: 'Остекление, утепление, отделка', kinds: [...fromMaster('m-balcony', 'glaze', undefined, { warm: 'Тёплый балкон под ключ', cold: 'Холодное остекление', none: 'Утепление и отделка' }), ...tpls('balcony-warm', 'balcony-cold')] },
+  { id: 'demo', icon: '🔨', title: 'Демонтаж', text: 'Плитка, стяжка, перегородки, вывоз', kinds: [...fromMaster('m-demo', 'obj', undefined, { flat: 'Квартира под ремонт', bath: 'Санузел', room: 'Комната', custom: 'Выберу сам' }), ...tpls('demo-flat', 'demo-bath')] },
+  { id: 'climate', icon: '❄️', title: 'Кондиционеры', text: 'Сплит-системы, трассы, вытяжки', kinds: [master('m-ac', 'Кондиционеры и вентиляция', 'Монтаж сплит-систем, трассы, помпы, вытяжки'), ...tpls('ac-2')] },
   { id: 'electric', icon: '⚡', title: 'Электрика', text: 'Проводка, щит, розетки, свет', kinds: [
     ...fromMaster('m-electric', 'obj', undefined, { flat: 'Электрика в квартире', house: 'Электрика в частном доме' }),
     { id: 'mep-e', icon: '📐', title: 'По плану комнат (3D)', text: 'Точки по ПУЭ, трассы, щит, чертёж и смета', to: '/mep' },
+    ...tpls('electric-flat', 'electric-house'),
   ] },
   { id: 'plumb', icon: '🚿', title: 'Сантехника', text: 'Разводка, канализация, приборы', kinds: [
     master('m-plumb', 'Сантехника под ключ', 'Разводка, канализация, установка приборов'),
     { id: 'mep-p', icon: '📐', title: 'По плану комнат (3D)', text: 'Трубы, канализация, чертёж и смета', to: '/mep' },
+    ...tpls('plumb-flat'),
   ] },
-  { id: 'roof', icon: '🏠', title: 'Кровля', text: 'Стропила, покрытие, водосток', kinds: fromMaster('m-roof', 'shape', undefined, { gable: 'Двускатная крыша', shed: 'Односкатная крыша', hip: 'Вальмовая крыша', mansard: 'Мансардная крыша' }) },
+  { id: 'roof', icon: '🏠', title: 'Кровля', text: 'Стропила, покрытие, водосток', kinds: [...fromMaster('m-roof', 'shape', undefined, { gable: 'Двускатная крыша', shed: 'Односкатная крыша', hip: 'Вальмовая крыша', mansard: 'Мансардная крыша' }), ...tpls('roof-gable', 'roof-soft-hip', 'roof-replace')] },
   { id: 'found', icon: '🏗', title: 'Фундамент', text: 'Лента, плита, сваи, отмостка', kinds: [
     ...fromMaster('m-found', 'type', undefined, { strip: 'Ленточный фундамент', slab: 'Монолитная плита', pile: 'Свайно-ростверковый', screw: 'Винтовые сваи' }),
-    ...tpl('blind-area'),
+    ...tpls('blind-area', 'strip-foundation', 'found-slab', 'found-screw', 'found-pile'),
   ] },
-  { id: 'walls', icon: '🧱', title: 'Стены и кладка', text: 'Газобетон, кирпич, блоки', kinds: fromMaster('m-mason', 'mat', undefined, { gas: 'Стены из газобетона', brick1: 'Кирпич в 1 кирпич', brick15: 'Кирпич в 1,5 кирпича', keramzit: 'Керамзитобетонный блок', ceramic: 'Керамический блок' }) },
-  { id: 'facade', icon: '🏘', title: 'Фасад', text: 'Утепление, штукатурка, сайдинг', kinds: fromMaster('m-facade', 'sys') },
+  { id: 'walls', icon: '🧱', title: 'Стены и кладка', text: 'Газобетон, кирпич, блоки', kinds: [...fromMaster('m-mason', 'mat', undefined, { gas: 'Стены из газобетона', brick1: 'Кирпич в 1 кирпич', brick15: 'Кирпич в 1,5 кирпича', keramzit: 'Керамзитобетонный блок', ceramic: 'Керамический блок' }), ...tpls('walls-gas', 'walls-brick2')] },
+  { id: 'facade', icon: '🏘', title: 'Фасад', text: 'Утепление, штукатурка, сайдинг', kinds: [...fromMaster('m-facade', 'sys'), ...tpls('facade-wet', 'facade-siding')] },
   { id: 'heat', icon: '🔥', title: 'Отопление и газ', text: 'Котёл, радиаторы, газгольдер', kinds: [
     ...fromMaster('m-heat', 'src', undefined, { gaswall: 'Газовый настенный котёл', gasfloor: 'Газовый напольный котёл', electric: 'Электрокотёл', solid: 'Твердотопливный котёл', hp: 'Тепловой насос' }),
-    ...tpl('gasholder'), ...tpl('boiler'),
+    ...tpls('gasholder', 'boiler', 'heat-gas-150', 'heat-el-80'),
   ] },
   { id: 'water', icon: '💧', title: 'Вода и канализация', text: 'Скважина, септик, дренаж', kinds: [
     ...fromMaster('m-septic', 'type', undefined, { bio: 'Станция биоочистки', plastic: 'Пластиковый септик', rings: 'Септик из колец' }),
     ...fromMaster('m-well', 'src', undefined, { sand: 'Скважина на песок', lime: 'Скважина на известняк', ring: 'Колодец из колец' }),
-    ...tpl('drainage'),
+    ...tpls('drainage', 'septic-bio5', 'septic-rings', 'well-sand', 'well-lime', 'well-caisson'),
   ] },
   { id: 'yard', icon: '🚧', title: 'Заборы и участок', text: 'Заборы, мощение, площадки', kinds: [
     { id: 'fence', icon: '🚧', title: 'Забор и ворота', text: '17 видов заборов, ворота, калитки', to: '/calculators/fence-pro' },
@@ -78,17 +87,40 @@ export const DIRECTIONS: Direction[] = [
     ...fromMaster('m-gates', 'gate', ['sliding', 'swing'], { sliding: 'Откатные ворота', swing: 'Распашные ворота' }),
     master('m-gates', 'Козырьки, лестницы, перила', 'Металлоконструкции, сварка, покраска'),
     master('m-yard', 'Ливнёвка, газон, освещение', 'Лотки, ливнеприёмники, газон, фонари, посадки, полив'),
-    ...tpl('tko'),
+    { id: 'site3d', icon: '🗺', title: 'План участка в 3D', text: 'Дом, септик, скважина, парковка — с проверкой норм и сметой', to: '/site' },
+    ...tpls('tko', 'paving-yard', 'paving-paths', 'parking-rubble', 'parking', 'paving', 'gates-sliding', 'gates-swing', 'yard-lawn', 'yard-drain', 'yard-lights', 'fence', 'fence-euro', 'fence-3d', 'fence-rabica', 'fence-jalousie', 'fence-brick'),
   ] },
-  { id: 'house', icon: '🏠', title: 'Дома и бани', text: 'Каркасный дом, баня из каркаса или бруса', kinds: fromMaster('m-house', 'type', undefined, { house: 'Каркасный дом', bathf: 'Баня каркасная', bathb: 'Баня из бруса' }) },
+  { id: 'house', icon: '🏠', title: 'Дома и бани', text: 'Каркасный дом, баня из каркаса или бруса', kinds: [...fromMaster('m-house', 'type', undefined, { house: 'Каркасный дом', bathf: 'Баня каркасная', bathb: 'Баня из бруса' }), ...tpls('house-frame', 'house-frame-2', 'bath-frame', 'bath-timber')] },
   { id: 'build', icon: '🏡', title: 'Постройки', text: 'Навесы, бытовки, гаражи, беседки — 3D', kinds: [
     { id: 'd-canopy', icon: '🚗', title: 'Навес', text: 'Для машины, террасы, двора', to: '/designer?preset=car' },
     { id: 'd-bytovka', icon: '🏠', title: 'Бытовка / хозблок', text: 'Каркасная, утеплённая, с окнами', to: '/designer?preset=bytovka' },
     { id: 'd-gazebo', icon: '⛺', title: 'Беседка', text: 'Деревянная или металлическая', to: '/designer?preset=gazebo-wood' },
     { id: 'd-garage', icon: '🚙', title: 'Гараж', text: 'Каркасный из профиля', to: '/designer?preset=garage' },
-    { id: 'd-all', icon: '📐', title: 'Все постройки', text: 'Теплицы, дровники, пергола, ангары', to: '/designer' },
+    d3('car2', '🚗', 'Навес на 2 машины 6×6', 'профлист, водосток'),
+    d3('lean', '🏠', 'Навес к дому 6×4', 'поликарбонат, пристенный'),
+    d3('terrace', '🌿', 'Терраса к дому 6×3', 'настил, перила, крыша'),
+    d3('pergola', '🌸', 'Пергола из бруса 4×3', 'для отдыха и винограда'),
+    d3('kitchen', '🍖', 'Летняя кухня 5×4', 'с мангальной зоной'),
+    d3('bbq', '🔥', 'Навес для мангала 4×3', 'из бруса, мягкая кровля'),
+    d3('gazebo-glass', '🪟', 'Закрытая беседка 4×3', 'поликарбонат'),
+    d3('gh-36', '🌱', 'Теплица 3×6', 'арочная, поликарбонат'),
+    d3('gh-gable', '🌿', 'Теплица двускатная 3,5×6', 'под рассаду и томаты'),
+    d3('woodshed', '🪵', 'Дровник 3×1,5', 'деревянный'),
+    d3('shed', '🛖', 'Хозблок 3×2,5', 'для инвентаря'),
+    d3('shed-m', '🧱', 'Сарай из профлиста 4×3', 'металлокаркас'),
+    d3('porch', '🚪', 'Навес над крыльцом 3×2', 'пристенный'),
+    d3('visor', '☂️', 'Козырёк над входом', '1,6×1,0'),
+    d3('workshop', '🔧', 'Тёплая мастерская 9×6', 'каркас, утепление'),
+    d3('garage2', '🚙', 'Гараж на 2 машины 7×6', 'каркасный'),
+    d3('hangar', '🏭', 'Ангар 12×18', 'склад, техника'),
+    d3('park-10', '🅿️', 'Стоянка на 10 машин', 'навес в 2 ряда'),
+    d3('pool', '🏊', 'Навес над бассейном', 'арка 5×10'),
+    d3('kiosk', '🏪', 'Торговый павильон 6×3', 'каркас, витрина'),
+    d3('tko-s', '🗑', 'Площадка ТКО на 2 контейнера', 'ограждение, навес'),
+    d3('combo-car-shed', '🚗', 'Навес для авто + хозблок 9×4', 'два в одном'),
+    { id: 'd-all', icon: '📐', title: 'Все 3D-постройки (60+)', text: 'Теплицы, дровники, ангары, стоянки, площадки ТКО', to: '/designer' },
   ] },
-  { id: 'handy', icon: '🧰', title: 'Мелкий ремонт', text: 'Повесить, собрать, заменить', kinds: [master('m-handy', 'Мастер на час', 'Полки, карнизы, мебель, смесители, розетки, люстры')] },
+  { id: 'handy', icon: '🧰', title: 'Мелкий ремонт', text: 'Повесить, собрать, заменить', kinds: [master('m-handy', 'Мастер на час', 'Полки, карнизы, мебель, смесители, розетки, люстры'), ...tpls('handy-move')] },
 ];
 
 export const getDirection = (id: string | null | undefined) => DIRECTIONS.find((d) => d.id === id) || null;
@@ -105,6 +137,22 @@ export function parseSet(q: string | null): Record<string, string> {
 
 // ---------------- поиск по видам работ: синонимы и разговорные названия ----------------
 const KEYWORDS: Record<string, string> = {
+  't:flat1-turnkey': 'однушка однокомнатная квартира ремонт под ключ комплексный',
+  't:flat2-turnkey': 'двушка двухкомнатная квартира ремонт под ключ комплексный',
+  't:newbuild-45': 'новостройка white box вайтбокс предчистовая черновая отделка квартира',
+  't:bath-turnkey': 'ванная санузел туалет под ключ ремонт ванной',
+  't:shower-room': 'душевая трап душ без поддона',
+  't:toilet-room': 'туалет уборная',
+  't:room-cosmetic': 'косметический ремонт комнаты обои',
+  't:handy-move': 'муж на час переезд мелкий ремонт',
+  't:house-frame': 'каркасник каркасный дом',
+  't:walls-gas': 'коробка дома газоблок',
+  'd-gh-36': 'теплица парник поликарбонат', 'd-gh-gable': 'теплица парник',
+  'd-kitchen': 'летняя кухня мангал барбекю', 'd-bbq': 'мангал барбекю',
+  'd-pool': 'бассейн', 'd-hangar': 'ангар склад', 'd-park-10': 'парковка стоянка автостоянка',
+  'd-terrace': 'терраса веранда', 'd-pergola': 'пергола', 'd-shed': 'сарай хозблок', 'd-woodshed': 'дровник дрова',
+  'd-kiosk': 'павильон киоск ларёк магазин', 'd-tko-s': 'мусорка контейнерная площадка тко',
+  site3d: 'план участка генплан септик скважина нормы',
   'm-finish': 'ремонт комнаты квартиры отделка под ключ штукатурка шпаклевка покраска обои стены потолок малярка косметический',
   'm-gkl:part': 'гипсокартон гкл перегородка стенка каркас профиль кнауф',
   'm-gkl:wall': 'гипсокартон гкл обшивка стен выравнивание каркас профиль',

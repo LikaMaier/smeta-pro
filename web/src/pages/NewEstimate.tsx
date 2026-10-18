@@ -5,7 +5,7 @@ import { useMe } from '../App';
 import { Fold, Icon, SearchBox, useLoad, useToast } from '../components/ui';
 import { rub0 } from '../format';
 import { DIRECTIONS, getDirection, searchKinds, type WorkKind } from '../../../shared/directions';
-import { TEMPLATES } from '../../../shared/templates';
+import { TEMPLATES, TEMPLATE_GROUPS } from '../../../shared/templates';
 import { ImportButton } from './Estimates';
 
 const DIR_KEY = 'smeta_dir';
@@ -142,10 +142,14 @@ function More({ busy, create, mine }: { busy: boolean; create: (b: any, s?: stri
             </div>
           </>
         )}
-        <div className="xs muted" style={{ margin: '0 0 6px' }}>Готовые шаблоны</div>
-        <div className="list" style={{ marginBottom: 10 }}>
-          {TEMPLATES.map((t) => <button key={t.id} className="list-item" disabled={busy} onClick={() => create({ templateId: t.id })}><div className="grow"><div className="title">{t.title}</div><div className="xs muted">{t.description}</div></div><Icon.chevron className="chev" width={18} /></button>)}
-        </div>
+        <div className="xs muted" style={{ margin: '0 0 6px' }}>Готовые сметы ({TEMPLATES.length}) — количество и цены потом поправите под объект</div>
+        {TEMPLATE_GROUPS.map((g) => (
+          <Fold key={g} id={`tpl-${g}`} title={g} summary={`${TEMPLATES.filter((t) => t.group === g).length}`}>
+            <div className="list" style={{ marginBottom: 10 }}>
+              {TEMPLATES.filter((t) => t.group === g).map((t) => <button key={t.id} className="list-item" disabled={busy} onClick={() => create({ templateId: t.id })}><div className="grow"><div className="title">{t.title}</div><div className="xs muted">{t.description}</div></div><Icon.chevron className="chev" width={18} /></button>)}
+            </div>
+          </Fold>
+        ))}
         <ImportButton onDone={(id) => nav(`/estimates/${id}`)} />
         <Link to="/assistant" className="btn block" style={{ marginTop: 8 }}>🤖 ИИ-сметчик: по голосу и тексту</Link>
       </Fold>

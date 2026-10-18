@@ -1,4 +1,5 @@
 import { fenceEstimate, FenceInput } from './fence';
+import { READY_TEMPLATES } from './readyTemplates';
 /**
  * Готовые шаблоны смет. Количество — типовое для примера, его нужно поправить под объект
  * (строки помечаются «требует уточнения»). Цена берётся из справочника пользователя по названию,
@@ -6,7 +7,7 @@ import { fenceEstimate, FenceInput } from './fence';
  */
 type T = 'work' | 'material' | 'equipment' | 'service' | 'other';
 export interface TemplateLine { name: string; qty: number; unit: string; type: T; category: string; price?: number; composition?: string; note?: string }
-export interface EstimateTemplate { id: string; title: string; description: string; lines: TemplateLine[] }
+export interface EstimateTemplate { id: string; title: string; description: string; lines: TemplateLine[]; group?: string }
 
 const w = (category: string, name: string, qty: number, unit: string): TemplateLine => ({ category, name, qty, unit, type: 'work' });
 const m = (category: string, name: string, qty: number, unit: string): TemplateLine => ({ category, name, qty, unit, type: 'material' });
@@ -154,4 +155,11 @@ export const TEMPLATES: EstimateTemplate[] = [
   },
 ];
 
+// группы для списка «Готовые шаблоны»
+const GROUP_OF: Record<string, string> = { gasholder: 'Инженерия', septic: 'Инженерия', drainage: 'Участок', boiler: 'Инженерия', 'strip-foundation': 'Дом', 'well-caisson': 'Инженерия', 'blind-area': 'Дом' };
+for (const t of TEMPLATES) t.group ||= GROUP_OF[t.id] || 'Участок';
+// готовые сметы под ключ от мастеров (квартира, санузел, кровля, дом, баня…)
+TEMPLATES.push(...(READY_TEMPLATES as unknown as EstimateTemplate[]));
+
+export const TEMPLATE_GROUPS = ['Квартира', 'Полы и стены', 'Инженерия', 'Дом', 'Участок'];
 export const getTemplate = (id: string) => TEMPLATES.find((t) => t.id === id);
