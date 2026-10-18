@@ -37,17 +37,22 @@ export async function priceFor(user: PriceUser, plan: { code: string; months: nu
   const founder = LAUNCH_ENDS ? (await prisma.payment.count({ where: { userId: user.id, status: 'paid', createdAt: { lt: new Date(LAUNCH_ENDS) } } })) > 0 : false;
   const fp = founder ? FOUNDER[plan.code] : undefined;
   if (fp && fp < base.rub) base = { ...base, rub: fp, stars: rubToStars(fp), note: 'цена основателя' };
-  // 3D-проект: с «Про» или «Бригадой» — дешевле
+  // 3D-проект: первый — за PRICES.designFirst; основателям с подпиской — прежняя цена
   if (plan.code === 'design1') {
+    const boughtBefore = (await prisma.payment.count({ where: { userId: user.id, planCode: 'design1', status: 'paid' } })) > 0;
+    if (!boughtBefore && PRICES.designFirst < base.rub) return { ...base, rub: PRICES.designFirst, stars: rubToStars(PRICES.designFirst), discountPct: Math.round((1 - PRICES.designFirst / plan.rubPrice) * 100), note: 'первый проект' };
     const sub = (user.subscriptionUntil && user.subscriptionUntil > now) || (user.teamUntil && user.teamUntil > now);
-    const sp = Math.min(PRICES.designPro, founder ? FOUNDER.design1_sub : Infinity);
-    return sub && sp < base.rub ? { ...base, rub: sp, stars: rubToStars(sp), note: 'цена с подпиской' } : base;
+    const sp = founder && sub ? FOUNDER.design1_sub : Infinity;
+    return sp < base.rub ? { ...base, rub: sp, stars: rubToStars(sp), note: 'цена основателя' } : base;
   }
   if (plan.months === 0 || plan.code === 'studio_m') return base;
   const options = [base];
   const first = !(await hadSubscription(user.id));
-  if (first && plan.code === 'pro_m') options.push({ ...base, rub: PRICES.proFirst, stars: rubToStars(PRICES.proFirst), discountPct: Math.round((1 - PRICES.proFirst / plan.rubPrice) * 100), note: 'первый месяц' });
-  if (user.offerPct && user.offerUntil && user.offerUntil > now && plan.code === 'pro_m') {
+  // первый месяц со скидкой: Лайт и Про — фиксированная цена, Бригада — −50%
+  const firstRub = plan.code === 'lite_m' ? PRICES.liteFirst : plan.code === 'pro_m' ? PRICES.proFirst
+    : /^team\d*_m$/.test(plan.code) ? Math.round((plan.rubPrice * (100 - PRICES.teamFirstPct)) / 100 / 10) * 10 : 0;
+  if (first && firstRub && firstRub < plan.rubPrice) options.push({ ...base, rub: firstRub, stars: rubToStars(firstRub), discountPct: Math.round((1 - firstRub / plan.rubPrice) * 100), note: 'первый месяц' });
+  if (user.offerPct && user.offerUntil && user.offerUntil > now && (plan.code === 'pro_m' || plan.code === 'lite_m')) {
     const k = 1 - Math.min(90, user.offerPct) / 100;
     options.push({ ...base, rub: Math.max(1, Math.round(plan.rubPrice * k)), stars: Math.max(1, Math.round(plan.starsPrice * k)), discountPct: user.offerPct, note: `скидка до ${user.offerUntil.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` });
   }

@@ -34,7 +34,7 @@ export default function Home() {
       {(me.access.estimateCount ?? 0) > 0 && <Link to="/calendar" style={{ display: 'block' }}>
         <Hero
           title={<>Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span></>}
-          sub={me.access.mode === 'subscription' || me.access.mode === 'team' ? `Тариф «${me.plan?.label || 'Про'}» до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный «Про»: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'Сметы — бесплатно, без ограничений' : `Бесплатных смет в этом месяце: ${me.access.freeLeft ?? 3}`) : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатные сметы месяца использованы — новые 1-го числа'}
+          sub={me.access.mode === 'subscription' || me.access.mode === 'team' ? `Тариф «${me.plan?.label || 'Про'}» до ${new Date(me.access.until).toLocaleDateString('ru-RU')}` : me.access.mode === 'trial' ? `Пробный период — всё открыто: ${me.access.daysLeft} дн.` : me.access.mode === 'admin' ? 'Полный доступ' : me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'Сметы — бесплатно, без ограничений' : `Бесплатных смет в этом месяце: ${me.access.freeLeft ?? 3}`) : me.access.mode === 'expired' ? 'Подписка закончилась' : 'Бесплатные сметы месяца использованы — новые 1-го числа'}
         />
       </Link>}
 

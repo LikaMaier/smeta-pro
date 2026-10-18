@@ -573,7 +573,7 @@ def build(d):
             canvas.setFillColor(GOLD)
             canvas.setFont("DV-B", 8)
             bot = d.get("bot")
-            mark = "Сделано в СМЕТА PRO — смета за 2 минуты бесплатно, в Telegram" + (f": @{bot}" if bot else "")
+            mark = "Сделано в СМЕТА PRO — смета за 2 минуты в Telegram" + (f": @{bot}" if bot else "")
             canvas.drawCentredString(A4[0] / 2, 4.5 * mm, mark)
             if bot:  # кликабельная ссылка на бота с меткой «pdf» — видно в сводке, сколько пришло из смет
                 w = canvas.stringWidth(mark, "DV-B", 8)

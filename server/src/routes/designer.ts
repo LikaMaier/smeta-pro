@@ -24,10 +24,7 @@ import { TIERS, PRICES, can, monthKey } from '../../../shared/plans';
  *  Без оплаты — черновой PDF с водяным знаком: бесплатно 1 всего, с подпиской — несколько в месяц. */
 export const studioActive = (u: any) => Boolean(u.studioUntil && new Date(u.studioUntil) > new Date());
 const premiumUser = (u: any) => studioActive(u) || accessOf(u).tier === 'team';
-const projectOffer = (u: any) => {
-  const sub = accessOf(u).mode === 'subscription' || accessOf(u).mode === 'team';
-  return `3D-проект для заказчика (PDF без водяного знака + 3D-ссылка) — ${sub ? PRICES.designPro : PRICES.design} ₽ за объект${sub ? '' : ` (с «Про» — ${PRICES.designPro} ₽)`}. Без ограничений — в тарифе «Бригада».`;
-};
+const projectOffer = (_u: any) => `3D-проект для заказчика (PDF без водяного знака + 3D-ссылка) — ${PRICES.design} ₽ за объект, первый — всего ${PRICES.designFirst} ₽. Без ограничений — в тарифе «Бригада» или «3D-Студии».`;
 /** Кто оплатил «Про» до перехода на отдельные 3D-проекты (14.10.2026): до конца подписки — 5 чистых проектов в месяц, как обещали */
 const LEGACY_BEFORE = new Date('2026-10-14T08:45:00Z');
 async function legacyLeft(u: any) {

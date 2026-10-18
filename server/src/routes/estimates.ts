@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { prisma, plain, notFound, audit, num, HttpError, accessOf, freeCtx } from '../util';
+import { prisma, plain, notFound, audit, num, HttpError, accessOf, freeCtx, docsOk, needDocs } from '../util';
 import { calcEstimate } from '../../../shared/estimate';
 import { runImport, pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind } from '../pdf';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
@@ -136,8 +136,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
   type EKind = typeof KINDS[number];
   const PAID: EKind[] = ['act', 'contract', 'xlsx', 'xlsxown']; // бесплатно — только PDF первой сметы
   const needPaid = (user: any, kind: EKind) => {
-    if (PAID.includes(kind) && !accessOf(user).active)
-      throw new HttpError(402, 'Договор, акт и экспорт в Excel доступны по подписке.', 'subscription_required');
+    if (PAID.includes(kind)) needDocs(user);
   };
   async function buildFile(e: any, user: any, kind: EKind, actDate?: string) {
     const number = await estimateNumber(user.id, e);
@@ -191,7 +190,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     if (!checkSig(kind, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте файл из приложения заново' });
     const e = await prisma.estimate.findFirst({ where: { id, deletedAt: null }, include: { lines: { orderBy: { position: 'asc' } }, user: true } });
     if (!e) return reply.status(404).send({ error: 'Смета не найдена' });
-    if (PAID.includes(kind) && !accessOf(e.user).active) return reply.status(402).send({ error: 'Доступно по подписке' });
+    if (PAID.includes(kind) && !docsOk(e.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });
     const f = await buildFile(e, e.user, kind);
     return reply.header('Content-Type', f.type)
       .header('Content-Disposition', `${f.type === 'application/pdf' ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`).send(f.buf);

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
-import { prisma, plain, notFound, audit, num, HttpError, accessOf } from '../util';
+import { prisma, plain, notFound, audit, num, HttpError, accessOf, docsOk, needDocs } from '../util';
 import { renderXlsx, fileLink, checkSig, fileName } from '../pdf';
 import { calcProjectFinance } from '../../../shared/finance';
 import { estimateTotals } from './estimates';
@@ -121,7 +121,7 @@ async function projectXlsx(p: any) {
 
 export async function projectRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
   const paid = (user: any) => {
-    if (!accessOf(user).active) throw new HttpError(402, 'Экспорт в Excel доступен по подписке.', 'subscription_required');
+    needDocs(user);
   };
   app.post('/api/projects/:id/xlsx/send', async (req) => {
     paid(req.user);
@@ -144,7 +144,7 @@ export async function projectRoutes(app: FastifyInstance, opts: { bot?: any } = 
     if (!checkSig('pxlsx', id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте файл из приложения заново' });
     const owner = await prisma.project.findFirst({ where: { id, deletedAt: null }, include: { user: true } });
     if (!owner) return reply.status(404).send({ error: 'Объект не найден' });
-    if (!accessOf(owner.user).active) return reply.status(402).send({ error: 'Доступно по подписке' });
+    if (!docsOk(owner.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });
     const p = await loadProject(owner.userId, id);
     return reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName(p.name, 'xlsx', 'Объект'))}`).send(await projectXlsx(p));

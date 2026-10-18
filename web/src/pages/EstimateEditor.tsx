@@ -428,7 +428,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       {!readOnly && !me.access.active && !initial.paidAt && !(me.access.paidEstimateIds || []).includes(initial.id) && (
         <button className="banner" style={{ display: 'block', width: '100%', textAlign: 'left', marginTop: 12, cursor: 'pointer' }} onClick={() => setSheet('clean')}>
           <b>Заказчик увидит пометку «Сделано в СМЕТА PRO»</b>
-          <div className="xs">Убрать и поставить ваш логотип — {PRICES.estimate} ₽ за эту смету или «Про» от {PRICES.proFirst} ₽ →</div>
+          <div className="xs">Убрать и поставить ваш логотип — {PRICES.estimate} ₽ за эту смету или «Лайт» от {PRICES.liteFirst} ₽ в первый месяц →</div>
         </button>
       )}
       <div className="grid2" style={{ marginTop: 12 }}>
@@ -448,7 +448,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт</button>
           <button className="btn" disabled={pdfBusy} onClick={() => sendFile('xlsx')}>📊 Excel</button>
         </div>
-        <p className="xs muted" style={{ marginBottom: 0 }}>В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!me.access.active && ' Договор, акт и Excel — по подписке.'}</p>
+        <p className="xs muted" style={{ marginBottom: 0 }}>В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!['pro', 'team'].includes(me.access.tier || '') && ' Договор, акт и Excel — в тарифе «Про».'}</p>
       </Fold>
 
       <Fold id="est-own" title="🔒 Для себя: прибыль" summary={<span className={totals.plannedProfit < 0 ? 'neg' : ''}>{rub(totals.plannedProfit)}</span>}>
@@ -477,7 +477,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <Sheet open={sheet === 'clean'} onClose={() => setSheet(null)} title="Смета без пометки">
         <p className="small" style={{ marginTop: 0 }}>Без «Сделано в СМЕТА PRO», с вашим логотипом и подписью — заказчик видит солидную смету от вашей фирмы.</p>
         <Offers target={initial.id} onPaid={() => { setSheet(null); reload(); }} items={[
-          { code: 'pro_m', title: '⭐ «Про» — все сметы без пометки', text: 'Сметы без ограничений, договор и акты, объекты и учёт денег. Без автосписаний.', best: true },
+          { code: 'lite_m', title: '🔹 «Лайт» — все сметы без пометки', text: 'Сметы без ограничений, ваш логотип и подпись. Без автосписаний.', best: true },
+          { code: 'pro_m', title: '⭐ «Про» — плюс договор, акты и деньги', text: 'Всё из «Лайт» + договор подряда, акты КС-2/КС-3, Excel, объекты и учёт денег, ИИ-сметчик.' },
           { code: 'est1', title: '📄 Только эта смета', text: 'Без пометки и с логотипом. Править и отправлять — сколько угодно.' },
         ]} />
       </Sheet>

@@ -7,10 +7,40 @@ import { TIERS, SEAT_RUB, PRICES, type Tier } from '../../../shared/plans';
 import { PayButtons, rub } from './Pay';
 
 const TIER_ICON: Record<string, string> = { lite: '🔹', pro: '⭐', team: '👷' };
+/** Что входит: строка → [Бесплатно, Лайт, Про, Бригада] */
+const COMPARE: [string, string, string, string, string][] = [
+  ['Сметы', '3 в месяц', 'без ограничений', 'без ограничений', 'без ограничений'],
+  ['Без пометки, ваш логотип и подпись', '—', '✓', '✓', '✓'],
+  ['Ссылка заказчику, согласование кнопкой', '✓', '✓', '✓', '✓'],
+  ['Договор подряда, акты, КС-2, КС-3, Excel', '—', '—', '✓', '✓'],
+  ['Объекты: деньги, расходы, долги, прибыль', '—', '—', '✓', '✓'],
+  ['ИИ-сметчик (голос и текст)', '—', '—', '✓', '✓'],
+  ['3D-проект для заказчика', `${PRICES.design} ₽`, `${PRICES.design} ₽`, `${PRICES.design} ₽`, 'без ограничений'],
+  ['Бригада, общий справочник цен', '—', '—', '—', '✓'],
+];
+function Compare({ cur }: { cur: string }) {
+  const cols = ['free', 'lite', 'pro', 'team'];
+  return (
+    <div className="panel" style={{ padding: 0, overflowX: 'auto', marginBottom: 12 }}>
+      <table className="compare" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead><tr>
+          <th style={{ textAlign: 'left', padding: '10px 8px' }}>Что входит</th>
+          {['Бесплатно', 'Лайт', 'Про', 'Бригада'].map((t, i) => <th key={t} style={{ padding: '10px 4px', textAlign: 'center', background: cols[i] === 'pro' ? 'var(--amber-soft, rgba(232,160,40,.12))' : undefined, whiteSpace: 'nowrap' }}>{t}{cur === cols[i] ? <div className="xs muted">ваш</div> : null}</th>)}
+        </tr></thead>
+        <tbody>{COMPARE.map(([name, ...v]) => (
+          <tr key={name} style={{ borderTop: '1px solid var(--line)' }}>
+            <td style={{ padding: '8px' }}>{name}</td>
+            {v.map((x, i) => <td key={i} style={{ padding: '8px 4px', textAlign: 'center', color: x === '—' ? 'var(--muted)' : x === '✓' ? 'var(--ok)' : undefined, fontWeight: x === '✓' ? 700 : 400, background: cols[i] === 'pro' ? 'var(--amber-soft, rgba(232,160,40,.12))' : undefined }}>{x}</td>)}
+          </tr>
+        ))}</tbody>
+      </table>
+    </div>
+  );
+}
 const PACK_TEXT: Record<string, string> = {
   est10: `10 смет без пометки, с вашим логотипом. Действуют ${PRICES.packMonths} месяцев — удобно, если заказы бывают не каждый месяц.`,
-  studio_m: 'Все 3D-проекты и 3D-ссылки для заказчиков без ограничений на месяц — выгодно, если объектов больше двух.',
-  design1: 'Премиальный 3D-проект одного объекта для заказчика: PDF без водяного знака (3D, план, фасады, узлы, ведомость) и 3D-ссылка, которую заказчик крутит пальцем. Включите его в смету — обычно это 3–5 тыс. ₽.',
+  studio_m: 'Все 3D-проекты и 3D-ссылки для заказчиков без ограничений на месяц — выгодно, если объектов больше двух в месяц.',
+  design1: `Премиальный 3D-проект одного объекта для заказчика: PDF без водяного знака (3D, план, фасады, узлы, ведомость) и 3D-ссылка, которую заказчик крутит пальцем. Первый проект — ${PRICES.designFirst} ₽, дальше ${PRICES.design} ₽. Включите его в смету — обычно это 3–5 тыс. ₽.`,
 };
 
 /** Тарифы: Про / Бригада (3, 5 или 10 человек) и 3D-проект для заказчика; оплата ЮKassa (карта, СБП) и Telegram Stars */
@@ -30,16 +60,18 @@ export default function Tariffs() {
       <Load state={plans}>{(list) => {
         const proM = list.find((x) => x.code === 'pro_m');
         const firstDeal = proM?.price?.note === 'первый месяц';
+        const liteM = list.find((x) => x.code === 'lite_m');
         const year = yearSel ?? !firstDeal; // новичку сначала показываем первый месяц со скидкой, остальным — год
         return (
         <>
           <div className="seg" style={{ marginBottom: 8 }}>
-            <button className={`chip ${!year ? 'on' : ''}`} onClick={() => setYear(false)}>{firstDeal ? `Первый месяц · ${rub(proM.price.rub)}` : 'На месяц'}</button>
+            <button className={`chip ${!year ? 'on' : ''}`} onClick={() => setYear(false)}>{firstDeal ? `Первый месяц · от ${rub(liteM?.price?.rub ?? proM.price.rub)}` : 'На месяц'}</button>
             <button className={`chip ${year ? 'on' : ''}`} onClick={() => setYear(true)}>На год · выгоднее</button>
           </div>
           <div className="tariffs">
-            {cur === 'lite' && paid && <div className="dz-warn">У вас тариф «Лайт» — он работает до {new Date(me.access.until).toLocaleDateString('ru-RU')}. Новых подписок «Лайт» больше нет: при переходе на «Про» оставшиеся дни пересчитаются.</div>}
-            {(['pro', 'team'] as const).map((t) => {
+            {me.access.mode === 'trial' && <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Сейчас у вас пробный период — открыто всё, как в «Про». Осталось {me.access.daysLeft} дн. Потом бесплатно — 3 сметы в месяц с пометкой.</div>}
+            <Compare cur={me.access.mode === 'trial' ? 'free' : cur} />
+            {(['lite', 'pro', 'team'] as const).map((t) => {
               const p = list.find((x) => x.tier === t && x.months === (year ? 12 : 1) && (t !== 'team' || (x.seats || 3) === seats));
               if (!p) return null;
               const on = cur === t && paid;
@@ -55,7 +87,7 @@ export default function Tariffs() {
                     {price < p.rubPrice && <s className="muted" style={{ marginRight: 6 }}>{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</s>}
                     <b className="num">{rub(year ? Math.round(price / 12) : price)}</b><span className="muted">{!year && p.price?.note === 'первый месяц' ? ` за первый месяц, дальше ${rub(p.rubPrice)}` : ` в месяц${year ? ` · ${rub(price)} за год` : ''}`}</span>
                   </div>
-                  <div className="xs muted">≈ {perDay(price, p.months)} ₽ в день{t === 'pro' ? ' — дешевле пачки саморезов' : ''}{year ? ` · экономия ${rub(Math.round((list.find((x) => x.tier === t && x.months === 1 && (t !== 'team' || (x.seats || 3) === seats))?.rubPrice || 0) * 12 - p.rubPrice))}` : ''}</div>
+                  <div className="xs muted">≈ {perDay(price, p.months)} ₽ в день{t === 'lite' ? ' — дешевле пачки саморезов' : t === 'pro' ? ' — окупается одним договором' : ''}{year ? ` · экономия ${rub(Math.round((list.find((x) => x.tier === t && x.months === 1 && (t !== 'team' || (x.seats || 3) === seats))?.rubPrice || 0) * 12 - p.rubPrice))}` : ''}</div>
                   {p.price?.discountPct > 0 && p.price?.note && p.price.note !== 'первый месяц' && <span className="badge ok">−{p.price.discountPct}% {p.price.note}</span>}
                   {t === 'team' && (
                     <div className="segc" role="radiogroup" aria-label="Человек в бригаде" style={{ margin: '6px 0 2px' }}>

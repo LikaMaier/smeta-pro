@@ -1,9 +1,10 @@
+import { TRADES, tradeOf, TRADE_EXAMPLE } from '../../shared/trades';
 import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from './env';
 import { prisma, accessOf } from './util';
-import { can, TIERS } from '../../shared/plans';
+import { can, TIERS, PRICES } from '../../shared/plans';
 import { aiConfigured, sttConfigured } from './ai/openai';
 import { applyPayment } from './routes/billing';
 import { upsertUser } from './routes/auth';
@@ -55,11 +56,27 @@ export function createBot() {
       } catch (e: any) { await ctx.reply(`Не получилось вступить в бригаду: ${e.message}`); }
     }
     await ctx.reply(welcomeText(u), { parse_mode: 'HTML', reply_markup: appKb() });
-    // новичку — пошаговая инструкция в картинках (один раз)
+    // новичку — один вопрос «Чем занимаетесь?»: по ответу сразу открываем нужного мастера (инструкция — позже, если не начал)
     if (u && ctx.from && Date.now() - new Date(u.createdAt).getTime() < 5 * 60e3) {
       const first = await prisma.appKV.create({ data: { key: `guide:${ctx.from.id}`, value: '1' } }).then(() => true).catch(() => false);
-      if (first) await sendGuide(ctx).catch((e) => console.error('guide', e));
+      if (first) {
+        const kb = new InlineKeyboard();
+        TRADES.forEach((t, i) => { kb.text(t.label, `trade:${t.id}`); if (i % 2 === 1) kb.row(); });
+        await ctx.reply('👷 <b>Чем вы занимаетесь?</b>\nВыберите — сразу открою нужный расчёт, первая смета будет готова за пару минут.', { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
+      }
     }
+  });
+  // ответ на «Чем занимаетесь?»: запоминаем и открываем мастера этого направления
+  bot.callbackQuery(/^trade:([a-z]+)$/, async (ctx) => {
+    const t = tradeOf(ctx.match![1]);
+    await ctx.answerCallbackQuery().catch(() => {});
+    if (!t || !ctx.from) return;
+    await prisma.appKV.upsert({ where: { key: `trade:${ctx.from.id}` }, create: { key: `trade:${ctx.from.id}`, value: t.id }, update: { value: t.id } }).catch(() => {});
+    const url = env.PUBLIC_URL ? `${env.PUBLIC_URL}/new${t.dir ? `?dir=${t.dir}` : ''}` : '';
+    const ex = TRADE_EXAMPLE[t.id];
+    await ctx.editMessageText(`👍 ${t.label.replace(/^\S+\s/, '')} — понял.${ex ? `\n\nНапример: <b>${ex}</b>.` : ''}\nВпишите размеры — работы, материалы и цены посчитаются сами. Любую цену можно поменять на свою.`, {
+      parse_mode: 'HTML', reply_markup: url ? new InlineKeyboard().webApp('🧾 Сделать первую смету', url) : undefined,
+    }).catch(() => {});
   });
   bot.command(['guide', 'kak'], (ctx) => sendGuide(ctx).catch(() => ctx.reply('Не получилось отправить инструкцию, попробуйте ещё раз.')));
   bot.hears(/^(как начать|инструкция|как пользоваться)\??$/i, (ctx) => sendGuide(ctx).catch(() => {}));
@@ -224,8 +241,8 @@ export function welcomeText(u: any) {
   const acc = u ? accessOf(u) : null;
   if (!isNew && acc) {
     const status = acc.mode === 'subscription' || acc.mode === 'team' ? `Тариф «${TIERS[acc.tier].label}» до ${new Date(acc.until).toLocaleDateString('ru-RU')}.`
-      : acc.mode === 'trial' ? `Пробный «Про»: осталось ${acc.daysLeft} дн.`
-      : acc.mode === 'admin' ? 'Полный доступ.' : 'Бесплатный режим: сметы, справочник, калькуляторы, напоминания.';
+      : acc.mode === 'trial' ? `Пробный период — всё открыто, осталось ${acc.daysLeft} дн.`
+      : acc.mode === 'admin' ? 'Полный доступ.' : 'Бесплатный режим: 3 сметы в месяц, справочник, калькуляторы, напоминания.';
     return `С возвращением, ${name}! 👋\nОбъекты ждут, сметы скучают.\n\n<i>${status}</i>\n\nОткрывайте 👇`;
   }
   return `👷 Привет, ${name}! Это <b>СМЕТА PRO</b> — карманный сметчик, который не уходит на перекур.\n\n` +
@@ -235,7 +252,7 @@ export function welcomeText(u: any) {
     '💰 <b>Деньги по объектам</b>: сколько получили, сколько потратили и сколько осталось вам, а не только поставщику бетона.\n' +
     '⏰ <b>Напоминания</b>: «забрать оплату», «вернуть экскаватор» — бот напомнит, даже если вы забыли, что просили.\n' +
     '👷 <b>Бригада</b>: один справочник цен на всю команду.\n\n' +
-    `🎁 Сметы — бесплатно и без ограничений${env.PRO_TRIAL_DAYS > 0 ? `, плюс ${env.PRO_TRIAL_DAYS} ${env.PRO_TRIAL_DAYS % 10 === 1 && env.PRO_TRIAL_DAYS % 100 !== 11 ? 'день' : [2, 3, 4].includes(env.PRO_TRIAL_DAYS % 10) && ![12, 13, 14].includes(env.PRO_TRIAL_DAYS % 100) ? 'дня' : 'дней'} полного тарифа «Про»: пробуйте всё, пока чай не остыл` : ''}.\n\n` +
+    `🎁 <b>${env.PRO_TRIAL_DAYS} дней — всё бесплатно</b>: сметы, PDF с вашим логотипом, договор, акты и учёт денег. Потом 3 сметы в месяц остаются бесплатными, а «Лайт» — от ${PRICES.liteFirst} ₽ за первый месяц.\n\n` +
     'Жмите кнопку ниже 👇';
 }
 
@@ -247,8 +264,8 @@ export const BOT_DESCRIPTION =
   '🧊 3D навесов, заборов и плана участка — заказчик крутит пальцем\n' +
   '💰 Прибыль по каждому объекту, а не «вроде что-то заработали»\n' +
   '⏰ Напоминания про оплату, бетон и технику\n\n' +
-  '🎁 Сметы — бесплатно и без ограничений. Нажмите «Старт» — Excel не обидится.';
-export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказчика и прибыль по объектам. Сметы — бесплатно.';
+  '🎁 14 дней — всё бесплатно, без карты. Нажмите «Старт» — Excel не обидится.';
+export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказчика и прибыль по объектам. 14 дней — бесплатно.';
 
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);

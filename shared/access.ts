@@ -8,9 +8,15 @@
 export const FREE_ESTIMATES = 3;
 /** Стартовый период (набор аудитории): сметы бесплатно без ограничений — с пометкой «Сделано в СМЕТА PRO».
  *  Вернуть лимит — поставить false. */
-export const FREE_UNLIMITED = true;
-/** Лимит смет в месяц, который реально действует сейчас */
-export const FREE_PER_MONTH = FREE_UNLIMITED ? 100000 : FREE_ESTIMATES;
+export const FREE_UNLIMITED = false;
+/** С этого момента бесплатно — FREE_ESTIMATES смет в месяц. Кто пришёл раньше (им обещали «без ограничений»),
+ *  остаётся без лимита, и все сметы, созданные до этой даты, редактируются навсегда. */
+export const FREE_LIMIT_SINCE = '2026-10-18T13:00:00+03:00';
+export const UNLIMITED = 100000;
+/** Лимит смет в месяц для человека: старожилам — без ограничений */
+export const freeLimitFor = (createdAt: Date | string) => (FREE_UNLIMITED || new Date(createdAt) < new Date(FREE_LIMIT_SINCE) ? UNLIMITED : FREE_ESTIMATES);
+/** Лимит для новых пользователей (тексты) */
+export const FREE_PER_MONTH = FREE_UNLIMITED ? UNLIMITED : FREE_ESTIMATES;
 
 /**
  * Бесплатные сметы: первые FREE_ESTIMATES каждого месяца + купленные раньше пакеты (сверх месячных, по порядку).
@@ -24,6 +30,7 @@ export function freeAllowance(list: { id: string; createdAt: Date | string; paid
   let packUsed = 0;
   for (const e of sorted) {
     if (e.paidAt) { freeIds.push(e.id); packIds.push(e.id); continue; } // оплачена отдельно — в лимит не входит
+    if (new Date(e.createdAt) < new Date(FREE_LIMIT_SINCE)) { freeIds.push(e.id); continue; } // из безлимитного периода — навсегда
     const m = monthOf(new Date(e.createdAt));
     perMonth[m] = (perMonth[m] || 0) + 1;
     if (perMonth[m] <= perMonthLimit) freeIds.push(e.id);
@@ -56,3 +63,10 @@ export function freeWriteAllowed(method: string, url: string, ctx: FreeCtx): boo
 
 /** Нужен ли запрос к базе, чтобы решить (экономим запросы для прочих маршрутов) */
 export const needsEstimateCtx = (url: string) => url === '/api/estimates' || url.startsWith('/api/estimates/');
+
+/** Только с «Про»: объекты и деньги (запись), акты, договор, Excel. «Лайт» — сметы для заказчика. */
+const PRO_ONLY_WRITE = [/^\/api\/projects(\/|$)/, /^\/api\/ops(\/|$)/, /^\/api\/estimates\/[^/]+\/acts$/, /^\/api\/acts\//, /^\/api\/estimates\/[^/]+\/file\/(act|contract|xlsx|xlsxown)\/send$/];
+const PRO_ONLY_READ = [/^\/api\/estimates\/[^/]+\/file\/(act|contract|xlsx|xlsxown)\/link$/, /^\/api\/projects\/[^/]+\/xlsx\/link$/, /^\/api\/acts\/[^/]+\/link\//];
+export function proOnly(method: string, url: string) {
+  return (method === 'GET' ? PRO_ONLY_READ : PRO_ONLY_WRITE).some((r) => r.test(url));
+}

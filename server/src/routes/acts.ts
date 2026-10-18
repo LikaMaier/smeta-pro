@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma, plain, notFound, audit, num, HttpError, accessOf } from '../util';
+import { prisma, plain, notFound, audit, num, HttpError, accessOf, docsOk, needDocs } from '../util';
 import { loadEstimate, estimateTotals, estimateNumber } from './estimates';
 import { pdfData, renderPdf, renderKs, signedPath, checkSig, fileName } from '../pdf';
 import { progress, buildAct, lineKey, priceFactor, ActItem } from '../../../shared/acts';
@@ -22,7 +22,7 @@ function estimateRows(e: any) {
 }
 
 const paidOnly = (user: any) => {
-  if (!accessOf(user).active) throw new HttpError(402, 'Акты, КС-2 и КС-3 доступны по подписке.', 'subscription_required');
+  needDocs(user);
 };
 
 async function actsOf(estimateId: string) {
@@ -169,7 +169,7 @@ export async function actRoutes(app: FastifyInstance, opts: { bot?: any } = {}) 
     if (!FORMS.includes(form) || !checkSig(`act-${form}`, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте документ из приложения заново' });
     const a = await prisma.workAct.findFirst({ where: { id, deletedAt: null }, include: { user: true } });
     if (!a) return reply.status(404).send({ error: 'Акт не найден' });
-    if (!accessOf(a.user).active) return reply.status(402).send({ error: 'Доступно по подписке' });
+    if (!docsOk(a.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });
     const f = await render(a, a.user, form);
     return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(f.name)}`).send(f.buf);
   });

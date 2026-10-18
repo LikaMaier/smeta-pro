@@ -7,8 +7,8 @@ import { TIERS, PRICES, convertDays, teamMonthRub, TEAM_BASE_RUB, teamSeatHolder
 import { priceFor } from './promo';
 
 /**
- * Тарифы: Про / Бригада на 3, 5 или 10 человек (месяц и год −30%) и разовый эскизный проект 3D.
- * «Лайт» и «10 смет» больше не продаются (старые оплаты и подписки сохраняются).
+ * Тарифы: Лайт / Про / Бригада на 3, 5 или 10 человек (месяц и год −30%) и разовый 3D-проект для заказчика.
+ * «10 смет» больше не продаётся (старые оплаты сохраняются).
  * Оплата цифровых услуг внутри Telegram — Telegram Stars; картой и СБП — через ЮKassa.
  * 1 звезда ≈ 2,46 ₽ для пользователя, звёзды округлены (выплата Telegram за звезду меньше — выгоднее ЮKassa).
  * Цены синхронизируются с базой при каждом запуске; старые тарифы отключаются (оплаты по ним сохраняются).
@@ -19,6 +19,8 @@ const P = (code: string, title: string, tier: string, months: number, rubPrice: 
   ({ code, title, tier, months, rubPrice, starsPrice: toStars(rubPrice), aiLimit: extra.aiLimit ?? 0, sort, active: true, estimates: extra.estimates ?? 0, designs: extra.designs ?? 0, seats: extra.seats ?? 0 });
 const year = (m: number) => Math.round((m * 12 * 0.7) / 10) * 10; // год — −30%
 export const DEFAULT_PLANS = [
+  P('lite_m', 'Лайт на 1 месяц', 'lite', 1, PRICES.lite, 1),
+  P('lite_y', 'Лайт на 12 месяцев (−30%)', 'lite', 12, PRICES.liteYear, 2),
   P('pro_m', 'Про на 1 месяц', 'pro', 1, PRICES.pro, 3, { aiLimit: 300 }),
   P('pro_y', 'Про на 12 месяцев (−30%)', 'pro', 12, PRICES.proYear, 4, { aiLimit: 300 }),
   ...[3, 5, 10].flatMap((n, i) => [
@@ -35,7 +37,7 @@ export const DEFAULT_PLANS = [
 /** Разовые покупки и «3D-Студия» — не подписка «Про»/«Бригада» (для первой скидки и промокодов) */
 export const NOT_SUB = ['est1', 'est10', 'design1', 'studio_m'];
 /** Цена месяца уровня — для пересчёта остатка при смене тарифа (Бригада — по числу мест) */
-export const TIER_MONTH_RUB: Record<string, number> = { lite: 390, pro: PRICES.pro, team: TEAM_BASE_RUB };
+export const TIER_MONTH_RUB: Record<string, number> = { lite: PRICES.lite, pro: PRICES.pro, team: TEAM_BASE_RUB };
 const monthRub = (tier: string, seats?: number | null) => (tier === 'team' ? teamMonthRub(seats && seats > 0 ? seats : 5) : TIER_MONTH_RUB[tier] || PRICES.pro);
 
 export async function seedPlans() {
@@ -127,9 +129,9 @@ async function overspendHint(userId: string) {
   const since = new Date(`${monthKey()}-01T00:00:00+03:00`);
   const pays = await prisma.payment.findMany({ where: { userId, createdAt: { gte: since }, planCode: { in: ['est1', 'est10', 'design1'] }, status: 'paid' }, select: { amountRub: true, stars: true } });
   const spent = pays.reduce((a, p) => a + (p.amountRub || Math.round(p.stars * STAR_RUB)), 0);
-  if (spent < PRICES.pro) return '';
+  if (spent < PRICES.lite) return '';
   const first = (await prisma.payment.count({ where: { userId, planCode: { notIn: NOT_SUB } } })) === 0;
-  return `\n\n💡 В этом месяце вы потратили на разовые покупки ${spent} ₽. «Про» стоит ${PRICES.pro} ₽ в месяц${first ? ` (первый месяц — ${PRICES.proFirst} ₽)` : ''}: сметы без ограничений и 3D-проекты дешевле.`;
+  return `\n\n💡 В этом месяце вы потратили на разовые покупки ${spent} ₽. «Лайт» стоит ${PRICES.lite} ₽ в месяц${first ? ` (первый месяц — ${PRICES.liteFirst} ₽)` : ''}: все сметы без пометки и с вашим логотипом.`;
 }
 
 /** «Приведи друга»: за первую оплату приглашённого пригласившему +1 месяц (один раз на друга) */

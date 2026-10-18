@@ -20,7 +20,13 @@ export default function NewEstimate() {
   const nav = useNavigate();
   const toast = useToast();
   const { me } = useMe();
-  const [dirId, setDirId] = useState<string | null>(() => (new URLSearchParams(location.search).get('pick') ? null : readDir()));
+  // ?dir=roof — из бота («Чем занимаетесь?»): сразу нужное направление
+  const [dirId, setDirId] = useState<string | null>(() => {
+    const sp = new URLSearchParams(location.search);
+    const d = sp.get('dir');
+    if (d && getDirection(d)) { try { localStorage.setItem(DIR_KEY, d); } catch { /* */ } return d; }
+    return sp.get('pick') ? null : readDir();
+  });
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
   const dir = getDirection(dirId);

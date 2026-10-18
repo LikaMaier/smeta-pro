@@ -109,7 +109,7 @@ function Paywall() {
   const [design, setDesign] = useState<null | { msg: string; target?: string }>(null);
   const nav = useNavigate();
   useEffect(() => onApiError((e) => {
-    if (e.code === 'subscription_required') setOpen('');
+    if (e.code === 'subscription_required') setOpen(e.message || '');
     if (e.code === 'plan_required') setOpen(e.message || '');
     if (e.code === 'design_required') setDesign({ msg: e.message, target: e.target });
   }), []);
@@ -117,7 +117,7 @@ function Paywall() {
     <>
       <Sheet open={open !== false} onClose={() => setOpen(false)} title={open ? 'Нужен тариф выше' : 'Нужна подписка'}>
         <div className="stack">
-          <p style={{ margin: 0 }}>{open || `Бесплатно — сметы без ограничений, справочник, мастера, 3D-конструктор, календарь и напоминания. Ваш логотип вместо пометки, объекты и деньги, договоры и акты — в тарифе «Про» за ${PRICES.pro} ₽ в месяц (первый месяц — ${PRICES.proFirst} ₽).`}</p>
+          <p style={{ margin: 0 }}>{open || `Бесплатно — 3 сметы в месяц с пометкой. «Лайт» — сметы без ограничений и с вашим логотипом: ${PRICES.lite} ₽ в месяц (первый — ${PRICES.liteFirst} ₽). «Про» — плюс договор, акты, объекты и учёт денег: ${PRICES.pro} ₽ (первый — ${PRICES.proFirst} ₽).`}</p>
           <p className="small muted" style={{ margin: 0 }}>Все ваши данные сохранены и доступны для просмотра.</p>
           <button className="btn primary block lg" onClick={() => { setOpen(false); nav('/settings'); }}>Выбрать тариф</button>
         </div>
@@ -127,7 +127,7 @@ function Paywall() {
           <div className="stack">
             <p className="small" style={{ margin: 0 }}>Чистый PDF без водяного знака и 3D-ссылка, которую заказчик крутит пальцем. {design.target ? 'Покупка сразу применится к этому проекту.' : 'Сохраните проект — и покупка применится к нему.'}</p>
             <Offers target={design.target} onPaid={() => setDesign(null)} items={[
-              { code: 'design1', title: '🧊 Этот 3D-проект', text: 'PDF и 3D-ссылка для одного объекта — сколько угодно раз. Включите в смету: обычно 3–5 тыс. ₽.', best: true },
+              { code: 'design1', title: '🧊 Этот 3D-проект', text: `PDF и 3D-ссылка для одного объекта — сколько угодно раз. Первый проект — ${PRICES.designFirst} ₽. Включите в смету: обычно 3–5 тыс. ₽.`, best: true },
               { code: 'studio_m', title: '🎨 «3D-Студия» на месяц', text: 'Все 3D-проекты и 3D-ссылки для заказчиков без ограничений — выгодно, если объектов больше двух.' },
             ]} />
           </div>

@@ -1,4 +1,4 @@
-import { freeAllowance, FREE_PER_MONTH } from '../../shared/access';
+import { freeAllowance, FREE_PER_MONTH, FREE_ESTIMATES, freeLimitFor } from '../../shared/access';
 import { TIERS, can, FEATURE_MSG, monthKey, type Tier, type Feature } from '../../shared/plans';
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { FastifyReply } from 'fastify';
@@ -74,6 +74,11 @@ export function accessOf(u: AccessUser) {
   };
 }
 
+/** Договор, акты, КС, Excel — с «Про» (пробный период — тоже «Про») */
+export const docsOk = (u: AccessUser) => can(accessOf(u).tier, 'docs');
+const DOCS_MSG = FEATURE_MSG.docs;
+export const needDocs = (u: AccessUser) => { if (!docsOk(u)) throw new HttpError(402, DOCS_MSG, 'plan_required'); };
+
 /** Проверка возможности тарифа: 402 с понятным текстом, если уровень ниже */
 export function requireFeature(u: AccessUser, f: Feature) {
   if (!can(accessOf(u).tier, f)) throw new HttpError(402, FEATURE_MSG[f], 'plan_required');
@@ -94,10 +99,10 @@ export async function useAi(u: AccessUser & { id: string }, n = 1) {
 /** Данные для бесплатного режима: сметы в месяц (сейчас без лимита — FREE_PER_MONTH) + купленные раньше пакеты.
  *  estimateCount — создано в этом месяце, limit — сколько можно всего в этом месяце (estimateCount + остаток). */
 export async function freeCtx(userId: string, _extra?: number) {
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { extraEstimates: true, extraUntil: true } });
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { extraEstimates: true, extraUntil: true, createdAt: true } });
   // купленные сметы действуют до extraUntil (пакет — полгода); старые покупки без срока — бессрочно
   const more = u && (!u.extraUntil || u.extraUntil > new Date()) ? u.extraEstimates : 0;
   const list = await prisma.estimate.findMany({ where: { userId, isTemplate: false }, select: { id: true, createdAt: true, paidAt: true } }); // удалённые тоже считаются
-  const a = freeAllowance(list, Math.max(0, more), monthKey(), (d) => monthKey(d), FREE_PER_MONTH);
+  const a = freeAllowance(list, Math.max(0, more), monthKey(), (d) => monthKey(d), u ? freeLimitFor(u.createdAt) : FREE_ESTIMATES);
   return { estimateCount: a.thisMonth, freeEstimateIds: a.freeIds, paidEstimateIds: a.packIds, limit: a.thisMonth + a.left };
 }

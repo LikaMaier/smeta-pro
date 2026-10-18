@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { z } from 'zod';
 import { env } from '../env';
 import { prisma, plain, audit, accessOf, HttpError } from '../util';
-import { can } from '../../../shared/plans';
+import { can, PRICES } from '../../../shared/plans';
 import { loadEstimate, estimateTotals, estimateNumber, estimatePaid, docData } from './estimates';
 import { pdfData, renderPdf, fileName } from '../pdf';
 import { brandPath } from '../brand';
@@ -115,7 +115,16 @@ export async function shareRoutes(app: FastifyInstance, opts: { bot?: any } = {}
     });
     if (claimed.count) {
       await audit(e.userId, 'estimate', e.id, 'customer_approved', { name });
-      await notify(opts.bot, e, `✅ <b>Заказчик согласовал смету</b> «${esc(e.title)}» на ${money(estimateTotals(e).total)}${name ? `\nКто: ${esc(name)}` : ''}\n\nСледующий шаг — договор подряда: откройте смету и нажмите «Договор».`);
+      const total = estimateTotals(e).total;
+      const acc = accessOf(e.user);
+      // момент, когда приложение принесло заказ, — честное место предложить тариф
+      const pctOf = (p: number) => (total > 0 ? String(Math.max(0.01, Math.round((p / total) * 10000) / 100)).replace('.', ',') : '');
+      const offer = acc.mode === 'trial'
+        ? `\n\nСледующий шаг — договор подряда: откройте смету и нажмите «Договор» (в пробном периоде он уже доступен). После пробного договор и акты — в «Про»: ${PRICES.pro} ₽ в месяц${total > 0 ? ` — это ${pctOf(PRICES.pro)}% от этого заказа` : ''}, первый месяц ${PRICES.proFirst} ₽.`
+        : !can(acc.tier, 'docs')
+          ? `\n\nСледующий шаг — договор подряда и акты. Они в тарифе «Про»: ${PRICES.pro} ₽ в месяц${total > 0 ? ` — это <b>${pctOf(PRICES.pro)}% от этого заказа</b>` : ''}. Первый месяц — ${PRICES.proFirst} ₽.`
+          : '\n\nСледующий шаг — договор подряда: откройте смету и нажмите «Договор».';
+      await notify(opts.bot, e, `✅ <b>Заказчик согласовал смету</b> «${esc(e.title)}» на ${money(total)}${name ? `\nКто: ${esc(name)}` : ''}${offer}`);
     }
     return { ok: true, approvedAt: now };
   });
