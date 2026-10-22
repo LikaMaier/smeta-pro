@@ -64,6 +64,10 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [restore, setRestore] = useState<any>(null);
   const [savedTpl, setSavedTpl] = useState(false);
   const [docKind, setDocKind] = useState<null | 'invoice' | 'aosr'>(null);
+  // Простой вид: позиции, итог и «Отправить заказчику». Всё остальное — по кнопке «Все возможности».
+  // Новичкам (до 3 смет) — простой по умолчанию; выбор запоминается.
+  const [simple, setSimpleState] = useState<boolean>(() => { try { const v = localStorage.getItem('smeta_simple'); if (v) return v === '1'; } catch { /* */ } return (me.access.estimateCount ?? 0) <= 3; });
+  const setSimple = (v: boolean) => { setSimpleState(v); try { localStorage.setItem('smeta_simple', v ? '1' : '0'); } catch { /* */ } };
   const saving = useRef(false);
   // из «Новой сметы → Другое»: сразу поиск по справочнику
   useEffect(() => { if (new URLSearchParams(location.search).get('add') === '1' && !initial.lines.length) setSheet('add'); }, []); // eslint-disable-line
@@ -296,7 +300,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
         <Icon.chevron className="chev" width={20} />
       </button>
-      {lines.length > 0 && (
+      {!simple && lines.length > 0 && (
         <div className="grid2 quick-acts">
           <button className="btn sm" disabled={pdfBusy} onClick={() => sendPdf()}>📄 {pdfBusy ? 'Готовлю…' : 'PDF клиенту'}</button>
           <button className="btn sm" onClick={() => setSheet('head')}>📁 {initial.project ? 'Объект' : 'В объект'}</button>
@@ -306,7 +310,10 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <div className="row between" style={{ marginBottom: 8 }}>
         <span className="xs muted">{readOnly ? 'Только просмотр' : saveState === 'saving' ? 'Сохраняю…' : saveState === 'error' ? 'Не сохранено' : dirty ? 'Есть изменения' : 'Сохранено'}</span>
         <div className="row">
-          <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По разделам</button>
+          {simple ? <button className="chip" onClick={() => setSimple(false)}>Все возможности</button> : <>
+            <button className="chip" onClick={() => setSimple(true)}>Простой вид</button>
+            <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По разделам</button>
+          </>}
           <button className="icon-btn" aria-label="Действия" onClick={() => setSheet('more')}><Icon.more /></button>
         </div>
       </div>
@@ -381,19 +388,19 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
       )}
       <datalist id="own-items">{(cat.data || []).slice(0, 400).map((i: any) => <option key={i.id} value={i.name}>{`${i.price} ₽/${i.unit}`}</option>)}</datalist>
-      {!readOnly && fresh.length > 0 && (
+      {!simple && !readOnly && fresh.length > 0 && (
         <button className="btn block save-prices" style={{ marginTop: 8 }} onClick={() => { setSkip(new Set(fresh.filter((x) => /Примерная цена/.test(x.l.note)).map((x) => x.l.k))); setSheet('prices'); }}>
           💾 Запомнить мои расценки · {fresh.length}<small>новые и изменённые цены → в справочник, для следующих смет</small>
         </button>
       )}
-      {!readOnly && initial.source === 'template' && !initial.isTemplate && !savedTpl && (
+      {!simple && !readOnly && initial.source === 'template' && !initial.isTemplate && !savedTpl && (
         <div className="panel" style={{ marginTop: 12 }}>
           <b>📋 Смета из готового шаблона</b>
           <div className="xs muted" style={{ margin: '4px 0 8px' }}>Поправьте количество и цены под себя — и сохраните как свой шаблон: в следующий раз такая смета будет готова за 10 секунд, с вашими ценами.</div>
           <button className="btn sm block" onClick={() => action(async () => { await post(`/estimates/${initial.id}/save-as-template`, {}); setSavedTpl(true); }, 'Сохранено в «Мои шаблоны» — они в «Новой смете»')}>💾 Сохранить как мой шаблон</button>
         </div>
       )}
-      {!readOnly && (
+      {!simple && !readOnly && (
         <div className="grid2" style={{ marginTop: 8 }}>
           <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/masters'); }}>👷 Посчитать мастером</button>
           <button className="btn sm" onClick={async () => { if (dirty) await save(); nav('/tools'); }}>📐 3D-проект</button>
@@ -405,6 +412,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <div className="dim"><div className="dim-value num">{rub(totals.total)}</div><div className="dim-label">Итого заказчику · работы {rub(totals.worksSubtotal)} · материалы {rub(totals.materialsSubtotal)}</div></div>
         {totals.optionalTotal > 0 && <div className="xs muted" style={{ marginTop: 4 }}>+ по желанию заказчика {rub(totals.optionalTotal)} — не входит в итог</div>}
         {h.showVariants && variants && <div className="xs" style={{ marginTop: 4 }}>Варианты: эконом {rub(variants.eco)} · стандарт {rub(variants.std)} · премиум {rub(variants.prem)}</div>}
+        {!simple && <>
         <Fold id="est-total" title="Как получилась сумма" summary={[totals.markup > 0 && 'наценка', totals.discount > 0 && 'скидка', totals.tax > 0 && 'налог'].filter(Boolean).join(', ') || 'без наценок'}>
         <table className="breakdown">
           <tbody>
@@ -423,15 +431,16 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </table>
         </Fold>
         <button className="btn block" style={{ marginTop: 4 }} onClick={() => setSheet('params')} disabled={readOnly}>Скидка, наценка, налог, доставка</button>
+        </>}
       </div>
 
-      <button className="list-item panel" style={{ marginTop: 12 }} onClick={() => setSheet('pay')}>
+      {!simple && <button className="list-item panel" style={{ marginTop: 12 }} onClick={() => setSheet('pay')}>
         <div className="grow">
           <div className="title">График оплаты</div>
           <div className="xs muted">{h.paySchedule.length ? payStages(totals.total, h.paySchedule.map((x) => ({ title: x.title, pct: parseNum(x.pct) }))).map((x) => `${x.pct}% — ${rub(x.amount)}`).join(' · ') : 'Не задан — например, 50% аванс, 30% материал, 20% по окончании'}</div>
         </div>
         <Icon.chevron className="chev" width={20} />
-      </button>
+      </button>}
       {issues.length > 0 && <button className="xs" style={{ background: 'none', border: 0, padding: '8px 0 0', color: issues.some((i) => i.level === 'error') ? 'var(--bad)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={() => { setPending(null); setSheet('check'); }}>⚠️ Проверка сметы: замечаний {issues.length} — посмотреть</button>}
 
       {!readOnly && !me.access.active && !initial.paidAt && !(me.access.paidEstimateIds || []).includes(initial.id) && (
@@ -440,6 +449,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <div className="xs">Убрать и поставить ваш логотип — {PRICES.estimate} ₽ за эту смету или «Лайт» от {PRICES.liteFirst} ₽ в первый месяц →</div>
         </button>
       )}
+      {simple && <h2 className="section-title">Отправить заказчику</h2>}
       <div className="grid2" style={{ marginTop: 12 }}>
         <button className="btn primary" disabled={pdfBusy} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 PDF в Telegram'}</button>
         <button className="btn" disabled={pdfBusy} onClick={() => guard(openPdf)}>Открыть PDF</button>
@@ -451,7 +461,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           {share.customerComment && /💬/.test(share.customerComment) ? ' · есть вопросы' : ''}
         </button>
       )}
-      <Fold id="est-docs" title="📝 Договор, акт, Excel" summary="для заказчика">
+      {!simple && <Fold id="est-docs" title="📝 Договор, акт, Excel" summary="для заказчика">
         <div className="grid3">
           <button className="btn" disabled={pdfBusy} onClick={() => setSheet('contract')}>📝 Договор</button>
           <button className="btn" disabled={pdfBusy} onClick={() => sendFile('act')}>🧾 Акт</button>
@@ -464,12 +474,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
         <button className="btn block" style={{ marginTop: 8 }} onClick={() => nav(`/estimates/${initial.id}/acts`)}>📑 Акты по частям, КС-2 и КС-3</button>
         <p className="xs muted" style={{ marginBottom: 0 }}>В документах только то, что видит заказчик: без закупочных цен и вашей прибыли. Логотип, подпись и реквизиты — в Настройках.{!['pro', 'team'].includes(me.access.tier || '') && ' Договор, акты, КС и счёт — в тарифе «Про».'}</p>
-      </Fold>
+      </Fold>}
       <Sheet open={!!docKind} onClose={() => setDocKind(null)} title={docKind === 'invoice' ? 'Счёт на оплату' : 'Акт освидетельствования скрытых работ'}>
         {docKind && <DocForm kind={docKind} id={initial.id} lines={lines} schedule={h.paySchedule} total={totals.total} hasReq={Boolean(me.requisites?.inn && me.requisites?.rs)} save={async () => { if (dirty) await save(); }} onDone={() => setDocKind(null)} />}
       </Sheet>
 
-      <Fold id="est-own" title="🔒 Для себя: прибыль" summary={<span className={totals.plannedProfit < 0 ? 'neg' : ''}>{rub(totals.plannedProfit)}</span>}>
+      {!simple && <Fold id="est-own" title="🔒 Для себя: прибыль" summary={<span className={totals.plannedProfit < 0 ? 'neg' : ''}>{rub(totals.plannedProfit)}</span>}>
         <table className="breakdown"><tbody>
           <tr><td>Себестоимость (прямые затраты)</td><td>{rub(totals.directCost)}</td></tr>
           <tr><td>Выручка без налога</td><td>{rub(totals.revenueExTax)}</td></tr>
@@ -478,7 +488,14 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </tbody></table>
         {totals.linesWithoutCost > 0 && <p className="xs muted" style={{ marginBottom: 0 }}>У {totals.linesWithoutCost} поз. не указана закупочная цена — они не входят в себестоимость, прибыль может быть завышена.</p>}
         <button className="btn block" style={{ marginTop: 12 }} disabled={pdfBusy} onClick={() => sendFile('xlsxown')}>📊 Excel для себя (с прибылью)</button>
-      </Fold>
+      </Fold>}
+      {simple && (
+        <button className="list-item panel" style={{ marginTop: 14 }} onClick={() => setSimple(false)}>
+          <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">⚙️</span>
+          <div className="grow"><div className="title">Все возможности</div><div className="xs muted">скидки и наценка, график оплаты, договор, акты и КС, прибыль, шаблоны</div></div>
+          <Icon.chevron className="chev" width={20} />
+        </button>
+      )}
 
       <div className="totalbar"><div className="in">
         <div className="grow"><div className="xs muted">Итого</div><div className="sum num">{rub(totals.total)}</div></div>

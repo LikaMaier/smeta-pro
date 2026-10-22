@@ -7,12 +7,13 @@ import { rub0 } from '../format';
 import { DIRECTIONS, getDirection, searchKinds, type WorkKind } from '../../../shared/directions';
 import { TEMPLATES, TEMPLATE_GROUPS } from '../../../shared/templates';
 import { ImportButton } from './Estimates';
+import QuickEstimate from '../components/QuickEstimate';
 
 const DIR_KEY = 'smeta_dir';
 const readDir = () => { try { return localStorage.getItem(DIR_KEY); } catch { return null; } };
 
 /**
- * «Новая смета» в два шага: направление → вид работы.
+ * «Новая смета»: сверху — «Опишите работу» (текст → готовые строки), ниже — направление → вид работы.
  * Направление запоминается: в следующий раз сразу виды работ, сменить — одной кнопкой.
  * «Другое» — пустая смета с поиском по справочнику и своими строками.
  */
@@ -56,7 +57,9 @@ export default function NewEstimate() {
   if (!dir) {
     return (
       <>
-        <p className="muted" style={{ marginTop: 0 }}>Чем занимаетесь? Выберите направление — дальше вид работы и готовая смета с ценами.</p>
+        <QuickEstimate onBusy={setBusy} />
+        <div className="home-sec" style={{ margin: '18px 0 6px' }}>Или выберите направление</div>
+        <p className="xs muted" style={{ marginTop: 0 }}>Дальше вид работы, 2–3 вопроса — и готовая смета с ценами.</p>
         <SearchBox value={q} onChange={setQ} placeholder="Или найдите: септик, стяжка, кровля…" />
         {qs.length >= 2 && (
           <div className="list" style={{ marginBottom: 12 }}>
@@ -99,7 +102,10 @@ export default function NewEstimate() {
   // ---------- шаг 2: вид работы ----------
   return (
     <>
-      <button className="linklike small" onClick={() => choose(null)} style={{ marginBottom: 6 }}>← Все направления</button>
+      <div className="row between" style={{ marginBottom: 6 }}>
+        <button className="linklike small" onClick={() => choose(null)}>← Все направления</button>
+        <button className="linklike small" onClick={() => choose(null)}>✍️ Описать словами</button>
+      </div>
       <div className="dir-head"><span aria-hidden="true">{dir.icon}</span>{dir.title}</div>
       <p className="muted" style={{ marginTop: 0 }}>Что делаем? Ответьте на 2–3 вопроса — работы и материалы посчитаются сами, материалы можно взять эконом, стандарт или премиум.</p>
       <div className="list">

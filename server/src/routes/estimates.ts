@@ -92,7 +92,7 @@ async function cloneEstimate(userId: string, src: any, overrides: any) {
 }
 
 /** Цены для строк шаблона: свой справочник → примерные цены на работы → 0 (заполнить вручную) */
-async function priceTemplateLines(userId: string, lines: { name: string; qty: number; unit: string; type: string; category: string; price?: number; composition?: string; note?: string }[]) {
+async function priceTemplateLines(userId: string, lines: { name: string; qty: number; unit: string; type: string; category: string; price?: number; composition?: string; note?: string }[], qtyKnown = false) {
   const items = await prisma.catalogItem.findMany({ where: { userId, deletedAt: null, active: true } });
   const byName = new Map(items.map((i) => [i.name.toLowerCase(), i]));
   const starter = new Map(STARTER_PRICES.map((p) => [p.name.toLowerCase(), p]));
@@ -105,7 +105,7 @@ async function priceTemplateLines(userId: string, lines: { name: string; qty: nu
       price: own ? own.price : st ? st.price : l.price ?? 0, costPrice: own?.costPrice ?? null, catalogItemId: own?.id ?? null,
       matPrice: Number((own?.params as any)?.matPrice) > 0 ? Number((own?.params as any).matPrice) : null,
       composition: own?.description || l.composition || compositionFor(l.name)?.join('\n') || null,
-      note: note ? `${note}; количество типовое — уточните` : 'Количество типовое — уточните', unconfirmed: true,
+      note: qtyKnown ? note : note ? `${note}; количество типовое — уточните` : 'Количество типовое — уточните', unconfirmed: qtyKnown ? Boolean(note) : true,
     };
   });
 }
@@ -253,7 +253,11 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
   });
 
   app.post('/api/estimates', async (req) => {
-    const body = headerSchema.partial({ title: true }).extend({ fromId: z.string().optional(), templateId: z.string().optional() }).parse(req.body);
+    const body = headerSchema.partial({ title: true }).extend({
+      fromId: z.string().optional(), templateId: z.string().optional(),
+      // «Быстрая смета»: строки из описания работ — цены свои из справочника, иначе примерные
+      quick: z.array(z.object({ name: z.string().trim().min(1).max(300), qty: nonneg.max(1e9), unit: z.string().trim().min(1).max(30), category: z.string().max(100).nullable().optional() })).max(300).optional(),
+    }).parse(req.body);
     await checkProject(req.user.id, body.projectId);
     if (body.templateId) {
       const tpl = getTemplate(body.templateId);
@@ -266,6 +270,18 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
         include: { lines: { orderBy: { position: 'asc' } } },
       });
       await audit(req.user.id, 'estimate', e.id, 'create', { template: tpl.id });
+      return view(e);
+    }
+    if (body.quick?.length) {
+      const typeOf = (c?: string | null) => (c === 'Аренда техники' ? 'equipment' : c === 'Доставка' ? 'service' : 'work');
+      const e = await prisma.estimate.create({
+        data: {
+          userId: req.user.id, title: body.title || 'Новая смета', source: 'quick', projectId: body.projectId || null, customer: body.customer || null,
+          lines: { create: await priceTemplateLines(req.user.id, body.quick.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, type: typeOf(l.category), category: l.category || '' })), true) },
+        },
+        include: { lines: { orderBy: { position: 'asc' } } },
+      });
+      await audit(req.user.id, 'estimate', e.id, 'create', { quick: body.quick.length });
       return view(e);
     }
     if (body.fromId) {

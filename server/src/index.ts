@@ -12,6 +12,7 @@ import { startThreads } from './threads';
 import { notifyAiWishers } from './routes/ai';
 import { COMPOSITIONS, compositionFor } from '../../shared/compositions';
 import { STARTER_PRICES } from '../../shared/starterPrices';
+import { STARTER_PREV_PRICES } from '../../shared/starterPricesPrev';
 
 /** Новые позиции стартового справочника — тем, кто им пользуется (по названию, без дублей) */
 async function backfillStarter() {
@@ -31,6 +32,24 @@ async function backfillStarter() {
   }
 }
 
+/** Справочник перешёл на цены СПб: обновить примерные цены, которые пользователь не менял (один раз) */
+async function backfillStarterPrices() {
+  const KEY = 'migr:starter-spb-2026-10';
+  if (await prisma.appKV.findUnique({ where: { key: KEY } })) return;
+  let n = 0;
+  for (const p of STARTER_PRICES) {
+    const prev = STARTER_PREV_PRICES[p.name];
+    if (prev == null || prev === p.price) continue;
+    const r = await prisma.catalogItem.updateMany({
+      where: { name: p.name, price: prev, deletedAt: null, notes: { startsWith: 'Примерная цена' } },
+      data: { price: p.price, priceUpdatedAt: new Date() },
+    });
+    n += r.count;
+  }
+  await prisma.appKV.create({ data: { key: KEY, value: String(n) } });
+  console.log(`Справочник: цены СПб обновлены у ${n} непоправленных позиций`);
+}
+
 /** Стартовым позициям справочника без состава — добавить типовой «в составе» (свои позиции не трогаем) */
 async function backfillCompositions() {
   for (const [name, list] of Object.entries(COMPOSITIONS)) {
@@ -41,7 +60,7 @@ async function backfillCompositions() {
 async function main() {
   assertEnv();
   await seedPlans();
-  backfillCompositions().then(backfillStarter).catch((e) => console.error('backfill catalog', e));
+  backfillCompositions().then(backfillStarterPrices).then(backfillStarter).catch((e) => console.error('backfill catalog', e));
   const bot = createBot();
   if (bot) await bot.init();
   const app = await buildApp({ bot });
