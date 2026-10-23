@@ -104,8 +104,9 @@ export default function NewEstimate() {
     <>
       <div className="row between" style={{ marginBottom: 6 }}>
         <button className="linklike small" onClick={() => choose(null)}>← Все направления</button>
-        <button className="linklike small" onClick={() => choose(null)}>✍️ Описать словами</button>
       </div>
+      <QuickEstimate onBusy={setBusy} />
+      <div className="home-sec" style={{ margin: '18px 0 6px' }}>Или выберите вид работы</div>
       <div className="dir-head"><span aria-hidden="true">{dir.icon}</span>{dir.title}</div>
       <p className="muted" style={{ marginTop: 0 }}>Что делаем? Ответьте на 2–3 вопроса — работы и материалы посчитаются сами, материалы можно взять эконом, стандарт или премиум.</p>
       <div className="list">

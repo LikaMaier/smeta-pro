@@ -5,6 +5,7 @@ import { useMe } from '../App';
 import { useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import Hero from '../components/Hero';
+import QuickEstimate from '../components/QuickEstimate';
 
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const MONTH_NAME = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString('ru-RU', { month: 'long' });
@@ -41,9 +42,11 @@ export default function Home() {
       <button className="tile wide home-new" onClick={() => nav(canCreate ? '/new' : '/settings')}>
         <span className="home-new-plus" aria-hidden="true">+</span>
         Новая смета
-        <small>{!me.access.active && me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'сметы бесплатно — без ограничений' : `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}`) : 'напишите, что делать, — смета соберётся сама'}</small>
+        <small>{!me.access.active && me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'сметы бесплатно — без ограничений' : `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}`) : 'готовые сметы по направлениям и шаблонам'}</small>
       </button>
 
+
+      {canCreate && <div style={{ marginTop: 10 }}><QuickEstimate /></div>}
 
       {last.length > 0 && (
         <>

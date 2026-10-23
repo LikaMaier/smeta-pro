@@ -65,8 +65,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [savedTpl, setSavedTpl] = useState(false);
   const [docKind, setDocKind] = useState<null | 'invoice' | 'aosr'>(null);
   // Простой вид: позиции, итог и «Отправить заказчику». Всё остальное — по кнопке «Все возможности».
-  // Новичкам (до 3 смет) — простой по умолчанию; выбор запоминается.
-  const [simple, setSimpleState] = useState<boolean>(() => { try { const v = localStorage.getItem('smeta_simple'); if (v) return v === '1'; } catch { /* */ } return (me.access.estimateCount ?? 0) <= 3; });
+  // По умолчанию — простой; выбор запоминается.
+  const [simple, setSimpleState] = useState<boolean>(() => { try { const v = localStorage.getItem('smeta_simple'); if (v) return v === '1'; } catch { /* */ } return true; });
   const setSimple = (v: boolean) => { setSimpleState(v); try { localStorage.setItem('smeta_simple', v ? '1' : '0'); } catch { /* */ } };
   const saving = useRef(false);
   // из «Новой сметы → Другое»: сразу поиск по справочнику

@@ -121,10 +121,13 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
   const here = path.dirname(fileURLToPath(import.meta.url));
   const dist = path.resolve(here, '../../web/dist');
   if (fs.existsSync(dist)) {
-    await app.register(fastifyStatic, { root: dist, prefix: '/' });
+    // index.html — без кэша, иначе Telegram показывает старую версию после выкладки; файлы с хэшем в имени — надолго
+    await app.register(fastifyStatic, { root: dist, prefix: '/', setHeaders: (res, file) => {
+      res.setHeader('Cache-Control', /\.html$/.test(file) ? 'no-cache, no-store, must-revalidate' : /assets\//.test(file) ? 'public, max-age=31536000, immutable' : 'public, max-age=3600');
+    } });
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) return reply.status(404).send({ error: 'Не найдено' });
-      return reply.sendFile('index.html');
+      return reply.header('Cache-Control', 'no-cache, no-store, must-revalidate').sendFile('index.html');
     });
   }
   return app;
