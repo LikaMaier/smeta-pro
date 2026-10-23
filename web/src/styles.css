@@ -505,3 +505,9 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
 .meter { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
 .meter span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
 .kpi > div { min-width: 0; }
+
+/* подсказки из справочника под строкой сметы */
+.suggest { margin: 4px 0 6px; border: 1px solid var(--line); border-radius: var(--r-m, 8px); background: var(--surface-2); overflow: hidden; }
+.suggest-item { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 9px 12px; background: none; border: 0; border-bottom: 1px solid var(--line); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.suggest-item:last-child { border-bottom: 0; }
+.suggest-item .ellipsis { min-width: 0; flex: 1; }

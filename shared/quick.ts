@@ -82,7 +82,8 @@ function score(q: string[], it: string[], ctx: string[]): number {
   }
   if (!strong) return 0;
   // главное действие позиции названо в запросе («покраска стен» → «Покраска стен…», а не «Шпаклёвка стен под покраску»)
-  if (q.some((t) => same(t, it[0]))) s += 0.35;
+  // (только когда в запросе есть и действие, и предмет: «плинтус» — это монтаж плинтуса, а не «Плинтус из плитки»)
+  if (strong >= 2 && q.some((t) => same(t, it[0]))) s += 0.35;
   for (const side of SIDE) if (it.some((x) => same(x, side)) && !q.some((t) => same(t, side))) s -= 0.8;
   // соседние фразы как контекст: «плитка …, затирка» → затирка швов плитки
   for (const c of ctx) if (it.some((x) => same(c, x))) s += 0.1;
@@ -150,7 +151,7 @@ export function parseQuick(text: string, ix: QuickIndex): QuickLine[] {
     const k = out.indexOf(l);
     const src = out.find((o) => o.given && o.match && o.match.unit === l.match!.unit && tokens(o.text).some((t) => mine.some((m) => same(m, t.replace(/^~/, '')))))
       // одно слово («затирка») — продолжение предыдущей фразы с той же единицей
-      ?? (mine.length <= 1 ? out.slice(0, k).reverse().find((o) => o.given && o.match?.unit === l.match!.unit) : undefined);
+      ?? (words(l.text).length === 1 ? out.slice(0, k).reverse().find((o) => o.given && o.match?.unit === l.match!.unit) : undefined);
     if (src) { l.qty = src.qty; l.given = true; }
   }
   return out;

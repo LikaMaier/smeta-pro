@@ -59,8 +59,7 @@ export default function NewEstimate() {
       <>
         <QuickEstimate onBusy={setBusy} />
         <div className="home-sec" style={{ margin: '18px 0 6px' }}>Или выберите направление</div>
-        <p className="xs muted" style={{ marginTop: 0 }}>Дальше вид работы, 2–3 вопроса — и готовая смета с ценами.</p>
-        <SearchBox value={q} onChange={setQ} placeholder="Или найдите: септик, стяжка, кровля…" />
+        <SearchBox value={q} onChange={setQ} placeholder="Поиск: септик, стяжка, кровля…" />
         {qs.length >= 2 && (
           <div className="list" style={{ marginBottom: 12 }}>
             {found.map(({ d, k }) => (
@@ -70,7 +69,7 @@ export default function NewEstimate() {
                 <Icon.chevron className="chev" width={18} />
               </button>
             ))}
-            {!found.length && <button className="list-item" onClick={own}><div className="grow"><div className="title">Не нашли? Составьте сами</div><div className="xs muted">Пустая смета с поиском по справочнику</div></div><Icon.chevron className="chev" width={18} /></button>}
+            {!found.length && <button className="list-item" onClick={own}><div className="grow"><div className="title">Не нашли? Составьте сами</div></div><Icon.chevron className="chev" width={18} /></button>}
           </div>
         )}
         <div className="dir-grid">
@@ -84,7 +83,7 @@ export default function NewEstimate() {
           <button className="dir-tile other" onClick={own} disabled={busy}>
             <span className="dir-ico" aria-hidden="true">✏️</span>
             <span className="dir-t">Другое</span>
-            <small>Составлю сам: свои работы и цены</small>
+            <small>своя смета</small>
           </button>
         </div>
         {last && (
@@ -108,7 +107,7 @@ export default function NewEstimate() {
       <QuickEstimate onBusy={setBusy} />
       <div className="home-sec" style={{ margin: '18px 0 6px' }}>Или выберите вид работы</div>
       <div className="dir-head"><span aria-hidden="true">{dir.icon}</span>{dir.title}</div>
-      <p className="muted" style={{ marginTop: 0 }}>Что делаем? Ответьте на 2–3 вопроса — работы и материалы посчитаются сами, материалы можно взять эконом, стандарт или премиум.</p>
+      <p className="xs muted" style={{ marginTop: 0 }}>2–3 вопроса — смета посчитается сама</p>
       <div className="list">
         {dir.kinds.map((k) => (
           <button key={k.id} className="list-item" disabled={busy} onClick={() => openKind(k)}>
@@ -119,7 +118,7 @@ export default function NewEstimate() {
         ))}
         <button className="list-item" disabled={busy} onClick={own}>
           <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">✏️</span>
-          <div className="grow"><div className="title">Другое — составлю сам</div><div className="xs muted">Пустая смета: поиск по справочнику и свои строки</div></div>
+          <div className="grow"><div className="title">Другое — составлю сам</div><div className="xs muted">пустая смета</div></div>
           <Icon.chevron className="chev" width={18} />
         </button>
       </div>
@@ -140,7 +139,7 @@ function More({ busy, create, mine }: { busy: boolean; create: (b: any, s?: stri
   const nav = useNavigate();
   return (
     <div style={{ marginTop: 14 }}>
-      <Fold id="new-more" title="Другие способы" summary="шаблоны, Excel, ИИ">
+      <Fold id="new-more" title="Шаблоны и Excel">
         {mine.length > 0 && (
           <>
             <div className="xs muted" style={{ margin: '0 0 6px' }}>Мои шаблоны</div>
@@ -149,7 +148,7 @@ function More({ busy, create, mine }: { busy: boolean; create: (b: any, s?: stri
             </div>
           </>
         )}
-        <div className="xs muted" style={{ margin: '0 0 6px' }}>Готовые сметы ({TEMPLATES.length}) — количество и цены потом поправите под объект</div>
+        <div className="xs muted" style={{ margin: '0 0 6px' }}>Готовые сметы ({TEMPLATES.length})</div>
         {TEMPLATE_GROUPS.map((g) => (
           <Fold key={g} id={`tpl-${g}`} title={g} summary={`${TEMPLATES.filter((t) => t.group === g).length}`}>
             <div className="list" style={{ marginBottom: 10 }}>

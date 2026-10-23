@@ -397,6 +397,14 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     return { ok: true };
   });
 
+  // Удалить несколько смет сразу (из списка). Восстановить можно по одной: /restore
+  app.post('/api/estimates/bulk-delete', async (req) => {
+    const { ids } = z.object({ ids: z.array(z.string()).min(1).max(500) }).parse(req.body);
+    const r = await prisma.estimate.updateMany({ where: { id: { in: ids }, userId: req.user.id, deletedAt: null }, data: { deletedAt: new Date() } });
+    await audit(req.user.id, 'estimate', ids[0], 'delete', { bulk: ids.length });
+    return { ok: true, deleted: r.count };
+  });
+
   app.post('/api/estimates/:id/restore', async (req) => {
     const { id } = req.params as any;
     const e = await prisma.estimate.findFirst({ where: { id, userId: req.user.id } });
