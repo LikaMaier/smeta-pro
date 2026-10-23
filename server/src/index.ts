@@ -13,6 +13,7 @@ import { notifyAiWishers } from './routes/ai';
 import { COMPOSITIONS, compositionFor } from '../../shared/compositions';
 import { STARTER_PRICES } from '../../shared/starterPrices';
 import { STARTER_PREV_PRICES } from '../../shared/starterPricesPrev';
+import { seedAdminEstimates } from './seedEstimates';
 
 /** Новые позиции стартового справочника — тем, кто им пользуется (по названию, без дублей) */
 async function backfillStarter() {
@@ -68,6 +69,7 @@ async function main() {
   if (bot) {
     // Ошибка настройки бота не должна ронять приложение
     setupBot(bot).catch((e) => app.log.error({ err: e }, 'Не удалось настроить бота'));
+    seedAdminEstimates(bot).catch((e) => app.log.error({ err: e }, 'Готовые сметы администратору'));
     startReminderLoop(bot, app.log, env.PUBLIC_URL);
     startAdminReports(bot, app.log);
     startFunnel(bot, app.log, env.PUBLIC_URL);
