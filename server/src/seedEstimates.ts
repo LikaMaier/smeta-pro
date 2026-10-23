@@ -29,6 +29,12 @@ export async function seedAdminEstimates(bot: Bot | null) {
         },
       });
       await prisma.appKV.create({ data: { key, value: e.id } });
+      // новая версия той же сметы: прежнюю убираем, чтобы в «Мои сметы» не было дубля
+      if (s.replaces) {
+        const old = await prisma.appKV.findUnique({ where: { key: `seed:${s.replaces}:${user.id}` } });
+        if (old) await prisma.estimate.updateMany({ where: { id: old.value, userId: user.id, deletedAt: null }, data: { deletedAt: new Date() } });
+        else await prisma.appKV.create({ data: { key: `seed:${s.replaces}:${user.id}`, value: 'replaced' } }).catch(() => {});
+      }
       console.log(`Смета «${s.title}» добавлена администратору ${tg}`);
       if (bot && env.PUBLIC_URL) {
         await bot.api.sendMessage(tg, `📄 Смета готова и лежит в «Мои сметы»:\n${s.title}`, {
