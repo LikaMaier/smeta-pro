@@ -30,14 +30,14 @@ export async function seedAdminEstimates(bot: Bot | null) {
       });
       await prisma.appKV.create({ data: { key, value: e.id } });
       // новая версия той же сметы: прежнюю убираем, чтобы в «Мои сметы» не было дубля
-      if (s.replaces) {
-        const old = await prisma.appKV.findUnique({ where: { key: `seed:${s.replaces}:${user.id}` } });
+      for (const prev of [].concat(s.replaces || [])) {
+        const old = await prisma.appKV.findUnique({ where: { key: `seed:${prev}:${user.id}` } });
         if (old) await prisma.estimate.updateMany({ where: { id: old.value, userId: user.id, deletedAt: null }, data: { deletedAt: new Date() } });
-        else await prisma.appKV.create({ data: { key: `seed:${s.replaces}:${user.id}`, value: 'replaced' } }).catch(() => {});
+        else await prisma.appKV.create({ data: { key: `seed:${prev}:${user.id}`, value: 'replaced' } }).catch(() => {});
       }
       console.log(`Смета «${s.title}» добавлена администратору ${tg}`);
       if (bot && env.PUBLIC_URL) {
-        await bot.api.sendMessage(tg, `📄 Смета готова и лежит в «Мои сметы»:\n${s.title}`, {
+        await bot.api.sendMessage(tg, `📄 ${s.final ? 'Окончательная смета' : 'Смета'} в «Мои сметы»:\n${s.title}${s.total ? `\nИтого: ${s.total}` : ''}${s.replaces ? '\nПрежняя версия убрана.' : ''}`, {
           reply_markup: { inline_keyboard: [[{ text: 'Открыть смету', web_app: { url: `${env.PUBLIC_URL}/estimates/${e.id}` } }]] },
         }).catch(() => {});
       }
