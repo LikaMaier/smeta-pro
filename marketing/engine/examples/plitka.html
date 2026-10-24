@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Тротуарная плитка не просядет</title></head><body><div id="stage">
+<svg class="main" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6c48a"/><stop offset="1" stop-color="#fde9cf"/></linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a45"/><stop offset="1" stop-color="#5e452b"/></linearGradient>
+    <pattern id="grav" width="26" height="22" patternUnits="userSpaceOnUse"><rect width="26" height="22" fill="#8d949a"/><ellipse cx="7" cy="6" rx="6.5" ry="5" fill="#c9ced3" stroke="#6d7379"/><ellipse cx="19" cy="15" rx="7" ry="5.5" fill="#b4bac0" stroke="#6d7379"/></pattern>
+    <pattern id="sandP" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#e3c88a"/><circle cx="3" cy="3" r="1" fill="#c9a865"/><circle cx="8" cy="7" r="1" fill="#d6b674"/></pattern>
+    <radialGradient id="vigG" cx=".5" cy=".45" r=".8"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient>
+  </defs>
+  <g id="cam">
+    <rect x="-60" y="-60" width="660" height="490" fill="url(#sky)"/>
+    <circle cx="90" cy="250" r="50" fill="#fff1c9"/>
+    <g id="trees"></g>
+    <rect x="-60" y="420" width="660" height="640" fill="url(#soil)"/>
+    <g id="pebbles"></g>
+    <path d="M-60 420 L40 420 M500 420 L600 420" stroke="#4f8a3a" stroke-width="10"/>
+    <!-- правильный пирог -->
+    <g id="good" opacity="0">
+      <rect id="pit" x="40" y="420" width="430" height="0" fill="#3d2c1b"/>
+      <path id="geo" d="M40 640 L470 640" stroke="#f5f5f0" stroke-width="7" stroke-dasharray="430" stroke-dashoffset="430"/>
+      <rect id="gr" x="40" y="640" width="430" height="0" fill="url(#grav)"/>
+      <rect id="sd" x="40" y="460" width="430" height="0" fill="url(#sandP)"/>
+      <!-- бордюр -->
+      <g id="curb" opacity="0"><path d="M448 540 L510 540 L520 640 L436 640 Z" fill="#b9bdc1" stroke="#6d7379" stroke-width="2"/>
+        <rect x="456" y="392" width="26" height="170" rx="3" fill="#d6d9dc" stroke="#6d7379" stroke-width="3"/></g>
+    </g>
+    <!-- «как делают»: песок прямо на грунт -->
+    <g id="bad"><rect x="40" y="420" width="430" height="26" fill="url(#sandP)"/></g>
+    <g id="tiles"></g>
+    <g id="puddles"></g>
+    <!-- машина -->
+    <g id="car">
+      <path d="M-70 -46 L-40 -80 L40 -80 L70 -46 L95 -44 L95 -12 L-95 -12 L-95 -44Z" fill="#2f6fd6" stroke="#1a2b4a" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-34 -74 L-6 -74 L-6 -48 L-58 -48Z M2 -74 L34 -74 L58 -48 L2 -48Z" fill="#cfe9ff"/>
+      <circle id="w1" cx="-55" cy="-10" r="20" fill="#222" stroke="#555" stroke-width="5"/><circle id="w2" cx="55" cy="-10" r="20" fill="#222" stroke="#555" stroke-width="5"/>
+    </g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+  <rect id="dim" width="540" height="960" fill="#06101f" opacity="0"/>
+</svg>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">🙈 ТАК ДЕЛАЮТ ЧАСТО</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🚗</div><div class="logo">СМЕТА PRO</div><div class="l2">Плитка, бордюр, парковка —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script>
+window.DUR = 23;
+const S = { bad: 0, car1: 2.6, good: 7.6, gr: 9.6, sd: 11.4, tl: 13.0, curb: 14.6, car2: 16.0, phone: 18.8, end: 20.8 };
+const SUBS = [
+  [2.6, 5.0, 'Плитка на тонкий песок<br>прямо по грунту…'],
+  [5.0, 7.4, '…через сезон — <b>колеи и лужи</b> 💦'],
+  [7.8, 9.6, '<b>1.</b> Корыто 30–40 см<br>и геотекстиль на дно'],
+  [9.7, 11.4, '<b>2.</b> Щебень <b>15–20 см</b>,<br>трамбуем виброплитой'],
+  [11.5, 13.0, '<b>3.</b> Песок или отсев<br><b>3–5 см</b> по маякам'],
+  [13.1, 14.6, '<b>4.</b> Плитка: 6 см — для людей,<br><b>8 см — под машину</b>'],
+  [14.7, 16.0, '<b>5.</b> Бордюр на бетоне —<br>плитка не расползётся'],
+  [16.1, 18.6, 'Через сезон — <b>ровно</b> ✅'],
+  [18.9, 20.8, 'Посчитать площадку:<br>смета — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[19.0, '2dirs', 130, 300], [19.9, '5result', 120, 470]];
+
+// деревья на фоне, камешки
+for (let i = 0; i < 6; i++) { const x = 30 + i * 95 + R(i) * 30, h = 70 + R(i + 1) * 60; E('rect', { x: x - 5, y: 420 - h * .5, width: 10, height: h * .5, fill: '#7a5230' }, $('trees')); E('circle', { cx: x, cy: 420 - h * .6, r: h * .35, fill: ['#6fa35a', '#5c9148', '#7ab565'][i % 3] }, $('trees')); }
+for (let i = 0; i < 80; i++) E('ellipse', { cx: R(i) * 540, cy: 450 + R(i + 1) * 500, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles'));
+// плитки (разрез): 10 штук
+const TW = 39, TL = [];
+for (let i = 0; i < 10; i++) TL.push(E('rect', { width: TW, height: 26, rx: 3, fill: i % 2 ? '#a6493a' : '#8c8f93', stroke: '#3b3f44', 'stroke-width': 2 }, $('tiles')));
+const PUD = [130, 300].map((x) => E('ellipse', { cx: x, cy: 0, rx: 0, ry: 7, fill: '#6fb6ff', opacity: .9 }, $('puddles')));
+
+function grow(id, bottom, h, k) { const hh = h * ease(k); $(id).setAttribute('y', bottom - hh); $(id).setAttribute('height', hh); }
+
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Почему тротуарная плитка<br><b>проседает</b> через год? 🤔';
+  $('hook').style.opacity = win(t, .05, 2.5, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const goodOn = t >= S.good;
+  const zc = 1.22 + t * .004;
+  $('cam').setAttribute('transform', `translate(270 470) scale(${zc}) translate(-268 -470)`);
+
+  // плитки: в плохом варианте проседают волной
+  const sink = goodOn ? 0 : ease((t - S.car1 - .6) / 3.2);
+  const tilesIn = goodOn ? ease((t - S.tl) / 1.2) : 1;
+  TL.forEach((r, i) => {
+    const x = 42 + i * (TW + 2);
+    const dip = Math.max(0, Math.sin((i / 9) * Math.PI * 2 + .6)) * 30 + (i === 3 || i === 7 ? 10 : 0);
+    const y = goodOn ? lerp(240, 394, eOut((t - S.tl - i * .07) / .5)) : 394 + dip * sink;
+    r.setAttribute('x', x); r.setAttribute('y', y);
+    r.setAttribute('transform', goodOn ? '' : `rotate(${(i % 2 ? 1 : -1) * 8 * sink * (dip > 5 ? 1 : 0)} ${x + TW / 2} ${y + 13})`);
+    r.setAttribute('opacity', goodOn ? (t > S.tl + i * .07 ? 1 : 0) : 1);
+  });
+  PUD.forEach((p, i) => { p.setAttribute('cy', 420 + (i ? 22 : 26) * sink); p.setAttribute('rx', (goodOn ? 0 : 45 * clamp((t - 4.4) / 1.5))); });
+
+  // машина: проезд 1 (плохо) — раскачивается, проезд 2 (хорошо) — ровно
+  let cx = -200, cy = 394, rot = 0;
+  if (t > S.car1 && t < S.good) { const k = (t - S.car1) / 4.4; cx = lerp(-120, 680, k); const d = Math.max(0, Math.sin(((cx - 42) / 430) * Math.PI * 2 + .6)) * 30 * sink; cy = 394 + d; rot = Math.cos(cx / 40) * 4 * sink; }
+  if (t > S.car2 && t < S.phone) { const k = (t - S.car2) / 2.6; cx = lerp(-120, 680, k); cy = 394; rot = 0; }
+  $('car').setAttribute('transform', `translate(${cx} ${cy}) rotate(${rot})`);
+
+  $('bad').setAttribute('opacity', goodOn ? 0 : 1);
+  $('good').setAttribute('opacity', goodOn ? 1 : 0);
+  // 1. корыто и геотекстиль
+  $('pit').setAttribute('height', 222 * ease((t - S.good) / 1.2));
+  $('geo').setAttribute('stroke-dashoffset', 430 * (1 - ease((t - S.good - 1) / .7)));
+  // 2. щебень 640→520, 3. песок 520→420
+  grow('gr', 640, 180, (t - S.gr) / 1.4);
+  grow('sd', 460, 40, (t - S.sd) / 1.2);
+  // плитка «садится» на песок: песок до 420, плитки сверху 394 — песок рисуем до 420
+  $('curb').setAttribute('opacity', clamp((t - S.curb) / .3));
+  $('curb').setAttribute('transform', `translate(0 ${(1 - eOut((t - S.curb) / .5)) * -300})`);
+
+  renderTag('tagBad', t, 2.6, 7.4);
+  const stepN = t < S.gr ? 1 : t < S.sd ? 2 : t < S.tl ? 3 : t < S.curb ? 4 : 5;
+  $('step').textContent = t < S.car2 ? `ШАГ ${stepN} из 5` : '✅ ПРАВИЛЬНЫЙ ПИРОГ';
+  $('step').className = t < S.car2 ? 'tag info' : 'tag good';
+  $('step').style.opacity = win(t, S.good + .1, S.phone - .1, .2, .2);
+  const bump = Math.max(0, ...[S.gr, S.sd, S.tl, S.curb, S.car2].map((a) => (t > a && t < a + .35 ? Math.sin((t - a) / .35 * Math.PI) : 0)));
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+
+  $('dim').setAttribute('opacity', clamp((t - S.phone) / .4) * .75);
+  renderPhone(t, S.phone, S.end + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - S.good) / .22) * .85;
+  renderEnd(t, S.end);
+};
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Отмостка, которая не треснет</title></head><body><div id="stage">
+<svg class="main" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd0f5"/><stop offset="1" stop-color="#e6f4ff"/></linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a45"/><stop offset="1" stop-color="#5e452b"/></linearGradient>
+    <linearGradient id="conc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9ccd0"/><stop offset="1" stop-color="#a3a8ad"/></linearGradient>
+    <pattern id="sandP" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#e3c88a"/><circle cx="3" cy="3" r="1" fill="#c9a865"/><circle cx="8" cy="7" r="1" fill="#d6b674"/></pattern>
+    <pattern id="epsP" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="#f4a9c4"/><path d="M0 12 L24 12" stroke="#e58aad" stroke-width="2"/></pattern>
+    <pattern id="brick" width="40" height="20" patternUnits="userSpaceOnUse"><rect width="40" height="20" fill="#c8693f"/><path d="M0 0 H40 M0 10 H40 M10 0 V10 M30 10 V20" stroke="#8f4325" stroke-width="2"/></pattern>
+    <radialGradient id="vigG" cx=".5" cy=".45" r=".8"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient>
+  </defs>
+  <g id="cam">
+    <rect x="-60" y="-60" width="660" height="440" fill="url(#sky)"/>
+    <g id="clouds"></g>
+    <rect x="-60" y="360" width="660" height="700" fill="url(#soil)"/>
+    <g id="pebbles"></g>
+    <path d="M120 360 L600 360" stroke="#4f8a3a" stroke-width="10"/>
+    <g id="grass"></g>
+    <!-- котлован и слои: полигоны с уклоном от дома -->
+    <path id="pit" fill="#3d2c1b"/>
+    <path id="Lsand" fill="url(#sandP)"/>
+    <path id="Leps" fill="url(#epsP)" stroke="#c96b8f" stroke-width="1.5"/>
+    <path id="Lconc" fill="url(#conc)" stroke="#7d8389" stroke-width="2"/>
+    <path id="mesh" fill="none" stroke="#3b3f44" stroke-width="3" stroke-dasharray="10 7"/>
+    <rect id="tape" x="120" y="350" width="8" height="0" fill="#ffd43b" stroke="#b38b00" stroke-width="1.5"/>
+    <!-- дом: стена и фундамент -->
+    <rect x="-20" y="360" width="140" height="420" fill="#9ea3a8" stroke="#3b3f44" stroke-width="3"/>
+    <text x="50" y="560" text-anchor="middle" font-family="PT" font-size="20" fill="#5d6268" transform="rotate(-90 50 560)">ФУНДАМЕНТ</text>
+    <rect x="-20" y="120" width="140" height="240" fill="url(#brick)" stroke="#3b3f44" stroke-width="3"/>
+    <path d="M-30 120 L190 120 L190 104 L-30 104Z" fill="#6b4a3a" stroke="#3b3f44" stroke-width="3"/>
+    <path d="M-30 104 L60 30 L190 104" fill="#b5452f" stroke="#3b3f44" stroke-width="3"/>
+    <text x="210" y="98" font-family="PT" font-size="16" fill="#3b3f44">свес крыши</text>
+    <g id="drops"></g>
+    <!-- стрелка уклона -->
+    <g id="slope" opacity="0"><path d="M170 300 L420 322" stroke="#0d2440" stroke-width="6" stroke-linecap="round"/><path d="M420 322 l-20 -14 l2 24Z" fill="#0d2440"/>
+      <text x="300" y="290" text-anchor="middle" font-family="PT" font-size="22" fill="#0d2440">уклон от дома 2–3%</text></g>
+    <!-- ширина -->
+    <g id="width" opacity="0"><path d="M120 600 L470 600" stroke="#FFD43B" stroke-width="5"/><path d="M120 586 V614 M470 586 V614" stroke="#FFD43B" stroke-width="5"/>
+      <text x="295" y="585" text-anchor="middle" font-family="PT" font-size="22" fill="#FFD43B">от 1 м и шире свеса на 20–30 см</text></g>
+    <!-- трещина для ошибок -->
+    <path id="crack" d="M130 352 l8 14 l-6 12 l10 16" stroke="#1b1d20" stroke-width="4" fill="none" opacity="0"/>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+  <rect id="dim" width="540" height="960" fill="#06101f" opacity="0"/>
+</svg>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="e1" class="tag err" style="left:24px;top:230px;font-size:24px;width:492px">❌ Вплотную к стене без шва — трещина</div>
+<div id="e2" class="tag err" style="left:24px;top:310px;font-size:24px;width:492px">❌ Уклон «в ноль» или к дому</div>
+<div id="e3" class="tag err" style="left:24px;top:390px;font-size:24px;width:492px">❌ Сплошная лента без швов</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🏠</div><div class="logo">СМЕТА PRO</div><div class="l2">Сохрани, чтобы не забыть.<br><span style="color:#FFD43B">Смета на отмостку — за 2 минуты</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<style>.tag.err{background:#fff;color:#c1121f;border:3px solid #e5383b}</style>
+<script src="drain-common.js"></script>
+<script>
+window.DUR = 23.5;
+const S = { dig: 2.2, sand: 5.0, eps: 7.4, tape: 9.8, conc: 12.2, done: 14.8, err: 16.6, phone: 19.6, end: 21.4 };
+const SUBS = [
+  [2.4, 5.0, '<b>1.</b> Снимаем грунт ~30 см.<br>Уклон <b>от дома 2–3%</b>'],
+  [5.1, 7.4, '<b>2.</b> Песок <b>10 см</b><br>с трамбовкой'],
+  [7.5, 9.8, '<b>3.</b> Утеплитель ЭППС 5 см —<br>грунт у дома не пучит'],
+  [9.9, 12.2, '<b>4.</b> Демпферная лента у стены<br>и армирующая сетка'],
+  [12.3, 14.8, '<b>5.</b> Бетон 8–10 см, швы<br><b>каждые 2 м</b>'],
+  [14.9, 16.5, 'Вода уходит <b>от фундамента</b> ✅'],
+  [16.7, 19.5, 'Так делать <b>не надо</b> ☝️'],
+  [19.7, 21.4, 'Посчитать отмостку:<br>смета — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[19.7, '2dirs', 130, 300], [20.6, '5result', 120, 470]];
+const X0 = 120, X1 = 470, SL = .06;               // уклон: y растёт на 6 px на 100 px
+const yAt = (y, x) => y + (x - X0) * SL;
+function band(yTop, yBot, x0 = X0 + 8, x1 = X1) { return `M${x0} ${yAt(yTop, x0)} L${x1} ${yAt(yTop, x1)} L${x1} ${yAt(yBot, x1)} L${x0} ${yAt(yBot, x0)}Z`; }
+function grow(id, yTop, yBot, k) { const yt = lerp(yBot, yTop, ease(k)); $(id).setAttribute('d', k <= 0 ? '' : band(yt, yBot)); }
+
+for (let i = 0; i < 5; i++) { const g = E('g', { class: 'cl', 'data-i': i, opacity: .8 }, $('clouds')); const x = R(i) * 540, y = 170 + R(i + 1) * 140, w = 60 + R(i + 2) * 60; for (let k = 0; k < 4; k++) E('ellipse', { cx: x + k * w * .35, cy: y - (k % 2) * 12, rx: w * .4, ry: w * .2, fill: '#fff' }, g); }
+for (let i = 0; i < 80; i++) E('ellipse', { cx: R(i) * 540, cy: 380 + R(i + 1) * 560, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles'));
+for (let i = 0; i < 50; i++) { const x = 124 + i * 9 + R(i) * 6; E('path', { d: `M${x} 360 l${R(i) * 4 - 2} -${8 + R(i + 1) * 12}`, stroke: '#5c9a45', 'stroke-width': 3, 'stroke-linecap': 'round', class: x < X1 + 4 ? 'gIn' : '' }, $('grass')); }
+const DR = []; for (let i = 0; i < 10; i++) DR.push(E('circle', { r: 6, fill: '#4aa3ff', opacity: 0 }, $('drops')));
+
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Отмостка, которая<br><b>не треснет</b> через зиму 👇';
+  $('hook').style.opacity = win(t, .05, 2.3, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const z = 1 + ease((t - 2) / 12) * .12 - ease((t - S.err) / .6) * .12;
+  $('cam').setAttribute('transform', `translate(300 420) scale(${z}) translate(-300 -420)`);
+  document.querySelectorAll('.cl').forEach((e) => e.setAttribute('transform', `translate(${(t * (6 + +e.dataset.i * 2)) % 700 - 120} 0)`));
+
+  // 1. котлован
+  const dk = ease((t - S.dig) / 1.6);
+  $('pit').setAttribute('d', dk <= 0 ? '' : `M${X0} 360 L${X1} 360 L${X1} ${360 + 140 * dk} L${X0} ${yAt(360, X0) + 140 * dk - (X1 - X0) * SL}Z`);
+  $('pit').setAttribute('d', dk <= 0 ? '' : band(360, lerp(360, 500, dk), X0, X1));
+  document.querySelectorAll('.gIn').forEach((g) => g.setAttribute('opacity', 1 - clamp((t - S.dig) / .3)));
+  $('slope').setAttribute('opacity', win(t, S.dig + .5, S.sand, .3, .2) + win(t, S.done, S.err, .3, .2));
+  // 2. песок 500→440, 3. ЭППС 440→410, 5. бетон 410→352
+  grow('Lsand', 440, 500, (t - S.sand) / 1.4);
+  grow('Leps', 410, 440, (t - S.eps) / 1.2);
+  grow('Lconc', 352, 410, (t - S.conc) / 1.6);
+  // 4. лента и сетка
+  const tk = ease((t - S.tape) / .8);
+  $('tape').setAttribute('height', 150 * tk); $('tape').setAttribute('y', 352);
+  const mk = ease((t - S.tape - .8) / .9);
+  $('mesh').setAttribute('d', mk <= 0 ? '' : `M${X0 + 14} ${yAt(388, X0 + 14)} L${lerp(X0 + 14, X1 - 6, mk)} ${yAt(388, lerp(X0 + 14, X1 - 6, mk))}`);
+  // швы на бетоне (вертикальные риски)
+  // вода стекает от дома
+  DR.forEach((d, i) => {
+    const k = ((t - S.done) * .5 + i / DR.length) % 1;
+    const on = t > S.done && t < S.err;
+    const x = lerp(140, 520, k);
+    d.setAttribute('cx', x); d.setAttribute('cy', (x < X1 ? yAt(345, x) : yAt(345, X1) + (x - X1) * .1)); d.setAttribute('opacity', on ? Math.sin(k * Math.PI) : 0);
+  });
+  $('width').setAttribute('opacity', win(t, S.done, S.err, .3, .2));
+  $('crack').setAttribute('opacity', win(t, S.err + .3, S.phone - .1, .2, .2));
+
+  const stepN = t < S.sand ? 1 : t < S.eps ? 2 : t < S.tape ? 3 : t < S.conc ? 4 : 5;
+  $('step').textContent = t < S.done ? `ШАГ ${stepN} из 5` : '✅ ОТМОСТКА ГОТОВА';
+  $('step').className = t < S.done ? 'tag info' : 'tag good';
+  $('step').style.opacity = win(t, S.dig, S.err - .1, .2, .2);
+  const bump = Math.max(0, ...[S.sand, S.eps, S.tape, S.conc, S.done].map((a) => (t > a && t < a + .35 ? Math.sin((t - a) / .35 * Math.PI) : 0)));
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+
+  $('dim').setAttribute('opacity', clamp((t - S.err) / .4) * .62 + clamp((t - S.phone) / .3) * .2);
+  renderTag('e1', t, S.err + .3, S.phone - .1);
+  renderTag('e2', t, S.err + 1.1, S.phone - .1);
+  renderTag('e3', t, S.err + 1.9, S.phone - .1);
+  renderPhone(t, S.phone, S.end + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - S.err) / .2) * .5;
+  renderEnd(t, S.end);
+};
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>
