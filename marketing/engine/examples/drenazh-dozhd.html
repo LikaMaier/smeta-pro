@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Дренаж: до и после дождя</title></head><body><div id="stage">
+<svg class="main" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b5d73"/><stop offset="1" stop-color="#8d9fb2"/></linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a45"/><stop offset="1" stop-color="#5e452b"/></linearGradient>
+    <linearGradient id="wat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4aa3ff" stop-opacity=".75"/><stop offset="1" stop-color="#1f5fa8" stop-opacity=".85"/></linearGradient>
+    <pattern id="grav" width="22" height="18" patternUnits="userSpaceOnUse"><rect width="22" height="18" fill="#9aa0a6"/><ellipse cx="6" cy="5" rx="5" ry="4" fill="#c4c9ce"/><ellipse cx="16" cy="12" rx="5.5" ry="4" fill="#b3b8bd"/><ellipse cx="4" cy="14" rx="3" ry="2.5" fill="#7d8389"/></pattern>
+    <radialGradient id="vigG" cx=".5" cy=".45" r=".8"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/></radialGradient>
+    <clipPath id="soilClip"><rect x="0" y="430" width="540" height="530"/></clipPath>
+  </defs>
+  <g id="cam">
+    <rect x="-60" y="-60" width="660" height="520" fill="url(#sky)"/>
+    <g id="clouds"></g>
+    <!-- грунт -->
+    <rect x="-60" y="430" width="660" height="600" fill="url(#soil)"/>
+    <g id="pebbles"></g>
+    <!-- грунтовые воды -->
+    <g clip-path="url(#soilClip)"><path id="gw" fill="url(#wat)"/></g>
+    <!-- дом -->
+    <g id="house">
+      <rect x="44" y="430" width="200" height="175" fill="#9ea3a8" stroke="#3b3f44" stroke-width="3"/>
+      <rect x="60" y="440" width="168" height="150" fill="#d9d4c7"/>
+      <text x="144" y="530" text-anchor="middle" font-family="PT" font-size="20" fill="#6b6457">ПОДВАЛ</text>
+      <g id="wet" opacity="0">
+        <rect x="60" y="560" width="168" height="30" fill="#4aa3ff" opacity=".55"/>
+        <path d="M60 440 q10 60 0 150 M228 470 q-8 50 0 120" stroke="#3f7fc9" stroke-width="10" opacity=".4" fill="none"/>
+        <circle id="drip" cx="110" cy="450" r="5" fill="#4aa3ff"/>
+      </g>
+      <rect x="54" y="260" width="180" height="170" fill="#f0d8b0" stroke="#3b3f44" stroke-width="3"/>
+      <path d="M34 266 L144 176 L254 266Z" fill="#b5452f" stroke="#3b3f44" stroke-width="3" stroke-linejoin="round"/>
+      <rect x="80" y="300" width="52" height="52" fill="#9fd0ff" stroke="#3b3f44" stroke-width="3"/>
+      <rect x="160" y="330" width="48" height="100" fill="#7a4a2a" stroke="#3b3f44" stroke-width="3"/>
+      <!-- водосток -->
+      <path d="M246 268 L246 420 q0 10 12 10 L270 430" stroke="#6b7480" stroke-width="7" fill="none"/>
+    </g>
+    <!-- поверхность и лужи -->
+    <path d="M-60 430 L600 430" stroke="#4f8a3a" stroke-width="10"/>
+    <g id="grass"></g>
+    <g id="puddles"></g>
+    <!-- дренаж -->
+    <g id="drain" opacity="0">
+      <path id="trench" d="M252 560 L292 560 L470 618 L470 668 L252 618Z" fill="url(#grav)" stroke="#555" stroke-width="2" stroke-dasharray="6 4"/>
+      <path id="pipe" d="M258 596 L470 650" stroke="#ff8a1f" stroke-width="16" stroke-linecap="round" fill="none"/>
+      <path d="M258 596 L470 650" stroke="#c25e00" stroke-width="3" stroke-dasharray="3 9" fill="none"/>
+      <path id="flow" d="M258 596 L470 650" stroke="#bfe6ff" stroke-width="6" stroke-linecap="round" stroke-dasharray="10 22" fill="none"/>
+      <!-- колодец -->
+      <rect x="452" y="420" width="70" height="330" fill="#7d8389" stroke="#3b3f44" stroke-width="3"/>
+      <rect x="462" y="420" width="50" height="320" fill="#30343a"/>
+      <rect id="wellWater" x="462" y="700" width="50" height="40" fill="#4aa3ff"/>
+      <rect x="446" y="410" width="82" height="14" rx="3" fill="#5c6168" stroke="#3b3f44" stroke-width="3"/>
+      <text x="487" y="785" text-anchor="middle" font-family="PT" font-size="18" fill="#ffe9b0">колодец</text>
+      <g id="seep"></g>
+    </g>
+    <g id="rain"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+  <rect id="dim" width="540" height="960" fill="#06101f" opacity="0"/>
+</svg>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">💦 БЕЗ ДРЕНАЖА</div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ С ДРЕНАЖОМ</div>
+<div id="lbl1" class="tag info" style="left:286px;top:690px;font-size:22px">труба в щебне</div>
+<div id="lbl2" class="tag info" style="left:262px;top:470px;font-size:22px">уровень воды ↓</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">💧</div><div class="logo">СМЕТА PRO</div><div class="l2">Дренаж, отмостка, септик —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script>
+window.DUR = 20;
+const SUBS = [
+  [2.8, 5.2, 'Без дренажа вода уходит<br>в грунт…'],
+  [5.2, 7.8, '…и подпирает фундамент.<br><b>Подвал мокнет.</b>'],
+  [8.6, 10.9, 'Труба в щебне вдоль фундамента<br>собирает воду…'],
+  [10.9, 13.8, '…и уводит её в колодец.<br><b>Фундамент сухой.</b> ✅'],
+  [14.2, 17.5, 'Сколько стоит такой дренаж?<br>Смета — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[14.3, '2dirs', 130, 300], [15.5, '5result', 120, 470], [16.6, '8est', 120, 500]];
+
+// облака, травинки, камешки в грунте
+for (let i = 0; i < 6; i++) { const g = E('g', { class: 'cl', 'data-i': i, opacity: .55 }, $('clouds')); const x = R(i) * 540, y = 40 + R(i + 1) * 140, w = 80 + R(i + 2) * 80; for (let k = 0; k < 4; k++) E('ellipse', { cx: x + k * w * .35, cy: y - (k % 2) * 14, rx: w * .42, ry: w * .2, fill: '#c9d3de' }, g); }
+for (let i = 0; i < 60; i++) { const x = i * 9 + R(i) * 6; if (x > 40 && x < 250) continue; E('path', { d: `M${x} 430 l${R(i) * 4 - 2} -${8 + R(i + 1) * 10}`, stroke: '#5c9a45', 'stroke-width': 3, 'stroke-linecap': 'round' }, $('grass')); }
+for (let i = 0; i < 70; i++) E('ellipse', { cx: R(i) * 540, cy: 450 + R(i + 1) * 500, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles'));
+const PUD = [[300, 70], [380, 50], [440, 40], [20, 26]].map(([x, w]) => E('ellipse', { cx: x, cy: 432, rx: 0, ry: 6, fill: '#6fb6ff', opacity: .9 }, $('puddles')));
+const SEEP = [];
+for (let i = 0; i < 14; i++) SEEP.push(E('circle', { r: 4, fill: '#7cc4ff' }, $('seep')));
+const rain = makeRain($('rain'), 80);
+
+function gwPath(level, t) {
+  let d = `M0 ${level}`;
+  for (let x = 0; x <= 540; x += 20) d += ` L${x} ${level + Math.sin(x / 40 + t * 2) * 4}`;
+  return d + ' L540 960 L0 960Z';
+}
+
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  // крючок
+  $('hook').innerHTML = 'Почему подвал мокнет<br><b>каждую весну?</b> 💧';
+  $('hook').style.opacity = win(t, .05, 2.6, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+
+  const good = t >= 8;
+  // камера: лёгкий наезд, в каждой части
+  const ph = good ? (t - 8) / 6 : t / 8;
+  const z = 1 + ph * .06;
+  $('cam').setAttribute('transform', `translate(270 480) scale(${z}) translate(-270 -480)`);
+  document.querySelectorAll('.cl').forEach((e) => e.setAttribute('transform', `translate(${(t * (8 + +e.dataset.i * 3)) % 700 - 120} 0)`));
+
+  // дождь
+  rain(t, clamp(t / .5) * (t < 14 ? 1 : clamp(1 - (t - 14) / .4)));
+
+  // грунтовые воды и лужи
+  let level, pud;
+  if (!good) { const k = ease((t - 2.4) / 5.2); level = lerp(780, 535, k); pud = k; }
+  else { level = 700 + Math.sin(t * 1.2) * 4; pud = clamp(.25 - (t - 8) / 2); }
+  $('gw').setAttribute('d', gwPath(level, t));
+  PUD.forEach((p, i) => p.setAttribute('rx', [70, 50, 40, 26][i] * pud));
+  // мокрый подвал
+  $('wet').setAttribute('opacity', good ? 0 : clamp((t - 5.2) / .8));
+  const dk = (t * 1.3) % 1; $('drip').setAttribute('cy', 450 + dk * 110); $('drip').setAttribute('opacity', dk < .9 ? 1 : 0);
+
+  // дренаж появляется
+  const dIn = clamp((t - 8.1) / .5);
+  $('drain').setAttribute('opacity', good ? dIn : 0);
+  $('flow').setAttribute('stroke-dashoffset', -t * 60);
+  $('flow').setAttribute('opacity', good ? clamp((t - 9.6) / .5) : 0);
+  const ww = good ? lerp(40, 70, clamp((t - 10.5) / 3)) : 40;
+  $('wellWater').setAttribute('y', 740 - ww); $('wellWater').setAttribute('height', ww);
+  // капли из грунта к трубе
+  SEEP.forEach((c, i) => {
+    const k = ((t - 8.6) * .55 + R(i)) % 1;
+    const x0 = 270 + R(i + 2) * 190, y0 = 470 + R(i + 5) * 60;
+    const xp = x0, yp = 596 + (x0 - 258) * (54 / 212);
+    c.setAttribute('cx', xp); c.setAttribute('cy', lerp(y0, yp, k));
+    c.setAttribute('opacity', good && t > 8.6 && t < 14 ? Math.sin(k * Math.PI) : 0);
+  });
+
+  // ярлыки
+  renderTag('tagBad', t, 2.6, 7.9);
+  renderTag('tagGood', t, 8.4, 13.9);
+  renderTag('lbl1', t, 9.2, 13.9);
+  renderTag('lbl2', t, 11.2, 13.9);
+
+  // телефон и затемнение
+  $('dim').setAttribute('opacity', clamp((t - 14) / .4) * .72);
+  renderPhone(t, 14.1, 17.8, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - 8) / .22) * .85;
+  renderEnd(t, 17.6);
+};
+readyWith(['2dirs', '5result', '8est']);
+</script>
+</body></html>

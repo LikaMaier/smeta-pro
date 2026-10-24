@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Дренаж, который не заилится</title></head><body><div id="stage">
+<svg class="main" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8cc4ee"/><stop offset="1" stop-color="#d9eefc"/></linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a45"/><stop offset="1" stop-color="#5e452b"/></linearGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8cf8f"/><stop offset="1" stop-color="#d4b46c"/></linearGradient>
+    <linearGradient id="pipeG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset="1" stop-color="#e06d00"/></linearGradient>
+    <pattern id="grav" width="26" height="22" patternUnits="userSpaceOnUse"><rect width="26" height="22" fill="#8d949a"/><ellipse cx="7" cy="6" rx="6.5" ry="5" fill="#c9ced3" stroke="#6d7379"/><ellipse cx="19" cy="15" rx="7" ry="5.5" fill="#b4bac0" stroke="#6d7379"/><ellipse cx="4" cy="17" rx="3.5" ry="3" fill="#a3a9af"/></pattern>
+    <radialGradient id="vigG" cx=".5" cy=".45" r=".8"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient>
+    <clipPath id="tr"><path d="M120 330 L420 330 L390 720 L150 720Z"/></clipPath>
+    <clipPath id="fillClip"><rect id="fillRect" x="0" y="720" width="540" height="0"/></clipPath>
+  </defs>
+  <g id="cam">
+    <rect x="-60" y="-60" width="660" height="400" fill="url(#sky)"/>
+    <circle cx="450" cy="90" r="46" fill="#fff3b0"/><circle cx="450" cy="90" r="70" fill="#fff3b0" opacity=".25"/>
+    <rect x="-60" y="330" width="660" height="700" fill="url(#soil)"/>
+    <g id="pebbles"></g>
+    <path d="M-60 330 L600 330" stroke="#4f8a3a" stroke-width="10"/>
+    <g id="grassL"></g>
+    <!-- траншея: выемка -->
+    <g clip-path="url(#tr)">
+      <rect id="hole" x="100" y="330" width="340" height="0" fill="#3d2c1b"/>
+      <g id="layers">
+        <!-- щебень снизу, труба, щебень сверху, песок, грунт — каждый слой своим прямоугольником -->
+        <rect id="g1" x="100" y="720" width="340" height="0" fill="url(#grav)"/>
+        <rect id="g2" x="100" y="640" width="340" height="0" fill="url(#grav)"/>
+        <rect id="sd" x="100" y="500" width="340" height="0" fill="url(#sand)"/>
+        <rect id="sl" x="100" y="420" width="340" height="0" fill="#87673f"/>
+      </g>
+    </g>
+    <!-- геотекстиль -->
+    <g id="geoAll" stroke-dasharray="1400" stroke-dashoffset="1400">
+      <path id="geo" d="M133 500 L150 720 L390 720 L407 500" fill="none" stroke="#f5f5f0" stroke-width="7" stroke-linejoin="round"/>
+      <path id="geoTail" d="M70 322 L120 330 L133 500 M407 500 L420 330 L470 322" fill="none" stroke="#f5f5f0" stroke-width="7" stroke-linejoin="round"/>
+    </g>
+    <path id="geoL" d="M133 500 L292 498" fill="none" stroke="#f5f5f0" stroke-width="7" stroke-linecap="round" opacity="0"/>
+    <path id="geoR" d="M407 500 L248 506" fill="none" stroke="#e9e9e2" stroke-width="7" stroke-linecap="round" opacity="0"/>
+    <!-- труба -->
+    <g id="pipe" opacity="0">
+      <circle cx="270" cy="602" r="42" fill="url(#pipeG)" stroke="#8a3f00" stroke-width="4"/>
+      <circle cx="270" cy="602" r="30" fill="#2b1a0c"/>
+      <g id="holes"></g>
+      <circle id="pw" cx="270" cy="602" r="0" fill="#5fb7ff" opacity=".9"/>
+    </g>
+    <g id="stones"></g>
+    <g id="drops"></g>
+    <!-- врезка: уклон -->
+    <g id="inset" opacity="0" transform="translate(300 170)">
+      <rect x="0" y="0" width="215" height="130" rx="14" fill="#0d2440" stroke="#FFD43B" stroke-width="3"/>
+      <text x="107" y="28" text-anchor="middle" font-family="PT" font-size="18" fill="#fff">вид сбоку</text>
+      <path d="M18 62 L196 98" stroke="#ff8a1f" stroke-width="12" stroke-linecap="round"/>
+      <circle id="slDrop" cx="30" cy="60" r="7" fill="#5fb7ff"/>
+      <text x="107" y="122" text-anchor="middle" font-family="PT" font-size="17" fill="#FFD43B">→ к колодцу</text>
+    </g>
+    <!-- ошибки -->
+    <g id="err" opacity="0"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+  <rect id="dim" width="540" height="960" fill="#06101f" opacity="0"/>
+</svg>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="e1" class="tag err" style="left:24px;top:230px;font-size:24px;width:492px">❌ Нет уклона — вода стоит в трубе</div>
+<div id="e2" class="tag err" style="left:24px;top:310px;font-size:24px;width:492px">❌ Без геотекстиля — щебень заилится</div>
+<div id="e3" class="tag err" style="left:24px;top:390px;font-size:24px;width:492px">❌ Песок или мелочь вокруг трубы</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🛠</div><div class="logo">СМЕТА PRO</div><div class="l2">Сохрани, чтобы не забыть.<br><span style="color:#FFD43B">Смета на дренаж — за 2 минуты</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<style>.tag.err{background:#fff;color:#c1121f;border:3px solid #e5383b}</style>
+<script src="drain-common.js"></script>
+<script>
+window.DUR = 23.5;
+const S = { dig: 2.2, geo: 5.0, g1: 7.4, pipe: 9.8, g2: 12.0, top: 14.6, err: 16.4, phone: 19.4, end: 21.4 };
+const SUBS = [
+  [2.4, 5.0, '<b>1.</b> Траншея с уклоном —<br><b>от 5 мм на метр</b> к колодцу'],
+  [5.1, 7.4, '<b>2.</b> Геотекстиль по дну и стенкам —<br>с запасом на нахлёст'],
+  [7.5, 9.8, '<b>3.</b> Щебень 20–40 мм,<br>подушка <b>около 10 см</b>'],
+  [9.9, 12.0, '<b>4.</b> Перфорированная труба —<br>ровно по уклону, без провисов'],
+  [12.1, 14.6, '<b>5.</b> Щебень сверху<br>и геотекстиль <b>внахлёст</b>'],
+  [14.7, 16.3, 'Сверху — песок и грунт.<br><b>Готово</b> ✅'],
+  [16.5, 19.3, 'Так делать <b>не надо</b> ☝️'],
+  [19.5, 21.4, 'Посчитать дренаж:<br>смета — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[19.5, '2dirs', 130, 300], [20.4, '5result', 120, 470]];
+
+for (let i = 0; i < 80; i++) E('ellipse', { cx: R(i) * 540, cy: 350 + R(i + 1) * 600, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles'));
+for (let i = 0; i < 64; i++) { const x = i * 9 + R(i) * 6; E('path', { d: `M${x} 330 l${R(i) * 4 - 2} -${8 + R(i + 1) * 12}`, stroke: '#5c9a45', 'stroke-width': 3, 'stroke-linecap': 'round', class: x > 115 && x < 425 ? 'gTr' : '' }, $('grassL')); }
+for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; E('circle', { cx: 270 + Math.cos(a) * 36, cy: 602 + Math.sin(a) * 36, r: 3.2, fill: '#2b1a0c' }, $('holes')); }
+const ST = [];
+for (let i = 0; i < 26; i++) ST.push(E('ellipse', { rx: 7 + R(i) * 5, ry: 5 + R(i + 1) * 4, fill: ['#c9ced3', '#b4bac0', '#a3a9af'][i % 3], stroke: '#6d7379', 'stroke-width': 1.5, opacity: 0 }, $('stones')));
+const DR = [];
+for (let i = 0; i < 12; i++) DR.push(E('circle', { r: 5, fill: '#5fb7ff', opacity: 0 }, $('drops')));
+
+/** заполнение слоя снизу вверх: rect id, нижняя граница, высота, k */
+function grow(id, bottom, h, k) { const hh = h * ease(k); $(id).setAttribute('y', bottom - hh); $(id).setAttribute('height', hh); }
+function stonesFall(t, a, d, yTo) {
+  ST.forEach((s, i) => {
+    const k = (t - a - R(i) * (d - .5)) / .5;
+    if (k <= 0 || k >= 1) { s.setAttribute('opacity', 0); return; }
+    s.setAttribute('cx', 160 + R(i + 7) * 220); s.setAttribute('cy', lerp(250, yTo, k * k)); s.setAttribute('opacity', 1);
+  });
+}
+
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Дренаж, который<br><b>не заилится</b> через год 👇';
+  $('hook').style.opacity = win(t, .05, 2.3, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+
+  // камера: медленный наезд на траншею
+  const z = 1 + ease((t - 2) / 12) * .1 - ease((t - 16.2) / .6) * .1;
+  $('cam').setAttribute('transform', `translate(270 520) scale(${z}) translate(-270 ${-520 + ease((t - 2) / 12) * 20})`);
+
+  // 1. копаем
+  const dk = ease((t - S.dig) / 1.8);
+  $('hole').setAttribute('height', 390 * dk);
+  document.querySelectorAll('.gTr').forEach((g) => g.setAttribute('opacity', 1 - clamp((t - S.dig) / .3) + clamp((t - S.top) / .8)));
+  $('inset').setAttribute('opacity', win(t, S.dig + .6, S.geo - .1, .3, .2));
+  const sk = ((t - S.dig) * .6) % 1; $('slDrop').setAttribute('cx', 30 + sk * 160); $('slDrop').setAttribute('cy', 60 + sk * 32);
+  // 2. геотекстиль
+  const gk = ease((t - S.geo) / 1.6);
+  $('geo').setAttribute('stroke-dasharray', `${520 * gk} 2000`);
+  $('geoTail').setAttribute('stroke-dasharray', 'none');
+  $('geoAll').removeAttribute('stroke-dasharray'); $('geoAll').removeAttribute('stroke-dashoffset');
+  $('geoTail').setAttribute('opacity', gk * (1 - clamp((t - S.g2 - 1.7) / .5)));
+  // 3. щебень снизу (720 → 640)
+  grow('g1', 720, 80, (t - S.g1) / 1.8); 
+  // 4. труба
+  const pk = eOut((t - S.pipe) / .7);
+  $('pipe').setAttribute('opacity', clamp((t - S.pipe) / .2));
+  $('pipe').setAttribute('transform', `translate(0 ${(1 - pk) * -380})`);
+  // 5. щебень сверху (640 → 500) и нахлёст
+  grow('g2', 640, 140, (t - S.g2) / 1.8); if (t > S.g1 && t < S.pipe) stonesFall(t, S.g1, 1.9, 700); else if (t > S.g2 && t < S.g2 + 2) stonesFall(t, S.g2, 1.9, 540); else ST.forEach((x) => x.setAttribute('opacity', 0));
+  const fk = clamp((t - S.g2 - 1.7) / .7);
+  $('geoL').setAttribute('opacity', fk); $('geoR').setAttribute('opacity', fk);
+  $('geoL').setAttribute('stroke-dasharray', `${160 * fk} 400`); $('geoR').setAttribute('stroke-dasharray', `${160 * fk} 400`);
+  // 6. песок и грунт
+  grow('sd', 500, 80, (t - S.top) / .7);
+  grow('sl', 420, 90, (t - S.top - .6) / .7);
+  // вода: капли сквозь щебень в трубу — после засыпки
+  DR.forEach((d, i) => {
+    const k = ((t - S.top - .8) * .7 + R(i)) % 1;
+    const on = t > S.top + .8 && t < S.err;
+    const x = 170 + R(i + 3) * 200;
+    d.setAttribute('cx', lerp(x, 270, k * k)); d.setAttribute('cy', lerp(340, 595, k)); d.setAttribute('opacity', on ? Math.sin(k * Math.PI) : 0);
+  });
+  $('pw').setAttribute('r', t > S.top + 1 ? 26 * clamp((t - S.top - 1) / 1.2) : 0);
+
+  // шаг N из 5
+  const stepN = t < S.geo ? 1 : t < S.g1 ? 2 : t < S.pipe ? 3 : t < S.g2 ? 4 : 5;
+  $('step').textContent = t < S.top ? `ШАГ ${stepN} из 5` : '✅ ДРЕНАЖ ГОТОВ';
+  $('step').className = t < S.top ? 'tag info' : 'tag good';
+  $('step').style.opacity = win(t, S.dig, S.err - .1, .2, .2);
+  const bump = Math.max(0, ...[S.geo, S.g1, S.pipe, S.g2, S.top].map((a) => (t > a && t < a + .35 ? Math.sin((t - a) / .35 * Math.PI) : 0)));
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+
+  // ошибки
+  $('dim').setAttribute('opacity', clamp((t - S.err) / .4) * .62 + clamp((t - S.phone) / .3) * .2);
+  renderTag('e1', t, S.err + .3, S.phone - .1);
+  renderTag('e2', t, S.err + 1.1, S.phone - .1);
+  renderTag('e3', t, S.err + 1.9, S.phone - .1);
+
+  renderPhone(t, S.phone, S.end + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - S.err) / .2) * .5;
+  renderEnd(t, S.end);
+};
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>
