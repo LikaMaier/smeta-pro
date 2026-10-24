@@ -15,6 +15,8 @@ import { Field, Fold, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounce
 import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog, haptic, tg } from '../tg';
 import { normName } from '../../../shared/names';
+import { compositionFor } from '../../../shared/compositions';
+import NameSuggest, { useSuggestIndex, type SuggestItem } from '../components/NameSuggest';
 
 type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; matPrice: string; coef: string; composition: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
 type H = { title: string; customer: string; address: string; date: string; status: string; projectId: string | null; notes: string; paymentTerms: string; validDays: string; customerDetails: string; workStart: string; workEnd: string; warrantyMonths: string;
@@ -100,6 +102,20 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         costPrice: it.costPrice == null ? '' : String(it.costPrice), composition: l.composition || it.description || '', catalogItemId: it.id });
       haptic('light');
     } else setLine(l.k, { name });
+  };
+  /** Выбрали подсказку — подставляем позицию целиком (цена, ед., тип, состав) */
+  const suggestIx = useSuggestIndex(cat.data || undefined);
+  const pickItem = (l: L, s: SuggestItem) => {
+    const it: any = s.raw;
+    if (it) {
+      const m = itemMat(it);
+      setLine(l.k, { name: it.name, unit: it.unit, price: String(it.price), matPrice: m ? String(m) : '', type: it.type || 'work', category: l.category || it.category || '',
+        costPrice: it.costPrice == null ? '' : String(it.costPrice), composition: it.description || l.composition || '', catalogItemId: it.id });
+    } else {
+      setLine(l.k, { name: s.name, unit: s.unit, price: String(s.price), type: s.category === 'Аренда техники' ? 'equipment' : s.category === 'Доставка' || s.name.startsWith('Вывоз') ? 'service' : 'work',
+        category: l.category || s.category || '', composition: l.composition || (compositionFor(s.name)?.join('\n') ?? ''), catalogItemId: null });
+    }
+    haptic('light');
   };
   /** Позиции, цены которых отличаются от справочника или которых в нём нет */
   const fresh = useMemo(() => {
@@ -336,10 +352,9 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
               )}
               {!(g.cat && folded.has(g.cat)) && g.items.map((l) => (
                 <div key={l.k} className={`line ${l.unconfirmed ? 'unconfirmed' : ''}`}>
-                  <div className="line-top">
-                    <input className="line-name" value={l.name} placeholder="Название позиции" list="own-items" onChange={(e) => setName(l, e.target.value)} readOnly={readOnly} aria-label="Название" />
-                    <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Подробнее" onClick={() => { setEditLine(l.k); setSheet('line'); }}><Icon.more /></button>
-                  </div>
+                  <NameSuggest rowClassName="line-top" className="line-name" value={l.name} placeholder="Название позиции" readOnly={readOnly} ariaLabel="Название"
+                    index={suggestIx} onChange={(v) => setName(l, v)} onPick={(s) => pickItem(l, s)}
+                    after={<button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Подробнее" onClick={() => { setEditLine(l.k); setSheet('line'); }}><Icon.more /></button>} />
                   {l.composition.trim() && (
                     <button className="line-comp" onClick={() => { setEditLine(l.k); setSheet('line'); }}>
                       в составе: {l.composition.split('\n').map((x) => x.replace(/^[-–•\s]+/, '').trim()).filter(Boolean).join('; ')}
@@ -387,7 +402,6 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <button className="btn" onClick={() => addLines([{}])}><Icon.plus width={18} />Пустая строка</button>
         </div>
       )}
-      <datalist id="own-items">{(cat.data || []).slice(0, 400).map((i: any) => <option key={i.id} value={i.name}>{`${i.price} ₽/${i.unit}`}</option>)}</datalist>
       {!simple && !readOnly && fresh.length > 0 && (
         <button className="btn block save-prices" style={{ marginTop: 8 }} onClick={() => { setSkip(new Set(fresh.filter((x) => /Примерная цена/.test(x.l.note)).map((x) => x.l.k))); setSheet('prices'); }}>
           💾 Запомнить мои расценки · {fresh.length}<small>новые и изменённые цены → в справочник, для следующих смет</small>
@@ -657,7 +671,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <Sheet open={sheet === 'line' && !!current} onClose={() => setSheet(null)} title="Позиция">
         {current && (
           <div className="stack">
-            <Field label="Название"><input className="input" value={current.name} list="own-items" onChange={(e) => setName(current, e.target.value)} readOnly={readOnly} /></Field>
+            <Field label="Название"><NameSuggest className="input" value={current.name} readOnly={readOnly} index={suggestIx} onChange={(v) => setName(current, v)} onPick={(s) => pickItem(current, s)} /></Field>
             {current.type === 'material' && !readOnly && (() => {
               const vs = materialVariants(current.name, parseNum(current.price));
               if (!vs.length) return null;

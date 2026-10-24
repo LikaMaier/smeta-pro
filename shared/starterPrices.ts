@@ -4,11 +4,13 @@
  * (не минимальные «от»). Для других регионов цены пересчитываются коэффициентом в Справочнике.
  * Это не предложение поставщиков и не рыночная гарантия: пользователь правит цены под себя.
  */
+import { EXTRA_PRICES } from './starterPricesExtra';
+
 export interface StarterItem { category: string; name: string; unit: string; price: number }
 
 const W = (category: string, rows: [string, string, number][]): StarterItem[] => rows.map(([name, unit, price]) => ({ category, name, unit, price }));
 
-export const STARTER_PRICES: StarterItem[] = [
+const BASE_PRICES: StarterItem[] = [
   ...W('Демонтаж', [
     ['Демонтаж стяжки', 'м²', 700], ['Демонтаж плитки со стен', 'м²', 380], ['Демонтаж перегородок из кирпича', 'м²', 900],
     ['Вывоз строительного мусора (контейнер 8 м³)', 'рейс', 10500], ['Демонтаж бетонных конструкций (перфоратор)', 'м³', 7450],
@@ -406,5 +408,11 @@ export const STARTER_PRICES: StarterItem[] = [
     ['Вывоз мусора газелью', 'рейс', 5000], ['Вывоз мусора контейнером 20 м³', 'рейс', 16000],
   ]),
 ];
+
+/** Основной список + расширение (дубли по названию отбрасываются, основной важнее) */
+export const STARTER_PRICES: StarterItem[] = (() => {
+  const seen = new Set<string>();
+  return [...BASE_PRICES, ...EXTRA_PRICES].filter((p) => { const k = p.name.toLowerCase().replace(/ё/g, 'е'); if (seen.has(k)) return false; seen.add(k); return true; });
+})();
 
 export const STARTER_CATEGORIES = [...new Set(STARTER_PRICES.map((p) => p.category))];

@@ -505,3 +505,24 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
 .meter { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
 .meter span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
 .kpi > div { min-width: 0; }
+
+/* ===== Подсказки названия позиции: под строкой, в потоке (ничего не перекрывают) ===== */
+.ns { width: 100%; min-width: 0; }
+.ns-list { margin-top: 6px; border: 1px solid var(--line); border-radius: var(--r-l); background: var(--surface-2); overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25); animation: ns-in .12s ease-out; }
+@keyframes ns-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.ns-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 4px 12px; font-size: var(--fs-xs); color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
+.ns-close { width: 32px; height: 28px; border: 0; background: none; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; border-radius: var(--r-s); }
+.ns-close:active { background: var(--surface); }
+.ns-item { display: flex; flex-direction: column; gap: 3px; width: 100%; text-align: left; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; color: var(--text); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ns-item:last-child { border-bottom: 0; }
+.ns-item.on, .ns-item:active { background: var(--surface); box-shadow: inset 3px 0 0 var(--accent); }
+.ns-name { font-size: var(--fs-s); font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
+.ns-name mark { background: none; color: var(--amber); font-weight: 700; }
+.ns-own { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--on-accent); background: var(--accent); vertical-align: 1px; }
+.ns-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: var(--fs-xs); }
+.ns-cat { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ns-price { margin-left: auto; flex: none; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+.ns-price span { font-weight: 400; color: var(--muted); }
