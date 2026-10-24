@@ -1,33 +1,31 @@
 import React, { useState } from 'react';
 import { get, post, del } from '../api';
 import { useMe } from '../App';
-import { Fold, Load, useLoad, useToast } from './ui';
+import { Load, useLoad, useToast } from './ui';
 import { openInvoice, haptic, tg, confirmDialog } from '../tg';
 import { TIERS, SEAT_RUB, PRICES, type Tier } from '../../../shared/plans';
 import { PayButtons, rub } from './Pay';
 
 const TIER_ICON: Record<string, string> = { lite: '🔹', pro: '⭐', team: '👷' };
-/** Что входит: строка → [Бесплатно, Лайт, Про]. Бригада и 3D — ниже, отдельно */
-const COMPARE: [string, string, string, string][] = [
-  ['Сметы', '3 в месяц', '✓', '✓'],
-  ['Без пометки, ваш логотип', '—', '✓', '✓'],
-  ['Договор, акты, КС-2, КС-3', '—', '—', '✓'],
-  ['Объекты: деньги и долги', '—', '—', '✓'],
-  ['3D-проект заказчику', `${PRICES.design} ₽`, `${PRICES.design} ₽`, '1 в мес.'],
+/** Что входит: строка → [Бесплатно, Лайт, Про, Бригада] */
+const COMPARE: [string, string, string, string, string][] = [
+  ['Сметы', '3 в месяц', 'без ограничений', 'без ограничений', 'без ограничений'],
+  ['Без пометки, ваш логотип и подпись', '—', '✓', '✓', '✓'],
+  ['Ссылка заказчику, согласование кнопкой', '✓', '✓', '✓', '✓'],
+  ['Договор подряда, акты, КС-2, КС-3, Excel', '—', '—', '✓', '✓'],
+  ['Объекты: деньги, расходы, долги, прибыль', '—', '—', '✓', '✓'],
+  ['ИИ-сметчик (голос и текст)', '—', '—', '✓', '✓'],
+  ['3D-проект для заказчика', `${PRICES.design} ₽`, `${PRICES.design} ₽`, '1 в месяц бесплатно', 'без ограничений'],
+  ['Бригада, общий справочник цен', '—', '—', '—', '✓'],
 ];
-/** Одна строка разницы на карточке вместо длинного списка */
-const ONE_LINE: Record<string, string> = {
-  lite: 'Сметы без пометки, с вашим логотипом',
-  pro: 'Всё из «Лайт» + договор, акты, КС и учёт денег',
-};
 function Compare({ cur }: { cur: string }) {
-  const cols = ['free', 'lite', 'pro'];
+  const cols = ['free', 'lite', 'pro', 'team'];
   return (
     <div className="panel" style={{ padding: 0, overflowX: 'auto', marginBottom: 12 }}>
       <table className="compare" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr>
           <th style={{ textAlign: 'left', padding: '10px 8px' }}>Что входит</th>
-          {['Бесплатно', 'Лайт', 'Про'].map((t, i) => <th key={t} style={{ padding: '10px 4px', textAlign: 'center', background: cols[i] === 'pro' ? 'var(--amber-soft, rgba(232,160,40,.12))' : undefined, whiteSpace: 'nowrap' }}>{t}{cur === cols[i] ? <div className="xs muted">ваш</div> : null}</th>)}
+          {['Бесплатно', 'Лайт', 'Про', 'Бригада'].map((t, i) => <th key={t} style={{ padding: '10px 4px', textAlign: 'center', background: cols[i] === 'pro' ? 'var(--amber-soft, rgba(232,160,40,.12))' : undefined, whiteSpace: 'nowrap' }}>{t}{cur === cols[i] ? <div className="xs muted">ваш</div> : null}</th>)}
         </tr></thead>
         <tbody>{COMPARE.map(([name, ...v]) => (
           <tr key={name} style={{ borderTop: '1px solid var(--line)' }}>
@@ -41,8 +39,8 @@ function Compare({ cur }: { cur: string }) {
 }
 const PACK_TEXT: Record<string, string> = {
   est10: `10 смет без пометки, с вашим логотипом. Действуют ${PRICES.packMonths} месяцев — удобно, если заказы бывают не каждый месяц.`,
-  studio_m: 'Все 3D-проекты без ограничений на месяц.',
-  design1: `PDF без водяного знака и 3D-ссылка для заказчика. Первый — ${PRICES.designFirst} ₽, дальше ${PRICES.design} ₽; в «Про» — 1 в месяц бесплатно.`,
+  studio_m: 'Все 3D-проекты и 3D-ссылки для заказчиков без ограничений на месяц — выгодно, если объектов больше двух в месяц.',
+  design1: `Премиальный 3D-проект одного объекта для заказчика: PDF без водяного знака (3D, план, фасады, узлы, ведомость) и 3D-ссылка, которую заказчик крутит пальцем. Первый проект — ${PRICES.designFirst} ₽, дальше ${PRICES.design} ₽; в «Про» — 1 в месяц бесплатно. Включите его в смету — обычно это 3–5 тыс. ₽.`,
 };
 
 /** Тарифы: Про / Бригада (3, 5 или 10 человек) и 3D-проект для заказчика; оплата ЮKassa (карта, СБП) и Telegram Stars */
@@ -51,7 +49,6 @@ export default function Tariffs() {
   const plans = useLoad(() => get<any[]>('/plans'), [me.promo?.code, me.access.mode, me.plan?.tier]);
   const [yearSel, setYear] = useState<boolean | null>(null);
   const [seats, setSeats] = useState(5);
-  const [showTeam, setShowTeam] = useState(() => me.plan?.tier === 'team');
   const cur: Tier = me.plan?.tier || 'free';
   const paid = me.access.mode === 'subscription';
   const perDay = (v: number, months: number) => Math.round(v / (months * 30.4));
@@ -72,9 +69,9 @@ export default function Tariffs() {
             <button className={`chip ${year ? 'on' : ''}`} onClick={() => setYear(true)}>На год · выгоднее</button>
           </div>
           <div className="tariffs">
-            {me.access.mode === 'trial' && <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Пробный период: открыто всё. Осталось {me.access.daysLeft} дн.</div>}
+            {me.access.mode === 'trial' && <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Сейчас у вас пробный период — открыто всё, как в «Про». Осталось {me.access.daysLeft} дн. Потом бесплатно — 3 сметы в месяц с пометкой.</div>}
             <Compare cur={me.access.mode === 'trial' ? 'free' : cur} />
-            {(['lite', 'pro', 'team'] as const).filter((t) => t !== 'team' || showTeam).map((t) => {
+            {(['lite', 'pro', 'team'] as const).map((t) => {
               const p = list.find((x) => x.tier === t && x.months === (year ? 12 : 1) && (t !== 'team' || (x.seats || 3) === seats));
               if (!p) return null;
               const on = cur === t && paid;
@@ -90,7 +87,7 @@ export default function Tariffs() {
                     {price < p.rubPrice && <s className="muted" style={{ marginRight: 6 }}>{rub(year ? Math.round(p.rubPrice / 12) : p.rubPrice)}</s>}
                     <b className="num">{rub(year ? Math.round(price / 12) : price)}</b><span className="muted">{!year && p.price?.note === 'первый месяц' ? ` за первый месяц, дальше ${rub(p.rubPrice)}` : ` в месяц${year ? ` · ${rub(price)} за год` : ''}`}</span>
                   </div>
-                  <div className="xs muted">≈ {perDay(price, p.months)} ₽ в день{year ? ` · экономия ${rub(Math.round((list.find((x) => x.tier === t && x.months === 1 && (t !== 'team' || (x.seats || 3) === seats))?.rubPrice || 0) * 12 - p.rubPrice))}` : ''}</div>
+                  <div className="xs muted">≈ {perDay(price, p.months)} ₽ в день{t === 'lite' ? ' — дешевле пачки саморезов' : t === 'pro' ? ' — окупается одним договором' : ''}{year ? ` · экономия ${rub(Math.round((list.find((x) => x.tier === t && x.months === 1 && (t !== 'team' || (x.seats || 3) === seats))?.rubPrice || 0) * 12 - p.rubPrice))}` : ''}</div>
                   {p.price?.discountPct > 0 && p.price?.note && p.price.note !== 'первый месяц' && <span className="badge ok">−{p.price.discountPct}% {p.price.note}</span>}
                   {t === 'team' && (
                     <div className="segc" role="radiogroup" aria-label="Человек в бригаде" style={{ margin: '6px 0 2px' }}>
@@ -98,20 +95,16 @@ export default function Tariffs() {
                     </div>
                   )}
                   {t === 'team' && <div className="xs muted">3 человека в базовой цене, каждый следующий — +{SEAT_RUB} ₽ в месяц</div>}
-                  {ONE_LINE[t] ? <div className="small" style={{ margin: '8px 0' }}>{ONE_LINE[t]}</div> : <ul className="tariff-perks">{TIERS[t].perks.map((x) => (t === 'team' && /^от 3 человек/.test(x) ? `до ${seats} человек, общий справочник цен` : x)).map((x) => <li key={x}>{!me.aiAvailable && /^ИИ/.test(x) ? <>{x.replace(/^ИИ-сметчик: /, 'ИИ-сметчик (').replace(/^ИИ: /, 'ИИ (')}) — <b className="soon">скоро, без доплаты</b></> : x}</li>)}</ul>}
+                  <ul className="tariff-perks">{TIERS[t].perks.map((x) => (t === 'team' && /^от 3 человек/.test(x) ? `до ${seats} человек, общий справочник цен` : x)).map((x) => <li key={x}>{!me.aiAvailable && /^ИИ/.test(x) ? <>{x.replace(/^ИИ-сметчик: /, 'ИИ-сметчик (').replace(/^ИИ: /, 'ИИ (')}) — <b className="soon">скоро, без доплаты</b></> : x}</li>)}</ul>
                   <PayButtons p={p} label={on ? 'Продлить' : undefined} />
                 </div>
               );
             })}
           </div>
-          {paid && <p className="xs muted">При смене тарифа оставшиеся дни пересчитаются.</p>}
+          {paid && <p className="xs muted">При смене тарифа или размера бригады оставшиеся дни пересчитываются по цене месяца.</p>}
 
-          {!showTeam && <Fold id="tariff-team" title="👷 Для бригады" summary={`от ${rub(list.find((x) => x.tier === 'team' && x.months === 1 && (x.seats || 3) === 3)?.rubPrice || 0)}`}>
-            <p className="small" style={{ marginTop: 0 }}>Всё из «Про» для 3–10 человек и общий справочник цен.</p>
-            <button className="btn block" onClick={() => setShowTeam(true)}>Показать тариф «Бригада»</button>
-          </Fold>}
-          <Fold id="tariff-3d" title="🧊 3D-проекты для заказчиков" summary={`от ${PRICES.designFirst} ₽`}>
-          <p className="small muted" style={{ marginTop: 0 }}>Конструктор — бесплатно. Проект заказчику — отдельно.</p>
+          <h2 className="section-title">🧊 3D-проекты для заказчиков</h2>
+          <p className="small muted" style={{ marginTop: 0 }}>3D-конструктор и смета по модели — бесплатно. Готовый проект для заказчика — отдельно: включите его в смету и заработайте на нём.</p>
           <div className="list">
             {['design1', 'studio_m'].map((c) => list.find((x) => x.code === c)).filter(Boolean).map((p: any) => (
               <div key={p.code} className="list-item" style={{ display: 'block', cursor: 'default' }}>
@@ -121,13 +114,12 @@ export default function Tariffs() {
               </div>
             ))}
           </div>
-          </Fold>
 
           <p className="xs muted">Нужна всего одна смета без пометки? Оплатите её прямо в смете — {PRICES.estimate} ₽.</p>
         </>
         );
       }}</Load>
-      <p className="xs muted">{me.pay?.yookassa ? 'Карта, СБП или Telegram Stars.' : 'Оплата в Telegram Stars.'} Без автосписаний.</p>
+      <p className="xs muted">{me.pay?.yookassa ? 'Картой или через СБП — через ЮKassa. Или в Telegram Stars.' : 'Оплата в Telegram Stars; сумма в рублях примерная — зависит от того, где покупать звёзды.'} Доступ включается сразу после подтверждения платежа. Без автосписаний — продлеваете, только когда сами захотите.</p>
       <PromoField />
       <TeamPanel />
     </>

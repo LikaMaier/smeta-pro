@@ -31,7 +31,7 @@ export default function QuickEstimate({ onBusy }: { onBusy?: (b: boolean) => voi
 
   const build = () => {
     const parsed = parseQuick(text, ix);
-    if (!parsed.length) return toast('Например: «ламинат 20 м², 6 розеток»', true);
+    if (!parsed.length) return toast('Напишите, что нужно сделать: например, «ламинат 20 м², 6 розеток»', true);
     setRows(parsed.map((l, k) => ({ k, text: l.text, qty: String(l.qty), pick: l.match ? 0 : -1, alts: l.alts, off: false })));
   };
   const set = (k: number, p: Partial<Row>) => setRows((rs) => rs!.map((r) => (r.k === k ? { ...r, ...p } : r)));
@@ -57,15 +57,8 @@ export default function QuickEstimate({ onBusy }: { onBusy?: (b: boolean) => voi
 
   return (
     <div className="panel quick">
-      {rows ? (
-        <div className="row between" style={{ alignItems: 'center' }}>
-          <button className="linklike" onClick={() => setRows(null)}>← Назад</button>
-          <b>Проверьте смету</b>
-          <span style={{ width: 60 }} />
-        </div>
-      ) : <>
-      <b>✍️ Что нужно сделать?</b>
-      <div className="xs muted" style={{ margin: '4px 0 8px' }}>Пишите через запятую — цены подставятся сами</div>
+      <b>✍️ Опишите работу — смета соберётся сама</b>
+      <div className="xs muted" style={{ margin: '4px 0 8px' }}>Пишите как заказчику, через запятую. Количество и единицы найдутся в тексте, цены — из вашего справочника (или средние по СПб).</div>
       <textarea className="textarea" style={{ minHeight: 90 }} value={text} onChange={(e) => { setText(e.target.value); setRows(null); }}
         placeholder="Например: плитка в ванной 12 м², демонтаж старой плитки, установка унитаза, 6 розеток" aria-label="Что нужно сделать" />
       {!text && (
@@ -73,8 +66,7 @@ export default function QuickEstimate({ onBusy }: { onBusy?: (b: boolean) => voi
           {QUICK_EXAMPLES.map((x) => <button key={x} className="chip" onClick={() => setText(x)}>{x.split(',')[0]}…</button>)}
         </div>
       )}
-      <button className="btn primary block" style={{ marginTop: 10 }} disabled={!text.trim()} onClick={build}>Собрать смету</button>
-      </>}
+      {!rows && <button className="btn primary block" style={{ marginTop: 10 }} disabled={!text.trim()} onClick={build}>Собрать смету</button>}
       {rows && (
         <>
           <div className="list" style={{ marginTop: 10 }}>
@@ -89,7 +81,7 @@ export default function QuickEstimate({ onBusy }: { onBusy?: (b: boolean) => voi
                         {r.alts.map((a, i) => <option key={a.name} value={i}>{a.name}</option>)}
                       </select>
                     ) : <div className="title">{it.name}</div>
-                  ) : <div className="small" style={{ color: 'var(--bad)' }}>Не нашёл — цену впишете сами</div>}
+                  ) : <div className="small" style={{ color: 'var(--bad)' }}>Не нашёл в справочнике — добавлю строкой, цену укажете сами</div>}
                   <div className="row" style={{ gap: 8, marginTop: 6, alignItems: 'center' }}>
                     <div style={{ width: 110 }}><NumInput value={r.qty} onChange={(v) => set(r.k, { qty: v })} unit={it?.unit || 'шт'} aria-label="Количество" /></div>
                     <span className="grow num" style={{ textAlign: 'right' }}>{it ? <>{rub(it.price * parseNum(r.qty))}<span className="xs muted" style={{ display: 'block' }}>по {rub(it.price)}/{it.unit}{it.own ? ' · моя цена' : ''}</span></> : '—'}</span>
@@ -99,8 +91,9 @@ export default function QuickEstimate({ onBusy }: { onBusy?: (b: boolean) => voi
               );
             })}
           </div>
-          <div className="row between" style={{ marginTop: 10 }}><span className="muted">Работы, без материалов</span><b className="num">{rub(total)}</b></div>
+          <div className="row between" style={{ marginTop: 10 }}><span className="muted">Примерно, без материалов</span><b className="num">{rub(total)}</b></div>
           <button className="btn primary block lg" style={{ marginTop: 10 }} disabled={busy || !live.length} onClick={create}>{busy ? 'Создаю…' : `Создать смету · ${live.length} поз.`}</button>
+          <button className="btn ghost block" style={{ marginTop: 6 }} onClick={() => setRows(null)}>Исправить текст</button>
         </>
       )}
     </div>

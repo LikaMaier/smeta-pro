@@ -31,7 +31,7 @@ export default function Home() {
 
   return (
     <>
-      {me.isAdmin && <Link to="/admin/stats" className="list-item panel" style={{ marginBottom: 10 }}><span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">📊</span><div className="grow"><div className="title">Статистика</div><div className="xs muted">видите только вы</div></div></Link>}
+      {me.isAdmin && <Link to="/admin/stats" className="list-item panel" style={{ marginBottom: 10 }}><span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">📊</span><div className="grow"><div className="title">Статистика приложения</div><div className="xs muted">заходы, сметы, оплаты — видите только вы</div></div></Link>}
       {(me.access.estimateCount ?? 0) > 0 && <Link to="/calendar" style={{ display: 'block' }}>
         <Hero
           title={<>Заработано за {MONTH_NAME(monthNow())}: <span className={earned < 0 ? 'neg' : ''}>{earned == null ? '…' : rub0(earned)}</span></>}
@@ -39,16 +39,14 @@ export default function Home() {
         />
       </Link>}
 
-      {/* Главное действие — написать, что делать. Готовые сметы и шаблоны — ссылкой. */}
-      {canCreate ? <QuickEstimate /> : (
-        <button className="tile wide home-new" onClick={() => nav('/settings')}>
-          <span className="home-new-plus" aria-hidden="true">+</span>Новая смета<small>бесплатные сметы месяца закончились</small>
-        </button>
-      )}
-      <div className="row between" style={{ marginTop: 8 }}>
-        <Link to="/new?pick=1" className="small">📋 Готовые сметы и шаблоны →</Link>
-        {!me.access.active && me.access.freeEstimateLeft && (me.access.freeLeft ?? 0) < 1000 && <span className="xs muted">бесплатно: ещё {me.access.freeLeft ?? 3}</span>}
-      </div>
+      <button className="tile wide home-new" onClick={() => nav(canCreate ? '/new' : '/settings')}>
+        <span className="home-new-plus" aria-hidden="true">+</span>
+        Новая смета
+        <small>{!me.access.active && me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'сметы бесплатно — без ограничений' : `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}`) : 'готовые сметы по направлениям и шаблонам'}</small>
+      </button>
+
+
+      {canCreate && <div style={{ marginTop: 10 }}><QuickEstimate /></div>}
 
       {last.length > 0 && (
         <>
@@ -65,10 +63,10 @@ export default function Home() {
       )}
 
       <div className="tiles" style={{ marginTop: 10 }}>
-        <Link className="tile" to="/projects">🏗 Объекты<small>{active ? `в работе: ${active}` : 'деньги и долги'}</small></Link>
-        <Link className="tile" to="/calendar">📅 Календарь<small>{remToday ? `сегодня: ${remToday}` : 'напоминания'}</small></Link>
-        <Link className="tile" to="/tools">📐 3D и расчёты<small>проекты, калькуляторы</small></Link>
-        <Link className="tile" to="/more">📚 Ещё<small>цены, настройки</small></Link>
+        <Link className="tile" to="/projects">🏗 Объекты<small>{active ? `в работе: ${active}` : 'деньги, долги, контакты'}</small></Link>
+        <Link className="tile" to="/calendar">📅 Календарь<small>{remToday ? `напоминаний сегодня: ${remToday}` : 'фото, журнал, напоминания'}</small></Link>
+        <Link className="tile" to="/tools">📐 3D и расчёты<small>постройки, заборы, электрика, мастера</small></Link>
+        <Link className="tile" to="/more">📚 Справочник и ещё<small>цены, финансы, контакты, настройки</small></Link>
       </div>
     </>
   );

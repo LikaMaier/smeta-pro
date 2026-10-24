@@ -101,14 +101,6 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       haptic('light');
     } else setLine(l.k, { name });
   };
-  /** Выбрали позицию из подсказки — название, единица и цена из справочника */
-  const pickItem = (l: L, it: any) => {
-    const m = itemMat(it);
-    setLine(l.k, { name: it.name, unit: it.unit, price: String(it.price), matPrice: m ? String(m) : '', type: it.type, category: l.category || it.category || '',
-      costPrice: it.costPrice == null ? '' : String(it.costPrice), composition: l.composition || it.description || '', catalogItemId: it.id });
-    haptic('light');
-  };
-  const [focusK, setFocusK] = useState<string | null>(null);
   /** Позиции, цены которых отличаются от справочника или которых в нём нет */
   const fresh = useMemo(() => {
     if (!cat.data) return [];
@@ -197,7 +189,6 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
 
   // «Часто забывают» — подсказки недостающих позиций
   const [hiddenTips, setHiddenTips] = useState<Set<string>>(new Set());
-  const [tipsOpen, setTipsOpen] = useState(false);
   const tips = useMemo(() => forgottenFor(lines.map((l) => ({ name: l.name, category: l.category })), 12).filter((t) => !hiddenTips.has(t.name)).slice(0, 6), [lines, hiddenTips]);
   const addTip = (t: ReturnType<typeof forgottenFor>[number]) => {
     const it: any = catMap.get(normName(t.name));
@@ -316,25 +307,19 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
       )}
 
-      {simple ? (
-        // простой вид: сохраняется молча, без статусов и меню; о проблемах — только если не сохранилось
-        <div className="row between" style={{ marginBottom: 8 }}>
-          <span className="xs" style={{ color: 'var(--bad)' }}>{readOnly ? 'Только просмотр' : saveState === 'error' ? 'Не сохранилось — проверьте связь' : ''}</span>
-          <button className="chip" onClick={() => setSimple(false)}>Все возможности</button>
-        </div>
-      ) : (
       <div className="row between" style={{ marginBottom: 8 }}>
         <span className="xs muted">{readOnly ? 'Только просмотр' : saveState === 'saving' ? 'Сохраняю…' : saveState === 'error' ? 'Не сохранено' : dirty ? 'Есть изменения' : 'Сохранено'}</span>
         <div className="row">
-          <button className="chip" onClick={() => setSimple(true)}>Простой вид</button>
-          <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По разделам</button>
+          {simple ? <button className="chip" onClick={() => setSimple(false)}>Все возможности</button> : <>
+            <button className="chip" onClick={() => setSimple(true)}>Простой вид</button>
+            <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По разделам</button>
+          </>}
           <button className="icon-btn" aria-label="Действия" onClick={() => setSheet('more')}><Icon.more /></button>
         </div>
       </div>
-      )}
 
       {lines.length === 0 ? (
-        <div className="panel"><State title="Пока пусто" text="Добавьте работы из справочника или строкой." /></div>
+        <div className="panel"><State title="В смете пока нет позиций" text="Добавьте работы и материалы из своего справочника или пустой строкой." /></div>
       ) : (
         <div className="list">
           {order.map((g) => (
@@ -352,11 +337,9 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
               {!(g.cat && folded.has(g.cat)) && g.items.map((l) => (
                 <div key={l.k} className={`line ${l.unconfirmed ? 'unconfirmed' : ''}`}>
                   <div className="line-top">
-                    <input className="line-name" value={l.name} placeholder="Название позиции" onChange={(e) => setName(l, e.target.value)} readOnly={readOnly} aria-label="Название"
-                      onFocus={() => setFocusK(l.k)} onBlur={() => setTimeout(() => setFocusK((k) => (k === l.k ? null : k)), 150)} autoComplete="off" />
+                    <input className="line-name" value={l.name} placeholder="Название позиции" list="own-items" onChange={(e) => setName(l, e.target.value)} readOnly={readOnly} aria-label="Название" />
                     <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Подробнее" onClick={() => { setEditLine(l.k); setSheet('line'); }}><Icon.more /></button>
                   </div>
-                  {focusK === l.k && !readOnly && <Suggest name={l.name} items={cat.data || []} onPick={(it) => { pickItem(l, it); setFocusK(null); }} />}
                   {l.composition.trim() && (
                     <button className="line-comp" onClick={() => { setEditLine(l.k); setSheet('line'); }}>
                       в составе: {l.composition.split('\n').map((x) => x.replace(/^[-–•\s]+/, '').trim()).filter(Boolean).join('; ')}
@@ -386,18 +369,16 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       )}
 
       {!readOnly && tips.length > 0 && (
-        <div className="panel" style={{ marginTop: 12, padding: tipsOpen ? undefined : '10px 14px' }}>
-          <button className="row between" style={{ width: '100%', background: 'none', border: 0, padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }} onClick={() => setTipsOpen(!tipsOpen)} aria-expanded={tipsOpen}>
-            <b>💡 Часто забывают: {tips.length}</b><span className="xs muted">{tipsOpen ? 'свернуть' : 'показать'}</span>
-          </button>
-          {tipsOpen && <div className="row wrap" style={{ marginTop: 8, gap: 6 }}>
+        <div className="panel" style={{ marginTop: 12 }}>
+          <div className="row between"><b>💡 Часто забывают</b><span className="xs muted">нажмите, чтобы добавить</span></div>
+          <div className="row wrap" style={{ marginTop: 8, gap: 6 }}>
             {tips.map((t) => (
               <span key={t.name} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingRight: 4 }}>
                 <button style={{ background: 'none', border: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', padding: 0, textAlign: 'left' }} onClick={() => addTip(t)} title={t.why}>+ {t.name} <span className="muted">· {rub(t.price)}/{t.unit}</span></button>
                 <button aria-label={`Скрыть: ${t.name}`} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: '0 4px', fontSize: 16 }} onClick={() => setHiddenTips((x) => new Set(x).add(t.name))}>×</button>
               </span>
             ))}
-          </div>}
+          </div>
         </div>
       )}
       {!readOnly && (
@@ -406,9 +387,10 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
           <button className="btn" onClick={() => addLines([{}])}><Icon.plus width={18} />Пустая строка</button>
         </div>
       )}
+      <datalist id="own-items">{(cat.data || []).slice(0, 400).map((i: any) => <option key={i.id} value={i.name}>{`${i.price} ₽/${i.unit}`}</option>)}</datalist>
       {!simple && !readOnly && fresh.length > 0 && (
         <button className="btn block save-prices" style={{ marginTop: 8 }} onClick={() => { setSkip(new Set(fresh.filter((x) => /Примерная цена/.test(x.l.note)).map((x) => x.l.k))); setSheet('prices'); }}>
-          💾 Запомнить мои цены · {fresh.length}<small>в следующий раз подставятся сами</small>
+          💾 Запомнить мои расценки · {fresh.length}<small>новые и изменённые цены → в справочник, для следующих смет</small>
         </button>
       )}
       {!simple && !readOnly && initial.source === 'template' && !initial.isTemplate && !savedTpl && (
@@ -463,8 +445,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
 
       {!readOnly && !me.access.active && !initial.paidAt && !(me.access.paidEstimateIds || []).includes(initial.id) && (
         <button className="banner" style={{ display: 'block', width: '100%', textAlign: 'left', marginTop: 12, cursor: 'pointer' }} onClick={() => setSheet('clean')}>
-          <b>В смете будет пометка «СМЕТА PRO»</b>
-          <div className="xs">Убрать: {PRICES.estimate} ₽ за смету или «Лайт» от {PRICES.liteFirst} ₽ →</div>
+          <b>Заказчик увидит пометку «Сделано в СМЕТА PRO»</b>
+          <div className="xs">Убрать и поставить ваш логотип — {PRICES.estimate} ₽ за эту смету или «Лайт» от {PRICES.liteFirst} ₽ в первый месяц →</div>
         </button>
       )}
       {simple && <h2 className="section-title">Отправить заказчику</h2>}
@@ -510,15 +492,9 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       {simple && (
         <button className="list-item panel" style={{ marginTop: 14 }} onClick={() => setSimple(false)}>
           <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">⚙️</span>
-          <div className="grow"><div className="title">Все возможности</div><div className="xs muted">договор, акты, скидки, прибыль</div></div>
+          <div className="grow"><div className="title">Все возможности</div><div className="xs muted">скидки и наценка, график оплаты, договор, акты и КС, прибыль, шаблоны</div></div>
           <Icon.chevron className="chev" width={20} />
         </button>
-      )}
-      {simple && !readOnly && (
-        <button className="linklike small" style={{ display: 'block', margin: '14px auto 0', color: 'var(--bad)' }} onClick={async () => {
-          if (!(await confirmDialog('Удалить смету?'))) return;
-          await action(async () => { await del(`/estimates/${initial.id}`); nav('/estimates', { replace: true }); }, 'Смета удалена');
-        }}>🗑 Удалить смету</button>
       )}
 
       <div className="totalbar"><div className="in">
@@ -681,7 +657,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <Sheet open={sheet === 'line' && !!current} onClose={() => setSheet(null)} title="Позиция">
         {current && (
           <div className="stack">
-            <Field label="Название"><input className="input" value={current.name} autoComplete="off" onChange={(e) => setName(current, e.target.value)} readOnly={readOnly} /></Field>
+            <Field label="Название"><input className="input" value={current.name} list="own-items" onChange={(e) => setName(current, e.target.value)} readOnly={readOnly} /></Field>
             {current.type === 'material' && !readOnly && (() => {
               const vs = materialVariants(current.name, parseNum(current.price));
               if (!vs.length) return null;
@@ -999,26 +975,6 @@ function DocForm({ kind, id, lines, schedule, total, hasReq, save, onDone }: { k
         <button className="btn primary" disabled={busy} onClick={() => run('send')}>{busy ? 'Готовлю…' : 'В Telegram'}</button>
         <button className="btn" disabled={busy} onClick={() => run('open')}>Открыть</button>
       </div>
-    </div>
-  );
-}
-
-/** Подсказки из справочника под строкой (вместо системного списка, который лагал и закрывал клавиатуру) */
-function Suggest({ name, items, onPick }: { name: string; items: any[]; onPick: (it: any) => void }) {
-  const q = normName(name);
-  const found = useMemo(() => {
-    if (q.length < 3) return [];
-    const words = q.split(' ').filter(Boolean);
-    return items.filter((i) => { const n = normName(i.name); return n !== q && words.every((w) => n.includes(w)); }).slice(0, 4);
-  }, [q, items]);
-  if (!found.length) return null;
-  return (
-    <div className="suggest">
-      {found.map((i) => (
-        <button key={i.id} className="suggest-item" onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i)}>
-          <span className="ellipsis">{i.name}</span><span className="xs muted num">{rub(i.price)}/{i.unit}</span>
-        </button>
-      ))}
     </div>
   );
 }
