@@ -26,7 +26,7 @@ export default function Home() {
   const earned = cal.data?.total?.earned;
   const active = fin.data?.activeCount;
   const canCreate = me.access.active || me.access.freeEstimateLeft;
-  const last = (recent.data || []).filter((e: any) => !e.isTemplate).slice(0, 3);
+  const last = (recent.data || []).filter((e: any) => !e.isTemplate).slice(0, 1);
 
   return (
     <>

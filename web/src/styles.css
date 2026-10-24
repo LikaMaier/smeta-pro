@@ -526,3 +526,15 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
 .ns-cat { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ns-price { margin-left: auto; flex: none; font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
 .ns-price span { font-weight: 400; color: var(--muted); }
+
+/* ===== Мои сметы: выбор и удаление ===== */
+.est-box { flex: none; width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--tile-border, var(--line)); display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: var(--on-accent); }
+.est-box.on { background: var(--accent); border-color: var(--accent); }
+.list-item.est-on { background: var(--surface-2); }
+.est-selall { min-height: 44px; }
+.est-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 640px; margin: 0 auto; padding: 12px 16px calc(12px + var(--safe-b)); background: var(--surface); border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 18px rgba(0,0,0,.25); animation: ns-in .15s ease-out; }
+.est-bar + .est-bar { display: none; }
+.est-bar .btn.danger { border-color: var(--bad); }

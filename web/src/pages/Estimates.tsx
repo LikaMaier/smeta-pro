@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { get, post } from '../api';
-import { Chips, Icon, Load, SearchBox, State, useDebounced, useLoad } from '../components/ui';
+import { get, post, del } from '../api';
+import { confirmDialog, haptic } from '../tg';
+import { Chips, Icon, Load, SearchBox, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, date, EST_STATUS } from '../format';
 
 export default function Estimates() {
@@ -13,6 +14,30 @@ export default function Estimates() {
   const [to, setTo] = useState('');
   const dq = useDebounced(q);
   const list = useLoad(() => get<any[]>('/estimates', { q: dq, status, template: tab === 'templates' ? '1' : '', from, to: to ? `${to}T23:59:59` : '' }), [dq, status, tab, from, to]);
+  // выбор и удаление смет
+  const toast = useToast();
+  const [sel, setSel] = useState<Set<string> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [undo, setUndo] = useState<string[] | null>(null);
+  const toggle = (id: string) => setSel((x) => { const c = new Set(x || []); c.has(id) ? c.delete(id) : c.add(id); return c; });
+  const removeIds = async (ids: string[]) => {
+    if (!ids.length) return;
+    const word = ids.length === 1 ? 'смету' : `сметы (${ids.length})`;
+    if (!(await confirmDialog(`Удалить ${word}? Сразу после удаления можно нажать «Вернуть».`))) return;
+    setBusy(true);
+    const done: string[] = [];
+    for (const id of ids) { try { await del(`/estimates/${id}`); done.push(id); } catch { /* пропускаем */ } }
+    setBusy(false); setSel(null); haptic('medium');
+    if (done.length < ids.length) toast(`Не удалось удалить: ${ids.length - done.length}`, true);
+    if (done.length) { setUndo(done); window.setTimeout(() => setUndo((u) => (u === done ? null : u)), 8000); }
+    list.reload?.();
+  };
+  const restore = async () => {
+    const ids = undo || [];
+    setUndo(null);
+    for (const id of ids) { try { await post(`/estimates/${id}/restore`, {}); } catch { /* ок */ } }
+    toast('Вернула'); list.reload?.();
+  };
   // новая смета — пошаговый выбор направления (/new)
   React.useEffect(() => { if (new URLSearchParams(location.search).get('new') === '1') nav('/new', { replace: true }); }, []); // eslint-disable-line
 
@@ -21,7 +46,10 @@ export default function Estimates() {
     <>
       <div className="page-head">
         <h1 className="page-title">Мои сметы</h1>
-        <button className="btn primary sm" onClick={() => nav('/new')}><Icon.plus width={18} />Смета</button>
+        <div className="row" style={{ gap: 6 }}>
+          {(list.data?.length ?? 0) > 0 && <button className="btn sm" onClick={() => setSel((x) => (x ? null : new Set()))}>{sel ? 'Отмена' : 'Выбрать'}</button>}
+          {!sel && <button className="btn primary sm" onClick={() => nav('/new')}><Icon.plus width={18} />Смета</button>}
+        </div>
       </div>
       <Chips value={tab} onChange={setTab} options={[{ value: 'list', label: 'Сметы' }, { value: 'templates', label: 'Шаблоны' }]} />
       <SearchBox value={q} onChange={setQ} placeholder="Поиск по названию, заказчику, позициям" />
@@ -40,7 +68,22 @@ export default function Estimates() {
       ))}>
         {(items) => (
           <div className="list">
-            {items.map((e) => (
+            {sel && (
+              <button className="list-item est-selall" onClick={() => setSel(sel.size === items.length ? new Set() : new Set(items.map((e) => e.id)))}>
+                <span className={`est-box ${sel.size === items.length ? 'on' : ''}`}>{sel.size === items.length ? '✓' : ''}</span>
+                <div className="grow muted">{sel.size === items.length ? 'Снять выбор' : 'Выбрать все'}</div>
+              </button>
+            )}
+            {items.map((e) => sel ? (
+              <button key={e.id} className={`list-item ${sel.has(e.id) ? 'est-on' : ''}`} onClick={() => toggle(e.id)} aria-pressed={sel.has(e.id)}>
+                <span className={`est-box ${sel.has(e.id) ? 'on' : ''}`}>{sel.has(e.id) ? '✓' : ''}</span>
+                <div className="grow">
+                  <div className="title ellipsis">{e.title}</div>
+                  <div className="xs muted ellipsis">{[e.customer, date(e.date), `${e.linesCount} поз.`].filter(Boolean).join(' · ')}</div>
+                </div>
+                <div className="num" style={{ fontWeight: 700 }}>{rub(e.total)}</div>
+              </button>
+            ) : (
               <Link key={e.id} to={`/estimates/${e.id}`} className="list-item">
                 <div className="grow">
                   <div className="title ellipsis">{e.title}</div>
@@ -55,7 +98,19 @@ export default function Estimates() {
           </div>
         )}
       </Load>
-
+      {(sel || undo) && <div style={{ height: 76 }} />}
+      {sel && (
+        <div className="est-bar">
+          <span>Выбрано: <b>{sel.size}</b></span>
+          <button className="btn danger" disabled={!sel.size || busy} onClick={() => removeIds([...sel])}><Icon.trash width={18} />{busy ? 'Удаляю…' : 'Удалить'}</button>
+        </div>
+      )}
+      {undo && !sel && (
+        <div className="est-bar">
+          <span>Удалено смет: <b>{undo.length}</b></span>
+          <button className="btn" onClick={restore}>Вернуть</button>
+        </div>
+      )}
     </>
   );
 }
