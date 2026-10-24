@@ -4,6 +4,7 @@
  */
 import { prisma } from './util';
 import { env } from './env';
+import { blockedLine } from './adminStats';
 
 const MSK = 3 * 3600e3;
 /** «2026-10-13» — день по Москве */
@@ -84,6 +85,8 @@ export async function buildReport(from: Date, to: Date) {
   for (const x of p.payments.slice(0, 10)) L.push(`   • ${who(x.user)} — ${esc(plans.get(x.planCode) || x.planCode)}${x.amountRub ? `, ${rub(x.amountRub)}` : `, ${x.stars} ⭐`}`);
   L.push('', `<b>За сегодня:</b> новых ${today.newUsers.length} · заходили ${today.visitors} · смет ${today.estimates} · оплат ${today.payments.length}${today.rub ? ` (${rub(today.rub)})` : ''}`);
   L.push(`<b>Всего:</b> пользователей ${total} · платных подписок ${paidNow} · на пробном периоде ${trialNow}`);
+  L.push(await blockedLine().catch(() => ''));
+  L.push('', '<i>Подробно: /users · /smety · /top · /blocked</i>');
   return L.join('\n');
 }
 

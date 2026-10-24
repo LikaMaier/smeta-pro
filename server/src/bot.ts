@@ -17,6 +17,7 @@ import { joinTeam } from './routes/team';
 import { priceFor } from './routes/promo';
 import { attachInstagram } from './instagram';
 import { attachThreads } from './threads';
+import { attachAdminStats } from './adminStats';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -124,6 +125,7 @@ export function createBot() {
   });
   attachInstagram(bot); // кнопки «Опубликовать» и ответы на комментарии — раньше ИИ-обработчика текста
   attachThreads(bot);
+  attachAdminStats(bot); // /users /user /smety /top /blocked и учёт блокировок
   // ответ администратора на вопрос в поддержку: ответить (reply) на сообщение бота с вопросом → уходит пользователю
   bot.on('message:text', async (ctx, next) => {
     const rt = ctx.message.reply_to_message;
@@ -278,10 +280,10 @@ export async function setupBot(bot: Bot) {
     await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'СМЕТА PRO', web_app: { url: env.PUBLIC_URL } } });
     await bot.api.setWebhook(`${env.PUBLIC_URL}/bot/webhook`, {
       secret_token: env.WEBHOOK_SECRET || undefined,
-      allowed_updates: ['message', 'pre_checkout_query', 'callback_query'],
+      allowed_updates: ['message', 'pre_checkout_query', 'callback_query', 'my_chat_member'],
     });
   } else {
     await bot.api.deleteWebhook();
-    bot.start({ allowed_updates: ['message', 'pre_checkout_query', 'callback_query'] });
+    bot.start({ allowed_updates: ['message', 'pre_checkout_query', 'callback_query', 'my_chat_member'] });
   }
 }
