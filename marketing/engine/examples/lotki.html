@@ -11,13 +11,12 @@
     <linearGradient id="skyS" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd3f2"/><stop offset="1" stop-color="#eaf6fc"/></linearGradient>
     <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a45"/><stop offset="1" stop-color="#5e452b"/></linearGradient>
     <pattern id="grav" width="22" height="18" patternUnits="userSpaceOnUse"><rect width="22" height="18" fill="#8d949a"/><ellipse cx="6" cy="5" rx="5.5" ry="4" fill="#c9ced3" stroke="#6d7379"/><ellipse cx="16" cy="12" rx="6" ry="4.5" fill="#b4bac0" stroke="#6d7379"/></pattern>
-    <pattern id="concP" width="14" height="14" patternUnits="userSpaceOnUse"><rect width="14" height="14" fill="#b3b8bd"/><circle cx="3" cy="4" r="1" fill="#8f959b"/><circle cx="10" cy="10" r="1.2" fill="#9ca2a8"/></pattern>
     <pattern id="prof" width="12" height="10" patternUnits="userSpaceOnUse"><rect width="12" height="10" fill="#2f7a4f"/><rect width="5" height="10" fill="#3d9563"/></pattern>
     <radialGradient id="vigG" cx=".5" cy=".45" r=".8"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient>
   </defs>
   <g id="cam">
-    <rect x="-200" y="-200" width="940" height="900" fill="url(#skyS)"/>
-    <rect id="skyRain" x="-200" y="-200" width="940" height="900" fill="url(#skyR)"/>
+    <rect x="-300" y="-300" width="1400" height="1000" fill="url(#skyS)"/>
+    <rect id="skyRain" x="-300" y="-300" width="1400" height="1000" fill="url(#skyR)"/>
     <g id="clouds"></g>
     <!-- дом -->
     <g id="house">
@@ -26,119 +25,167 @@
       <rect x="10" y="410" width="48" height="48" fill="#9fd0ff" stroke="#3b3f44" stroke-width="3"/>
       <rect x="84" y="430" width="40" height="96" fill="#7a4a2a" stroke="#3b3f44" stroke-width="3"/>
     </g>
-    <!-- грунт -->
     <path id="ground" fill="url(#soil)"/>
     <g id="pebbles"></g>
     <path id="grass" fill="none" stroke="#5aa043" stroke-width="8"/>
-    <!-- размыв под забором -->
-    <ellipse id="wash" cx="478" cy="590" rx="0" ry="0" fill="#5b4632"/>
-    <ellipse id="washW" cx="478" cy="582" rx="0" ry="0" fill="#5b8fc4" opacity=".85"/>
-    <!-- лужа -->
-    <ellipse id="pool" cx="450" cy="568" rx="0" ry="7" fill="#6fb6ff" opacity=".9"/>
-    <!-- траншея и лоток -->
+    <rect id="road" x="500" y="572" width="700" height="10" fill="#4a4f55"/>
+    <!-- размыв и лужа -->
+    <ellipse id="wash" cx="380" cy="582" rx="0" ry="0" fill="#5b4632"/>
+    <ellipse id="washW" cx="380" cy="574" rx="0" ry="0" fill="#5b8fc4" opacity=".85"/>
+    <ellipse id="pool" cx="352" cy="560" rx="0" ry="7" fill="#6fb6ff" opacity=".9"/>
+    <!-- траншея за забором -->
     <g id="tr">
       <path id="hole" fill="#3d2c1b"/>
-      <rect id="Lgr" x="360" y="650" width="80" height="0" fill="url(#grav)"/>
-      <rect id="Lpad" x="360" y="625" width="80" height="0" fill="#9aa0a6" stroke="#6d7379" stroke-width="1.5"/>
-      <g id="Lside" opacity="0"><rect x="358" y="561" width="16" height="64" fill="url(#concP)" stroke="#6d7379" stroke-width="1.5"/><rect x="426" y="565" width="16" height="60" fill="url(#concP)" stroke="#6d7379" stroke-width="1.5"/></g>
-      <g id="lotok" opacity="0">
-        <path d="M372 565 H382 V597 H418 V565 H428 V605 H372Z" fill="#cfd2d5" stroke="#5d6268" stroke-width="2.5"/>
-        <rect id="chW" x="382" y="597" width="36" height="0" fill="#4aa3ff"/>
-      </g>
-      <g id="grate" opacity="0"><rect x="380" y="566" width="40" height="6" fill="#3b3f44"/><path d="M386 566 v6 M392 566 v6 M398 566 v6 M404 566 v6 M410 566 v6 M416 566 v6" stroke="#9aa0a6" stroke-width="2"/></g>
+      <rect id="Lgr" x="410" y="645" width="80" height="0" fill="url(#grav)"/>
+      <path id="geo" d="M412 576 L412 614 L488 614 L488 576" fill="none" stroke="#f5f5f0" stroke-width="5" stroke-linejoin="round" stroke-dasharray="200" stroke-dashoffset="200"/>
+      <rect id="pzL" x="410" y="614" width="12" height="0" fill="url(#grav)"/>
+      <rect id="pzR" x="478" y="614" width="12" height="0" fill="url(#grav)"/>
       <g id="dims" opacity="0">
-        <path d="M448 625 V650 M444 625 H452 M444 650 H452" stroke="#FFD43B" stroke-width="2.5"/>
-        <text id="dimT" x="456" y="643" font-family="PT" font-size="13" fill="#FFD43B">10–15 см</text>
+        <path d="M498 615 V645 M494 615 H502 M494 645 H502" stroke="#FFD43B" stroke-width="2.5"/>
+        <text x="506" y="635" font-family="PT" font-size="13" fill="#FFD43B">10–15 см</text>
       </g>
     </g>
-    <!-- поток воды по поверхности -->
+    <!-- поток воды -->
     <path id="flow" fill="none" stroke="#7cc4ff" stroke-width="6" stroke-linecap="round" stroke-dasharray="14 18"/>
-    <g id="drops"></g>
-    <text id="toWell" x="250" y="540" font-family="PT" font-size="16" fill="#0d2440" opacity="0">⊙ вода уходит в колодец</text>
-    <!-- забор -->
-    <g id="fence">
+    <!-- забор (столб у x=380) -->
+    <g id="fence"><g transform="translate(-98 -10)">
       <rect x="473" y="570" width="10" height="70" fill="#5d6268"/>
-      <path d="M480 392 L560 352 L560 538 L480 568Z" fill="url(#prof)" stroke="#1e4d33" stroke-width="2.5"/>
+      <path d="M480 392 L560 352 L560 538 L480 566Z" fill="url(#prof)" stroke="#1e4d33" stroke-width="2.5"/>
       <rect x="472" y="384" width="12" height="190" fill="#6b7480" stroke="#3b3f44" stroke-width="2"/>
       <rect x="470" y="380" width="16" height="8" fill="#3b3f44"/>
+    </g></g>
+    <!-- манипулятор -->
+    <g id="truck">
+      <rect x="10" y="-38" width="205" height="12" fill="#2b2f34"/>
+      <path d="M0 -30 L0 -84 Q0 -94 10 -94 L44 -94 L58 -64 L58 -30Z" fill="#e8eef3" stroke="#3b3f44" stroke-width="3"/>
+      <path d="M8 -86 L38 -86 L48 -64 L8 -64Z" fill="#9fd0ff" stroke="#3b3f44" stroke-width="2"/>
+      <rect x="70" y="-50" width="145" height="12" fill="#6b4a3a" stroke="#3b3f44" stroke-width="2"/>
+      <rect x="60" y="-82" width="12" height="44" fill="#f2b705" stroke="#3b3f44" stroke-width="2"/>
+      <!-- лоток, который остаётся на борту -->
+      <path d="M118 -90 H128 V-58 H164 V-90 H174 V-50 H118Z" fill="#cfd2d5" stroke="#5d6268" stroke-width="2.5"/>
+      <g id="legs"><rect x="66" y="-40" width="6" height="0" fill="#3b3f44"/></g>
+      <circle cx="34" cy="-14" r="16" fill="#222" stroke="#666" stroke-width="5"/>
+      <circle cx="150" cy="-14" r="16" fill="#222" stroke="#666" stroke-width="5"/>
+      <circle cx="188" cy="-14" r="16" fill="#222" stroke="#666" stroke-width="5"/>
     </g>
+    <g id="crane">
+      <line id="b1o" stroke="#3b3f44" stroke-width="14" stroke-linecap="round"/><line id="b1" stroke="#f2b705" stroke-width="9" stroke-linecap="round"/>
+      <line id="b2o" stroke="#3b3f44" stroke-width="11" stroke-linecap="round"/><line id="b2" stroke="#f2b705" stroke-width="6" stroke-linecap="round"/>
+      <circle id="joint" r="6" fill="#3b3f44"/>
+      <line id="rope" stroke="#2b2f34" stroke-width="2.5"/>
+      <line id="sl1" stroke="#ff7a1a" stroke-width="2.5"/><line id="sl2" stroke="#ff7a1a" stroke-width="2.5"/>
+      <path id="hookI" d="M0 0 v6 q0 7 -6 7" fill="none" stroke="#2b2f34" stroke-width="3"/>
+    </g>
+    <!-- монтируемый лоток (опорная точка — верх-центр, итог: 450, 572) -->
+    <g id="lotok">
+      <path d="M-28 0 H-18 V32 H18 V0 H28 V40 H-28Z" fill="#cfd2d5" stroke="#5d6268" stroke-width="2.5"/>
+      <rect id="chW" x="-18" y="32" width="36" height="0" fill="#4aa3ff"/>
+    </g>
+    <g id="grate" opacity="0"><rect x="430" y="573" width="40" height="6" fill="#3b3f44"/><path d="M436 573 v6 M442 573 v6 M448 573 v6 M454 573 v6 M460 573 v6 M466 573 v6" stroke="#9aa0a6" stroke-width="2"/></g>
+    <!-- уровень -->
+    <g id="level" opacity="0"><rect x="420" y="556" width="60" height="12" rx="2" fill="#FFD43B" stroke="#3b3f44" stroke-width="2"/><rect x="443" y="558" width="14" height="8" rx="4" fill="#b8f0a8" stroke="#3b3f44" stroke-width="1.5"/><circle id="bub" cx="450" cy="562" r="2.6" fill="#fff"/></g>
+    <!-- виброплита -->
+    <g id="vib" opacity="0"><rect x="-16" y="-8" width="32" height="8" fill="#e05a1a" stroke="#3b3f44" stroke-width="2"/><rect x="-10" y="-20" width="18" height="12" rx="2" fill="#4a4f55"/><path d="M6 -18 L24 -44" stroke="#3b3f44" stroke-width="3"/></g>
+    <g id="drops"></g>
+    <text id="toWell" x="250" y="520" font-family="PT" font-size="16" fill="#0d2440" opacity="0">⊙ вода уходит в колодец</text>
     <g id="mud"></g>
     <g id="rain"></g>
   </g>
   <rect width="540" height="960" fill="url(#vigG)"/>
   <rect id="dim" width="540" height="960" fill="#06101f" opacity="0"/>
 </svg>
-<div id="ban">📋 Смета на монтаж ЖБ лотков · СПб</div>
+<div id="ban">🔧 СМЕТА PRO — монтаж ЖБ лотков в СПб</div>
 <div id="tagBad" class="tag bad" style="left:24px;top:172px">❌ БЕЗ ЛОТКА</div>
 <div id="tagFall" class="tag err" style="left:24px;top:234px;font-size:24px">🚧 забор завалился</div>
 <div id="step" class="tag info" style="left:24px;top:172px">ШАГ 1 из 5</div>
-<div id="info" class="tag good" style="left:24px;top:234px;font-size:24px">📐 уклон 0,5–1%</div>
+<div id="info" class="tag good" style="left:24px;top:234px;font-size:24px"></div>
 <div id="tagGood" class="tag good" style="left:24px;top:172px">✅ С ЛОТКОМ — ЗАБОР СТОИТ</div>
 <div id="hook" class="cap"></div>
 <div id="sub" class="cap"></div>
 <div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
 <div id="fade"></div>
-<div id="end"><div class="ic">🌧</div><div class="logo">СМЕТА PRO</div><div class="l2">Лотки, ливнёвка, дренаж —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+<div id="end"><div class="ic">🌧</div><div class="logo">СМЕТА PRO</div><div class="l2">Монтаж ЖБ лотков в СПб и ЛО —<br><span style="color:#FFD43B">заявка и смета в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">лотки · ливнёвка · дренаж</div></div>
 </div>
 <script src="drain-common.js"></script>
 <script>
-window.DUR = 30;
-const A = 2.4, B = 10.2, SD = 2.3, st = (i) => B + .2 + i * SD;
-const TEST = st(5), PHONE = TEST + 2.6, END = PHONE + 2.6;
+window.DUR = 32.5;
+const A = 2.4, B = 10.2;
+const ST = [10.4, 13.0, 15.0, 19.6, 21.9];
+const TEST = 24.3, PHONE = 26.9, END = 29.5;
 const STEPS = [
-  ['Траншея с уклоном <b>0,5–1%</b><br>в сторону колодца', '📐 уклон 0,5–1%'],
-  ['Щебень <b>10–15 см</b><br>с трамбовкой', '🪨 щебень 10–15 см'],
-  ['Бетонная подушка <b>~10 см</b>', '🧱 бетон М200'],
-  ['ЖБ лоток по уровню, от точки<br>сброса, стыки — на раствор', '📏 от колодца вверх'],
-  ['Бока обетонировать, решётка<br>на <b>3–5 мм ниже</b> покрытия', '▦ решётка чугун/сталь'],
+  ['Траншея с уклоном 0,5–1%,<br>щебень <b>10–15 см</b> с трамбовкой', '🪨 щебень 10–15 см'],
+  ['Сверху — <b>геотекстиль</b>:<br>подушка не заилится', '🧵 геотекстиль'],
+  ['Манипулятор привозит лотки<br>и ставит <b>на подушку</b>', '🏗 манипулятор'],
+  ['Лоток по уровню, от точки<br>сброса, стыки — на раствор', '📏 строго по уровню'],
+  ['Пазухи — щебень с трамбовкой,<br>решётка <b>на 3–5 мм ниже</b>', '🚫 без бетона'],
 ];
 const SUBS = [
   [A + .2, 5.0, 'Дождь. Вода со всего двора<br>бежит к забору…'],
   [5.0, 7.5, '…и размывает грунт<br>под столбами 💦'],
   [7.5, B - .1, 'Итог — <b>забор завалился</b>.<br>Ремонт дороже лотков в разы'],
-  ...STEPS.map(([s], i) => [st(i) + .1, st(i + 1) - .05, `<b>${i + 1}.</b> ${s}`]),
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || TEST) - .05, `<b>${i + 1}.</b> ${s}`]),
   [TEST + .1, PHONE, 'Вода уходит в лоток —<br><b>забор стоит</b> ✅'],
-  [PHONE + .1, END, 'Смета на монтаж лотков<br>по СПб — <b>за 2 минуты</b>'],
+  [PHONE + .1, END, 'Монтаж ЖБ лотков в СПб —<br>смета <b>за 2 минуты</b>'],
 ];
 const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.2, '5result', 120, 470]];
 
-const gy = (x) => 522 + (x + 40) * .1;
-const surf = () => { let d = ''; for (let x = -200; x <= 740; x += 20) d += `${d ? 'L' : 'M'}${x} ${gy(x).toFixed(1)}`; return d; };
-$('ground').setAttribute('d', `${surf()} L740 1100 L-200 1100Z`);
-$('grass').setAttribute('d', surf());
-for (let i = 0; i < 6; i++) { const g = E('g', { class: 'cl', 'data-i': i, opacity: .85 }, $('clouds')); const x = R(i) * 540, y = 120 + R(i + 1) * 150, w = 70 + R(i + 2) * 70; for (let k = 0; k < 4; k++) E('ellipse', { cx: x + k * w * .35, cy: y - (k % 2) * 12, rx: w * .42, ry: w * .2, fill: '#dfe7ef' }, g); }
-for (let i = 0; i < 90; i++) { const x = R(i) * 700 - 80; E('ellipse', { cx: x, cy: gy(x) + 25 + R(i + 1) * 380, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles')); }
+const gy = (x) => (x < 500 ? 522 + (x + 40) * .1 : 576);
+const surf = () => { let d = ''; for (let x = -300; x <= 1100; x += 10) d += `${d ? 'L' : 'M'}${x} ${gy(x).toFixed(1)}`; return d; };
+$('ground').setAttribute('d', `${surf()} L1100 1200 L-300 1200Z`);
+$('grass').setAttribute('d', (() => { let d = ''; for (let x = -300; x <= 500; x += 10) d += `${d ? 'L' : 'M'}${x} ${gy(x).toFixed(1)}`; return d; })());
+for (let i = 0; i < 8; i++) { const g = E('g', { class: 'cl', 'data-i': i, opacity: .85 }, $('clouds')); const x = R(i) * 800, y = 120 + R(i + 1) * 150, w = 70 + R(i + 2) * 70; for (let k = 0; k < 4; k++) E('ellipse', { cx: x + k * w * .35, cy: y - (k % 2) * 12, rx: w * .42, ry: w * .2, fill: '#dfe7ef' }, g); }
+for (let i = 0; i < 120; i++) { const x = R(i) * 1000 - 120; E('ellipse', { cx: x, cy: gy(x) + 25 + R(i + 1) * 380, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles')); }
 const rain = makeRain($('rain'), 90);
 const MUD = []; for (let i = 0; i < 14; i++) MUD.push(E('circle', { r: 3 + R(i) * 5, fill: '#6b4f33', opacity: 0 }, $('mud')));
 const DR = []; for (let i = 0; i < 8; i++) DR.push(E('circle', { r: 4.5, fill: '#4aa3ff', opacity: 0 }, $('drops')));
-
 const flowPath = (x1) => { let d = ''; for (let x = 150; x <= x1; x += 10) d += `${d ? 'L' : 'M'}${x} ${(gy(x) - 4).toFixed(1)}`; return d; };
+
+// камера: ключевые кадры [t, zoom, fx, fy]
+const CAM = [[0, 1.22, 290, 505], [B - .01, 1.28, 290, 505], [B, 1.3, 360, 520], [B + .9, 2.0, 450, 598], [ST[2] - .2, 2.0, 450, 598], [ST[2] + .7, 1.08, 545, 500],
+  [ST[3] - .3, 1.08, 545, 500], [ST[3] + .5, 2.0, 450, 598], [TEST - .2, 2.0, 450, 598], [TEST + .7, 1.35, 380, 520], [99, 1.35, 380, 520]];
+function cam(t) {
+  let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++;
+  const [t0, z0, x0, y0] = CAM[i], [t1, z1, x1, y1] = CAM[i + 1];
+  const k = t1 - t0 < .02 ? 1 : ease((t - t0) / (t1 - t0));
+  return [lerp(z0, z1, k), lerp(x0, x1, k), lerp(y0, y1, k)];
+}
+
+// манипулятор: две секции стрелы (обратная кинематика), крюк, стропы
+const TR_PARK = 520, L1 = 120, L2 = 112, ROPE = 46;
+const tipPath = (u, px, py) => {
+  const rest = [px - 10, py - 96], above = [665, 434 - ROPE], lift = [665, 380 - ROPE], over = [450, 380 - ROPE], down = [450, 560 - ROPE], up = [455, 508 - ROPE];
+  const seg = [[1.6, rest], [2.1, above], [2.45, lift], [3.45, over], [4.05, down], [4.35, up], [4.9, rest]];
+  let prev = [0, rest];
+  for (const s of seg) { if (u < s[0]) { const k = ease((u - prev[0]) / (s[0] - prev[0])); return [lerp(prev[1][0], s[1][0], k), lerp(prev[1][1], s[1][1], k)]; } prev = s; }
+  return rest;
+};
+function ik(px, py, tx, ty) {
+  let dx = tx - px, dy = ty - py, d = Math.hypot(dx, dy); d = Math.min(d, L1 + L2 - 1);
+  const base = Math.atan2(dy, dx), a = Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
+  const e1 = [px + L1 * Math.cos(base - a), py + L1 * Math.sin(base - a)], e2 = [px + L1 * Math.cos(base + a), py + L1 * Math.sin(base + a)];
+  return e1[1] < e2[1] ? e1 : e2;
+}
+const setL = (id, a, b) => { const e = $(id); e.setAttribute('x1', a[0]); e.setAttribute('y1', a[1]); e.setAttribute('x2', b[0]); e.setAttribute('y2', b[1]); };
 
 window.render = function (t) {
   renderSubs(t, SUBS);
-  $('hook').innerHTML = 'Зачем нужны <b>ЖБ лотки</b><br>во дворе? 🤔';
+  $('hook').innerHTML = 'Зачем нужны <b>ЖБ лотки</b><br>у забора? 🤔';
   $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
   $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
   $('ban').style.transform = `translateX(-50%) scale(${back((t - .1) / .5)})`;
-
   const inB = t >= B;
-  // небо и дождь
+
   const rainK = !inB ? clamp((t - .3) / .6) : (t > TEST - .2 && t < PHONE ? win(t, TEST - .2, PHONE, .4, .4) : 0);
   $('skyRain').setAttribute('opacity', Math.max(rainK, inB ? 0 : clamp(t / .6)));
   rain(t, rainK);
-  document.querySelectorAll('.cl').forEach((e) => e.setAttribute('transform', `translate(${(t * (7 + +e.dataset.i * 3)) % 760 - 140} 0)`));
-
-  // камера: в части B — наезд на траншею, на проверке — отъезд
-  // A: план 1.3 на двор и забор; B: наезд 2.1 на траншею; проверка: 1.45
-  const zin = inB ? ease((t - B - .1) / .9) * (1 - .62 * ease((t - TEST + .2) / .9)) : 0;
-  const z = inB ? lerp(1.3, 2.1, zin) : 1.22 + t * .006;
-  const fx = inB ? lerp(330, 400, zin) : 305, fy = inB ? lerp(510, 600, zin) : 510;
-  $('cam').setAttribute('transform', `translate(270 ${inB ? lerp(520, 560, zin) : 520}) scale(${z}) translate(${-fx} ${-fy})`);
+  document.querySelectorAll('.cl').forEach((e) => e.setAttribute('transform', `translate(${(t * (7 + +e.dataset.i * 3)) % 1000 - 200} 0)`));
+  const [z, fx, fy] = cam(t);
+  $('cam').setAttribute('transform', `translate(270 540) scale(${z}) translate(${-fx} ${-fy})`);
 
   // ===== A: без лотка
   const flA = !inB ? clamp((t - A) / 1.6) : 0;
-  const flB = t > TEST && t < PHONE ? clamp((t - TEST - .2) / .8) : 0;
-  $('flow').setAttribute('d', !inB ? flowPath(lerp(150, 470, flA)) : flowPath(lerp(150, 382, flB)));
+  const flB = t > TEST && t < PHONE ? clamp((t - TEST - .2) / .9) : 0;
+  $('flow').setAttribute('d', !inB ? flowPath(lerp(150, 372, flA)) : flowPath(lerp(150, 434, flB)));
   $('flow').setAttribute('stroke-dashoffset', -t * 70);
   $('flow').setAttribute('opacity', !inB ? flA * (1 - clamp((t - 9.4) / .5)) : flB * (1 - clamp((t - PHONE + .4) / .4)));
   const poolK = !inB ? clamp((t - 4.0) / 1.5) * (1 - clamp((t - 8.6) / .4) * .6) : 0;
@@ -146,50 +193,82 @@ window.render = function (t) {
   const wk = !inB ? ease((t - 5.0) / 2.6) : 0;
   $('wash').setAttribute('rx', 40 * wk); $('wash').setAttribute('ry', 30 * wk);
   $('washW').setAttribute('rx', 30 * wk); $('washW').setAttribute('ry', 12 * wk);
-  // забор: наклон и падение
   let rot = 0;
   if (!inB) rot = -(10 * ease((t - 6.4) / 1.6) + 68 * (t > 8.0 ? back((t - 8.0) / .55) : 0)) + Math.sin(t * 30) * clamp((t - 6.6) / .4) * (t < 8 ? 1.2 : 0);
-  $('fence').setAttribute('transform', `rotate(${rot} 478 572)`);
+  $('fence').setAttribute('transform', `rotate(${rot} 380 562)`);
   MUD.forEach((m, i) => {
     const k = (t - 8.45 - R(i) * .15) / .7;
     if (inB || k <= 0 || k >= 1) { m.setAttribute('opacity', 0); return; }
-    m.setAttribute('cx', 440 - (R(i + 2) - .3) * 140 * k); m.setAttribute('cy', 560 - 90 * k * (1 - k) * 4 * R(i + 4) + 30 * k); m.setAttribute('opacity', 1 - k);
+    m.setAttribute('cx', 342 - (R(i + 2) - .3) * 140 * k); m.setAttribute('cy', 552 - 90 * k * (1 - k) * 4 * R(i + 4) + 30 * k); m.setAttribute('opacity', 1 - k);
   });
   renderTag('tagBad', t, A, B - .2);
   renderTag('tagFall', t, 8.5, B - .2);
 
-  // ===== B: монтаж
-  const hk = inB ? ease((t - st(0)) / 1.2) : 0;
-  const y0 = (x) => gy(x);
-  const hb = lerp(y0(400), 650, hk);
-  $('hole').setAttribute('d', hk <= 0 ? '' : `M358 ${y0(358)} L442 ${y0(442)} L442 ${hb} L358 ${hb}Z`);
+  // ===== B: монтаж за забором
+  const hk = inB ? ease((t - ST[0]) / .6) : 0;
+  const hb = lerp(gy(450), 645, hk);
+  $('hole').setAttribute('d', hk <= 0 ? '' : `M408 ${gy(408)} L492 ${gy(492)} L492 ${hb} L408 ${hb}Z`);
   const grow = (id, bottom, h, k) => { const hh = h * ease(k); $(id).setAttribute('y', bottom - hh); $(id).setAttribute('height', hh); };
-  grow('Lgr', 650, 25, inB ? (t - st(1) - .1) / 1 : 0);
-  grow('Lpad', 625, 20, inB ? (t - st(2) - .1) / 1 : 0);
-  const lk = inB ? eOut((t - st(3) - .1) / .6) : 0;
-  $('lotok').setAttribute('opacity', clamp(lk * 4)); $('lotok').setAttribute('transform', `translate(0 ${(1 - lk) * -160})`);
-  $('Lside').setAttribute('opacity', inB ? clamp((t - st(4) - .1) / .4) : 0);
-  const gk = inB ? eOut((t - st(4) - .7) / .5) : 0;
-  $('grate').setAttribute('opacity', clamp(gk * 4)); $('grate').setAttribute('transform', `translate(0 ${(1 - gk) * -60})`);
-  $('dims').setAttribute('opacity', inB ? win(t, st(1) + .3, st(3) - .1, .2, .2) : 0);
-  $('dimT').textContent = t < st(2) ? '10–15 см' : '~10 см';
-  $('dims').setAttribute('transform', t < st(2) ? '' : 'translate(0 -25)');
-  // проверка дождём: вода в канале
-  const cw = t > TEST ? clamp((t - TEST - .9) / .8) : 0;
-  $('chW').setAttribute('y', 597 - 12 * cw); $('chW').setAttribute('height', 12 * cw);
-  $('toWell').setAttribute('opacity', t > TEST && t < PHONE ? clamp((t - TEST - 1.1) / .3) : 0);
-  DR.forEach((d, i) => { const k = ((t - TEST - .9) * 1.2 + i / DR.length) % 1; d.setAttribute('cx', 384 + R(i) * 30); d.setAttribute('cy', lerp(560, 594, k)); d.setAttribute('opacity', t > TEST + .9 && t < PHONE ? Math.sin(k * Math.PI) : 0); });
+  grow('Lgr', 645, 31, inB ? (t - ST[0] - .6) / .9 : 0);
+  $('dims').setAttribute('opacity', inB ? win(t, ST[0] + 1.2, ST[1] + .2, .2, .2) : 0);
+  $('geo').setAttribute('stroke-dashoffset', 200 * (1 - (inB ? ease((t - ST[1] - .15) / 1.2) : 0)));
+  // виброплита: щебень (шаг 1) и пазухи (шаг 5)
+  const v1 = inB && t > ST[0] + 1.4 && t < ST[1] - .1, v2 = inB && t > ST[4] + .9 && t < ST[4] + 1.9;
+  const vx = v1 ? lerp(426, 474, (Math.sin((t - ST[0]) * 3) + 1) / 2) : v2 ? (t < ST[4] + 1.4 ? 416 : 484) : 450;
+  const vy = (v1 ? 614 : 571) - Math.abs(Math.sin(t * 40)) * 2;
+  $('vib').setAttribute('opacity', v1 || v2 ? 1 : 0);
+  $('vib').setAttribute('transform', `translate(${vx} ${vy}) scale(${v2 ? .55 : 1})`);
+  grow('pzL', 614, 42, inB ? (t - ST[4] - .1) / .7 : 0);
+  grow('pzR', 614, 38, inB ? (t - ST[4] - .3) / .7 : 0);
+  const gk = inB ? eOut((t - ST[4] - 1.9) / .4) : 0;
+  $('grate').setAttribute('opacity', clamp(gk * 4)); $('grate').setAttribute('transform', `translate(0 ${(1 - gk) * -50})`);
+
+  // манипулятор
+  const u = t - ST[2];
+  let tx = 1200;
+  if (inB && u > -1) tx = u < 1.2 ? lerp(900, TR_PARK, eOut(u / 1.2)) : TR_PARK;
+  if (t > ST[3]) tx = lerp(TR_PARK, 1000, ease((t - ST[3]) / 1.4));
+  $('truck').setAttribute('transform', `translate(${tx} 576)`);
+  $('legs').firstElementChild.setAttribute('height', 26 * clamp((u - 1.2) / .3) * (1 - clamp((t - ST[3]) / .2)));
+  const px = tx + 66, py = 576 - 84;
+  const tip = u > 0 && t < ST[3] ? tipPath(u, px, py) : [px - 10, py - 96];
+  const el = ik(px, py, tip[0], tip[1]);
+  setL('b1o', [px, py], el); setL('b1', [px, py], el); setL('b2o', el, tip); setL('b2', el, tip);
+  $('joint').setAttribute('cx', el[0]); $('joint').setAttribute('cy', el[1]);
+  const hookP = [tip[0], tip[1] + ROPE];
+  setL('rope', tip, hookP);
+  $('hookI').setAttribute('transform', `translate(${hookP[0]} ${hookP[1]})`);
+  // лоток: на борту → на крюке → на подушке
+  let lp = [665, 452 - 6 + 4];
+  const carry = u > 2.1 && u < 4.05;
+  if (u >= 2.1) lp = [hookP[0], hookP[1] + 12];
+  if (u >= 4.05 || t > ST[3]) lp = [450, 572];
+  if (u < 2.1) lp = [tx + 145, 576 - 50 - 40 - 40];
+  const lotVis = inB && (u > -1 || t > ST[3]);
+  $('lotok').setAttribute('opacity', lotVis ? 1 : 0);
+  $('lotok').setAttribute('transform', `translate(${lp[0]} ${lp[1]}) rotate(${carry ? Math.sin(t * 4) * 2.5 : 0})`);
+  const sling = u > 1.95 && u < 4.2 && t < ST[3];
+  setL('sl1', hookP, sling ? [lp[0] - 26, lp[1]] : hookP); setL('sl2', hookP, sling ? [lp[0] + 26, lp[1]] : hookP);
+  $('crane').setAttribute('opacity', inB && tx < 1100 ? 1 : 0);
+  // уровень
+  $('level').setAttribute('opacity', inB ? win(t, ST[3] + .5, ST[4] - .05, .25, .2) : 0);
+  $('bub').setAttribute('cx', 450 + Math.sin(clamp((t - ST[3] - .6) / 1) * Math.PI * 3) * 5 * (1 - clamp((t - ST[3] - .6) / 1)));
+  // проверка дождём
+  const cw = t > TEST ? clamp((t - TEST - 1.0) / .8) : 0;
+  $('chW').setAttribute('y', 32 - 12 * cw); $('chW').setAttribute('height', 12 * cw);
+  $('toWell').setAttribute('opacity', t > TEST && t < PHONE ? clamp((t - TEST - 1.2) / .3) : 0);
+  DR.forEach((d, i) => { const k = ((t - TEST - 1) * 1.2 + i / DR.length) % 1; d.setAttribute('cx', 434 + R(i) * 30); d.setAttribute('cy', lerp(566, 600, k)); d.setAttribute('opacity', t > TEST + 1 && t < PHONE ? Math.sin(k * Math.PI) : 0); });
 
   // ярлыки
-  const si = Math.max(0, Math.min(4, Math.floor((t - B - .2) / SD)));
+  let si = 0; for (let i = 0; i < 5; i++) if (t >= ST[i]) si = i;
   $('step').textContent = `ШАГ ${si + 1} из 5`;
-  $('step').style.opacity = win(t, B + .2, TEST - .05, .2, .2);
-  const bump = t > st(si) && t < st(si) + .35 ? Math.sin((t - st(si)) / .35 * Math.PI) : 0;
+  $('step').style.opacity = win(t, ST[0], TEST - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
   $('step').style.transform = `scale(${1 + bump * .12})`;
   $('info').textContent = STEPS[si][1];
-  $('info').style.opacity = win(t, B + .4, TEST - .05, .2, .2) * clamp((t - st(si) - .2) / .25);
-  $('info').style.transform = `translateX(${(1 - eOut((t - st(si) - .2) / .35)) * -30}px)`;
-  renderTag('tagGood', t, TEST + 1.0, PHONE - .1);
+  $('info').style.opacity = win(t, ST[0] + .2, TEST - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, TEST + 1.1, PHONE - .1);
 
   $('dim').setAttribute('opacity', clamp((t - PHONE) / .4) * .72);
   renderPhone(t, PHONE, END + .2, SCREENS);

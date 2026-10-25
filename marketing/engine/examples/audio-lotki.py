@@ -6,7 +6,7 @@ OUT = sys.argv[1]
 src = open(__file__.replace('audio-lotki.py', 'audio-terrasy.py'), encoding='utf-8').read()
 sys.argv = [sys.argv[0], OUT]
 __file__ = __file__.replace('audio-lotki.py', 'audio-terrasy.py')
-exec(src.split('b = 60 / 80')[0])
+exec(src.split('b = 60 / 80')[0].replace('DUR = 30.0', 'DUR = 32.5'))
 
 def rainbed(at, d, g):
     x = rng.standard_normal(int(d * SR)); y = hp(lp(x, 5500), 700) * .55 + lp(x, 450) * .2
@@ -14,9 +14,10 @@ def rainbed(at, d, g):
     tt = t_(d); e = np.minimum(1, np.minimum(tt / .8, (d - tt) / .8))
     add(y * e, at, g, -.35); add(y * e, at, g, .35)
 
-A, B, SD = 2.4, 10.2, 2.3
-st = lambda i: B + .2 + i * SD
-TEST = st(5); PHONE = TEST + 2.6; END = PHONE + 2.6
+A, B = 2.4, 10.2
+ST = [10.4, 13.0, 15.0, 19.6, 21.9]
+st = lambda i: ST[i]
+TEST, PHONE, END = 24.3, 26.9, 29.5
 b = 60 / 80
 # ---- часть A: дождь и грустный перебор
 rainbed(0, B + .3, .16)
@@ -61,7 +62,27 @@ while t < END - .05:
     t += 4 * b; bar += 1
 for i, n in enumerate([74, 76, 78, 81, 83]): glock(n, st(i) + .02, .06)
 x = lp(rng.standard_normal(int(1.0 * SR)), 1000) * np.sin(np.pi * t_(1.0)); add(x, st(0) + .1, .05)
-thud(st(3) + .45, .2)
+# виброплита: щебень и пазухи
+def vibro(at, d, g=.035):
+    tt = t_(d); x = lp(np.sign(np.sin(2 * np.pi * 42 * tt)) + .3 * rng.standard_normal(len(tt)), 700) * np.sin(np.pi * tt / d) ** .5
+    add(x, at, g, .2)
+vibro(st(0) + 1.4, st(1) - st(0) - 1.5); vibro(st(4) + .9, 1.0)
+# манипулятор: подъезд, гидравлика стрелы, лоток встаёт на подушку, отъезд
+def engine(at, d, g=.09, up=0):
+    tt = t_(d); fr = 34 + 10 * np.sin(np.pi * tt / d) + up * tt / d * 8
+    x = lp(np.sign(np.sin(2 * np.pi * np.cumsum(fr) / SR)) + .2 * rng.standard_normal(len(tt)), 260) * np.sin(np.pi * tt / d) ** .7
+    add(x, at, g, .3)
+def hydro(at, d, g=.025, f0=220, f1=300):
+    tt = t_(d); fr = f0 + (f1 - f0) * tt / d
+    x = bp(saw(1, d) * 0 + np.sin(2 * np.pi * np.cumsum(fr) / SR) + .5 * np.sin(4 * np.pi * np.cumsum(fr) / SR), 150, 1200) * np.sin(np.pi * tt / d)
+    add(x, at, g, .4)
+S2 = st(2)
+engine(S2 - .9, 2.4, .1)
+for a, d, f0, f1 in ((S2 + 1.6, .5, 200, 260), (S2 + 2.1, .35, 260, 320), (S2 + 2.45, 1.0, 240, 280), (S2 + 3.45, .6, 300, 220), (S2 + 4.35, .55, 220, 260)):
+    hydro(a, d, .03, f0, f1)
+thud(S2 + 4.05, .35); glock(86, S2 + 4.1, .04)
+engine(st(3), 1.6, .07, up=1)
+thud(st(4) + 2.0, .15)
 rainbed(TEST - .3, PHONE - TEST + .6, .1)
 for k, n in enumerate([81, 85, 88]): glock(n, TEST + 1.0 + k * .1, .05)
 for a in (B + 1.0, st(2) + .8, st(4) + 1.4): bird(a, .03, .6)
