@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Террасирование участка</title></head><body><div id="stage">
+<svg class="main" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd3f2"/><stop offset=".7" stop-color="#e3f3fb"/><stop offset="1" stop-color="#fff6e3"/></linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a7550"/><stop offset="1" stop-color="#5e452b"/></linearGradient>
+    <pattern id="grav" width="22" height="18" patternUnits="userSpaceOnUse"><rect width="22" height="18" fill="#8d949a"/><ellipse cx="6" cy="5" rx="5.5" ry="4" fill="#c9ced3" stroke="#6d7379"/><ellipse cx="16" cy="12" rx="6" ry="4.5" fill="#b4bac0" stroke="#6d7379"/></pattern>
+    <radialGradient id="vigG" cx=".5" cy=".45" r=".8"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></radialGradient>
+    <radialGradient id="sunG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff8d6"/><stop offset=".45" stop-color="#ffe08a" stop-opacity=".8"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g id="cam">
+    <rect x="-80" y="-80" width="700" height="1100" fill="url(#sky)"/>
+    <circle cx="440" cy="250" r="110" fill="url(#sunG)"/>
+    <g id="clouds"></g>
+    <g id="hillsFar"></g>
+    <path id="ground" fill="url(#soil)"/>
+    <g id="pebbles"></g>
+    <path id="fertile" fill="none" stroke="#3e2a17" stroke-width="18" opacity="0"/>
+    <path id="grass" fill="none" stroke="#5aa043" stroke-width="9" stroke-linejoin="round"/>
+    <!-- 1. замер -->
+    <g id="survey" opacity="0" transform="translate(100 382) scale(1.5) translate(-60 -372)">
+      <path d="M60 372 L44 332 M60 372 L76 332 M60 372 L60 330" stroke="#4a4f55" stroke-width="3"/>
+      <rect x="48" y="316" width="26" height="16" rx="3" fill="#ffd43b" stroke="#3b3f44" stroke-width="2"/>
+      <text x="22" y="372" font-size="44" font-family="Noto Color Emoji">👷</text>
+      <path id="sight" d="M74 324 L520 324" stroke="#e5383b" stroke-width="3" stroke-dasharray="8 6"/>
+      <path d="M380 324 L380 571" stroke="#0d2440" stroke-width="3" stroke-dasharray="6 5"/>
+      <text x="390" y="460" font-family="PT" font-size="22" fill="#0d2440">перепад</text>
+    </g>
+    <!-- 2. разметка -->
+    <g id="stakes" opacity="0"></g>
+    <path id="str1" d="M-20 400 L250 400" stroke="#ff7a1a" stroke-width="4" stroke-dasharray="10 6" opacity="0"/>
+    <path id="str2" d="M250 540 L560 540" stroke="#ff7a1a" stroke-width="4" stroke-dasharray="10 6" opacity="0"/>
+    <!-- 4. основание -->
+    <g id="base" opacity="0">
+      <rect x="196" y="540" width="80" height="24" fill="url(#grav)" stroke="#555" stroke-width="1.5"/>
+      <path d="M194 566 L278 566" stroke="#f5f5f0" stroke-width="5"/>
+    </g>
+    <!-- 6. дренаж (за стенкой) -->
+    <g id="drain" opacity="0">
+      <rect x="176" y="408" width="38" height="132" fill="url(#grav)" stroke="#555" stroke-width="1.5"/>
+      <circle cx="195" cy="526" r="12" fill="#ff8a1f" stroke="#8a3f00" stroke-width="3"/><circle cx="195" cy="526" r="6" fill="#2b1a0c"/>
+      <g id="ddrops"></g>
+    </g>
+    <!-- 7. засыпка слоями -->
+    <g id="fill"></g>
+    <!-- 5. стенка -->
+    <g id="wall"></g>
+    <!-- 8. озеленение -->
+    <g id="plants"></g>
+    <g id="steps" opacity="0"><path d="M262 540 h26 v-28 h26 v-28 h26 v-28" fill="none" stroke="#7d8389" stroke-width="0"/></g>
+    <g id="dirt"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+  <rect id="dim" width="540" height="960" fill="#06101f" opacity="0"/>
+</svg>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 8</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px">📐 уклон 8–30%</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🌿</div><div class="logo">СМЕТА PRO</div><div class="l2">Террасы, подпорные стенки, дренаж —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script>
+window.DUR = 30;
+const T0 = 2.4, D = 2.8;                     // шаг i (0..7) начинается в T0 + i*D
+const st = (i) => T0 + i * D;
+const PHONE = st(8), END = PHONE + 2.6;
+const STEPS = [
+  ['Замер уклона: террасы —<br>для склона <b>8–30%</b>', '📐 уклон 8–30%'],
+  ['Разметка ярусов колышками<br>и шнуром, перепад <b>0,5–1,5 м</b>', '📏 террасы 2–6 м'],
+  ['Срезаем верх, подсыпаем низ,<br>уклон площадки <b>1–2%</b>', '🚜 уклон площадки 1–2%'],
+  ['Основание под стенку: щебень<br><b>10–20 см</b> и геотекстиль', '🪨 щебень 10–20 см'],
+  ['Подпорная стенка <b>0,5–1,5 м</b>:<br>блок, камень, габион', '🧱 высота 0,5–1,5 м'],
+  ['Дренаж за стенкой: труба <b>Ø110</b><br>в щебне <b>15–30 см</b>', '💧 вода не давит на стенку'],
+  ['Обратная засыпка слоями<br>по <b>15–20 см</b>, каждый трамбуем', '🔨 каждый слой отдельно'],
+  ['Плодородный слой <b>15–30 см</b>,<br>корни растений держат склон 🌿', '🌱 плодородный 15–30 см'],
+];
+const SUBS = [...STEPS.map(([s], i) => [st(i) + .15, st(i + 1) - .05, `<b>${i + 1}.</b> ${s}`]), [PHONE + .1, END, 'Посчитать террасы и стенку:<br>смета — <b>за 2 минуты</b>']];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.2, '5result', 120, 470]];
+
+// ---------- профиль участка: склон → две террасы
+const slopeY = (x) => 300 + (x + 20) * .69;
+const terrY = (x, upper) => (upper ? 400 + (x + 20) * .02 : 540 + (x - 250) * .02);
+const XS = []; for (let x = -20; x <= 560; x += 10) { XS.push([x, x <= 250]); if (x === 250) XS.push([250, false]); }
+function topPts(k) { return XS.map(([x, up]) => [x, lerp(slopeY(x), terrY(x, up), k)]); }
+const line = (pts) => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y.toFixed(1)}`).join(' ');
+
+// фон: облака, дальние холмы, камешки
+for (let i = 0; i < 5; i++) { const g = E('g', { class: 'cl', 'data-i': i, opacity: .85 }, $('clouds')); const x = R(i) * 540, y = 130 + R(i + 1) * 130, w = 60 + R(i + 2) * 60; for (let k = 0; k < 4; k++) E('ellipse', { cx: x + k * w * .35, cy: y - (k % 2) * 12, rx: w * .4, ry: w * .2, fill: '#fff' }, g); }
+E('path', { d: 'M-80 330 Q60 250 200 300 T480 270 T640 300 L640 700 L-80 700Z', fill: '#a9cf95', opacity: .7 }, $('hillsFar'));
+for (let i = 0; i < 90; i++) { const x = R(i) * 560 - 10; E('ellipse', { cx: x, cy: Math.max(slopeY(x), x < 250 ? 420 : 560) + 20 + R(i + 1) * 380, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles')); }
+// колышки
+const STK = [[-5, 400], [80, 400], [165, 400], [300, 540], [400, 540], [500, 540]];
+STK.forEach(([x, y], i) => E('rect', { x: x - 3, y: y - 12, width: 6, height: 0, fill: '#8a5a33', class: 'stk', 'data-i': i, 'data-y': y }, $('stakes')));
+// стенка: 6 рядов блоков
+const ROWS = [];
+for (let r = 0; r < 6; r++) {
+  const g = E('g', { opacity: 0 }, $('wall')); const y = 540 - (r + 1) * 22.5;
+  E('rect', { x: 214, y, width: 36, height: 22.5, fill: r % 2 ? '#b8bcc0' : '#a7acb1', stroke: '#5d6268', 'stroke-width': 2 }, g);
+  E('path', { d: `M${r % 2 ? 226 : 238} ${y} v22.5`, stroke: '#5d6268', 'stroke-width': 1.5 }, g);
+  ROWS.push([g, y]);
+}
+// засыпка: 4 слоя в зоне подсыпки за дренажом
+const FILL = [];
+for (let r = 0; r < 4; r++) {
+  const y0 = 470 - (r + 1) * 16;
+  const g = E('g', { opacity: 0 }, $('fill'));
+  E('rect', { x: 96, y: y0, width: 80, height: 16, fill: r % 2 ? '#a8835c' : '#93704b', stroke: '#6e5233', 'stroke-width': 1 }, g);
+  E('path', { d: `M96 ${y0 + 16} H176`, stroke: '#fff', 'stroke-width': 2, 'stroke-dasharray': '4 5', opacity: .7 }, g);
+  FILL.push(g);
+}
+const HAM = E('text', { 'font-size': 34, 'font-family': 'Noto Color Emoji', opacity: 0 }, $('fill')); HAM.textContent = '🔨';
+// капли в дренаже
+const DD = []; for (let i = 0; i < 6; i++) DD.push(E('circle', { r: 4.5, fill: '#4aa3ff', opacity: 0 }, $('ddrops')));
+// растения
+const PL = [];
+const plant = (x, y, kind, s = 1) => { const g = E('g', { transform: `translate(${x} ${y}) scale(0)` }, $('plants'));
+  if (kind === 'tree') { E('rect', { x: -5, y: -60, width: 10, height: 60, fill: '#7a5230' }, g); E('circle', { cx: 0, cy: -72, r: 34, fill: '#5c9a45' }, g); E('circle', { cx: -16, cy: -62, r: 22, fill: '#6fae55' }, g); }
+  else if (kind === 'bush') { E('circle', { cx: -12, cy: -14, r: 16, fill: '#4f8f3a' }, g); E('circle', { cx: 10, cy: -18, r: 19, fill: '#5ea347' }, g); E('circle', { cx: 0, cy: -8, r: 14, fill: '#6bb252' }, g); }
+  else { for (let k = 0; k < 3; k++) { E('path', { d: `M${-10 + k * 10} 0 v-22`, stroke: '#4f8a3a', 'stroke-width': 3 }, g); E('circle', { cx: -10 + k * 10, cy: -26, r: 6, fill: ['#ff6b8a', '#ffd43b', '#b07cff'][k] }, g); } }
+  PL.push([g, x, y, s]); };
+plant(40, terrY(40, true) - 4, 'tree', 1); plant(125, terrY(125, true) - 4, 'bush', 1); plant(175, terrY(175, true) - 4, 'flower', 1);
+plant(330, terrY(330) - 4, 'flower', 1); plant(410, terrY(410) - 4, 'bush', 1); plant(490, terrY(490) - 4, 'tree', .9);
+// крошки грунта при перемещении
+const DIRT = []; for (let i = 0; i < 18; i++) DIRT.push(E('circle', { r: 4 + R(i) * 4, fill: '#7d5a37', opacity: 0 }, $('dirt')));
+
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Участок на склоне?<br><b>Террасы — за 8 шагов</b> 👇';
+  $('hook').style.opacity = win(t, .05, T0 - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const zk = ease((t - st(2) - .1) / 1.6);
+  const z = lerp(1, 1.32, zk) + Math.min(t, PHONE) * .002;
+  $('cam').setAttribute('transform', `translate(270 ${lerp(480, 520, zk)}) scale(${z}) translate(${-lerp(270, 262, zk)} ${-lerp(470, 480, zk)})`);
+  document.querySelectorAll('.cl').forEach((e) => e.setAttribute('transform', `translate(${(t * (5 + +e.dataset.i * 2)) % 700 - 120} 0)`));
+
+  // профиль
+  const k = ease((t - st(2) - .2) / 1.8);
+  const pts = topPts(k);
+  $('ground').setAttribute('d', `${line(pts)} L560 1000 L-20 1000Z`);
+  $('grass').setAttribute('d', line(pts));
+  const grassK = t < st(2) ? 1 : t < st(7) ? clamp(1 - (t - st(2)) / .3) : clamp((t - st(7)) / .6);
+  $('grass').setAttribute('opacity', grassK);
+  $('fertile').setAttribute('d', line(topPts(1).map(([x, y]) => [x, y + 9])));
+  $('fertile').setAttribute('opacity', clamp((t - st(7)) / .5) * .8);
+  // крошки: от среза (слева) к подсыпке (справа)
+  DIRT.forEach((d, i) => {
+    const kk = (t - st(2) - .2 - R(i) * 1.2) / .7;
+    if (kk <= 0 || kk >= 1) { d.setAttribute('opacity', 0); return; }
+    const up = i % 2 === 0;
+    const x0 = up ? 10 + R(i + 3) * 90 : 260 + R(i + 3) * 60, y0 = slopeY(x0) - 5;
+    const x1 = up ? 150 + R(i + 5) * 60 : 420 + R(i + 5) * 120, y1 = slopeY(x1) - 30;
+    d.setAttribute('cx', lerp(x0, x1, kk)); d.setAttribute('cy', lerp(y0, y1, kk) - Math.sin(kk * Math.PI) * 70); d.setAttribute('opacity', 1);
+  });
+
+  // 1. замер
+  $('survey').setAttribute('opacity', win(t, st(0) + .1, st(1) + .2, .3, .3));
+  // 2. колышки и шнур
+  $('stakes').setAttribute('opacity', t >= st(1) ? clamp(1 - (t - st(4)) / .4) : 0);
+  document.querySelectorAll('.stk').forEach((s) => { const i = +s.dataset.i, y = +s.dataset.y; const kk = eOut((t - st(1) - i * .12) / .3); s.setAttribute('height', 40 * kk + 12 * (kk > 0)); s.setAttribute('y', y - 12); });
+  $('str1').setAttribute('opacity', clamp((t - st(1) - .9) / .3) * (1 - clamp((t - st(4)) / .4)));
+  $('str2').setAttribute('opacity', clamp((t - st(1) - 1.1) / .3) * (1 - clamp((t - st(4)) / .4)));
+  // 4. основание
+  $('base').setAttribute('opacity', clamp((t - st(3) - .1) / .4));
+  $('base').setAttribute('transform', `translate(0 ${(1 - eOut((t - st(3) - .1) / .5)) * -60})`);
+  // 5. стенка — ряды снизу вверх
+  ROWS.forEach(([g, y], r) => { const kk = eOut((t - st(4) - .1 - r * .3) / .3); g.setAttribute('opacity', clamp(kk * 3)); g.setAttribute('transform', `translate(0 ${(1 - kk) * -90})`); });
+  // 6. дренаж
+  $('drain').setAttribute('opacity', clamp((t - st(5) - .1) / .4));
+  DD.forEach((d, i) => { const kk = ((t - st(5) - .5) * .6 + i / DD.length) % 1; d.setAttribute('cx', 186 + R(i) * 18); d.setAttribute('cy', lerp(412, 520, kk)); d.setAttribute('opacity', t > st(5) + .5 && t < st(7) ? Math.sin(kk * Math.PI) : 0); });
+  // 7. засыпка слоями + трамбовка
+  FILL.forEach((g, r) => { const a = st(6) + .15 + r * .55; g.setAttribute('opacity', clamp((t - a) / .25) * (1 - clamp((t - st(7) - .3) / .5) * .6)); });
+  const hr = Math.floor((t - st(6) - .15) / .55);
+  const hOn = t > st(6) + .15 && t < st(7) - .1 && hr < 4;
+  const hb = ((t - st(6) - .15) % .55) / .55;
+  HAM.setAttribute('opacity', hOn ? 1 : 0);
+  HAM.setAttribute('x', 116 + (hr % 2) * 24); HAM.setAttribute('y', 470 - (Math.max(0, hr) + 1) * 16 - 4 - Math.abs(Math.sin(hb * Math.PI * 2)) * 18);
+  // 8. растения
+  PL.forEach(([g, x, y, s], i) => { const kk = back((t - st(7) - .2 - i * .15) / .45); g.setAttribute('transform', `translate(${x} ${y}) scale(${Math.max(0, kk) * s}) rotate(${Math.sin(t * 1.5 + i) * 2})`); });
+
+  // ярлыки шага
+  const si = Math.max(0, Math.min(7, Math.floor((t - T0) / D)));
+  const done = t >= st(7) + 1.4;
+  $('step').textContent = done ? '✅ ТЕРРАСЫ ГОТОВЫ' : `ШАГ ${si + 1} из 8`;
+  $('step').className = done ? 'tag good' : 'tag info';
+  $('step').style.opacity = win(t, T0, PHONE - .1, .2, .2);
+  const bump = t > st(si) && t < st(si) + .35 ? Math.sin((t - st(si)) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, T0 + .3, PHONE - .1, .2, .2) * clamp((t - st(si) - .25) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - st(si) - .25) / .35)) * -30}px)`;
+
+  $('dim').setAttribute('opacity', clamp((t - PHONE) / .4) * .72);
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  renderEnd(t, END);
+};
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>
