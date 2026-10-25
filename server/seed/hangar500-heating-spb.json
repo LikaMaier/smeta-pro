@@ -1,0 +1,978 @@
+{
+ "key": "hangar500-heating-spb",
+ "title": "Монтаж системы отопления ангара 500 м² с АБК (3 × Volcano VR2 EC, теплообменник)",
+ "customer": null,
+ "address": "Санкт-Петербург",
+ "notes": "Основа: ТЗ на монтаж отопления ангара 500 м². База цен — Москва, октябрь 2026.\nНагрузка 70,8 кВт: ангар 66 кВт + АБК 4,8 кВт (−24 °C снаружи, +16 °C в ангаре). Внутренний контур — пропиленгликоль −30 °C, 75/55 °C; теплоцентраль принята 90/70 °C.\nДопущения до обмера: ангар 25 × 20 м, АБК 6 × 8 м в углу, ввод теплоцентрали у торцевой стены, высота до низа ферм ≥ 6 м. При иных данных пересчитываются теплообменник, насос и длины трасс (±10 %).\nЕсли перепад давления теплоцентрали на узле меньше 30 кПа — нужен насос первичного контура (~50 тыс. ₽ с монтажом, не входит).\nНе входит: электромонтаж (питание Volcano, насоса, контроллера, контрольные кабели), подвод теплоцентрали дальше 3 м от теплообменника, согласования с теплоснабжающей стороной, общестроительные работы.\n* — ориентировочная цена, фиксируется счётом поставщика при закупке. Без звёздочки — прайс производителя/дилера.\nСрок монтажа 10–12 рабочих дней после поставки оборудования (5–10 рабочих дней). Схемы и расчёты — в КП (Claude Docs).",
+ "warrantyMonths": 24,
+ "validDays": 14,
+ "status": "draft",
+ "paySchedule": [
+  {
+   "title": "Аванс на оборудование и материалы",
+   "pct": 70
+  },
+  {
+   "title": "После испытаний и пусконаладки",
+   "pct": 30
+  }
+ ],
+ "lines": [
+  {
+   "name": "Тепловентилятор водяной Volcano VR2 EC (арт. 1-4-0101-0443), монтажная консоль в комплекте",
+   "qty": 3,
+   "unit": "шт",
+   "price": 59558,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": "8–50 кВт, 4850 м³/ч, патрубки 3/4″\nпри 75/55 °C на гликоле ~26 кВт\nконсоль в комплекте"
+  },
+  {
+   "name": "Теплообменник пластинчатый разборный Ридан НН№04 ДУ32, рама 3 (53–90 пластин), AISI 316 / EPDM, ~80 кВт",
+   "qty": 1,
+   "unit": "шт",
+   "price": 75367,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": "80 кВт, первичка 90/70, вторичка 75/55\nподбор пластин по расчёту Ридан HEX Design\nΔp ≤ 15 кПа втор. / 20 кПа перв."
+  },
+  {
+   "name": "Насос циркуляционный Wilo-Yonos MAXO 30/0,5-12 (G2, 180 мм) *",
+   "qty": 1,
+   "unit": "шт",
+   "price": 60000,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": "3,34 м³/ч, напор 9,5 м (расчёт)\nрежим Δp-v, гликоль до 50 %"
+  },
+  {
+   "name": "Радиатор стальной панельный Royal Thermo Compact C22-500-1400 (кронштейны, воздухоотводчик, заглушка в комплекте)",
+   "qty": 3,
+   "unit": "шт",
+   "price": 10139,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": null
+  },
+  {
+   "name": "Коллектор распределительный стальной, подача+обратка, 3 контура 1¼\", до 100 кВт, с кронштейном и теплоизоляцией *",
+   "qty": 1,
+   "unit": "шт",
+   "price": 24000,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": null
+  },
+  {
+   "name": "Бак расширительный мембранный Reflex NG 35/6 (антифриз до 50 %) *",
+   "qty": 1,
+   "unit": "шт",
+   "price": 7500,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": null
+  },
+  {
+   "name": "Сепаратор воздуха и шлама 1¼\" *",
+   "qty": 1,
+   "unit": "шт",
+   "price": 9500,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": null
+  },
+  {
+   "name": "Группа безопасности (предохранительный клапан 3 бар, манометр, автоматический воздухоотводчик) *",
+   "qty": 1,
+   "unit": "шт",
+   "price": 3200,
+   "type": "equipment",
+   "category": "1. Оборудование",
+   "composition": null
+  },
+  {
+   "name": "Клапан штоковый с сервоприводом Volcano NVMZ 3/4\" (арт. 1-2-1204-2019)",
+   "qty": 3,
+   "unit": "шт",
+   "price": 9530,
+   "type": "equipment",
+   "category": "2. Автоматика тепловентиляторов",
+   "composition": null
+  },
+  {
+   "name": "Контроллер HMI Volcano EC HY (арт. 1-4-2801-0157), до 8 агрегатов",
+   "qty": 1,
+   "unit": "шт",
+   "price": 12576,
+   "type": "equipment",
+   "category": "2. Автоматика тепловентиляторов",
+   "composition": null
+  },
+  {
+   "name": "Датчик температуры NTC (арт. 1-2-1205-0007)",
+   "qty": 1,
+   "unit": "шт",
+   "price": 2515,
+   "type": "equipment",
+   "category": "2. Автоматика тепловентиляторов",
+   "composition": null
+  },
+  {
+   "name": "Подводка гибкая сильфонная 3/4\" L=1 м (комплект 2 шт.)",
+   "qty": 3,
+   "unit": "компл",
+   "price": 1904,
+   "type": "equipment",
+   "category": "2. Автоматика тепловентиляторов",
+   "composition": null
+  },
+  {
+   "name": "Труба PP-FIBER PN25 50×8,3",
+   "qty": 76,
+   "unit": "пог. м",
+   "price": 882,
+   "type": "material",
+   "category": "3. Трубы PP-FIBER PN25",
+   "composition": null
+  },
+  {
+   "name": "Труба PP-FIBER PN25 40×6,7",
+   "qty": 20,
+   "unit": "пог. м",
+   "price": 568,
+   "type": "material",
+   "category": "3. Трубы PP-FIBER PN25",
+   "composition": null
+  },
+  {
+   "name": "Труба PP-FIBER PN25 32×5,4",
+   "qty": 12,
+   "unit": "пог. м",
+   "price": 380,
+   "type": "material",
+   "category": "3. Трубы PP-FIBER PN25",
+   "composition": null
+  },
+  {
+   "name": "Труба PP-FIBER PN25 25×4,2",
+   "qty": 24,
+   "unit": "пог. м",
+   "price": 221,
+   "type": "material",
+   "category": "3. Трубы PP-FIBER PN25",
+   "composition": null
+  },
+  {
+   "name": "Труба PP-FIBER PN25 20×3,4",
+   "qty": 24,
+   "unit": "пог. м",
+   "price": 145,
+   "type": "material",
+   "category": "3. Трубы PP-FIBER PN25",
+   "composition": null
+  },
+  {
+   "name": "Муфта 50 *",
+   "qty": 18,
+   "unit": "шт",
+   "price": 140,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Угольник 90° 50 *",
+   "qty": 22,
+   "unit": "шт",
+   "price": 240,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Угольник 45° 50 *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 220,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Тройник 50 *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 380,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Тройник переходной 50×32×50 *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 420,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта переходная 50/40 *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 170,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта комбинированная 50×1¼\" НР *",
+   "qty": 10,
+   "unit": "шт",
+   "price": 2300,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта комбинированная 50×1¼\" ВР *",
+   "qty": 6,
+   "unit": "шт",
+   "price": 2100,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта 40 *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 90,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Угольник 90° 40 *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 150,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта переходная 40/32 *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 110,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Угольник 90° 32 *",
+   "qty": 6,
+   "unit": "шт",
+   "price": 80,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта 32 *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 50,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта комбинированная 32×3/4\" НР *",
+   "qty": 6,
+   "unit": "шт",
+   "price": 650,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта 25 *",
+   "qty": 6,
+   "unit": "шт",
+   "price": 40,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Угольник 90° 25 *",
+   "qty": 8,
+   "unit": "шт",
+   "price": 45,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта переходная 25/20 *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 30,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта комбинированная 25×3/4\" НР *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 560,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Тройник 20 *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 35,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Угольник 90° 20 *",
+   "qty": 12,
+   "unit": "шт",
+   "price": 30,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта 20 *",
+   "qty": 6,
+   "unit": "шт",
+   "price": 25,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Муфта комбинированная 20×1/2\" ВР *",
+   "qty": 6,
+   "unit": "шт",
+   "price": 380,
+   "type": "material",
+   "category": "4. Фитинги PPR",
+   "composition": null
+  },
+  {
+   "name": "Кран шаровой полнопроходной 1¼\" (латунь, PN40) *",
+   "qty": 10,
+   "unit": "шт",
+   "price": 1450,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Кран шаровой полнопроходной 3/4\" *",
+   "qty": 8,
+   "unit": "шт",
+   "price": 600,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Фильтр сетчатый косой 1¼\" *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 1800,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Фильтр сетчатый косой 3/4\" *",
+   "qty": 3,
+   "unit": "шт",
+   "price": 650,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Клапан балансировочный ручной 1¼\" (Valtec VT.054 или аналог) *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 6500,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Клапан балансировочный ручной 3/4\" (Valtec VT.054 или аналог) *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 2300,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Клапан перепускной (байпасный) 3/4\" *",
+   "qty": 1,
+   "unit": "шт",
+   "price": 2600,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Воздухоотводчик автоматический 1/2\" с краном-отсекателем *",
+   "qty": 8,
+   "unit": "шт",
+   "price": 1000,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Кран шаровой сливной 1/2\" со штуцером под шланг *",
+   "qty": 8,
+   "unit": "шт",
+   "price": 550,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Термометр биметаллический 0–120 °C с гильзой *",
+   "qty": 4,
+   "unit": "шт",
+   "price": 1100,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Манометр 0–10 бар с краном трёхходовым *",
+   "qty": 5,
+   "unit": "шт",
+   "price": 1600,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Комплект радиаторный: клапан термостатический 1/2\" + термоголовка + запорный клапан 1/2\" *",
+   "qty": 3,
+   "unit": "шт",
+   "price": 3600,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Заглушка 1¼\" (резервный отвод коллектора) *",
+   "qty": 2,
+   "unit": "шт",
+   "price": 200,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Комплект резьбовых присоединений насоса G2×1¼\" *",
+   "qty": 1,
+   "unit": "шт",
+   "price": 1500,
+   "type": "material",
+   "category": "5. Арматура и КИП",
+   "composition": null
+  },
+  {
+   "name": "Труба стальная ВГП Ду32×3,2 *",
+   "qty": 6,
+   "unit": "пог. м",
+   "price": 450,
+   "type": "material",
+   "category": "6. Первичный контур (сталь)",
+   "composition": null
+  },
+  {
+   "name": "Фланец резьбовой Ду32 Ру16 + прокладки и крепёж (подключение теплообменника) *",
+   "qty": 4,
+   "unit": "компл",
+   "price": 1200,
+   "type": "material",
+   "category": "6. Первичный контур (сталь)",
+   "composition": null
+  },
+  {
+   "name": "Фасонные части Ду32 (отводы, сгоны, муфты, контргайки) *",
+   "qty": 1,
+   "unit": "компл",
+   "price": 3500,
+   "type": "material",
+   "category": "6. Первичный контур (сталь)",
+   "composition": null
+  },
+  {
+   "name": "Трубка теплоизоляционная Energoflex Super 54/13 *",
+   "qty": 74,
+   "unit": "пог. м",
+   "price": 167,
+   "type": "material",
+   "category": "7. Теплоизоляция",
+   "composition": null
+  },
+  {
+   "name": "Трубка теплоизоляционная Energoflex Super 42/13 *",
+   "qty": 18,
+   "unit": "пог. м",
+   "price": 135,
+   "type": "material",
+   "category": "7. Теплоизоляция",
+   "composition": null
+  },
+  {
+   "name": "Трубка теплоизоляционная Energoflex Super 35/13 *",
+   "qty": 10,
+   "unit": "пог. м",
+   "price": 115,
+   "type": "material",
+   "category": "7. Теплоизоляция",
+   "composition": null
+  },
+  {
+   "name": "Трубка теплоизоляционная Energoflex Super 28/9 *",
+   "qty": 22,
+   "unit": "пог. м",
+   "price": 70,
+   "type": "material",
+   "category": "7. Теплоизоляция",
+   "composition": null
+  },
+  {
+   "name": "Лента и клей Energoflex (комплект) *",
+   "qty": 1,
+   "unit": "компл",
+   "price": 2900,
+   "type": "material",
+   "category": "7. Теплоизоляция",
+   "composition": null
+  },
+  {
+   "name": "Лоток перфорированный оцинкованный 200×50, L=3 м *",
+   "qty": 11,
+   "unit": "шт",
+   "price": 1200,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Соединитель лотка с крепежом *",
+   "qty": 12,
+   "unit": "шт",
+   "price": 120,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Консоль настенная 250 мм (крепление лотка через 1,5 м) *",
+   "qty": 22,
+   "unit": "шт",
+   "price": 380,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Хомут трубный с EPDM 48–53 мм *",
+   "qty": 56,
+   "unit": "шт",
+   "price": 160,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Хомут трубный с EPDM 38–43 мм *",
+   "qty": 16,
+   "unit": "шт",
+   "price": 140,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Хомут трубный с EPDM 32–35 мм *",
+   "qty": 12,
+   "unit": "шт",
+   "price": 110,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Опора неподвижная (жёсткий хомут) 50 мм *",
+   "qty": 6,
+   "unit": "шт",
+   "price": 350,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Клипса PP 25 / 20 мм *",
+   "qty": 64,
+   "unit": "шт",
+   "price": 22,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Профиль монтажный 41×41 + крепёж (усиление крепления консолей Volcano к каркасу) *",
+   "qty": 3,
+   "unit": "компл",
+   "price": 2000,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Анкеры, саморезы по металлу, шпилька, гайки (комплект) *",
+   "qty": 1,
+   "unit": "компл",
+   "price": 4500,
+   "type": "material",
+   "category": "8. Опоры, крепления, лоток",
+   "composition": null
+  },
+  {
+   "name": "Теплоноситель на основе пропиленгликоля −30 °C, канистра 20 кг (Thermagent ЭКО −30 или аналог) *",
+   "qty": 8,
+   "unit": "шт",
+   "price": 4500,
+   "type": "material",
+   "category": "9. Теплоноситель и расходники",
+   "composition": null
+  },
+  {
+   "name": "Расходные материалы: лён/паста, герметик, ФУМ, маркировка, бирки *",
+   "qty": 1,
+   "unit": "компл",
+   "price": 8000,
+   "type": "material",
+   "category": "9. Теплоноситель и расходники",
+   "composition": null
+  },
+  {
+   "name": "Аренда передвижной вышки-туры (рабочая высота до 6 м), 10 смен с доставкой *",
+   "qty": 1,
+   "unit": "компл",
+   "price": 18000,
+   "type": "service",
+   "category": "10. Логистика и механизмы",
+   "composition": null
+  },
+  {
+   "name": "Доставка материалов и оборудования на объект *",
+   "qty": 1,
+   "unit": "рейс",
+   "price": 15000,
+   "type": "service",
+   "category": "10. Логистика и механизмы",
+   "composition": null
+  },
+  {
+   "name": "Теплотехнический расчёт теплопотерь здания (500 м²)",
+   "qty": 500,
+   "unit": "м²",
+   "price": 50,
+   "type": "service",
+   "category": "11. Расчёты",
+   "composition": null
+  },
+  {
+   "name": "Гидравлический расчёт, окончательный подбор теплообменника и насоса",
+   "qty": 1,
+   "unit": "компл",
+   "price": 15000,
+   "type": "service",
+   "category": "11. Расчёты",
+   "composition": null
+  },
+  {
+   "name": "Подготовка места работ, разметка трасс и точек установки",
+   "qty": 1,
+   "unit": "компл",
+   "price": 8000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж консолей и перфорированного лотка на высоте 4–6 м (k=1,3)",
+   "qty": 33,
+   "unit": "пог. м",
+   "price": 780,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж теплообменника разборного на опору с подключением фланцев",
+   "qty": 1,
+   "unit": "шт",
+   "price": 15000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Обвязка первичного контура: трубопроводы стальные Ду32 на резьбе",
+   "qty": 6,
+   "unit": "пог. м",
+   "price": 1200,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж циркуляционного насоса до Ø32",
+   "qty": 1,
+   "unit": "шт",
+   "price": 5000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж распределительного коллектора с подключением трубопроводов",
+   "qty": 1,
+   "unit": "шт",
+   "price": 10000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж трубопроводов PP 50 в тепловом узле",
+   "qty": 10,
+   "unit": "пог. м",
+   "price": 700,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж трубопроводов PP 50 на высоте 4–6 м (k=1,3)",
+   "qty": 56,
+   "unit": "пог. м",
+   "price": 910,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж трубопроводов PP 40 на высоте 4–6 м (k=1,3)",
+   "qty": 16,
+   "unit": "пог. м",
+   "price": 910,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж отводов PP 32 к тепловентиляторам на высоте (k=1,3)",
+   "qty": 9.0,
+   "unit": "пог. м",
+   "price": 585,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж трубопроводов PP 25 (контур АБК)",
+   "qty": 20,
+   "unit": "пог. м",
+   "price": 450,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж трубопроводов PP 20 (подводки к радиаторам)",
+   "qty": 19.0,
+   "unit": "пог. м",
+   "price": 350,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж запорной и регулирующей арматуры в тепловом узле и контуре АБК",
+   "qty": 27,
+   "unit": "шт",
+   "price": 750,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж арматуры на отводах тепловентиляторов и магистралях на высоте (k=1,3)",
+   "qty": 20,
+   "unit": "шт",
+   "price": 975,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж КИП (манометры, термометры)",
+   "qty": 9,
+   "unit": "шт",
+   "price": 1000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж тепловентилятора Volcano на кронштейн на высоте 4–5 м с подключением гибкими подводками",
+   "qty": 3,
+   "unit": "шт",
+   "price": 9000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": "на высоте 4–5 м, консоль на профиль 41×41 к каркасу\nкраны, фильтр, клапан NVMZ, балансир, гибкие подводки"
+  },
+  {
+   "name": "Монтаж радиатора (навеска на стену)",
+   "qty": 3,
+   "unit": "шт",
+   "price": 4000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж термостатического и запорного клапанов на радиатор",
+   "qty": 3,
+   "unit": "шт",
+   "price": 1200,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж расширительного бака до 50 л",
+   "qty": 1,
+   "unit": "шт",
+   "price": 5000,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж группы безопасности",
+   "qty": 1,
+   "unit": "шт",
+   "price": 3500,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж теплоизоляции трубопроводов (в т. ч. на высоте)",
+   "qty": 111.0,
+   "unit": "пог. м",
+   "price": 110,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": null
+  },
+  {
+   "name": "Монтаж автоматики: контроллер HMI, датчик NTC, приводы клапанов NVMZ (без прокладки кабелей)",
+   "qty": 1,
+   "unit": "компл",
+   "price": 7500,
+   "type": "work",
+   "category": "12. Монтажные работы",
+   "composition": "без прокладки кабелей и подключения питания (электромонтаж — заказчик)"
+  },
+  {
+   "name": "Заполнение контура антифризом насосом с удалением воздуха",
+   "qty": 1,
+   "unit": "компл",
+   "price": 8000,
+   "type": "work",
+   "category": "13. Испытания, ПНР, документация",
+   "composition": null
+  },
+  {
+   "name": "Гидравлические испытания с оформлением актов",
+   "qty": 1,
+   "unit": "компл",
+   "price": 10000,
+   "type": "work",
+   "category": "13. Испытания, ПНР, документация",
+   "composition": "теплоносителем, 0,45 МПа (1,5 Pраб)\n30 мин ≤ 0,06 МПа, затем 2 ч ≤ 0,02 МПа (СП 73.13330)"
+  },
+  {
+   "name": "Циркуляционная промывка теплоносителем, чистка фильтров",
+   "qty": 1,
+   "unit": "компл",
+   "price": 5000,
+   "type": "work",
+   "category": "13. Испытания, ПНР, документация",
+   "composition": null
+  },
+  {
+   "name": "Балансировка контуров (настройка балансировочных клапанов)",
+   "qty": 1,
+   "unit": "компл",
+   "price": 6000,
+   "type": "work",
+   "category": "13. Испытания, ПНР, документация",
+   "composition": null
+  },
+  {
+   "name": "Пусконаладка: теплообменник, насос, автоматика Volcano, проверка герметичности",
+   "qty": 1,
+   "unit": "компл",
+   "price": 20000,
+   "type": "work",
+   "category": "13. Испытания, ПНР, документация",
+   "composition": null
+  },
+  {
+   "name": "Исполнительная схема, акты, паспорта, перечень применённых материалов",
+   "qty": 1,
+   "unit": "компл",
+   "price": 12000,
+   "type": "service",
+   "category": "13. Испытания, ПНР, документация",
+   "composition": null
+  },
+  {
+   "name": "Уборка и вывоз упаковки",
+   "qty": 1,
+   "unit": "компл",
+   "price": 5000,
+   "type": "service",
+   "category": "13. Испытания, ПНР, документация",
+   "composition": null
+  }
+ ],
+ "final": false,
+ "total": "1 222 968 ₽"
+}
