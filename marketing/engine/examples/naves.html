@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Навес и парковка поэтапно</title>
+<style>.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }</style></head><body><div id="stage">
+<svg class="main" viewBox="0 0 540 960" width="540" height="960">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a9d6f2"/><stop offset="1" stop-color="#eef7fc"/></linearGradient>
+    <linearGradient id="skyW" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d8fa3"/><stop offset="1" stop-color="#cfd9e3"/></linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a6a45"/><stop offset="1" stop-color="#5e452b"/></linearGradient>
+    <linearGradient id="poly" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe3ff" stop-opacity=".9"/><stop offset="1" stop-color="#7fb8e6" stop-opacity=".85"/></linearGradient>
+    <pattern id="grav" width="22" height="18" patternUnits="userSpaceOnUse"><rect width="22" height="18" fill="#8d949a"/><ellipse cx="6" cy="5" rx="5.5" ry="4" fill="#c9ced3" stroke="#6d7379"/><ellipse cx="16" cy="12" rx="6" ry="4.5" fill="#b4bac0" stroke="#6d7379"/></pattern>
+    <pattern id="sandP" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#e3c88a"/><circle cx="3" cy="3" r="1" fill="#c9a865"/><circle cx="8" cy="7" r="1" fill="#d6b674"/></pattern>
+    <pattern id="concP" width="14" height="14" patternUnits="userSpaceOnUse"><rect width="14" height="14" fill="#a9aeb3"/><circle cx="3" cy="4" r="1.2" fill="#8a9096"/><circle cx="10" cy="10" r="1.3" fill="#959ba1"/></pattern>
+    <radialGradient id="vigG" cx=".5" cy=".45" r=".8"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></radialGradient>
+  </defs>
+  <g id="cam">
+    <rect x="-200" y="-200" width="940" height="900" fill="url(#sky)"/>
+    <rect id="skyWin" x="-200" y="-200" width="940" height="900" fill="url(#skyW)" opacity="0"/>
+    <g id="clouds"></g>
+    <g id="bg"></g>
+    <rect x="-200" y="600" width="940" height="600" fill="url(#soil)"/>
+    <g id="pebbles"></g>
+    <path d="M-200 600 H80 M460 600 H740" stroke="#5aa043" stroke-width="8"/>
+    <path id="grassMid" d="M80 600 H460" stroke="#5aa043" stroke-width="8"/>
+
+    <!-- ===== «как делают на скорую» ===== -->
+    <g id="bad">
+      <g id="badTiles"></g>
+      <g id="badPostL"><rect x="107" y="345" width="6" height="285" fill="#8a9096" stroke="#4a4f55" stroke-width="1.5"/></g>
+      <g id="badPostR"><rect x="427" y="368" width="6" height="262" fill="#8a9096" stroke="#4a4f55" stroke-width="1.5"/></g>
+      <g id="badRoof">
+        <path d="M92 340 L448 364" stroke="#7fb8e6" stroke-width="7" stroke-linecap="round"/>
+        <path id="badSnow" fill="#fff" stroke="#cfd9e3" stroke-width="1.5"/>
+      </g>
+    </g>
+
+    <!-- ===== правильно ===== -->
+    <g id="good" opacity="0">
+      <rect id="pit" x="80" y="600" width="380" height="0" fill="#3d2c1b"/>
+      <path id="geo" d="M80 646 H460" stroke="#f5f5f0" stroke-width="5" stroke-dasharray="380" stroke-dashoffset="380"/>
+      <!-- ямы под стойки и бетон -->
+      <rect id="hL" x="94" y="600" width="32" height="0" fill="#2e2114"/><rect id="hR" x="414" y="600" width="32" height="0" fill="#2e2114"/>
+      <rect id="cL" x="94" y="760" width="32" height="0" fill="url(#concP)" stroke="#6d7379" stroke-width="1.5"/><rect id="cR" x="414" y="760" width="32" height="0" fill="url(#concP)" stroke="#6d7379" stroke-width="1.5"/>
+      <g id="depth" opacity="0"><path d="M140 600 V760 M134 600 H146 M134 760 H146" stroke="#FFD43B" stroke-width="3"/><text x="150" y="690" font-family="PT" font-size="20" fill="#FFD43B">~1,2 м</text></g>
+      <!-- паребрики на бетонный замок -->
+      <g id="curbL" opacity="0"><path d="M54 640 H90 V662 H54Z" fill="url(#concP)" stroke="#6d7379" stroke-width="1.5"/><rect x="64" y="588" width="16" height="64" rx="2" fill="#d6d9dc" stroke="#5d6268" stroke-width="2.5"/></g>
+      <g id="curbR" opacity="0"><path d="M450 640 H486 V662 H450Z" fill="url(#concP)" stroke="#6d7379" stroke-width="1.5"/><rect x="460" y="588" width="16" height="64" rx="2" fill="#d6d9dc" stroke="#5d6268" stroke-width="2.5"/></g>
+      <rect id="gr" x="80" y="646" width="380" height="0" fill="url(#grav)"/>
+      <rect id="sd" x="80" y="619" width="380" height="0" fill="url(#sandP)"/>
+      <g id="tiles"></g>
+      <!-- стойки -->
+      <rect id="pL" x="104" y="760" width="12" height="0" fill="#5d6268" stroke="#2b2f34" stroke-width="1.5"/>
+      <rect id="pR" x="424" y="760" width="12" height="0" fill="#5d6268" stroke="#2b2f34" stroke-width="1.5"/>
+      <!-- фермы -->
+      <g id="truss"></g>
+      <!-- кровля и водосток -->
+      <g id="roof" opacity="0">
+        <path d="M86 320 L454 345 L454 353 L86 328Z" fill="url(#poly)" stroke="#4f7fa8" stroke-width="2"/>
+        <g id="gut" opacity="0"><path d="M450 348 h12 q6 0 6 6 v4 q0 6 -6 6 h-8" fill="none" stroke="#4a4f55" stroke-width="4"/><rect x="458" y="362" width="7" height="236" fill="#6b7480" stroke="#3b3f44" stroke-width="1.5"/></g>
+        <path id="goodSnow" fill="#fff" stroke="#cfd9e3" stroke-width="1.5"/>
+      </g>
+      <g id="vib" opacity="0"><rect x="-16" y="-8" width="32" height="8" fill="#e05a1a" stroke="#3b3f44" stroke-width="2"/><rect x="-10" y="-20" width="18" height="12" rx="2" fill="#4a4f55"/><path d="M6 -18 L24 -44" stroke="#3b3f44" stroke-width="3"/></g>
+    </g>
+
+    <!-- машина -->
+    <g id="car">
+      <path d="M-100 -22 L-96 -50 Q-90 -58 -74 -60 L-46 -60 L-22 -92 Q-16 -98 -6 -98 L48 -98 Q58 -98 66 -90 L92 -60 L108 -56 Q118 -52 118 -40 L118 -22Z" fill="#2f6fd6" stroke="#1a2b4a" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-38 -62 L-18 -88 L16 -88 L16 -62Z M24 -62 L24 -88 L50 -88 Q56 -88 60 -84 L80 -62Z" fill="#cfe9ff" stroke="#1a2b4a" stroke-width="2"/>
+      <circle cx="-62" cy="-20" r="20" fill="#222" stroke="#666" stroke-width="6"/><circle cx="76" cy="-20" r="20" fill="#222" stroke="#666" stroke-width="6"/>
+      <text id="boom" x="-30" y="-110" font-size="60" font-family="Noto Color Emoji" opacity="0">💥</text>
+    </g>
+    <g id="snow"></g>
+  </g>
+  <rect width="540" height="960" fill="url(#vigG)"/>
+  <rect id="dim" width="540" height="960" fill="#06101f" opacity="0"/>
+</svg>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">🙈 «НА СКОРУЮ»</div>
+<div id="e1" class="tag err" style="left:24px;top:212px;font-size:23px">❌ стойки без фундамента</div>
+<div id="e2" class="tag err" style="left:24px;top:266px;font-size:23px">❌ плитка прямо на грунт</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 7</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ НАВЕС СТОИТ, ПЛИТКА РОВНАЯ</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🚗</div><div class="logo">СМЕТА PRO</div><div class="l2">Навесы, парковки, бордюры —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script>
+window.DUR = 30;
+const A = 2.2, B = 8.3, SD = 2.2;
+const ST = [...Array(7)].map((_, i) => 8.4 + i * SD);
+const TEST = 8.4 + 7 * SD, PHONE = TEST + 2.2, END = PHONE + 2.0;
+const STEPS = [
+  ['Разметка, корыто <b>30–40 см</b><br>и геотекстиль на дно', '📐 корыто 30–40 см'],
+  ['Стойки — в бетон <b>ниже<br>промерзания</b>, в СПб ~1,2 м', '🏗 профтруба 80–100 мм'],
+  ['Паребрики по периметру —<br>на бетонный замок', '🧱 бордюр на бетон'],
+  ['Щебень <b>15–20 см</b><br>с трамбовкой', '🪨 щебень 15–20 см'],
+  ['Песок <b>3–5 см</b> и плитка<br><b>8 см</b> — под машину', '▦ плитка 8 см'],
+  ['Фермы и обрешётка,<br>уклон кровли для стока', '📐 уклон от 5°'],
+  ['Кровля и <b>водосток</b> —<br>вода не льётся на плитку', '🌧 водосток'],
+];
+const SUBS = [
+  [A + .1, 4.4, 'Навес «на скорую»: стойки без<br>фундамента, плитка на грунт'],
+  [4.4, 6.2, 'Зимой снег — <b>до 150 кг</b><br>на каждый м² крыши…'],
+  [6.2, B - .1, '…и навес <b>ложится на машину</b> 💥'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || TEST) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [TEST + .1, PHONE, 'Снег, ливень — навес стоит,<br>плитка ровная ✅'],
+  [PHONE + .1, END, 'Смета на навес и парковку —<br><b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+
+// фон
+for (let i = 0; i < 6; i++) { const g = E('g', { class: 'cl', 'data-i': i, opacity: .85 }, $('clouds')); const x = R(i) * 600, y = 110 + R(i + 1) * 150, w = 70 + R(i + 2) * 70; for (let k = 0; k < 4; k++) E('ellipse', { cx: x + k * w * .35, cy: y - (k % 2) * 12, rx: w * .42, ry: w * .2, fill: '#fff' }, g); }
+E('path', { d: 'M-200 600 L-200 470 Q-100 420 0 470 L40 460 L40 600Z', fill: '#9cc58a', opacity: .7 }, $('bg'));
+for (let i = 0; i < 5; i++) { const x = -60 + i * 150 + R(i) * 40, h = 90 + R(i + 1) * 50; E('rect', { x: x - 5, y: 600 - h * .45, width: 10, height: h * .45, fill: '#7a5230', opacity: .6 }, $('bg')); E('circle', { cx: x, cy: 600 - h * .6, r: h * .32, fill: '#7ab565', opacity: .55 }, $('bg')); }
+for (let i = 0; i < 100; i++) E('ellipse', { cx: R(i) * 740 - 100, cy: 670 + R(i + 1) * 400, rx: 2 + R(i + 2) * 4, ry: 1.5 + R(i + 3) * 3, fill: '#4a3620', opacity: .5 }, $('pebbles'));
+// плитка: 10 штук по 38 px
+const BT = [], GT = [];
+for (let i = 0; i < 10; i++) {
+  BT.push(E('rect', { width: 36, height: 11, rx: 2, fill: i % 2 ? '#a6493a' : '#8c8f93', stroke: '#3b3f44', 'stroke-width': 1.5 }, $('badTiles')));
+  GT.push(E('rect', { x: 82 + i * 37.8, y: 602, width: 36, height: 11, rx: 2, fill: i % 2 ? '#a6493a' : '#8c8f93', stroke: '#3b3f44', 'stroke-width': 1.5, opacity: 0 }, $('tiles')));
+}
+// фермы: верхний и нижний пояс + раскосы
+const TR = [];
+(() => {
+  const g = $('truss'); const yT = (x) => 322 + (x - 86) * (25 / 368), yB = (x) => 352 + (x - 86) * (25 / 368);
+  TR.push(E('path', { d: `M86 ${yT(86)} L454 ${yT(454)}`, stroke: '#4a4f55', 'stroke-width': 6, 'stroke-linecap': 'round' }, g));
+  TR.push(E('path', { d: `M100 ${yB(100)} L440 ${yB(440)}`, stroke: '#4a4f55', 'stroke-width': 5, 'stroke-linecap': 'round' }, g));
+  for (let k = 0; k < 8; k++) { const x0 = 100 + k * 42.5, x1 = x0 + 42.5; TR.push(E('path', { d: `M${x0} ${yB(x0)} L${(x0 + x1) / 2} ${yT((x0 + x1) / 2)} L${x1} ${yB(x1)}`, stroke: '#6b7480', 'stroke-width': 3, fill: 'none' }, g)); }
+})();
+// снег
+const SN = []; for (let i = 0; i < 70; i++) SN.push(E('circle', { r: 2 + R(i) * 3, fill: '#fff', opacity: 0 }, $('snow')));
+function snowPath(h, x0, y0, x1, y1) {
+  if (h <= .5) return '';
+  let d = `M${x0} ${y0}`; const n = 12;
+  for (let k = 0; k <= n; k++) { const x = lerp(x0, x1, k / n), y = lerp(y0, y1, k / n) - h * (.85 + .15 * Math.sin(k * 1.7)); d += ` L${x} ${y}`; }
+  return d + ` L${x1} ${y1}Z`;
+}
+function renderSnow(t, k) {
+  SN.forEach((s, i) => { const sp = 60 + R(i) * 50, ph = R(i + 7); const y = ((t * sp / 700 + ph) % 1) * 720 - 40; s.setAttribute('cx', R(i + 3) * 600 - 30 + Math.sin(t * 1.5 + i) * 12); s.setAttribute('cy', y); s.setAttribute('opacity', k * (.6 + R(i + 4) * .4)); });
+}
+
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Навес над парковкой,<br>который <b>переживёт зиму</b> 👇';
+  $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const inB = t >= B;
+  const z = inB ? 1.14 + Math.min(t - B, 16) * .003 : 1.06 + t * .006;
+  $('cam').setAttribute('transform', `translate(270 520) scale(${z}) translate(-270 ${inB ? -545 : -520})`);
+  document.querySelectorAll('.cl').forEach((e) => e.setAttribute('transform', `translate(${(t * (6 + +e.dataset.i * 2)) % 760 - 140} 0)`));
+  // зима: плохая часть и проверка
+  const winter = !inB ? clamp((t - 3.6) / .8) : win(t, TEST - .1, PHONE, .5, .4);
+  $('skyWin').setAttribute('opacity', winter * .85);
+  renderSnow(t, winter);
+
+  // ===== плохо
+  $('bad').setAttribute('opacity', inB ? 0 : 1);
+  $('good').setAttribute('opacity', inB ? 1 : 0);
+  const sk = !inB ? ease((t - 3.8) / 2.2) : 0;
+  $('badSnow').setAttribute('d', snowPath(26 * sk, 92, 337, 448, 361));
+  const bend = !inB ? ease((t - 5.4) / .8) : 0, drop = !inB ? eOut((t - 6.2) / .35) : 0;
+  const shake = !inB && t > 5.0 && t < 6.2 ? Math.sin(t * 40) * .8 : 0;
+  $('badPostL').setAttribute('transform', `rotate(${14 * bend + 60 * drop + shake} 110 630)`);
+  $('badPostR').setAttribute('transform', `rotate(${-12 * bend - 55 * drop - shake} 430 630)`);
+  $('badRoof').setAttribute('transform', `translate(0 ${bend * 20 + drop * 150}) rotate(${drop * 3} 270 350)`);
+  const sinkB = !inB ? ease((t - 4.0) / 3) : 0;
+  BT.forEach((r, i) => { const dip = Math.max(0, Math.sin(i / 9 * Math.PI * 2 + .5)) * 14 + (i === 2 || i === 7 ? 6 : 0); const x = 82 + i * 37.8, y = 594 + dip * sinkB; r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('transform', `rotate(${(i % 2 ? 1 : -1) * 7 * sinkB * (dip > 4 ? 1 : 0)} ${x + 18} ${y + 5})`); });
+  $('boom').setAttribute('opacity', !inB && t > 6.4 ? win(t, 6.4, B - .2, .1, .2) : 0);
+  $('boom').setAttribute('transform', `scale(${back((t - 6.4) / .3)})`);
+  renderTag('tagBad', t, A, B - .2); renderTag('e1', t, A + .5, B - .2); renderTag('e2', t, A + 1.0, B - .2);
+
+  // ===== правильно
+  const grow = (id, bottom, h, k) => { const hh = h * ease(k); $(id).setAttribute('y', bottom - hh); $(id).setAttribute('height', hh); };
+  const S = (i) => ST[i];
+  // 1. корыто + геотекстиль
+  $('pit').setAttribute('height', inB ? 46 * ease((t - S(0) - .1) / .8) : 0);
+  $('grassMid').setAttribute('opacity', inB ? 1 - clamp((t - S(0)) / .3) : 1);
+  $('geo').setAttribute('stroke-dashoffset', 380 * (1 - (inB ? ease((t - S(0) - 1.0) / .9) : 0)));
+  // 2. ямы, бетон, стойки
+  const hk = inB ? ease((t - S(1)) / .6) : 0;
+  $('hL').setAttribute('height', 160 * hk); $('hR').setAttribute('height', 160 * hk);
+  const pk = inB ? ease((t - S(1) - .5) / .9) : 0;
+  $('pL').setAttribute('y', lerp(760, 334, pk)); $('pL').setAttribute('height', lerp(0, 426, pk));
+  $('pR').setAttribute('y', lerp(760, 359, pk)); $('pR').setAttribute('height', lerp(0, 401, pk));
+  grow('cL', 760, 150, inB ? (t - S(1) - 1.2) / .8 : 0); grow('cR', 760, 150, inB ? (t - S(1) - 1.3) / .8 : 0);
+  $('depth').setAttribute('opacity', inB ? win(t, S(1) + .6, S(2) - .05, .2, .2) : 0);
+  // 3. паребрики
+  [['curbL', 0], ['curbR', .25]].forEach(([id, d]) => { const k = inB ? eOut((t - S(2) - .2 - d) / .5) : 0; $(id).setAttribute('opacity', clamp(k * 4)); $(id).setAttribute('transform', `translate(0 ${(1 - k) * -120})`); });
+  // 4. щебень + виброплита
+  grow('gr', 646, 27, inB ? (t - S(3) - .1) / .8 : 0);
+  const v = inB && t > S(3) + .9 && t < S(4) - .05;
+  $('vib').setAttribute('opacity', v ? 1 : 0);
+  $('vib').setAttribute('transform', `translate(${lerp(140, 400, (Math.sin((t - S(3)) * 2.6) + 1) / 2)} ${619 - Math.abs(Math.sin(t * 40)) * 2})`);
+  // 5. песок и плитка
+  grow('sd', 619, 6, inB ? (t - S(4) - .1) / .5 : 0);
+  GT.forEach((r, i) => { const k = inB ? eOut((t - S(4) - .6 - i * .1) / .35) : 0; r.setAttribute('opacity', clamp(k * 3)); r.setAttribute('transform', `translate(0 ${(1 - k) * -60})`); });
+  // 6. фермы
+  TR.forEach((p, i) => p.setAttribute('opacity', inB ? clamp((t - S(5) - .1 - i * .15) / .2) : 0));
+  // 7. кровля и водосток
+  const rk = inB ? eOut((t - S(6) - .1) / .5) : 0;
+  $('roof').setAttribute('opacity', clamp(rk * 3)); $('roof').setAttribute('transform', `translate(0 ${(1 - rk) * -90})`);
+  $('gut').setAttribute('opacity', inB ? clamp((t - S(6) - .9) / .3) : 0);
+  // проверка: снег на крыше
+  const gs = t > TEST ? ease((t - TEST - .3) / 1.4) : 0;
+  $('goodSnow').setAttribute('d', snowPath(22 * gs, 86, 320, 454, 345));
+
+  // машина
+  let cx = 270, cy = 600;
+  if (inB) cx = t < TEST ? -400 : lerp(-180, 270, eOut((t - TEST) / 1.2));
+  $('car').setAttribute('transform', `translate(${cx} ${cy})`);
+
+  // ярлыки
+  let si = 0; for (let i = 0; i < 7; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 7`;
+  $('step').style.opacity = win(t, ST[0], TEST - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, TEST - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, TEST + .8, PHONE - .1);
+
+  $('dim').setAttribute('opacity', clamp((t - PHONE) / .4) * .72);
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>
