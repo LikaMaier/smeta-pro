@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Монтаж газгольдера 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }
+.lbl { position: absolute; z-index: 14; transform: translate(-50%, -100%); font-family: 'PT', 'Noto Color Emoji'; font-size: 19px; color: #0d2440; background: rgba(255,255,255,.92); padding: 4px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.25); opacity: 0; }
+.lbl.y { background: #FFD43B; }
+.lbl:after { content: ''; position: absolute; left: 50%; bottom: -8px; margin-left: -7px; border: 7px solid transparent; border-top-color: inherit; border-bottom: 0; }
+#smoke { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#boomE { position: absolute; z-index: 15; font-family: 'Noto Color Emoji'; font-size: 54px; opacity: 0; transform: translate(-50%, -50%); }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="smoke" width="540" height="960"></canvas>
+<div id="lDist" class="lbl y">📏 ≥ 10 м до дома</div>
+<div id="lFence" class="lbl y">📏 ≥ 2 м до забора</div>
+<div id="lSlab" class="lbl">⚓ плита-якорь</div>
+<div id="lAnode" class="lbl">🔩 анод</div>
+<div id="lPipe" class="lbl y">газопровод ПЭ</div>
+<div id="lCond" class="lbl">конденсатосборник</div>
+<div id="lWater" class="lbl" style="background:#d6ecff">💧 грунтовые воды</div>
+<div id="boomE">💥</div>
+<div id="dimD" style="position:absolute;inset:0;background:#06101f;opacity:0;z-index:11"></div>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">❌ БЕЗ ПЛИТЫ-ЯКОРЯ</div>
+<div id="tagBad2" class="tag err" style="left:24px;top:212px;font-size:23px">😱 ёмкость всплыла, труба лопнула</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 6</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ ГАЗ В ДОМЕ — ТЕПЛО</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🔥</div><div class="logo">СМЕТА PRO</div><div class="l2">Газгольдер под ключ —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script>
+window.DUR = 30.5;
+const A = 2.2, B = 8.1, SD = 2.5;
+const ST = [...Array(6)].map((_, i) => 8.3 + i * SD);
+const FIN = 8.3 + 6 * SD, PHONE = FIN + 2.4, END = PHONE + 2.0;
+const STEPS = [
+  ['Место: <b>≥10 м</b> от дома,<br><b>≥2 м</b> от забора', '📏 по нормам'],
+  ['Котлован под ёмкость<br>с запасом под подушку', '🚜 глубина ~2,7 м'],
+  ['Песчаная подушка и <b>бетонная<br>плита-якорь</b>', '⚓ против всплытия'],
+  ['Газгольдер опускаем<br>краном на плиту', '🏗 манипулятор'],
+  ['Крепим стропами к плите,<br>ставим <b>анодную защиту</b>', '🔩 стропы + анод'],
+  ['Засыпка песком, газопровод<br>и конденсатосборник', '🟨 газопровод ПЭ'],
+];
+const SUBS = [
+  [A + .1, 5.0, 'Газгольдер поставили<br><b>без плиты-якоря</b>…'],
+  [5.0, B - .1, '…весной грунтовые воды<br><b>выталкивают ёмкость</b> 😱'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || FIN) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [FIN + .1, PHONE, 'Горловина над землёй,<br><b>в доме тепло</b> 🔥'],
+  [PHONE + .1, END, 'Смета на газгольдер<br>под ключ — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+
+// ---------- камера: [t, yaw, pitch, dist, tx, ty, tz]
+const K = (t, ...v) => [t, ...v];
+const VIEW = {
+  s1: [.3, .95, 40, -7, 0, -4.5], s2: [.2, .45, 12.5, 0, -1.4, -1.6], s3: [.1, .52, 10.5, 0, -2.0, -1.6], s4: [.35, .3, 16.5, 1.5, .2, -2.4],
+  s5: [.15, .32, 9.4, .3, -1.6, -1.4], s6: [.25, .55, 32, -6, -.4, -2.6], fin: [.5, .4, 32, -8, .8, -4],
+};
+const CAM = [
+  [0, .55, .32, 13, 0, -1.0, -1.6], [A, .4, .3, 11.5, 0, -1.0, -1.6], [6.0, .3, .28, 12, 0, -.4, -1.6], [B - .02, .26, .28, 12.5, 0, -.4, -1.6],
+  K(B, ...VIEW.s1), K(ST[1] - .3, ...VIEW.s1),
+  K(ST[1] + .5, ...VIEW.s2), K(ST[2] - .2, ...VIEW.s2), K(ST[2] + .4, ...VIEW.s3), K(ST[3] - .2, ...VIEW.s3),
+  K(ST[3] + .4, ...VIEW.s4), K(ST[4] - .2, ...VIEW.s4), K(ST[4] + .4, ...VIEW.s5), K(ST[5] - .2, ...VIEW.s5),
+  K(ST[5] + .5, ...VIEW.s6), K(FIN - .2, ...VIEW.s6), K(FIN + .4, ...VIEW.fin), [99, .58, .4, 32, -8, .8, -4],
+];
+function camAt(t) {
+  let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++;
+  const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0]));
+  return a.map((v, j) => lerp(v, b[j], k));
+}
+
+const S = new M3.Scene($('cv'));
+const SOIL = { top: '#4e3420', mid: '#a17549', deep: '#7e5a39' }, GRASS = '#5ea447';
+const PX = 2.5, PZ = -3.2, PD = -2.7;               // котлован: x[-PX,PX], z[PZ,0], дно PD
+const TANK = { c: [0, -1.62, -1.6], len: 3.0, r: .66 };
+
+/** грунт-диорама с вырезом под котлован; dig — сколько выкопано (0..1) */
+function soil(dig, heave) {
+  const layers = [[-.35, 0, SOIL.top], [-1.6, -.35, SOIL.mid], [-3.4, -1.6, SOIL.deep]];
+  const blk = (x0, x1, z0, z1, yb = -3.4, yt = 0) => layers.forEach(([y0, y1, c]) => {
+    const a = Math.max(y0, yb), b = Math.min(y1, yt); if (b - a < .01) return;
+    S.box(x0, x1, a, b, z0, z1, c, { top: b >= -.001 ? GRASS : c, groundTop: b >= -.001 });
+  });
+  blk(-19, -PX, -10, 0); blk(PX, 8, -10, 0); blk(-PX, PX, -10, PZ); blk(-PX, PX, PZ, 0, -3.4, PD);
+  // нетронутый грунт в котловане
+  const top = lerp(0, PD, dig);
+  if (top - PD > .02) blk(-PX, PX, PZ, 0, PD, top);
+}
+function tree(x, z, s = 1) { S.cyl('y', [x, .5 * s, z], .14 * s, 1 * s, '#7a5230', { shadow: true, seg: 7 }); S.cone([x, .8 * s, z], .9 * s, 2.6 * s, '#3f7f3a', { shadow: true }); S.cone([x, 2 * s, z], .65 * s, 1.8 * s, '#4c9145', { shadow: true }); }
+function house(warm) {
+  const x0 = -17.5, x1 = -12, z0 = -8, z1 = -3;
+  S.box(x0, x1, 0, 3.2, z0, z1, '#efe0c4', { shadow: true });
+  const roof = '#a9452f', yr = 3.2, yt = 5.1, xm = (x0 + x1) / 2, cr = [xm, 4, (z0 + z1) / 2];
+  S.poly([[x0 - .3, yr, z1 + .3], [xm, yt, z1 + .3], [xm, yt, z0 - .3], [x0 - .3, yr, z0 - .3]], roof, { center: cr, shadow: true });
+  S.poly([[xm, yt, z1 + .3], [x1 + .3, yr, z1 + .3], [x1 + .3, yr, z0 - .3], [xm, yt, z0 - .3]], roof, { center: cr, shadow: true });
+  S.poly([[x0, yr, z1], [x1, yr, z1], [xm, yt, z1]], '#e6d3b0', { center: cr });
+  S.poly([[x0, yr, z0], [xm, yt, z0], [x1, yr, z0]], '#e6d3b0', { center: cr });
+  S.box(-14, -13.4, 3.6, 5.6, -6, -5.4, '#8a5a40', { shadow: true });
+  const win = warm > 0 ? `rgb(${lerp(70, 255, warm) | 0},${lerp(110, 196, warm) | 0},${lerp(150, 90, warm) | 0})` : '#4e7aa6';
+  for (const wx of [-16.6, -14.8]) S.poly([[wx, 1.1, z1 + .02], [wx + 1.1, 1.1, z1 + .02], [wx + 1.1, 2.3, z1 + .02], [wx, 2.3, z1 + .02]], win, { two: true, emit: warm > 0, bias: -.1 });
+  S.poly([[-13.2, 0, z1 + .02], [-12.4, 0, z1 + .02], [-12.4, 2.1, z1 + .02], [-13.2, 2.1, z1 + .02]], '#6b432a', { two: true, bias: -.1 });
+}
+function fence() { for (let x = -1; x <= 8; x += 1.5) S.box(x - .05, x + .05, 0, 1.6, -9.05, -8.95, '#6b7480', { shadow: true }); S.box(-1, 8, 1.1, 1.3, -9.04, -8.96, '#2f7a4f', { shadow: true }); S.box(-1, 8, .3, 1.5, -9.02, -8.98, '#3d9563', { shadow: true }); }
+
+/** газгольдер; tf — преобразование (всплытие) */
+function tank(tf, extra = {}) {
+  const { c, len, r } = TANK, o = { tf, shadow: extra.shadow };
+  S.capsule(c, len, r, '#f1f3f0', { ...o, seg: 40 });
+  for (const bx of [-.9, .9]) S.cyl('x', [c[0] + bx, c[1], c[2]], r + .025, .14, '#2f7a4f', { ...o, caps: false });
+  S.cyl('y', [c[0], c[1] + r + .55, c[2]], .3, 1.2, '#2f7a4f', { ...o, cap: '#245f3d' });
+  S.cyl('y', [c[0], c[1] + r + 1.2, c[2]], .36, .1, '#1f4f33', o);
+}
+
+const SM = $('smoke').getContext('2d');
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Почему газгольдер<br><b>всплывает</b> весной? 😱';
+  $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const inB = t >= B;
+  const cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+
+  // небо и фон
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960); g.addColorStop(0, inB ? '#8cc7ee' : '#7f97b0'); g.addColorStop(.55, inB ? '#d9eefa' : '#c8d3de'); g.addColorStop(1, '#eef6fb');
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  const sun = S.proj([-30, 26, -60]);
+  if (inB && sun[2] > 0) { const sg = x.createRadialGradient(sun[0], sun[1], 0, sun[0], sun[1], 160); sg.addColorStop(0, 'rgba(255,248,214,.95)'); sg.addColorStop(1, 'rgba(255,230,160,0)'); x.fillStyle = sg; x.fillRect(0, 0, 540, 960); }
+  S.fogColor = inB ? [214, 234, 247] : [200, 210, 220];
+
+  // ---------- сцена
+  tree(-8, -9, 1.1); tree(-21, -8, 1.3); tree(5.5, -12, 1.2); tree(-3.5, -12.5, 1); tree(10, -7, 1.1);
+  house(inB ? clamp((t - FIN - .2) / .8) : 0);
+  fence();
+
+  if (!inB) {
+    // ===== плохо: ёмкость на дне без плиты, засыпка, грунтовые воды
+    soil(1);
+    const up = ease((t - 5.0) / 2.2), ang = -.32 * up;
+    const cTank = [0, -2.04, -1.6];
+    const tf = (p) => M3.rotZ([p[0], p[1] - .42 + up * 2.3, p[2]], [cTank[0], cTank[1] + up * 2.3, cTank[2]], ang);
+    tank(tf);
+    // засыпка песком (прозрачная) и «шапка» грунта, которую поднимает ёмкость
+    S.box(-PX, PX, PD, -.35, PZ, 0, '#e5cc8e', { alpha: .5 });
+    S.box(-PX, PX, -.35, 0, PZ, 0, SOIL.top, { top: GRASS, tf: (p) => M3.rotZ([p[0], p[1] + up * 1.1, p[2]], [0, up * 1.1, -1.6], ang * .6) });
+    // вода поднимается
+    const wl = lerp(-3.4, -.6, ease((t - 2.4) / 3.2));
+    if (t > 2.4) S.box(-19, 8, -3.4, wl, -10, .02, '#3d8fd6', { alpha: .32, two: false });
+    // газопровод рвётся
+    const tip = tf([-.4, TANK.c[1] + .6, -1.6]);
+    const broken = up > .35;
+    S.line([[-12, .2, -4], [-12, -1, -4], [-4, -1.2, -1.6], [-2.6, -1.0, -1.6]], { color: '#FFD43B', w: 4, dash: [9, 6] });
+    S.line([[-2.6, -1.0, -1.6], broken ? [-2.0, -1.3 + up * .4, -1.6] : tip], { color: broken ? '#e5383b' : '#FFD43B', w: 4, dash: [9, 6] });
+    if (broken) S.line([[-1.6, -1.0 + up * 1.5, -1.6], tip], { color: '#e5383b', w: 4, dash: [9, 6] });
+    const bp = S.proj([-2.2, -.9 + up * .8, -1.6]);
+    $('boomE').style.left = bp[0] + 'px'; $('boomE').style.top = bp[1] + 'px';
+    $('boomE').style.opacity = up > .35 ? win(t, 6.0, B - .2, .1, .2) : 0;
+    $('boomE').style.transform = `translate(-50%,-50%) scale(${back((t - 6.0) / .3)})`;
+    placeLbl('lWater', [-7, wl + .3, -.2], win(t, 3.0, B - .2));
+  } else {
+    // ===== правильно
+    const dig = ease((t - ST[1] - .1) / 1.6);
+    soil(t < ST[1] ? 0 : dig);
+    // куча грунта
+    const pile = t > ST[1] ? ease((t - ST[1]) / 1.6) * (1 - ease((t - ST[5]) / 1.2)) : 0;
+    if (pile > .02) S.cone([5, 0, -6], 2.2 * Math.sqrt(pile), 1.8 * pile, '#9a6d43', { seg: 10, shadow: true });
+    // подушка и плита
+    const sk = ease((t - ST[2] - .1) / .7);
+    if (sk > .01) S.box(-2.3, 2.3, PD, PD + .2 * sk, -3.0, -.2, '#e3c88a');
+    const slabK = eOut((t - ST[2] - .8) / .8);
+    if (slabK > .01) S.box(-2.2, 2.2, -2.5 + (1 - slabK) * 4, -2.3 + (1 - slabK) * 4, -2.9, -.3, '#b3b8bd', { shadow: true });
+    // монтаж ёмкости краном
+    const u = t - ST[3];
+    const drop = u < .2 ? 0 : ease((u - .2) / 1.7);
+    const ty = lerp(3.4, 0, drop);
+    const tShow = t > ST[3];
+    const tfT = (p) => [p[0], p[1] + ty, p[2]];
+    if (tShow) tank(tfT, { shadow: ty > 1.5 });
+    // манипулятор
+    const trk = t < ST[3] - .4 ? 0 : t < ST[4] + .8 ? 1 : 1 - ease((t - ST[4] - .8) / 1);
+    if (trk > .01) {
+      const tx0 = lerp(16, 4.2, ease(trk));
+      S.box(tx0, tx0 + 1.8, .6, 2.6, -5.6, -3.6, '#e8eef3', { shadow: true });
+      S.box(tx0 + .2, tx0 + 1.4, 1.6, 2.4, -3.62, -3.58, '#9fd0ff', { two: true, bias: -.05 });
+      S.box(tx0 + 1.8, tx0 + 7, .6, 1.2, -5.6, -3.6, '#6b4a3a', { shadow: true });
+      for (const wx of [tx0 + .9, tx0 + 4.8, tx0 + 6]) S.cyl('z', [wx, .45, -4.6], .45, 2.2, '#2b2f34', { seg: 14, shadow: true });
+      const base = [tx0 + 2.3, 1.4, -4.6];
+      S.cyl('y', [base[0], 2.2, base[2]], .25, 1.6, '#f2b705', { seg: 10, shadow: true });
+      const hook = [0, TANK.c[1] + TANK.r + 1.5 + ty, TANK.c[2]];
+      const tip = [hook[0] + .3, hook[1] + 1.4, hook[2]];
+      const elbow = [lerp(base[0], tip[0], .45), Math.max(base[1], tip[1]) + 2.6, lerp(base[2], tip[2], .5)];
+      const show = t < ST[4] + .3;
+      if (show) {
+        S.line([[base[0], 3.0, base[2]], elbow, tip], { color: '#2b2f34', w: 11 }); S.line([[base[0], 3.0, base[2]], elbow, tip], { color: '#f2b705', w: 7 });
+        S.line([tip, hook], { color: '#2b2f34', w: 2 });
+        if (t < ST[3] + 2.0) { S.line([hook, [-1.0, TANK.c[1] + TANK.r + ty, -1.6]], { color: '#ff7a1a', w: 2.5 }); S.line([hook, [1.0, TANK.c[1] + TANK.r + ty, -1.6]], { color: '#ff7a1a', w: 2.5 }); }
+      }
+    }
+    // стропы к плите и анод
+    const strap = ease((t - ST[4] - .1) / .6);
+    if (strap > .01) for (const bx of [-.9, .9]) for (const zz of [-1.6 - TANK.r - .02, -1.6 + TANK.r + .02]) S.box(bx - .05, bx + .05, -2.3, lerp(-2.3, TANK.c[1], strap), zz - .015, zz + .015, '#2f7a4f');
+    const anK = eOut((t - ST[4] - .9) / .6);
+    if (anK > .01) { S.cyl('y', [2.05, -2.0 + (1 - anK) * 3, -.5], .09, 1.0, '#7d8389', { seg: 10 }); if (anK > .9) S.line([[2.05, -1.5, -.5], [1.2, -1.4, -1.0]], { color: '#c1121f', w: 2 }); }
+    // засыпка песком (прозрачная) и грунт сверху
+    const bf = ease((t - ST[5] - .1) / 1.3);
+    if (bf > .01) S.box(-PX, PX, -2.3, lerp(-2.3, -.35, bf), PZ, 0, '#e5cc8e', { alpha: .45 });
+    const capK = ease((t - ST[5] - 1.4) / .6);
+    if (capK > .01) S.box(-PX, PX, -.35, lerp(-.35, 0, capK), PZ, 0, SOIL.top, { top: GRASS, groundTop: true });
+    // газопровод к дому
+    const gp = ease((t - ST[5] - .9) / 1.2);
+    if (gp > 0) {
+      const path = [[0, -1.0, -1.6], [-2.8, -1.0, -1.6], [-4, -1.25, -1.9], [-12, -1.0, -4], [-12, .5, -4]];
+      const cut = [], segs = path.length - 1, tot = gp * segs;
+      for (let i = 0; i <= segs; i++) { if (i <= tot) cut.push(path[i]); else { const k = tot - (i - 1); const a = path[i - 1], b = path[i]; cut.push([lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)]); break; } }
+      S.line(cut, { color: '#FFD43B', w: 5, glow: 'rgba(255,212,59,.8)', dash: [10, 6], offset: -t * 30 });
+      if (gp > .3) S.line([[-4, -1.25, -1.9], [-4, -.3, -1.9]], { color: '#FFD43B', w: 9 });
+    }
+    // подписи
+    placeLbl('lDist', [-7.5, .1, -1], win(t, ST[0] + .3, ST[1] - .1));
+    placeLbl('lFence', [3.5, 1.9, -8.8], win(t, ST[0] + .7, ST[1] - .1));
+    placeLbl('lSlab', [1.4, -2.2, -.3], win(t, ST[2] + 1.6, ST[3] - .1));
+    placeLbl('lAnode', [1.55, -1.3, -.5], win(t, ST[4] + 1.4, ST[5] - .1));
+    placeLbl('lPipe', [-8, -.95, -3], win(t, ST[5] + 1.6, PHONE - .1));
+    placeLbl('lCond', [-4, -.1, -1.9], win(t, ST[5] + 1.9, FIN + 1.2));
+    if (t > ST[0] && t < ST[1]) { S.line([[-2.4, .06, -1], [-11.9, .06, -1]], { color: '#FFD43B', w: 4 }); S.line([[1, .06, -3.3], [1, .06, -8.9]], { color: '#FFD43B', w: 4 }); }
+  }
+  ['lDist', 'lFence', 'lSlab', 'lAnode', 'lPipe', 'lCond'].forEach((id) => { if (!inB) $(id).style.opacity = 0; });
+  if (inB) { $('lWater').style.opacity = 0; $('boomE').style.opacity = 0; }
+  S.render();
+
+  // дым из трубы — тёплый дом
+  SM.clearRect(0, 0, 540, 960);
+  const warm = inB ? clamp((t - FIN - .2) / .8) : 0;
+  if (warm > 0) {
+    const ch = S.proj([-13.7, 5.7, -5.7]);
+    for (let i = 0; i < 14; i++) { const k = ((t * .45 + i / 14) % 1); SM.fillStyle = `rgba(245,245,245,${(1 - k) * .55 * warm})`; SM.beginPath(); SM.arc(ch[0] + Math.sin(k * 6 + i) * 8 + k * 30, ch[1] - k * 120, 5 + k * 16, 0, 7); SM.fill(); }
+  }
+
+  // ярлыки
+  renderTag('tagBad', t, A + .2, B - .2); renderTag('tagBad2', t, 6.1, B - .2);
+  let si = 0; for (let i = 0; i < 6; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 6`;
+  $('step').style.opacity = win(t, ST[0], FIN - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, FIN - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, FIN + .7, PHONE - .1);
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .72;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+function placeLbl(id, p, op) {
+  const q = S.proj(p), el = $(id);
+  el.style.left = q[0] + 'px'; el.style.top = (q[1] - 6) + 'px'; el.style.opacity = q[2] > .3 ? op : 0;
+}
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>
