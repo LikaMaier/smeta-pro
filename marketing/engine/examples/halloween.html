@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Хэллоуин прораба 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.num { position: absolute; left: 22px; top: 140px; z-index: 16; font-family: 'PTN', 'Noto Color Emoji'; font-size: 78px; transform-origin: 0 50%; color: #ff8a1f; -webkit-text-stroke: 6px #1a0b2e; paint-order: stroke fill; opacity: 0; text-shadow: 0 0 30px rgba(255,138,31,.7); }
+.bub { position: absolute; z-index: 15; transform: translate(-50%, -100%); background: rgba(240,236,255,.95); color: #1a0b2e; font-family: 'PT', 'Noto Color Emoji'; font-size: 24px; line-height: 1.15; padding: 10px 16px; border-radius: 18px; text-align: center; box-shadow: 0 0 28px rgba(190,170,255,.7); opacity: 0; white-space: nowrap; }
+.bub:after { content: ''; position: absolute; left: 50%; bottom: -12px; margin-left: -10px; border: 10px solid transparent; border-top-color: rgba(240,236,255,.95); border-bottom: 0; }
+#phone { box-shadow: 0 0 60px rgba(255,138,31,.65), 0 30px 70px rgba(0,0,0,.6), inset 0 0 0 3px #ff8a1f !important; }
+#end { background: radial-gradient(120% 80% at 50% 40%, #3a1a5e, #12081f 70%) !important; }
+#end .logo { color: #ff8a1f !important; }
+#sub b, #hook b { color: #ff9f3a !important; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="n3" class="num">№3</div><div id="n2" class="num">№2</div><div id="n1" class="num">№1</div>
+<div id="b1" class="bub">📄 Смету — от руки?<br>В 3 часа ночи?</div>
+<div id="b2" class="bub">«А давайте<br>ещё один этаж!»</div>
+<div id="b3" class="bub">🧱 Бетон: <b style="color:#c1121f">+30%</b><br>пересчитай всё!</div>
+<div id="dimD" style="position:absolute;inset:0;background:#0b0616;opacity:0;z-index:11"></div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🎃</div><div class="logo">СМЕТА PRO</div><div class="l2">Пусть страшно будет только в кино —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script>
+window.DUR = 23;
+const H = 2.6, P3 = [2.6, 7.4], P2 = [7.4, 12.0], P1 = [12.0, 16.4], PHONE = 16.6, END = 20.2;
+const SUBS = [
+  [P3[0] + .4, P3[1] - .1, 'Считать смету <b>на бумажке</b><br>до трёх ночи 👻'],
+  [P2[0] + .4, P2[1] - .1, 'Заказчик меняет проект<br><b>на середине стройки</b> 😱'],
+  [P1[0] + .4, P1[1] - .1, 'Цены выросли —<br><b>пересчитывай всё заново</b> 💀'],
+  [PHONE + .2, END, 'Не страшно, когда смета<br>считается <b>за 2 минуты</b> 😎'],
+];
+const SCREENS = [[PHONE + .2, '2dirs', 130, 300], [PHONE + 1.6, '5result', 120, 470]];
+// камера: [t, yaw, pitch, dist, tx, ty, tz]
+const CAM = [
+  [0, -.7, .2, 17, 0, 1.6, -1], [H, -.45, .18, 14, 0, 1.4, -1],
+  [P3[0] + .5, -.3, .16, 8, -2.6, .6, 1.4], [P3[1] - .2, -.1, .17, 8.5, -2.6, .8, 1.4],
+  [P2[0] + .5, .2, .14, 13, 0, 2.6, -1], [P2[1] - .2, .32, .15, 13, 0, 3.0, -1],
+  [P1[0] + .5, .55, .17, 11, 2.4, .9, 1.0], [P1[1] - .2, .7, .17, 11, 2.4, 1.0, 1.0],
+  [PHONE + .4, .9, .2, 16, 0, 1.5, -1], [99, 1.1, .2, 16, 0, 1.5, -1],
+];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+
+const S = new M3.Scene($('cv'));
+S.amb = .26; S.dif = .5; S.L = M3.norm([.45, .75, -.5]); S.tint = [.58, .62, .98]; S.fogColor = [26, 22, 52]; S.fog = [9, 38]; S.shadowA = .3;
+const PUMP = [[-2.4, 1.6, .55], [-3.1, 1.0, .38], [2.8, 1.5, .5], [3.5, .7, .34], [.6, 2.6, .42], [-.8, 3.2, .3]];
+const FX = $('fx').getContext('2d');
+
+function frame(extraFloor) {
+  const W = '#5a4030';
+  S.box(-3.2, 3.2, 0, .3, -3.6, 1.6, '#6f7378');
+  const cols = [[-3, -3.4], [3, -3.4], [-3, 1.4], [3, 1.4], [0, -3.4], [0, 1.4]];
+  for (const [x, z] of cols) S.box(x - .1, x + .1, .3, 3.0, z - .1, z + .1, W, { shadow: true });
+  for (const z of [-3.4, 1.4]) S.box(-3.1, 3.1, 2.9, 3.1, z - .11, z + .11, W, { shadow: true });
+  for (const x of [-3, 3]) S.box(x - .11, x + .11, 2.9, 3.1, -3.5, 1.5, W, { shadow: true });
+  // стропила
+  for (const z of [-3.4, -1.8, -.2, 1.4]) { S.line([[-3.2, 3.1, z], [0, 4.9, z], [3.2, 3.1, z]], { color: '#2a1d14', w: 6 }); }
+  S.line([[0, 4.9, -3.5], [0, 4.9, 1.5]], { color: '#2a1d14', w: 6 });
+  // «призрачный» лишний этаж
+  if (extraFloor > .01) {
+    const y0 = 3.1, y1 = 3.1 + 2.6 * extraFloor;
+    for (const [x, z] of cols.slice(0, 4)) S.box(x - .1, x + .1, y0, y1, z - .1, z + .1, '#b8a8ff', { alpha: .45 * extraFloor, emit: true });
+    S.box(-3.1, 3.1, y1 - .2, y1, -3.5, 1.5, '#b8a8ff', { alpha: .3 * extraFloor, emit: true });
+  }
+  // леса
+  for (const x of [-3.9, -3.5]) for (const z of [-3.6, -1.6, .4]) S.box(x - .04, x + .04, 0, 3.4, z - .04, z + .04, '#8a9096');
+  for (const y of [1.2, 2.4]) S.box(-4.0, -3.4, y, y + .08, -3.7, .5, '#9b7a4a');
+}
+function pumpkin([x, z, r], i) {
+  S.sphere([x, r * .8, z], r, '#e8781e', { sy: .8, seg: 14, rings: 8, shadow: true });
+  S.cyl('y', [x, r * 1.6 + .06, z], .05, .16, '#3f6b2a', { seg: 6 });
+}
+function face([x, z, r], i, t) {
+  const q = S.proj([x, r * .8, z]); if (q[2] < .3) return;
+  const s = S.F * r / q[2], fl = .8 + .2 * Math.sin(t * 13 + i * 3) * Math.sin(t * 7 + i);
+  // свечение на земле
+  const g0 = S.proj([x, .02, z]); const gr = FX.createRadialGradient(g0[0], g0[1], 0, g0[0], g0[1], s * 3.2);
+  gr.addColorStop(0, `rgba(255,150,40,${.38 * fl})`); gr.addColorStop(1, 'rgba(255,120,20,0)'); FX.fillStyle = gr; FX.beginPath(); FX.arc(g0[0], g0[1], s * 3.2, 0, 7); FX.fill();
+  FX.save(); FX.shadowColor = 'rgba(255,200,60,.95)'; FX.shadowBlur = 14; FX.fillStyle = `rgba(255,${200 + 40 * fl | 0},90,${.92 * fl})`;
+  const e = (dx) => { FX.beginPath(); FX.moveTo(q[0] + dx * s - .18 * s, q[1] - .05 * s); FX.lineTo(q[0] + dx * s + .18 * s, q[1] - .05 * s); FX.lineTo(q[0] + dx * s, q[1] - .32 * s); FX.closePath(); FX.fill(); };
+  e(-.32); e(.32);
+  FX.beginPath(); FX.moveTo(q[0] - .5 * s, q[1] + .15 * s);
+  for (let k = 0; k <= 6; k++) FX.lineTo(q[0] - .5 * s + k * s / 6, q[1] + (k % 2 ? .28 : .15) * s);
+  FX.lineTo(q[0] + .42 * s, q[1] + .42 * s); FX.lineTo(q[0] - .42 * s, q[1] + .42 * s); FX.closePath(); FX.fill(); FX.restore();
+}
+function ghost(p, sc, a, t) {
+  const q = S.proj(p); if (q[2] < .3 || a <= 0) return;
+  const s = S.F * sc / q[2], x = q[0] + Math.sin(t * 2) * s * .15, y = q[1] + Math.sin(t * 3) * s * .1;
+  FX.save(); FX.globalAlpha = a; FX.shadowColor = 'rgba(200,190,255,.9)'; FX.shadowBlur = 30; FX.fillStyle = 'rgba(240,238,255,.92)';
+  FX.beginPath(); FX.moveTo(x - .5 * s, y + .9 * s); FX.lineTo(x - .5 * s, y); FX.bezierCurveTo(x - .5 * s, y - .75 * s, x + .5 * s, y - .75 * s, x + .5 * s, y); FX.lineTo(x + .5 * s, y + .9 * s);
+  for (let k = 0; k < 4; k++) { const x0 = x + .5 * s - k * s / 4; FX.quadraticCurveTo(x0 - s / 8, y + (.75 + .1 * Math.sin(t * 6 + k)) * s, x0 - s / 4, y + .9 * s); }
+  FX.closePath(); FX.fill(); FX.shadowBlur = 0; FX.fillStyle = '#1a0b2e';
+  FX.beginPath(); FX.ellipse(x - .17 * s, y - .12 * s, .08 * s, .12 * s, 0, 0, 7); FX.ellipse(x + .17 * s, y - .12 * s, .08 * s, .12 * s, 0, 0, 7); FX.fill();
+  FX.beginPath(); FX.ellipse(x, y + .18 * s, .1 * s, .14 * s, 0, 0, 7); FX.fill(); FX.restore();
+  return [x, y - .7 * s];
+}
+function bat(x, y, s, t, i) {
+  const f = Math.sin(t * 16 + i) * .6;
+  FX.fillStyle = '#0b0616'; FX.beginPath(); FX.moveTo(x, y);
+  FX.quadraticCurveTo(x - s * .6, y - s * (.4 + f), x - s * 1.2, y - s * .1 * f); FX.quadraticCurveTo(x - s * .7, y + s * .1, x - s * .2, y + s * .15);
+  FX.lineTo(x, y + s * .25); FX.lineTo(x + s * .2, y + s * .15);
+  FX.quadraticCurveTo(x + s * .7, y + s * .1, x + s * 1.2, y - s * .1 * f); FX.quadraticCurveTo(x + s * .6, y - s * (.4 + f), x, y); FX.fill();
+}
+function bubble(id, at, a) { const el = $(id); if (!at) { el.style.opacity = 0; return; } el.style.left = at[0] + 'px'; el.style.top = (at[1] - 8) + 'px'; el.style.opacity = a; el.style.transform = `translate(-50%,-100%) scale(${.85 + .15 * a})`; }
+
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = '🎃 <b>Хэллоуин прораба</b><br>3 самых страшных вещи';
+  $('hook').style.opacity = win(t, .1, H - .1, .25, .25);
+  $('hook').style.transform = `scale(${back((t - .1) / .45)})`;
+  const cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960); g.addColorStop(0, '#120a2a'); g.addColorStop(.55, '#2b1a4e'); g.addColorStop(1, '#3d2350');
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  // звёзды и луна
+  for (let i = 0; i < 70; i++) { x.fillStyle = `rgba(255,255,255,${.3 + .5 * Math.abs(Math.sin(t * 1.3 + i))})`; x.fillRect(R(i) * 540, R(i + 1) * 520, 1.6, 1.6); }
+  const mx = 400 - cam[1] * 60, my = 200;
+  const mg = x.createRadialGradient(mx, my, 0, mx, my, 170); mg.addColorStop(0, 'rgba(255,244,214,.55)'); mg.addColorStop(1, 'rgba(255,230,180,0)'); x.fillStyle = mg; x.fillRect(0, 0, 540, 960);
+  x.fillStyle = '#fff3d1'; x.beginPath(); x.arc(mx, my, 54, 0, 7); x.fill();
+  x.fillStyle = 'rgba(220,200,160,.35)'; for (const [dx, dy, r] of [[-14, -10, 10], [12, 14, 7], [18, -18, 5]]) { x.beginPath(); x.arc(mx + dx, my + dy, r, 0, 7); x.fill(); }
+  // облака у луны
+  x.fillStyle = 'rgba(40,28,70,.85)'; for (let i = 0; i < 3; i++) { const cx = ((t * 14 + i * 230) % 760) - 110, cy = 170 + i * 46; x.beginPath(); x.ellipse(cx, cy, 90, 18, 0, 0, 7); x.ellipse(cx + 50, cy - 10, 60, 16, 0, 0, 7); x.fill(); }
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+
+  // ---- сцена
+  S.box(-30, 30, -.5, 0, -30, 12, '#2f4a2a', { groundTop: true });
+  for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2 + .3, rr = 11 + R(i) * 4; const tx = Math.cos(a) * rr, tz = Math.sin(a) * rr - 2; if (tz > 1) continue; S.cyl('y', [tx, .9, tz], .14, 1.8, '#2a1d14', { seg: 6 }); S.cone([tx, 1.4, tz], 1.1, 3.4, '#1d3324', {}); }
+  // кран вдали
+  S.line([[9, 0, -12], [9, 11, -12], [2, 11, -12], [14, 11, -12]], { color: '#140c22', w: 5 });
+  S.line([[11, 11, -12], [11, 6, -12]], { color: '#140c22', w: 2 });
+  const extra = win(t, P2[0] + .6, P2[1] - .2, .8, .4);
+  frame(extra);
+  PUMP.forEach(pumpkin);
+  // бумажки (№3)
+  for (let i = 0; i < 6; i++) S.box(-2.9 + i * .07, -2.3 + i * .05, .02 + i * .02, .04 + i * .02, .9 + (i % 2) * .1, 1.5 + (i % 3) * .05, '#e9e4d8', {});
+  S.render();
+
+  PUMP.forEach((p, i) => face(p, i, t));
+  // призраки
+  const g1 = ghost([-2.6, 1.1 + .6 * ease((t - P3[0] - .3) / 1.0), 1.2], .55, win(t, P3[0] + .3, P3[1] - .1, .5, .4), t);
+  bubble('b1', g1, win(t, P3[0] + 1.0, P3[1] - .2, .3, .3));
+  const g2 = ghost([0, 4.3, 1.6], .7, win(t, P2[0] + .4, P2[1] - .1, .5, .4), t + 1);
+  bubble('b2', g2, win(t, P2[0] + 1.0, P2[1] - .2, .3, .3));
+  const g3 = ghost([2.8, 1.5 + .4 * Math.sin(t), 1.0], .55, win(t, P1[0] + .3, P1[1] - .1, .5, .4), t + 2);
+  bubble('b3', g3, win(t, P1[0] + 1.0, P1[1] - .2, .3, .3));
+  // летающие листы и ценники
+  if (t > P3[0] && t < P3[1]) for (let i = 0; i < 10; i++) { const k = ((t - P3[0]) * .5 + i / 10) % 1, q = S.proj([-2.6 + Math.sin(i * 2 + t * 2) * 1.2, .3 + k * 3, 1.2 + Math.cos(i * 3 + t) * .8]); FX.save(); FX.globalAlpha = win(t, P3[0] + .3, P3[1] - .1) * (1 - k); FX.font = '26px "Noto Color Emoji"'; FX.translate(q[0], q[1]); FX.rotate(k * 6 + i); FX.fillText(i % 3 ? '📄' : '🧮', -13, 9); FX.restore(); }
+  if (t > P1[0] && t < P1[1]) for (let i = 0; i < 10; i++) { const k = ((t - P1[0]) * .5 + i / 10) % 1, q = S.proj([2.8 + Math.sin(i * 2 + t * 2) * 1.2, .3 + k * 3, 1.0 + Math.cos(i * 3 + t) * .8]); FX.save(); FX.globalAlpha = win(t, P1[0] + .3, P1[1] - .1) * (1 - k); FX.font = '26px "Noto Color Emoji"'; FX.translate(q[0], q[1]); FX.rotate(Math.sin(k * 6 + i) * .5); FX.fillText(i % 2 ? '💸' : '📈', -13, 9); FX.restore(); }
+  // мыши
+  for (let i = 0; i < 6; i++) { const k = ((t * .09 + i / 6) % 1); bat(-60 + k * 680, 140 + i * 38 + Math.sin(t * 2 + i) * 30, 15 + R(i) * 10, t, i); }
+  // туман
+  for (let i = 0; i < 5; i++) { const fx0 = ((t * 18 * (i % 2 ? 1 : -1) + i * 160) % 900) - 180; const fg = FX.createRadialGradient(fx0, 760 + i * 30, 0, fx0, 760 + i * 30, 260); fg.addColorStop(0, 'rgba(190,180,230,.16)'); fg.addColorStop(1, 'rgba(190,180,230,0)'); FX.fillStyle = fg; FX.fillRect(0, 0, 540, 960); }
+
+  // номера
+  [['n3', P3], ['n2', P2], ['n1', P1]].forEach(([id, [a, b]]) => { const el = $(id); el.style.opacity = win(t, a, b - .1, .2, .3); el.style.transform = `scale(${back((t - a) / .4)}) rotate(${Math.sin(t * 5) * 2}deg)`; });
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .7;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>

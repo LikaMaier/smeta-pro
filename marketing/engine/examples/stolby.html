@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Пучение выдавило столбы 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }
+.lbl { position: absolute; z-index: 14; transform: translate(-50%, -100%); font-family: 'PT', 'Noto Color Emoji'; font-size: 19px; color: #0d2440; background: rgba(255,255,255,.93); padding: 4px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.25); opacity: 0; }
+.lbl.y { background: #FFD43B; } .lbl.b { background: #d6ecff; } .lbl.r { background: #ffe1e1; color: #a1121f; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="lFrost" class="lbl b">❄️ граница промерзания</div>
+<div id="lHeave" class="lbl r">⬆️ грунт «выталкивает» столб</div>
+<div id="lDepth" class="lbl y">📏 ниже промерзания 1,5–1,8 м</div>
+<div id="lGrav" class="lbl">щебень 15–20 см</div>
+<div id="lWrap" class="lbl">обмотка — 2 слоя рубероида</div>
+<div id="lConc" class="lbl">бетон только внизу</div>
+<div id="lPgs" class="lbl">щебень с трамбовкой</div>
+<div id="dimD" style="position:absolute;inset:0;background:#06101f;opacity:0;z-index:11"></div>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">❌ СТОЛБЫ НА «СТАКАНЕ»</div>
+<div id="tagBad2" class="tag err" style="left:24px;top:212px;font-size:23px">😬 за зиму забор повело</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ ПОСЛЕ ЗИМЫ — РОВНО</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🧱</div><div class="logo">СМЕТА PRO</div><div class="l2">Заборы и ворота —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script>
+window.DUR = 28.5;
+const A = 2.2, B = 8.1, SD = 2.6;
+const ST = [...Array(5)].map((_, i) => 8.3 + i * SD);
+const FIN = 8.3 + 5 * SD, PHONE = FIN + 2.6, END = PHONE + 2.0;
+const STEPS = [
+  ['Бурим <b>ниже промерзания</b> —<br>1,5–1,8 м', '📏 глубина 1,5–1,8 м'],
+  ['На дно — <b>щебень</b><br>15–20 см', '🪨 подушка щебня'],
+  ['Столб в <b>обмотке</b> —<br>мёрзлый грунт не цепляет', '🧻 рубероид 2 слоя'],
+  ['Бетон <b>только внизу</b>,<br>выше — щебень с трамбовкой', '🔨 точечное бетонирование'],
+  ['Лаги и профлист —<br>по уровню', '📐 по уровню'],
+];
+const SUBS = [
+  [A + .1, 5.0, 'Столбы забетонировали<br>«стаканом» на <b>80 см</b>…'],
+  [5.0, B - .1, '…зимой грунт <b>пучит</b> —<br>столбы лезут вверх 😬'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || FIN) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [FIN + .1, PHONE, 'Мороз пучит грунт,<br>а <b>столбы стоят</b> ✅'],
+  [PHONE + .1, END, 'Смета на забор<br>под ключ — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+const K = (t, ...v) => [t, ...v];
+const VIEW = {
+  s1: [.3, .14, 8.5, 0, -.7, -1], s2: [.22, .12, 7.5, 0, -1.1, -1], s3: [.35, .14, 8, 0, -.6, -1], s4: [.25, .13, 8.5, 0, -.7, -1],
+  s5: [.22, .18, 16, 0, .5, -1], fin: [.18, .18, 17, 0, .3, -1],
+};
+const CAM = [
+  [0, .22, .2, 17.5, 0, .5, -1], [A, .16, .16, 16.5, 0, .3, -1], [5.2, .12, .14, 16, 0, .2, -1], [B - .02, .1, .14, 16, 0, .2, -1],
+  K(B, ...VIEW.s1), K(ST[1] - .2, ...VIEW.s1), K(ST[1] + .4, ...VIEW.s2), K(ST[2] - .2, ...VIEW.s2), K(ST[2] + .4, ...VIEW.s3), K(ST[3] - .2, ...VIEW.s3),
+  K(ST[3] + .4, ...VIEW.s4), K(ST[4] - .2, ...VIEW.s4), K(ST[4] + .4, ...VIEW.s5), K(FIN - .2, ...VIEW.s5), K(FIN + .5, ...VIEW.fin), [99, .22, .18, 17, 0, .3, -1],
+];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+
+const S = new M3.Scene($('cv'));
+const SOIL = { top: '#4e3420', mid: '#a17549', deep: '#7e5a39' }, GRASS = '#6f9a52', SNOW = '#f4f8fc';
+const PZ = -1, POSTS = [-2.4, 0, 2.4];
+function soil(snow, lift) {
+  const layers = [[-.35, 0, SOIL.top], [-1.6, -.35, SOIL.mid], [-3.2, -1.6, SOIL.deep]];
+  const blk = (z0, z1, alpha) => layers.forEach(([y0, y1, c]) => S.box(-14, 14, y0, y1 + (y1 >= 0 ? lift : 0), z0, z1, c, { top: y1 >= -.001 ? (snow ? SNOW : GRASS) : c, groundTop: y1 >= -.001, alpha, bias: alpha < 1 ? -60 : 0 }));
+  blk(-9, -1.45, 1);
+  blk(-1.45, 0, .42);
+}
+function tree(x, z, s = 1, snow) { S.cyl('y', [x, .5 * s, z], .14 * s, 1 * s, '#7a5230', { shadow: true, seg: 7 }); S.cone([x, .8 * s, z], .9 * s, 2.6 * s, '#3b6e45', { shadow: true }); S.cone([x, 2 * s, z], .65 * s, 1.8 * s, '#477d50', { shadow: true }); if (snow) S.cone([x, 3.1 * s, z], .35 * s, .8 * s, SNOW, {}); }
+function houseBg() { const x0 = -7, x1 = 0, z0 = -13, z1 = -9.5, xm = (x0 + x1) / 2, cr = [xm, 4, -6.7]; S.box(x0, x1, 0, 3, z0, z1, '#e9dcc9', { shadow: true }); S.poly([[x0 - .3, 3, z1 + .3], [xm, 4.8, z1 + .3], [xm, 4.8, z0 - .3], [x0 - .3, 3, z0 - .3]], '#8a4b3a', { center: cr }); S.poly([[xm, 4.8, z1 + .3], [x1 + .3, 3, z1 + .3], [x1 + .3, 3, z0 - .3], [xm, 4.8, z0 - .3]], '#8a4b3a', { center: cr }); S.poly([[x0, 3, z1], [x1, 3, z1], [xm, 4.8, z1]], '#ddcdb5', { center: cr }); }
+
+/** столб: x, dy — подъём, ang — наклон (рад), bottom — низ */
+function post(x, dy, ang, bottom, o = {}) {
+  const tf = (p) => M3.rotZ([p[0], p[1] + dy, p[2]], [x, bottom + dy, PZ], ang);
+  S.box(x - .07, x + .07, bottom, 2.0, PZ - .07, PZ + .07, '#5d6268', { tf, shadow: true, bias: -80 });
+  S.box(x - .09, x + .09, 1.98, 2.06, PZ - .09, PZ + .09, '#3b3f44', { tf, bias: -80 });
+  return tf;
+}
+/** лаги и профлист между верхушками столбов (точки с учётом сдвига) */
+function panel(tfs, k = 1) {
+  for (let i = 0; i < tfs.length - 1; i++) {
+    const a = tfs[i], b = tfs[i + 1], xa = POSTS[i] + .07, xb = POSTS[i + 1] - .07;
+    for (const y of [.45, 1.55]) {
+      const p = [a([xa, y, PZ + .09]), b([xb, y, PZ + .09]), b([xb, y + .07, PZ + .09]), a([xa, y + .07, PZ + .09])];
+      S.poly(p, '#4a4f55', { two: true, bias: -90 });
+    }
+    if (k > 0) {
+      const h = lerp(.1, 1.9, k);
+      S.poly([a([xa, .1, PZ + .11]), b([xb, .1, PZ + .11]), b([xb, h, PZ + .11]), a([xa, h, PZ + .11])], '#3d8a5c', { two: true, bias: -95 });
+      for (let r = 1; r < 16; r++) { const f = r / 16, xr = lerp(xa, xb, f); const top = [lerp(a([xa, h, 0])[0], b([xb, h, 0])[0], f), lerp(a([xa, h, 0])[1], b([xb, h, 0])[1], f)], bot = [lerp(a([xa, .1, 0])[0], b([xb, .1, 0])[0], f), lerp(a([xa, .1, 0])[1], b([xb, .1, 0])[1], f)]; S.line([[bot[0], bot[1], PZ + .12], [top[0], top[1], PZ + .12]], { color: 'rgba(28,77,51,.55)', w: 1.6 }); }
+    }
+  }
+}
+
+const FX = $('fx').getContext('2d');
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Весной забор <b>повело</b>?<br>Виновато пучение 🥶';
+  $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const inB = t >= B, cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const winter = !inB ? 1 : clamp((t - FIN + .4) / .8);
+  const g = x.createLinearGradient(0, 0, 0, 960);
+  g.addColorStop(0, winter > .5 ? '#9fb4c8' : '#8cc7ee'); g.addColorStop(.55, winter > .5 ? '#dfe7ef' : '#d9eefa'); g.addColorStop(1, '#f1f6fa');
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = winter > .5 ? [222, 230, 238] : [214, 234, 247];
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  const snow = winter > .5;
+  tree(-9, -6, 1.1, snow); tree(7, -7, 1.2, snow); tree(11, -4, 1, snow); houseBg();
+
+  let frost = 0;
+  if (!inB) {
+    frost = lerp(.2, 1.45, ease((t - 1.0) / 5.5));
+    const h = ease((t - 4.6) / 2.4);
+    soil(true, 0);
+    const lifts = [.45, .85, .3].map((v) => v * h), angs = [.1, -.14, .16].map((v) => v * h);
+    const tfs = POSTS.map((px, i) => { S.cyl('y', [px, -.4 + lifts[i], PZ], .2, .8, '#b3b8bd', { tf: (p) => M3.rotZ(p, [px, -.8 + lifts[i], PZ], angs[i]), bias: -70, seg: 16 }); return post(px, lifts[i], angs[i], -.8); });
+    panel(tfs, 1);
+    // стрелки пучения
+    if (h > .05) for (const px of POSTS) for (const dx of [-.45, .45]) { const p0 = S.proj([px + dx, -.9, 0]), p1 = S.proj([px + dx, -.9 + .55 * Math.min(1, h * 1.5), 0]); FX.strokeStyle = 'rgba(229,56,59,.9)'; FX.lineWidth = 3; FX.beginPath(); FX.moveTo(p0[0], p0[1]); FX.lineTo(p1[0], p1[1]); FX.stroke(); FX.fillStyle = 'rgba(229,56,59,.9)'; FX.beginPath(); FX.moveTo(p1[0], p1[1] - 7); FX.lineTo(p1[0] - 6, p1[1] + 3); FX.lineTo(p1[0] + 6, p1[1] + 3); FX.fill(); }
+    placeLbl('lHeave', [0, -.2, 0], win(t, 5.2, B - .2));
+  } else {
+    frost = winter * lerp(.2, 1.4, ease((t - FIN) / 2.0));
+    soil(snow, 0);
+    const bottom = -1.7;
+    const hole = ease((t - ST[0] - .2) / 1.4);
+    POSTS.forEach((px) => {
+      if (hole > .01) S.cyl('y', [px, -hole * 1.7 / 2, PZ], .2, hole * 1.7 + .01, '#2e2114', { bias: -65, seg: 16 });
+      const gr = ease((t - ST[1] - .1) / .7); if (gr > .01) S.cyl('y', [px, bottom + .09 * gr, PZ], .2, .18 * gr, '#9aa0a6', { bias: -66, seg: 16 });
+      const conc = ease((t - ST[3] - .1) / .7); if (conc > .01) S.cyl('y', [px, -1.52 + .25 * conc, PZ], .2, .5 * conc + .01, '#b3b8bd', { bias: -67, seg: 16 });
+      const pgs = ease((t - ST[3] - .9) / .9); if (pgs > .01) S.cyl('y', [px, -1.02 + lerp(0, 1.0, pgs) / 2, PZ], .2, 1.0 * pgs + .01, '#8d949a', { bias: -67, seg: 16, alpha: .9 });
+    });
+    // буровая
+    const au = t > ST[0] && t < ST[1] - .1;
+    if (au) { const d = hole * 1.7, ax = 0; S.cyl('y', [ax, 1.5 - d, PZ], .17, 3.4, '#8a9096', { bias: -100, seg: 12 }); S.box(ax - .5, ax + .5, 3.2 - d, 3.7 - d, PZ - .4, PZ + .4, '#e05a1a', { bias: -100 }); for (let k = 0; k < 9; k++) { const yy = -d + k * .25, a = t * 18 + k; S.line([[ax - .2 * Math.cos(a), yy, PZ + .2], [ax + .2 * Math.cos(a), yy + .12, PZ + .2]], { color: '#4a4f55', w: 3 }); } }
+    const pk = eOut((t - ST[2] - .1) / .6), wrap = ease((t - ST[2] - .8) / .8);
+    const tfs = POSTS.map((px) => { if (t < ST[2] + .1) return null; const tf = post(px, (1 - pk) * 3, 0, bottom + .18); if (wrap > .01) S.cyl('y', [px, bottom + .18 + (1.7 * wrap) / 2 + (1 - pk) * 3, PZ], .1, 1.7 * wrap, '#2b2f34', { bias: -85, seg: 10 }); return tf; });
+    if (t > ST[4]) panel(tfs, ease((t - ST[4] - .5) / .8));
+    placeLbl('lDepth', [1.2, -.6, 0], win(t, ST[0] + .9, ST[1] - .1));
+    placeLbl('lGrav', [.9, bottom + .15, 0], win(t, ST[1] + .6, ST[2] - .1));
+    placeLbl('lWrap', [.3, -.3, 0], win(t, ST[2] + 1.2, ST[3] - .1));
+    placeLbl('lConc', [-.9, -1.3, 0], win(t, ST[3] + .6, ST[4] - .1));
+    placeLbl('lPgs', [.9, -.4, 0], win(t, ST[3] + 1.4, ST[4] - .1));
+  }
+  if (!inB) ['lDepth', 'lGrav', 'lWrap', 'lConc', 'lPgs'].forEach((id) => ($(id).style.opacity = 0)); else $('lHeave').style.opacity = 0;
+  if (frost > .02) { S.box(-14, 14, -frost, 0, -1.45, .03, '#d8efff', { alpha: .38, bias: -110 }); S.line([[-14, -frost, .04], [14, -frost, .04]], { color: '#3d8fd6', w: 2.5, dash: [8, 6] }); }
+  placeLbl('lFrost', [1.2, -frost - .25, .05], (frost > .3 ? 1 : 0) * (!inB ? win(t, 1.8, B - .2) : win(t, FIN + .3, PHONE - .1)));
+  S.render();
+  const sk = !inB ? 1 : winter;
+  if (sk > 0) { FX.fillStyle = 'rgba(255,255,255,.9)'; for (let i = 0; i < 90; i++) { const sp = 50 + R(i) * 50; const y = ((t * sp / 700 + R(i + 7)) % 1) * 1000 - 40; FX.globalAlpha = sk * (.5 + R(i + 4) * .5); FX.beginPath(); FX.arc(R(i + 3) * 580 - 20 + Math.sin(t * 1.4 + i) * 14, y, 1.5 + R(i) * 2.5, 0, 7); FX.fill(); } FX.globalAlpha = 1; }
+
+  renderTag('tagBad', t, A + .2, B - .2); renderTag('tagBad2', t, 6.2, B - .2);
+  let si = 0; for (let i = 0; i < 5; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 5`;
+  $('step').style.opacity = win(t, ST[0], FIN - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, FIN - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, FIN + .9, PHONE - .1);
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .72;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+function placeLbl(id, p, op) { const q = S.proj(p), el = $(id); el.style.left = q[0] + 'px'; el.style.top = (q[1] - 6) + 'px'; el.style.opacity = q[2] > .3 ? op : 0; }
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const { chromium } = await import('playwright').catch(() => import('/home/claude/.npm-global/lib/node_modules/playwright/index.mjs'));
 const [html, out, wav] = process.argv.slice(2);
-const dir = path.join(path.dirname(path.resolve(out)), '.frames'); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
+const dir = path.join(path.dirname(path.resolve(out)), '.frames-' + path.basename(out, '.mp4')); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
 const exe = fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined;
 const url = 'file://' + path.resolve(html);
 const b0 = await chromium.launch({ executablePath: exe, args: ['--allow-file-access-from-files'] });

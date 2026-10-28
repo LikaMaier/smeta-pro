@@ -23,7 +23,7 @@ const M3 = (() => {
       this.sh = document.createElement('canvas'); this.sh.width = W * 2; this.sh.height = H * 2; this.shx = this.sh.getContext('2d');
       this.L = norm([-.45, .85, .38]);
       this.fogColor = [214, 230, 242]; this.fog = [18, 70];
-      this.groundY = 0.005;
+      this.groundY = 0.005; this.amb = .5; this.dif = .56; this.tint = [1, 1, 1]; this.shadowA = .22;
     }
     camera(target, yaw, pitch, dist, fov = 42) {
       const C = add(target, [dist * Math.cos(pitch) * Math.sin(yaw), dist * Math.sin(pitch), dist * Math.cos(pitch) * Math.cos(yaw)]);
@@ -76,6 +76,14 @@ const M3 = (() => {
       const oo = { ...o, center: c, smooth: true };
       for (let q = 0; q < rings.length - 1; q++) for (let i = 0; i < n; i++) { const j = (i + 1) % n; this.poly([rings[q][i], rings[q][j], rings[q + 1][j], rings[q + 1][i]], color, oo); }
     }
+    /** сфера (сплюснутая по y коэффициентом sy) */
+    sphere(c, r, color, o = {}) {
+      const n = o.seg || 16, m = o.rings || 9, sy = o.sy || 1, rings = [];
+      for (let k = 1; k < m; k++) { const a = k / m * Math.PI, rr = r * Math.sin(a), y = c[1] + r * sy * Math.cos(a), ring = []; for (let i = 0; i < n; i++) { const t = i / n * Math.PI * 2; ring.push([c[0] + rr * Math.cos(t), y, c[2] + rr * Math.sin(t)]); } rings.push(ring); }
+      const top = [c[0], c[1] + r * sy, c[2]], bot = [c[0], c[1] - r * sy, c[2]], oo = { ...o, center: c, smooth: true };
+      for (let i = 0; i < n; i++) { const j = (i + 1) % n; this.poly([top, rings[0][j], rings[0][i]], color, oo); this.poly([bot, rings[m - 2][i], rings[m - 2][j]], color, oo); }
+      for (let q = 0; q < rings.length - 1; q++) for (let i = 0; i < n; i++) { const j = (i + 1) % n; this.poly([rings[q][i], rings[q][j], rings[q + 1][j], rings[q + 1][i]], color, oo); }
+    }
     cone(c, r, hgt, color, o = {}) {
       const n = o.seg || 9, top = [c[0], c[1] + hgt, c[2]], base = [];
       for (let i = 0; i < n; i++) { const t = i / n * Math.PI * 2; base.push([c[0] + r * Math.cos(t), c[1], c[2] + r * Math.sin(t)]); }
@@ -89,8 +97,9 @@ const M3 = (() => {
       const c = rgb(f.color), o = f.o;
       let k;
       if (o.emit) k = 1;
-      else { const lam = Math.max(0, dot(f.n, this.L)); k = .5 + .56 * lam + .1 * Math.max(0, f.n[1]); }
-      let r = c[0] * k, g = c[1] * k, b = c[2] * k;
+      else { const lam = Math.max(0, dot(f.n, this.L)); k = this.amb + this.dif * lam + .1 * Math.max(0, f.n[1]); }
+      const tn = o.emit ? [1, 1, 1] : this.tint;
+      let r = c[0] * k * tn[0], g = c[1] * k * tn[1], b = c[2] * k * tn[2];
       const fg = Math.max(0, Math.min(1, (f.z - this.fog[0]) / (this.fog[1] - this.fog[0]))) * .75;
       r += (this.fogColor[0] - r) * fg; g += (this.fogColor[1] - g) * fg; b += (this.fogColor[2] - b) * fg;
       return [Math.min(255, r) | 0, Math.min(255, g) | 0, Math.min(255, b) | 0];
@@ -121,7 +130,7 @@ const M3 = (() => {
           pts.forEach((p, i) => { const k = (p[1] - gy) / L[1]; const q = this.proj(k > 0 ? sub(p, mul(L, k)) : [p[0], gy, p[2]]); if (q[2] < .3) ok = false; i ? s.lineTo(q[0], q[1]) : s.moveTo(q[0], q[1]); });
           if (ok) { s.closePath(); s.fill(); }
         }
-        x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = .22; x.filter = 'blur(3px)'; x.drawImage(this.sh, 0, 0); x.restore();
+        x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = this.shadowA; x.filter = 'blur(3px)'; x.drawImage(this.sh, 0, 0); x.restore();
       }
       rest.forEach((f) => this.draw(f));
       for (const { pts, style } of this.over) {
