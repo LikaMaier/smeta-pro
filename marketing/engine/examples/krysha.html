@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Сосульки-убийцы 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }
+.lbl { position: absolute; z-index: 14; transform: translate(-50%, -100%); font-family: 'PT', 'Noto Color Emoji'; font-size: 19px; color: #1a0b2e; background: rgba(255,255,255,.94); padding: 4px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.35); opacity: 0; }
+.lbl.o { background: #ff9f3a; } .lbl.b { background: #d6ecff; }
+.skull { position: absolute; z-index: 15; font-family: 'Noto Color Emoji'; font-size: 48px; transform: translate(-50%, -50%); opacity: 0; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="bG" class="bub">«Я — тепло из дома,<br>ухожу через крышу!» 🔥</div>
+<div id="eSk" class="skull">☠️</div>
+<div id="lPar" class="lbl b">пароизоляция</div>
+<div id="lIns" class="lbl o">утеплитель 200 мм</div>
+<div id="lWind" class="lbl">ветрозащита</div>
+<div id="lGap" class="lbl b">🌬 вентзазор</div>
+<div id="lSg" class="lbl">снегозадержатель</div>
+<div id="lCab" class="lbl o">🔥 кабель в водостоке</div>
+<div id="dimD" style="position:absolute;inset:0;background:#0b0616;opacity:0;z-index:11"></div>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">❌ ТЁПЛАЯ КРЫША</div>
+<div id="tagBad2" class="tag err" style="left:24px;top:212px;font-size:23px">☠️ наледь и сосульки над входом</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ СОСУЛЕК НЕТ</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🎃</div><div class="logo">СМЕТА PRO</div><div class="l2">Кровля под ключ —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="night.js"></script>
+<script>
+window.DUR = 28.8;
+const A = 2.4, B = 8.2, SD = 2.6;
+const ST = [...Array(5)].map((_, i) => 8.4 + i * SD);
+const FIN = 8.4 + 5 * SD, PHONE = FIN + 2.4, END = PHONE + 2.0;
+const STEPS = [
+  ['<b>Пароизоляция</b> снизу —<br>стыки на скотч', '🔵 пароизоляция'],
+  ['Утеплитель <b>200 мм</b><br>без щелей', '🟨 минвата 200 мм'],
+  ['Сверху — <b>ветрозащитная</b><br>мембрана', '⚪ ветрозащита'],
+  ['Контробрешётка — <b>вентзазор</b><br>от карниза до конька', '🌬 вентзазор 5 см'],
+  ['Снегозадержатели<br>и <b>обогрев водостока</b>', '🔥 греющий кабель'],
+];
+const SUBS = [
+  [A + .1, 5.2, 'Тонкий утеплитель, щели —<br><b>тепло уходит в крышу</b>…'],
+  [5.2, B - .1, '…снег тает, на карнизе<br>растут <b>сосульки-убийцы</b> ☠️'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || FIN) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [FIN + .1, PHONE, 'Холодная кровля:<br>снег лежит, <b>сосулек нет</b> ✅'],
+  [PHONE + .1, END, 'Смета на кровлю<br>под ключ — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+const K = (t, ...v) => [t, ...v];
+const VIEW = { s1: [.22, .1, 9.5, -2.6, 3.9, .3], s2: [.22, .1, 9.5, -2.6, 3.9, .3], s3: [.24, .1, 9.5, -2.5, 4.0, .3], s4: [.24, .1, 9.5, -2.5, 4.0, .3], s5: [.35, .08, 10, -3.6, 3.0, .3], fin: [.3, .1, 14, -2, 3.0, .3] };
+const CAM = [
+  [0, .45, .1, 16, -1, 2.6, .3], [A, .32, .1, 12.5, -2.4, 3.5, .3], [5.0, .3, .08, 11.5, -3.0, 3.0, .3], [B - .02, .3, .08, 11.5, -3.0, 3.0, .3],
+  K(B, ...VIEW.s1), K(ST[1] - .2, ...VIEW.s1), K(ST[1] + .4, ...VIEW.s2), K(ST[2] - .2, ...VIEW.s2), K(ST[2] + .4, ...VIEW.s3), K(ST[3] - .2, ...VIEW.s3),
+  K(ST[3] + .4, ...VIEW.s4), K(ST[4] - .2, ...VIEW.s4), K(ST[4] + .4, ...VIEW.s5), K(FIN - .2, ...VIEW.s5), K(FIN + .5, ...VIEW.fin), [99, .36, .1, 14, -2, 3.0, .3],
+];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+
+const S = new M3.Scene($('cv')); NIGHT.setup(S); S.amb = .44; S.dif = .6; S.tint = [.8, .82, 1.0];
+const EV = [-4.7, 2.75], RG = [0, 5.6], d = (() => { const v = [RG[0] - EV[0], RG[1] - EV[1]], l = Math.hypot(v[0], v[1]); return [v[0] / l, v[1] / l]; })(), n = [-d[1], d[0]];
+const E2 = [4.7, 2.75], n2 = [d[1], d[0]];
+const Z0 = -7.3, Z1 = .3;
+const P = (base, u, o, nn = n) => [lerp(base[0], RG[0], u) + nn[0] * o, lerp(base[1], RG[1], u) + nn[1] * o];
+function layer(o0, o1, color, opt = {}, u0 = 0, u1 = 1, base = EV, nn = n) { S.extrude([P(base, u0, o0, nn), P(base, u1, o0, nn), P(base, u1, o1, nn), P(base, u0, o1, nn)], opt.z0 ?? Z0, opt.z1 ?? Z1, color, opt); }
+function snowLayer(base, sn, nn = n, o = 0) {
+  const pts = [], N = 14;
+  for (let i = 0; i <= N; i++) { const u = i / N; pts.push(P(base, u, o, nn)); }
+  for (let i = N; i >= 0; i--) { const u = i / N; pts.push(P(base, u, o + sn(u), nn)); }
+  // выпуклые куски — по сегментам
+  for (let i = 0; i < N; i++) { const u0 = i / N, u1 = (i + 1) / N; S.extrude([P(base, u0, o, nn), P(base, u1, o, nn), P(base, u1, o + sn(u1), nn), P(base, u0, o + sn(u0), nn)], Z0, Z1, '#f4f8fc', { bias: -2 }); }
+}
+const PUMP = [[-1.6, 1.2, .45], [-.7, 1.6, .32], [1.4, 1.3, .4]];
+function house(glow) {
+  S.box(-4, 4, 0, 2.95, -7, 0, '#6e5d74', { shadow: true });
+  S.poly([[-.6, 0, .01], [.6, 0, .01], [.6, 2.1, .01], [-.6, 2.1, .01]], '#5a3a2a', { two: true, bias: -.2 });
+  for (const wx of [-3.2, 1.8]) S.poly([[wx, 1.0, .01], [wx + 1.3, 1.0, .01], [wx + 1.3, 2.2, .01], [wx, 2.2, .01]], glow ? '#ffb347' : '#4e5d7a', { two: true, emit: glow, bias: -.2 });
+  S.box(-1.2, 1.2, 0, .2, 0, 1.4, '#7d746a');
+  // фронтон (стена под крышей)
+  S.extrude([[-4, 2.95], [4, 2.95], [0, 5.3]], -7, -.05, '#5d4f63');
+}
+
+const FX = $('fx').getContext('2d');
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Сосульки-убийцы<br><b>над крыльцом</b>? 🧛';
+  $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const inB = t >= B, cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0); NIGHT.sky(x, t, cam[1]);
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  const winter = !inB || t > FIN - .3;
+
+  S.box(-30, 30, -.5, 0, -30, 12, winter ? '#dfe6f0' : '#2f4a2a', { groundTop: true });
+  for (let i = 0; i < 7; i++) { const tx = -14 + i * 4.5, tz = -12 - R(i) * 3; S.cyl('y', [tx, .9, tz], .14, 1.8, '#2a1d14', { seg: 6 }); S.cone([tx, 1.4, tz], 1.1, 3.4, '#1d3324', {}); if (winter) S.cone([tx, 3.8, tz], .45, 1.0, '#eef3f8', {}); }
+  house(true);
+  PUMP.forEach((p) => NIGHT.pumpkin(S, p));
+
+  let tipY = 0, icL = 0, guttOn = true;
+  if (!inB) {
+    // ===== плохо: тонкий утеплитель со щелью, металл сразу сверху
+    layer(0, .22, '#e8c84a', {}, 0, .44); layer(0, .22, '#e8c84a', {}, .5, 1);
+    layer(.22, .28, '#6b2a2a'); layer(.22, .28, '#6b2a2a', {}, 0, 1, E2, n2); layer(0, .22, '#e8c84a', {}, 0, 1, E2, n2);
+    const melt = ease((t - 3.0) / 3.0);
+    snowLayer(EV, (u) => (u < .18 ? .3 + .12 * melt : .3 * (1 - .85 * melt * Math.min(1, (u - .1) * 3))), n, .28);
+    snowLayer(E2, () => .3, n2, .28);
+    icL = 1.25 * ease((t - 3.8) / 3.0);
+    // капли талой воды по крыше
+    if (t > 3.2) for (let i = 0; i < 10; i++) { const k = ((t - 3.2) * .5 + i / 10) % 1, p = P(EV, .7 - k * .65, .3); const q = S.proj([p[0], p[1], -.4 - R(i) * 6]); FX.fillStyle = 'rgba(124,196,255,.9)'; FX.beginPath(); FX.arc(q[0], q[1], 3, 0, 7); FX.fill(); }
+  } else {
+    const s1 = ease((t - ST[0] - .1) / .7), s2 = ease((t - ST[1] - .1) / 1.0), s3 = ease((t - ST[2] - .1) / .7), s4 = ease((t - ST[3] - .1) / 1.0), s5 = ease((t - ST[4] - .1) / .8);
+    // стропила (каркас) видны с начала
+    for (const u of [.15, .45, .75]) { const a = P(EV, u - .03, .04), b = P(EV, u + .03, .5); S.extrude([P(EV, u - .02, .04), P(EV, u + .02, .04), P(EV, u + .02, .5), P(EV, u - .02, .5)], -.3, Z1, '#8a5a3a', { bias: -1 }); }
+    if (s1 > .01) layer(0, .04, '#4f9de8', {}, 0, s1);
+    if (s2 > .01) layer(.04, .5, '#e8c84a', {}, 0, s2);
+    if (s3 > .01) layer(.5, .54, '#f5f5f0', {}, 0, s3);
+    if (s4 > .01) for (let k = 0; k < 8; k++) { const u = .06 + k * .12; if (u > s4) break; layer(.72, .8, '#8a5a3a', {}, u, u + .04); }
+    if (s4 > .99 || t > ST[4]) { layer(.8, .86, '#6b2a2a'); layer(.8, .86, '#6b2a2a', {}, 0, 1, E2, n2); layer(.04, .5, '#e8c84a', {}, 0, 1, E2, n2); }
+    // противоположный скат (для силуэта) — до шага 4 показываем каркас
+    if (t < ST[4]) layer(.04, .5, '#3d3044', { alpha: .6 }, 0, 1, E2, n2);
+    // снег и проверка
+    if (t > FIN - .3) { snowLayer(EV, () => .3, n, .86); snowLayer(E2, () => .3, n2, .86); }
+    // холодный воздух в зазоре
+    if (t > ST[3] + .6) { const a = P(EV, .02, .63), b = P(EV, .98, .63); S.line([[a[0], a[1], Z1 + .02], [b[0], b[1], Z1 + .02]], { color: '#8fd3ff', w: 3, dash: [8, 10], offset: -t * 45, glow: 'rgba(140,210,255,.8)' }); }
+    // снегозадержатели
+    if (s5 > .01) for (const u of [.2]) { const p0 = P(EV, u, .86), p1 = P(EV, u + .02, 1.05 * s5 + .86 * (1 - s5)); S.extrude([p0, P(EV, u + .04, .86), p1], -7, Z1, '#4a4f55', { bias: -3 }); }
+    guttOn = true;
+    placeLbl('lPar', [...P(EV, .55, .02), Z1], win(t, ST[0] + .6, ST[1] - .1));
+    placeLbl('lIns', [...P(EV, .55, .3), Z1], win(t, ST[1] + .9, ST[2] - .1));
+    placeLbl('lWind', [...P(EV, .5, .56), Z1], win(t, ST[2] + .6, ST[3] - .1));
+    placeLbl('lGap', [...P(EV, .45, .66), Z1], win(t, ST[3] + .9, ST[4] - .1));
+    placeLbl('lSg', [...P(EV, .2, 1.1), Z1], win(t, ST[4] + .8, FIN - .1));
+    placeLbl('lCab', [EV[0] + .9, EV[1] - .35, Z1], win(t, ST[4] + 1.3, FIN + 1.5));
+  }
+  if (!inB) ['lPar', 'lIns', 'lWind', 'lGap', 'lSg', 'lCab'].forEach((id) => ($(id).style.opacity = 0));
+  // водосток
+  const gp = [EV[0] - .15, EV[1] - .1];
+  S.cyl('z', [gp[0], gp[1], (Z0 + Z1) / 2], .15, Z1 - Z0, '#7d8389', { seg: 12, caps: true });
+  if (inB && t > ST[4] + 1.0) S.line([[gp[0], gp[1] + .05, Z1 + .02], [gp[0], gp[1] + .05, Z0]], { color: '#ff7a1a', w: 3, glow: 'rgba(255,140,40,.9)' });
+  // сосульки
+  if (icL > .02) for (let k = 0; k < 15; k++) {
+    const z = Z1 - .25 - k * .5, L = icL * (.5 + R(k) * .7);
+    let y = gp[1] - .12, xx = gp[0];
+    if (k === 0 && t > 6.4) { const f = (t - 6.4) / .55; y -= 9.8 * f * f * .55 * 2; }
+    if (k === 0 && y < L) continue;
+    S.cone([xx, y, z], .07 + R(k + 3) * .05, -L, '#cdeeff', { alpha: .9, seg: 6 });
+  }
+  // упавшая сосулька и череп
+  if (!inB && t > 6.9) { const q = S.proj([gp[0], .3, Z1 - .25]); $('eSk').style.left = q[0] + 'px'; $('eSk').style.top = (q[1] - 30) + 'px'; }
+  $('eSk').style.opacity = !inB ? win(t, 6.95, B - .2, .1, .2) : 0;
+  $('eSk').style.transform = `translate(-50%,-50%) scale(${back((t - 6.95) / .35)})`;
+  S.render();
+
+  PUMP.forEach((p, i) => NIGHT.face(FX, S, p, i, t));
+  // тёплый воздух и «призрак тепла»
+  if (!inB && t > 1.2) for (let i = 0; i < 6; i++) { const k = ((t - 1.2) * .45 + i / 6) % 1, base = P(EV, .47 + (i % 3) * .01, 0), q0 = S.proj([base[0] + .1, base[1] - .9 + k * 1.6, -.3 - i * .9]); FX.fillStyle = `rgba(255,140,50,${.7 * Math.sin(k * Math.PI)})`; FX.beginPath(); FX.arc(q0[0], q0[1], 6, 0, 7); FX.fill(); }
+  const gpos = P(EV, .42, .3 + ease((t - 2.4) / 3) * .8);
+  const g = !inB ? NIGHT.ghost(FX, S, [gpos[0], gpos[1], -.6], .6, win(t, 2.4, B - .2, .5, .3), t, 'rgba(255,196,130,.88)') : null;
+  const el = $('bG'); if (g) { el.style.left = g[0] + 'px'; el.style.top = (g[1] - 8) + 'px'; } el.style.opacity = g ? win(t, 3.2, 5.8, .3, .3) : 0;
+  // снегопад
+  if (winter) { FX.fillStyle = 'rgba(255,255,255,.9)'; for (let i = 0; i < 70; i++) { const y = ((t * (50 + R(i) * 50) / 700 + R(i + 7)) % 1) * 1000 - 40; FX.globalAlpha = .45 + R(i + 4) * .45; FX.beginPath(); FX.arc(R(i + 3) * 580 - 20 + Math.sin(t * 1.4 + i) * 14, y, 1.4 + R(i) * 2.2, 0, 7); FX.fill(); } FX.globalAlpha = 1; }
+  NIGHT.bats(FX, t, 5); NIGHT.fog(FX, t, .1);
+
+  renderTag('tagBad', t, A + .2, B - .2); renderTag('tagBad2', t, 5.6, B - .2);
+  let si = 0; for (let i = 0; i < 5; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 5`;
+  $('step').style.opacity = win(t, ST[0], FIN - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, FIN - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, FIN + .9, PHONE - .1);
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .72;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+function placeLbl(id, p, op) { const q = S.proj(p), el = $(id); el.style.left = q[0] + 'px'; el.style.top = (q[1] - 6) + 'px'; el.style.opacity = q[2] > .3 ? op : 0; }
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>

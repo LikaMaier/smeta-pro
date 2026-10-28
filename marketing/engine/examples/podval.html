@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Привидение в подвале 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }
+.lbl { position: absolute; z-index: 14; transform: translate(-50%, -100%); font-family: 'PT', 'Noto Color Emoji'; font-size: 19px; color: #1a0b2e; background: rgba(255,255,255,.93); padding: 4px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.35); opacity: 0; }
+.lbl.o { background: #ff9f3a; } .lbl.b { background: #d6ecff; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="bG" class="bub">«Тут сыро, плесень —<br>я здесь поселился!» 👻</div>
+<div id="bBye" class="bub">«Сухо?! Ухожу…» 😱</div>
+<div id="lWater" class="lbl b">💧 грунтовые воды</div>
+<div id="lHydro" class="lbl o">⚫ обмазка + рулонная</div>
+<div id="lEpps" class="lbl">утеплитель ЭППС</div>
+<div id="lDrain" class="lbl o">дренаж ниже пола подвала</div>
+<div id="lOtm" class="lbl">отмостка с уклоном</div>
+<div id="dimD" style="position:absolute;inset:0;background:#0b0616;opacity:0;z-index:11"></div>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">❌ БЕЗ ГИДРОИЗОЛЯЦИИ</div>
+<div id="tagBad2" class="tag err" style="left:24px;top:212px;font-size:23px">🦠 сырость, плесень, вода на полу</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ В ПОДВАЛЕ СУХО</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🎃</div><div class="logo">СМЕТА PRO</div><div class="l2">Гидроизоляция и дренаж —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="night.js"></script>
+<script>
+window.DUR = 28.8;
+const A = 2.4, B = 8.2, SD = 2.6;
+const ST = [...Array(5)].map((_, i) => 8.4 + i * SD);
+const FIN = 8.4 + 5 * SD, PHONE = FIN + 2.4, END = PHONE + 2.0;
+const STEPS = [
+  ['Откапываем фундамент<br><b>снаружи</b> до подошвы', '⛏ до подошвы фундамента'],
+  ['Гидроизоляция: <b>обмазка</b><br>+ <b>рулонная</b> наплавляемая', '⚫ 2 слоя защиты'],
+  ['Утеплитель <b>ЭППС</b> —<br>и защита гидроизоляции', '🧱 ЭППС 50–100 мм'],
+  ['Пристенный <b>дренаж</b><br>ниже пола подвала', '🟠 труба в щебне'],
+  ['Засыпка песком<br>и <b>отмостка</b> с уклоном', '📐 уклон от дома'],
+];
+const SUBS = [
+  [A + .1, 5.2, 'Фундамент без гидроизоляции —<br>вода идёт <b>сквозь стены</b>…'],
+  [5.2, B - .1, '…сырость, плесень, лужи —<br>и в подвале <b>завёлся «жилец»</b> 👻'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || FIN) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [FIN + .1, PHONE, 'Вода уходит в дренаж —<br><b>сухо</b>, привидение съехало 😎'],
+  [PHONE + .1, END, 'Смета на гидроизоляцию<br>и дренаж — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+const K = (t, ...v) => [t, ...v];
+const VIEW = { s1: [.18, .1, 14, 3.0, -1.3, -2.0], s2: [.15, .08, 11.5, 3.7, -1.5, -1.8], s3: [.15, .08, 11.5, 3.7, -1.5, -1.8], s4: [.14, .07, 11.5, 3.8, -2.0, -1.8], s5: [.18, .1, 12.5, 3.5, -1.0, -2.0], fin: [.1, .12, 18, .8, -.9, -2.6] };
+const CAM = [
+  [0, .1, .14, 19, 0, -.6, -2.6], [A, .12, .1, 16.5, .2, -1.3, -2.6], [B - .02, .16, .1, 16, .2, -1.4, -2.6],
+  K(B, ...VIEW.s1), K(ST[1] - .2, ...VIEW.s1), K(ST[1] + .4, ...VIEW.s2), K(ST[2] - .2, ...VIEW.s2), K(ST[2] + .4, ...VIEW.s3), K(ST[3] - .2, ...VIEW.s3),
+  K(ST[3] + .4, ...VIEW.s4), K(ST[4] - .2, ...VIEW.s4), K(ST[4] + .4, ...VIEW.s5), K(FIN - .2, ...VIEW.s5), K(FIN + .5, ...VIEW.fin), [99, .16, .12, 18, .8, -.9, -2.6],
+];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+
+const S = new M3.Scene($('cv')); NIGHT.setup(S); S.amb = .44; S.dif = .6; S.tint = [.8, .82, 1.0];
+const SOIL = { top: '#4e3420', mid: '#8f6a45', deep: '#6f5034' }, GRASS = '#2f4a2a', CONC = '#a9adb2';
+const BF = -2.85, TX = 4.8;
+const PUMP = [[-5.2, -.9, .5], [-6.3, -1.6, .36], [-4.6, -2.2, .3]];
+function soil(dig) {
+  const layers = [[-.35, 0, SOIL.top], [-2.0, -.35, SOIL.mid], [-4.6, -2.0, SOIL.deep]];
+  const blk = (x0, x1, z0, z1, yb = -4.6, yt = 0) => layers.forEach(([y0, y1, c]) => { const a = Math.max(y0, yb), b = Math.min(y1, yt); if (b - a < .01) return; S.box(x0, x1, a, b, z0, z1, c, { top: b >= -.001 ? GRASS : c, groundTop: b >= -.001 }); });
+  blk(-12, -3.5, -9, 0); blk(TX, 12, -9, 0); blk(-3.5, TX, -9, -6); blk(-3.5, 3.5, -6, 0, -4.6, BF); blk(3.5, TX, -6, 0, -4.6, -3.1);
+  const top = lerp(0, -3.1, dig); if (top + 3.1 > .02) blk(3.5, TX, -6, 0, -3.1, top);
+}
+function house() {
+  // подвал
+  S.box(-3.5, 3.5, BF, BF + .2, -6, 0, CONC);
+  S.box(-3.5, -3.2, BF, 0, -6, 0, CONC); S.box(3.2, 3.5, BF, 0, -6, 0, CONC); S.box(-3.5, 3.5, BF, 0, -6, -5.7, CONC);
+  S.box(-3.5, 3.5, -.25, 0, -6, 0, '#7d746a');
+  // этаж и крыша
+  S.box(-3.5, -3.2, 0, 3, -6, 0, '#d8c8b0', { shadow: true }); S.box(3.2, 3.5, 0, 3, -6, 0, '#d8c8b0', { shadow: true }); S.box(-3.5, 3.5, 0, 3, -6, -5.7, '#d8c8b0', { shadow: true });
+  S.poly([[-1.4, 1, -5.69], [-.2, 1, -5.69], [-.2, 2.2, -5.69], [-1.4, 2.2, -5.69]], '#ffb347', { two: true, emit: true, bias: -.2 });
+  S.poly([[.6, 1, -5.69], [1.8, 1, -5.69], [1.8, 2.2, -5.69], [.6, 2.2, -5.69]], '#ffb347', { two: true, emit: true, bias: -.2 });
+  S.extrude([[-3.9, 3], [3.9, 3], [0, 5.2]], -6.3, .2, '#3a2f3f', { shadow: true, front: '#4a3b4f' });
+}
+
+const FX = $('fx').getContext('2d');
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'В подвале завелось<br><b>привидение</b>? 👻';
+  $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const inB = t >= B, cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0); NIGHT.sky(x, t, cam[1]);
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+
+  for (let i = 0; i < 7; i++) { const tx = -11 + i * 3.6, tz = -9.5 - R(i) * 2; S.cyl('y', [tx, .9, tz], .14, 1.8, '#2a1d14', { seg: 6 }); S.cone([tx, 1.4, tz], 1.1, 3.4, '#1d3324', {}); }
+  house();
+  PUMP.forEach((p) => NIGHT.pumpkin(S, p));
+
+  let wl, dry = 0;
+  if (!inB) {
+    soil(1);
+    wl = lerp(-3.4, -2.0, ease((t - .8) / 4.0));
+    const pd = ease((t - 3.2) / 2.5);
+    if (pd > .01) S.box(-3.2, 3.2, BF + .2, BF + .2 + .18 * pd, -5.7, 0, '#4f86c6', { alpha: .65, bias: -5 });
+  } else {
+    const dig = ease((t - ST[0] - .1) / 1.4);
+    soil(t < ST[0] ? 0 : dig);
+    const hy = ease((t - ST[1] - .1) / 1.2); if (hy > .01) S.box(3.5, 3.57, lerp(0, BF, hy), 0, -6, 0, '#1f2226', { bias: -10 });
+    const ep = eOut((t - ST[2] - .1) / .8); if (ep > .01) S.box(3.57, 3.72, BF + .1, 0 - (1 - ep) * -2, -6, 0, '#f4a9c4', { bias: -11 });
+    const dr = ease((t - ST[3] - .1) / .8); if (dr > .01) { S.box(3.72, 4.7, -3.1, lerp(-3.1, -2.45, dr), -6, 0, '#9aa0a6', { bias: -12 }); }
+    if (t > ST[3] + .8) S.cyl('z', [4.2, -2.85, -3], .12, 6, '#ff8a1f', { seg: 12, bias: -13 });
+    const bf = ease((t - ST[4] - .1) / 1.0); if (bf > .01) S.box(3.72, TX, -2.45, lerp(-2.45, -.3, bf), -6, 0, '#d9c08a', { alpha: .45, bias: -14 });
+    const ot = eOut((t - ST[4] - 1.1) / .6); if (ot > .01) { S.box(3.57, TX, -.3, 0, -6, 0, SOIL.top, { top: GRASS, groundTop: true }); S.extrude([[3.5, .16], [TX + .1, .04], [TX + .1, -.02], [3.5, -.02]], -6, 0, '#b3b8bd', { bias: -15 }); }
+    wl = lerp(-2.0, -3.6, ease((t - FIN) / 1.6));
+    if (t < FIN) wl = -2.0;
+    dry = ease((t - FIN - .2) / 1.0);
+    // вода в дренаже
+    if (t > FIN) S.line([[4.2, -2.85, 0], [4.2, -2.85, -6]], { color: '#7cc4ff', w: 3, dash: [6, 10], offset: -t * 40 });
+    placeLbl('lHydro', [3.6, -1.2, 0], win(t, ST[1] + 1.0, ST[2] - .1));
+    placeLbl('lEpps', [3.65, -.7, 0], win(t, ST[2] + .9, ST[3] - .1));
+    placeLbl('lDrain', [4.2, -2.6, 0], win(t, ST[3] + 1.0, ST[4] - .1));
+    placeLbl('lOtm', [4.2, .3, 0], win(t, ST[4] + 1.5, FIN - .1));
+  }
+  if (!inB) ['lHydro', 'lEpps', 'lDrain', 'lOtm'].forEach((id) => ($(id).style.opacity = 0));
+  // грунтовые воды (вне подвала)
+  S.box(-12, -3.5, -4.6, wl, -9, .02, '#3d6fb8', { alpha: .22, bias: -20 }); S.box(3.5, 12, -4.6, wl, -9, .02, '#3d6fb8', { alpha: .22, bias: -20 });
+  placeLbl('lWater', [-7, wl + .1, 0], !inB ? win(t, 1.6, B - .2) : win(t, FIN + .3, PHONE - .1));
+  S.render();
+
+  PUMP.forEach((p, i) => NIGHT.face(FX, S, p, i, t));
+  // сырость и плесень на стенах подвала
+  const damp = !inB ? ease((t - 2.2) / 3.5) : 0;
+  if (damp > .01) for (let i = 0; i < 9; i++) {
+    const p = i < 5 ? [-3.18, BF + .4 + R(i) * 2, -.6 - R(i + 2) * 4.8] : [-2.5 + R(i) * 5, BF + .4 + R(i + 3) * 1.8, -5.68];
+    const q = S.proj(p); if (q[2] < .3) continue; const rr = (40 + R(i + 5) * 40) / q[2] * 6 * damp;
+    const gg = FX.createRadialGradient(q[0], q[1], 0, q[0], q[1], rr); gg.addColorStop(0, `rgba(40,62,30,${.75 * damp})`); gg.addColorStop(.6, `rgba(60,80,40,${.35 * damp})`); gg.addColorStop(1, 'rgba(60,80,40,0)');
+    FX.fillStyle = gg; FX.beginPath(); FX.arc(q[0], q[1], rr, 0, 7); FX.fill();
+  }
+  // капли сквозь стену
+  if (!inB && t > 2.6) for (let i = 0; i < 8; i++) { const k = ((t - 2.6) * .8 + i / 8) % 1, q = S.proj([lerp(-3.4, -2.6, k), -1.6 - R(i) * .9 - k * .6, -1 - R(i + 1) * 4]); FX.fillStyle = 'rgba(124,196,255,.9)'; FX.beginPath(); FX.arc(q[0], q[1], 3.5, 0, 7); FX.fill(); }
+  // привидение в подвале
+  const ga = !inB ? win(t, 2.8, B - .1, .6, .3) : (t > FIN ? win(t, FIN + .1, FIN + 2.2, .3, .6) : 0);
+  const gy = !inB ? -1.4 : -1.4 + ease((t - FIN - .9) / 1.2) * 4;
+  const gp = NIGHT.ghost(FX, S, [.4, gy, -2.6], .75, ga, t);
+  bubbleAt('bG', gp, !inB ? win(t, 4.0, B - .3, .3, .3) : 0);
+  bubbleAt('bBye', gp, inB ? win(t, FIN + .3, FIN + 1.6, .2, .3) : 0);
+  NIGHT.bats(FX, t); NIGHT.fog(FX, t, .12);
+
+  renderTag('tagBad', t, A + .2, B - .2); renderTag('tagBad2', t, 5.4, B - .2);
+  let si = 0; for (let i = 0; i < 5; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 5`;
+  $('step').style.opacity = win(t, ST[0], FIN - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, FIN - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, FIN + 1.2, PHONE - .1);
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .72;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+function placeLbl(id, p, op) { const q = S.proj(p), el = $(id); el.style.left = q[0] + 'px'; el.style.top = (q[1] - 6) + 'px'; el.style.opacity = q[2] > .3 ? op : 0; }
+function bubbleAt(id, at, a) { const el = $(id); if (!at) { el.style.opacity = 0; return; } el.style.left = at[0] + 'px'; el.style.top = (at[1] - 8) + 'px'; el.style.opacity = a; }
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>

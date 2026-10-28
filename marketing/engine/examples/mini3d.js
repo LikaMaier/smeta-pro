@@ -84,6 +84,13 @@ const M3 = (() => {
       for (let i = 0; i < n; i++) { const j = (i + 1) % n; this.poly([top, rings[0][j], rings[0][i]], color, oo); this.poly([bot, rings[m - 2][i], rings[m - 2][j]], color, oo); }
       for (let q = 0; q < rings.length - 1; q++) for (let i = 0; i < n; i++) { const j = (i + 1) % n; this.poly([rings[q][i], rings[q][j], rings[q + 1][j], rings[q + 1][i]], color, oo); }
     }
+    /** выдавливание многоугольника pts=[[x,y],…] по оси z от z0 до z1 */
+    extrude(pts, z0, z1, color, o = {}) {
+      const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length, c = [cx, cy, (z0 + z1) / 2], oo = { ...o, center: c };
+      this.poly(pts.map((p) => [p[0], p[1], z1]), o.front || color, oo);
+      this.poly(pts.map((p) => [p[0], p[1], z0]).reverse(), color, oo);
+      for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; this.poly([[a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1]], o.side || color, oo); }
+    }
     cone(c, r, hgt, color, o = {}) {
       const n = o.seg || 9, top = [c[0], c[1] + hgt, c[2]], base = [];
       for (let i = 0; i < n; i++) { const t = i / n * Math.PI * 2; base.push([c[0] + r * Math.cos(t), c[1], c[2] + r * Math.sin(t)]); }
