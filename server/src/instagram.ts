@@ -16,6 +16,7 @@ import { prisma } from './util';
 import { env } from './env';
 import { reportTo } from './stats';
 import { autoReply, fallbackReply, isSpam, needsHuman } from '../../shared/igReplies';
+import { codeIn, grantByCode, IG_BONUS_DAYS } from './igBonus';
 export { autoReply };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../marketing');
@@ -182,6 +183,22 @@ async function checkComments(bot: Bot, log: any) {
     for (const c of cm.data || []) {
       if (!c.text || c.username === me) continue;
       if (!(await kvClaim(`ig:c:${c.id}`, 'seen'))) continue;
+      // код бонуса за подписку → +12 дней «Про»
+      const code = codeIn(c.text);
+      if (code) {
+        const r = await grantByCode(code, c.username || '').catch((e) => { log.error({ err: e }, 'ig bonus'); return { status: 'unknown' as const }; });
+        if (r.status === 'granted') {
+          await ig(`/${c.id}/replies`, { message: `🎁 Готово! +${IG_BONUS_DAYS} дней «Про» в СМЕТА PRO начислены. Спасибо за подписку!` }, 'POST').catch((e) => log.error({ err: e }, 'ig reply'));
+          await bot.api.sendMessage(Number(r.tgId), `🎉 <b>Бонус начислен: +${IG_BONUS_DAYS} дней «Про»</b> за подписку на Instagram.
+Всё открыто до <b>${r.until.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })}</b>: сметы без ограничений, PDF с логотипом, договор, акты, учёт денег.`, { parse_mode: 'HTML' }).catch(() => {});
+          for (const id of reportTo()) await bot.api.sendMessage(Number(id), `📸 Бонус за Instagram: @${esc(c.username || '?')} — +${IG_BONUS_DAYS} дн.`).catch(() => {});
+          continue;
+        }
+        if (r.status === 'used' || r.status === 'igUsed') {
+          await ig(`/${c.id}/replies`, { message: r.status === 'used' ? 'Бонус по этому коду уже начислен 🙂' : 'С этого аккаунта бонус уже получен 🙂 Один аккаунт — один бонус.' }, 'POST').catch(() => {});
+          continue;
+        }
+      }
       const ans = autoReply(c.text);
       if (ans) { await ig(`/${c.id}/replies`, { message: ans }, 'POST').catch((e) => log.error({ err: e }, 'ig reply')); continue; }
       const spam = isSpam(c.text), human = needsHuman(c.text);

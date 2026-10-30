@@ -1,3 +1,4 @@
+import IgBonus from './IgBonus';
 import React, { useState } from 'react';
 import { get, post, del } from '../api';
 import { useMe } from '../App';
@@ -69,7 +70,8 @@ export default function Tariffs() {
             <button className={`chip ${year ? 'on' : ''}`} onClick={() => setYear(true)}>На год · выгоднее</button>
           </div>
           <div className="tariffs">
-            {me.access.mode === 'trial' && <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Сейчас у вас пробный период — открыто всё, как в «Про». Осталось {me.access.daysLeft} дн. Потом бесплатно — 3 сметы в месяц с пометкой.</div>}
+            {me.access.mode === 'trial' && <div className="dz-warn" style={{ borderColor: 'var(--ok)' }}>🎁 Сейчас у вас пробный период — открыто всё, как в «Про». Осталось {me.access.daysLeft} дн. Потом бесплатно — 3 сметы в месяц с пометкой.{me.igBonus && !me.igBonus.done ? ` Ещё +${me.igBonus.days} дней «Про» — за подписку на наш Instagram (код на главной).` : ''}</div>}
+            {me.access.mode !== 'trial' && me.igBonus && !me.igBonus.done && <IgBonus />}
             <Compare cur={me.access.mode === 'trial' ? 'free' : cur} />
             {(['lite', 'pro', 'team'] as const).map((t) => {
               const p = list.find((x) => x.tier === t && x.months === (year ? 12 : 1) && (t !== 'team' || (x.seats || 3) === seats));

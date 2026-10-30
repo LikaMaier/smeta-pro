@@ -9,7 +9,7 @@ export const env = {
   WEBHOOK_SECRET: process.env.WEBHOOK_SECRET || '',
   ADMIN_TG_IDS: (process.env.ADMIN_TG_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
   // пробный период тарифа «Про» для новых пользователей, дней
-  PRO_TRIAL_DAYS: Number(process.env.PRO_TRIAL_DAYS ?? 14),
+  PRO_TRIAL_DAYS: Number(process.env.PRO_TRIAL_DAYS ?? 1),
   // Только для локальной разработки вне Telegram. На проде не включать.
   DEV_AUTH: process.env.DEV_AUTH === '1',
   // ИИ. Любой OpenAI-совместимый сервис: OpenAI, YandexGPT (AI Studio), DeepSeek, OpenRouter.

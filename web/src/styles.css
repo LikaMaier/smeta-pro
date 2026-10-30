@@ -541,3 +541,9 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
   box-shadow: 0 -6px 18px rgba(0,0,0,.25); animation: ns-in .15s ease-out; }
 .est-bar + .est-bar { display: none; }
 .est-bar .btn.danger { border-color: var(--bad); }
+
+/* ---- Бонус за Instagram ---- */
+.igb { margin: 10px 0; padding: 14px; border: 1px solid var(--gold); background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 14%, var(--surface)), var(--surface)); border-radius: 16px; }
+.igb-t { font-weight: 800; font-size: 17px; margin-bottom: 6px; }
+.igb-code { display: block; width: 100%; margin: 8px 0 6px; padding: 10px; border-radius: 12px; border: 2px dashed var(--gold); background: var(--surface); color: var(--text); font-family: inherit; font-weight: 800; font-size: 26px; line-height: 1; letter-spacing: 4px; cursor: pointer; }
+.igb-code .xs { letter-spacing: 0; font-weight: 400; color: var(--muted); }

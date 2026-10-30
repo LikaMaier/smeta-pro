@@ -18,6 +18,7 @@ import { priceFor } from './routes/promo';
 import { attachInstagram } from './instagram';
 import { attachThreads } from './threads';
 import { attachAdminStats } from './adminStats';
+import { bonusCode, bonusDone, bonusHowTo, igUrl, igUsername, IG_BONUS_DAYS } from './igBonus';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -56,7 +57,9 @@ export function createBot() {
         return ctx.reply(r.already ? `Вы уже в бригаде «${esc(r.owner)}».` : `👷 Вы в бригаде «${esc(r.owner)}». Доступ уровня «Бригада» и общий справочник цен уже у вас.`, { parse_mode: 'HTML', reply_markup: appKb() });
       } catch (e: any) { await ctx.reply(`Не получилось вступить в бригаду: ${e.message}`); }
     }
-    await ctx.reply(welcomeText(u), { parse_mode: 'HTML', reply_markup: appKb() });
+    const wkb = appKb();
+    if (wkb && u && !(await bonusDone(u.id)) && !accessOf(u).mode.match(/subscription|team|admin/)) wkb.row().text(`🎁 +${IG_BONUS_DAYS} дней бесплатно`, 'igbonus');
+    await ctx.reply(welcomeText(u), { parse_mode: 'HTML', reply_markup: wkb });
     // новичку — один вопрос «Чем занимаетесь?»: по ответу сразу открываем нужного мастера (инструкция — позже, если не начал)
     if (u && ctx.from && Date.now() - new Date(u.createdAt).getTime() < 5 * 60e3) {
       const first = await prisma.appKV.create({ data: { key: `guide:${ctx.from.id}`, value: '1' } }).then(() => true).catch(() => false);
@@ -119,6 +122,18 @@ export function createBot() {
   });
 
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
+  // бонус за подписку на Instagram: +12 дней «Про»
+  const sendBonus = async (ctx: any) => {
+    if (!ctx.from) return;
+    const u = await upsertUser(ctx.from.id, ctx.from.first_name, ctx.from.username).catch(() => null);
+    if (!u) return ctx.reply('Не получилось, попробуйте ещё раз.');
+    if (await bonusDone(u.id)) return ctx.reply(`✅ Бонус за Instagram уже начислен. Спасибо, что подписаны!`);
+    const url = await igUrl();
+    await ctx.reply(bonusHowTo(await bonusCode(u.id), await igUsername(), url), { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, reply_markup: new InlineKeyboard().url('📸 Открыть Instagram', url) });
+  };
+  bot.command(['bonus', 'insta'], (ctx) => sendBonus(ctx).catch(() => {}));
+  bot.hears(/^(бонус|\+?12 дней|подписка на инст\w*|инстаграм бонус)$/i, (ctx) => sendBonus(ctx).catch(() => {}));
+  bot.callbackQuery('igbonus', async (ctx) => { await ctx.answerCallbackQuery().catch(() => {}); await sendBonus(ctx).catch(() => {}); });
   bot.command(['help', 'support'], async (ctx) => {
     if (ctx.from) await prisma.appKV.upsert({ where: { key: `sup:${ctx.from.id}` }, create: { key: `sup:${ctx.from.id}`, value: String(Date.now()) }, update: { value: String(Date.now()) } }).catch(() => {});
     return ctx.reply('💬 Поддержка СМЕТА PRO. Напишите вопрос одним сообщением — ответим здесь, в этом чате.');
@@ -254,7 +269,7 @@ export function welcomeText(u: any) {
     '💰 <b>Деньги по объектам</b>: сколько получили, сколько потратили и сколько осталось вам, а не только поставщику бетона.\n' +
     '⏰ <b>Напоминания</b>: «забрать оплату», «вернуть экскаватор» — бот напомнит, даже если вы забыли, что просили.\n' +
     '👷 <b>Бригада</b>: один справочник цен на всю команду.\n\n' +
-    `🎁 <b>${env.PRO_TRIAL_DAYS} дней — всё бесплатно</b>: сметы, PDF с вашим логотипом, договор, акты и учёт денег. Потом 3 сметы в месяц остаются бесплатными, а «Лайт» — от ${PRICES.liteFirst} ₽ за первый месяц.\n\n` +
+    `🎁 <b>${env.PRO_TRIAL_DAYS === 1 ? 'Первый день' : `${env.PRO_TRIAL_DAYS} дн.`} — всё бесплатно</b>: сметы, PDF с вашим логотипом, договор, акты и учёт денег. А за подписку на наш Instagram — <b>ещё ${IG_BONUS_DAYS} дней бесплатно</b> (кнопка ниже). Потом 3 сметы в месяц остаются бесплатными, а «Лайт» — от ${PRICES.liteFirst} ₽ за первый месяц.\n\n` +
     'Жмите кнопку ниже 👇';
 }
 
@@ -266,8 +281,8 @@ export const BOT_DESCRIPTION =
   '🧊 3D навесов, заборов и плана участка — заказчик крутит пальцем\n' +
   '💰 Прибыль по каждому объекту, а не «вроде что-то заработали»\n' +
   '⏰ Напоминания про оплату, бетон и технику\n\n' +
-  '🎁 14 дней — всё бесплатно, без карты. Нажмите «Старт» — Excel не обидится.';
-export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказчика и прибыль по объектам. 14 дней — бесплатно.';
+  '🎁 День бесплатно + ещё 12 дней за подписку на наш Instagram. Без карты. Нажмите «Старт» — Excel не обидится.';
+export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказчика и прибыль по объектам. До 13 дней — бесплатно.';
 
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);

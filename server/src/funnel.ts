@@ -12,6 +12,7 @@
  * 4. Две оплаты помесячно — предложение перейти на год.
  * 5. Через 30 дней после окончания подписки — персональная скидка на 72 часа.
  */
+import { bonusCode, bonusDone, bonusHowTo, igUrl, igUsername } from './igBonus';
 import { prisma } from './util';
 import { env } from './env';
 import { PRICES } from '../../shared/plans';
@@ -92,6 +93,13 @@ export function startFunnel(bot: any, log: { error: (o: any, m?: string) => void
       for (const u of await prisma.user.findMany({ where: { trialEndAt: null, trialEndsAt: { lte: now, gt: new Date(now.getTime() - 3 * D) }, ...noSub }, take: 50 })) {
         if (isAdmin(u) || (await hadSub(u.id)) || !(await claim(u.id, 'trialEndAt'))) continue;
         const d = await done(u.id);
+        // бонус за Instagram ещё не брали — сначала предлагаем его: +12 дней бесплатно
+        if (!(await bonusDone(u.id))) {
+          const url = await igUrl();
+          await sendTo(u, `🔓 <b>Пробный день закончился.</b>${d ? `\nВы успели: ${d}. Всё сохранено.` : ''}\n\n${bonusHowTo(await bonusCode(u.id), await igUsername(), url)}`,
+            { link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: [[{ text: '📸 Открыть Instagram', url }]] } });
+          continue;
+        }
         await send(u, `🔓 <b>Пробный период закончился.</b>\n${d ? `Вы успели: ${d}. Всё сохранено. ` : ''}${FREE_LINE}\n\n${OFFER_LINE}`, `Лайт за ${PRICES.liteFirst} ₽ / Про за ${PRICES.proFirst} ₽`);
       }
       // 3. напоминание через 5 дней после окончания пробного

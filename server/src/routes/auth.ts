@@ -1,3 +1,4 @@
+import { bonusView } from '../igBonus';
 import { Prisma } from '@prisma/client';
 import { FREE_ESTIMATES } from '../../../shared/access';
 import type { FastifyInstance } from 'fastify';
@@ -82,6 +83,7 @@ export async function meView(user: any) {
     pay: { yookassa: Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY), receipt: env.YOOKASSA_RECEIPT },
     refLink: botLink(`ref_${user.id}`),
     supportLink: botLink('help'),
+    igBonus: ['subscription', 'team', 'admin'].includes(acc.mode) ? null : await bonusView(user.id).catch(() => null),
   });
 }
 
