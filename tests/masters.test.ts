@@ -55,3 +55,27 @@ test('кровля: двускатная 10×8, свесы 0,5, 30° → пло�
   const b = MASTERS.find((m) => m.id === 'm-roof')!.build({ shape: 'gable', L: 10, W: 8, o: 0.5, angle: 30, cover: 'metal', rafters: 'new', ins: 'no', gutter: 'yes', snow: 'yes', soffit: 'no', windows: 0, chimney: 0, wallH: 3, demo: 'no', cx: '1', debris: 'no' });
   assert.equal(b.summary[0].value, 114.3); // 11 × 9 / cos30
 });
+
+test('внутренняя отделка: этапы накапливаются, штукатурка — по толщине слоя', () => {
+  const m = MASTERS.find((x) => x.id === 'm-interior')!;
+  const base: Record<string, any> = {}; m.fields.forEach((f) => (base[f.key] = f.default));
+  const sum = (stage: string) => m.build({ ...base, stage }).lines.reduce((s, l) => s + l.qty * l.price, 0);
+  assert.ok(sum('rough') < sum('white') && sum('white') < sum('full'));
+  const names = m.build({ ...base, stage: 'full' }).lines.map((l) => l.name);
+  for (const n of ['Штробление стен в бетоне', 'Заделка штробы', 'Машинная штукатурка стен', 'Стяжка пола полусухая', 'Покраска стен в 2 слоя', 'Монтаж межкомнатной двери']) assert.ok(names.includes(n), n);
+  const f = MASTERS.find((x) => x.id === 'm-finish')!;
+  const fv: Record<string, any> = {}; f.fields.forEach((x) => (fv[x.key] = x.default));
+  const bags = (pt: number) => f.build({ ...fv, pt, doors: 0, windows: 0 }).lines.find((l) => l.name === 'Штукатурка гипсовая (30 кг)')!.qty;
+  // 5×4×2,7 = 48,6 м² × 20 мм × 0,9 кг = 875 кг → 30 мешков
+  assert.equal(bags(20), 30);
+  assert.ok(f.build({ ...fv, pt: 45 }).lines.some((l) => l.name === 'Штукатурка стен по маякам свыше 3 см (каждый см)' && l.qty > 0));
+});
+
+test('электрика: штробы по материалу стен, щит по числу групп', () => {
+  const e = MASTERS.find((x) => x.id === 'm-electric')!;
+  const v: Record<string, any> = {}; e.fields.forEach((f) => (v[f.key] = f.default));
+  const gas = e.build({ ...v, wall: 'gas' }).lines.map((l) => l.name);
+  assert.ok(gas.includes('Штробление стен в газобетоне') && gas.includes('Монтаж подрозетника в газобетон') && gas.includes('Заделка штробы'));
+  const big = e.build({ ...v, area: 200, rooms: 10 }).lines.map((l) => l.name);
+  assert.ok(big.includes('Сборка электрощита (до 36 модулей)') || big.includes('Сборка электрощита (до 24 модулей)'));
+});

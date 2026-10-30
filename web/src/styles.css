@@ -481,6 +481,9 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
 .dir-tile .dir-t { font-weight: 700; font-size: 16px; }
 .dir-tile small { color: var(--muted); font-size: 12px; line-height: 1.25; }
 .dir-tile.other { border-style: dashed; }
+.dir-tile { position: relative; }
+.dir-tile.wide { grid-column: 1 / -1; min-height: 84px; border-color: var(--gold); background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 16%, var(--surface)), var(--surface)); }
+.dir-badge { position: absolute; top: 10px; right: 10px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--on-accent); background: var(--accent); }
 .quick-acts { margin: -4px 0 10px; }
 
 /* ---- Варианты материала: эконом / стандарт / премиум ---- */

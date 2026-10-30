@@ -216,6 +216,14 @@ export const READY_TEMPLATES: ReadyTemplate[] = [
   one('yard-lawn', 'Участок', 'Рулонный газон 200 м² с грунтом', 'Завоз грунта, планировка, рулонный газон', 'm-yard', { trays: 0, inlets: 0, sand: 0, lawn: 'roll', lawnA: 200, lamps: 0, cable: 0 }),
   one('yard-drain', 'Участок', 'Ливнёвка двора: лотки и ливнеприёмники', 'Лотки, ливнеприёмники, пескоуловитель', 'm-yard', { trays: 20, inlets: 3, lawn: 'none', lamps: 0, cable: 0, soil: 'no' }),
   one('yard-lights', 'Участок', 'Освещение участка: 8 фонарей', 'Кабель в земле, фонари, подключение', 'm-yard', { trays: 0, inlets: 0, sand: 0, lawn: 'none', soil: 'no', lamps: 8, cable: 60 }),
+  // ---------- Внутренняя отделка по этапам ----------
+  one('interior-rough-50', 'Квартира', 'Черновая отделка новостройки 50 м²', 'Электрика, сантехника, машинная штукатурка по маякам, полусухая стяжка, гидроизоляция санузла', 'm-interior', { stage: 'rough', obj: 'new', area: 50, rooms: 2, baths: 1, wall: 'concrete', part: 0 }),
+  one('interior-white-65', 'Квартира', 'White box 65 м² (предчистовая)', 'Черновая + шпаклёвка под покраску, потолки под покраску, перегородки ПГП', 'm-interior', { stage: 'white', obj: 'new', area: 65, rooms: 3, baths: 1, wall: 'concrete', part: 12, partMat: 'pgp', ceil: 'paint' }),
+  one('interior-full-old-55', 'Квартира', 'Вторичка 55 м² под ключ по этапам', 'Демонтаж, электрика, сантехника, штукатурка, стяжка, покраска, плитка, ламинат, двери', 'm-interior', { stage: 'full', obj: 'old', area: 55, rooms: 2, baths: 1, wall: 'brick', part: 0 }),
+  one('interior-house-120', 'Дом', 'Внутренняя отделка дома 120 м²', 'Газобетон: электрика, сантехника, штукатурка по сетке, утепление наружных стен, стяжка, финиш', 'm-interior', { stage: 'full', obj: 'house', area: 120, rooms: 4, baths: 2, wall: 'gas', part: 20, ins: 'warm', extWall: 30, cover: 'spc' }),
+  one('insul-wall-in-20', 'Полы и стены', 'Утепление холодной стены изнутри 20 м²', 'Антисептик, минвата в каркас, пароизоляция, ГКЛ, утепление откосов и угла', 'm-insul', { sys: 'mw', aHeat: 20, t: 50, snd: 'none', slopes: 5, corners: 2.7 }),
+  one('sound-wall-15', 'Полы и стены', 'Шумоизоляция стены от соседей 15 м²', 'Каркас на виброподвесах, акустическая минвата, 2×ГКЛ, лента по примыканиям', 'm-insul', { sys: 'none', snd: 'frame', aSound: 15 }),
+  one('plaster-flat-120', 'Полы и стены', 'Машинная штукатурка 120 м² стен', 'Бетоноконтакт, маяки, гипсовая штукатурка машинным способом, откосы', 'm-finish', { L: 10, W: 5, H: 2.7, rooms: 1, doors: 2, windows: 3, walls: 'tile', level: 'plaster', pmat: 'machine', base: 'concrete', ceil: 'none' }),
 ];
 
 export const READY_GROUPS = [...new Set(READY_TEMPLATES.map((t) => t.group))];

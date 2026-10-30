@@ -72,7 +72,8 @@ export default function NewEstimate() {
         )}
         <div className="dir-grid">
           {DIRECTIONS.map((d) => (
-            <button key={d.id} className="dir-tile" onClick={() => choose(d.id)}>
+            <button key={d.id} className={`dir-tile${d.wide ? ' wide' : ''}`} onClick={() => choose(d.id)}>
+              {d.badge && <span className="dir-badge">{d.badge}</span>}
               <span className="dir-ico" aria-hidden="true">{d.icon}</span>
               <span className="dir-t">{d.title}</span>
               <small>{d.text}</small>

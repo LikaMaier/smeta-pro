@@ -6,7 +6,7 @@ import { MASTERS } from './masters';
 import { TEMPLATES } from './templates';
 
 export interface WorkKind { id: string; icon?: string; title: string; text?: string; to?: string; template?: string }
-export interface Direction { id: string; icon: string; title: string; text: string; kinds: WorkKind[] }
+export interface Direction { id: string; icon: string; title: string; text: string; kinds: WorkKind[]; badge?: string; wide?: boolean }
 
 const M = new Map(MASTERS.map((m) => [m.id, m]));
 const T = new Map(TEMPLATES.map((t) => [t.id, t]));
@@ -33,6 +33,18 @@ const d3 = (preset: string, icon: string, title: string, text: string): WorkKind
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const DIRECTIONS: Direction[] = [
+  { id: 'interior', icon: '🏠', title: 'Внутренняя отделка', text: 'От электрики до штукатурки и утепления стен — по этапам', badge: 'Новое', wide: true, kinds: [
+    ...fromMaster('m-interior', 'stage', undefined, { rough: 'Черновая отделка', white: 'Предчистовая (white box)', full: 'Отделка под ключ по этапам' }),
+    master('m-electric', 'Электромонтаж', 'Штробы, кабель, щит, розетки, свет, интернет/ТВ'),
+    master('m-plumb', 'Сантехника', 'Разводка воды, канализация, приборы'),
+    ...fromMaster('m-gkl', 'kind', ['part', 'wall'], { part: 'Перегородки ГКЛ', wall: 'Обшивка стен ГКЛ' }),
+    { id: 'm-finish:plaster', title: 'Штукатурка стен по маякам', text: 'Гипсовая, машинная или цементная — расход по толщине слоя', to: '/calculators/m-finish?set=level:plaster,walls:tile,ceil:none' },
+    ...fromMaster('m-insul', 'sys', ['mw', 'xps', 'pir', 'warm'], { mw: 'Утепление стен минватой изнутри', xps: 'Утепление ЭППС изнутри', pir: 'Утепление PIR-плитой изнутри', warm: 'Тёплая штукатурка' }),
+    { id: 'm-insul:sound', title: 'Шумоизоляция стен и потолка', text: 'Каркас на виброподвесах, ЗИПС, мембрана', to: '/calculators/m-insul?set=sys:none,snd:frame' },
+    master('m-finish', 'Шпаклёвка, покраска, обои', 'Стены, потолок, откосы — по размерам комнаты'),
+    ...fromMaster('m-floor', 'base', ['semi', 'cps', 'self'], { semi: 'Полусухая стяжка', cps: 'Стяжка ЦПС', self: 'Наливной пол' }),
+    ...tpls('interior-rough-50', 'interior-white-65', 'interior-full-old-55', 'interior-house-120', 'insul-wall-in-20', 'sound-wall-15', 'plaster-flat-120'),
+  ] },
   { id: 'turnkey', icon: '🔑', title: 'Ремонт под ключ', text: 'Квартира, санузел, комната — готовые сметы', kinds: [
     ...tpls('flat1-turnkey', 'flat2-turnkey', 'newbuild-45', 'bath-turnkey', 'shower-room', 'toilet-room', 'room-cosmetic', 'room-paint', 'kitchen-apron', 'demo-flat', 'handy-move'),
   ] },
