@@ -93,7 +93,7 @@ function cam(t) {
 let shake = 0;
 window.render = function (t) {
   renderSubs(t, SUBS);
-  $('hook').innerHTML = 'Под ламинатом —<br><b>11 слоёв</b>. Пропустишь<br>один — <b>переделка</b> 💸';
+  $('hook').innerHTML = window.V2 ? 'Пол скрипит и холодный? 🤔<br>Значит, пропустили<br><b>1 из 11 слоёв</b>' : 'Под ламинатом —<br><b>11 слоёв</b>. Пропустишь<br>один — <b>переделка</b> 💸';
   $('hook').style.opacity = win(t, .02, T0 + .9, .15, .25);
   $('hook').style.transform = `scale(${back((t - .02) / .35)})`;
   $('nich').style.opacity = win(t, .15, END - .1, .2, .3);
@@ -102,7 +102,7 @@ window.render = function (t) {
   const [tg, yaw, pitch, dist] = cam(t);
   S.camera(tg, yaw, pitch, dist, 40);
   const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
-  const g = x.createLinearGradient(0, 0, 0, 960); g.addColorStop(0, '#20314a'); g.addColorStop(.6, '#33506f'); g.addColorStop(1, '#4a6b8c');
+  const g = x.createLinearGradient(0, 0, 0, 960); if (window.V2) { g.addColorStop(0, '#2a2140'); g.addColorStop(.6, '#43365f'); g.addColorStop(1, '#5d4f7c'); } else { g.addColorStop(0, '#20314a'); g.addColorStop(.6, '#33506f'); g.addColorStop(1, '#4a6b8c'); }
   x.fillStyle = g; x.fillRect(0, 0, 540, 960);
   S.fogColor = [60, 85, 115]; S.fog = [30, 90]; S.L = M3.norm([.35, .9, .55]); S.amb = .55; S.dif = .5;
   room();
