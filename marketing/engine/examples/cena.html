@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Сколько стоит ремонт однушки 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#hook { top: 300px !important; font-size: 46px !important; }
+#money { position: absolute; left: 0; right: 0; top: 70px; z-index: 20; text-align: center; font-family: 'PTN'; font-size: 96px; line-height: 1; color: #FFD43B; -webkit-text-stroke: 7px #1b0f05; paint-order: stroke fill; opacity: 0; }
+#meta { position: absolute; left: 0; right: 0; top: 172px; z-index: 20; text-align: center; font-family: 'PT'; font-size: 24px; color: #fff; -webkit-text-stroke: 5px #000; paint-order: stroke fill; opacity: 0; }
+#stagePill { position: absolute; left: 50%; top: 214px; z-index: 20; transform: translateX(-50%); font-family: 'PT', 'Noto Color Emoji'; font-size: 30px; padding: 6px 18px; border-radius: 14px; color: #fff; white-space: nowrap; box-shadow: 0 8px 20px rgba(0,0,0,.35); opacity: 0; }
+#bars { position: absolute; left: 24px; right: 24px; bottom: 120px; z-index: 20; display: flex; flex-direction: column; gap: 10px; opacity: 0; }
+.bar { position: relative; height: 54px; border-radius: 14px; background: rgba(0,0,0,.45); overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 14px; }
+.bar span { position: absolute; left: 14px; right: 14px; top: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 25px; color: #fff; -webkit-text-stroke: 4px #000; paint-order: stroke fill; }
+#share { position: absolute; left: 20px; right: 20px; top: 250px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 46px; line-height: 1.12; color: #fff; -webkit-text-stroke: 8px #000; paint-order: stroke fill; opacity: 0; }
+#share b { color: #FFD43B; }
+#ask { position: absolute; left: 20px; right: 20px; top: 560px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 36px; color: #fff; -webkit-text-stroke: 7px #000; paint-order: stroke fill; opacity: 0; }
+#note { position: absolute; left: 0; right: 0; bottom: 74px; z-index: 20; text-align: center; font-family: 'PTR'; font-size: 17px; color: rgba(255,255,255,.85); opacity: 0; }
+#dim { position: absolute; inset: 0; background: #0b0614; opacity: 0; z-index: 21; }
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 18; pointer-events: none; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="money"></div>
+<div id="meta">однушка 36 м² · работа + материалы</div>
+<div id="stagePill"></div>
+<div id="bars">
+  <div class="bar"><i style="background:#8d8d88"></i><span><b>Черновая</b><em>≈ 510 тыс ₽</em></span></div>
+  <div class="bar"><i style="background:#d9d4c7"></i><span><b>White box</b><em>≈ 575 тыс ₽</em></span></div>
+  <div class="bar"><i style="background:#e0a050"></i><span><b>Под ключ</b><em>≈ 1 млн ₽</em></span></div>
+</div>
+<div id="note">ориентир по ценам СПб, октябрь 2026 · расчёт в СМЕТА PRO</div>
+<div id="flash"></div>
+<div id="dim"></div>
+<div id="share">📩 Отправь тому,<br>кто <b>собрался делать<br>ремонт</b></div>
+<div id="ask">А сколько отдали вы? 👇</div>
+<div id="hook" class="cap"></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🏠</div><div class="logo">СМЕТА PRO</div><div class="l2">Посчитайте свой ремонт<br><span style="color:#FFD43B">по этапам за 2 минуты</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script>
+window.DUR = 17;
+const S1 = 0, S2 = 4.6, S3 = 8.2, BARS = 11.3, SHARE = 13.0, END = 15.2;
+const TOT = [507778, 575398, 1008863];
+const S = new M3.Scene($('cv'));
+const FX = $('fx').getContext('2d');
+const fmt = (n) => Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ');
+function stageAt(t) { return t < S2 ? 0 : t < S3 ? 1 : 2; }
+
+function flat(st) {
+  const wall = ['#9b9a95', '#f2efe8', '#f2efe8'][st], floor = ['#8f8e89', '#bdb5a6', '#c98f58'][st];
+  const H = 2.6, T = .15;
+  S.box(-3, 3, -.25, 0, -3, 3, '#6c6b67', { top: floor });                 // плита/пол
+  S.box(-3 - T, -3, -.25, H, -3, 3, wall, { side: st === 2 ? '#7fae8f' : wall });     // левая стена (акцент — в финале)
+  S.box(-3 - T, 3, -.25, H, -3 - T, -3, wall, { front: wall });              // задняя стена
+  S.box(1, 1 + T, 0, H, -3, -.4, wall, {});                                  // перегородка санузла
+  S.box(1 + T, 3, 0, H, -.4 - T, -.4, wall, { front: wall });
+  if (st === 0) { // бетон: короба, мешки
+    S.box(-2.5, -1.9, 0, .5, 1.2, 1.7, '#d8c8a8', { shadow: true }); S.box(-2.4, -1.8, .5, 1, 1.25, 1.65, '#e3d4b4', { shadow: true });
+  }
+  if (st >= 1) S.box(1.15, 3, 0, .03, -3, -.55, st === 2 ? '#e3edf3' : '#b8b0a2', {});
+  if (st === 2) {
+    S.box(1.15, 3, .03, H - .05, -3 + .001, -2.98, '#9fcbe6', { front: '#a9d3ec' });           // плитка санузла
+    S.box(1.6, 2.9, 0, .55, -2.95, -2.25, '#ffffff', { shadow: true });                          // ванна
+    S.box(-2.9, -.6, 0, .88, -2.95, -2.35, '#fbfbf8', { top: '#3b3f46', shadow: true });         // кухня
+    S.box(-2.9, -.6, 1.5, 2.2, -2.95, -2.6, '#fbfbf8', { shadow: true });
+    S.box(-2.95, -2.15, 0, .45, -.2, 1.9, '#4f6d9a', { shadow: true }); S.box(-2.95, -2.75, .45, 1.0, -.2, 1.9, '#5a79a8', {}); // диван
+    S.box(-.6, .6, 0, .02, -.1, 1.6, '#e9e2d6', {});                                             // ковёр
+    S.cyl('y', [2.2, .25, 2.2], .22, .5, '#b9764a', { seg: 12 }); S.cone([2.2, .5, 2.2], .45, 1.2, '#3f8f55', { seg: 10 });
+    S.sphere([0, 2.05, .6], .2, '#ffe9a8', { emit: true, seg: 12 });
+  }
+}
+function lines(st, t) {
+  if (st === 0) { // кабели и трубы по стенам
+    const y = 2.3; S.line([[-2.99, y, 2.6], [-2.99, y, -2.99], [.9, y, -2.99]], { color: '#ffb000', w: 3 });
+    for (const z of [-1.8, .2, 1.8]) S.line([[-2.99, y, z], [-2.99, .35, z]], { color: '#ffb000', w: 3 });
+    S.line([[1.3, .3, -2.99], [2.8, .3, -2.99]], { color: '#e04848', w: 5 }); S.line([[1.3, .45, -2.99], [2.8, .45, -2.99]], { color: '#3c84e0', w: 5 });
+  }
+  if (st === 2) { for (let x = -2.6; x < 1; x += .55) S.line([[x, .002, -2.3], [x, .002, 3]], { color: 'rgba(90,50,20,.45)', w: 1.2 }); }
+}
+window.render = function (t) {
+  const st = stageAt(t);
+  // камера: всегда в движении — облёт + наезд в начале
+  const yaw = .55 + t * .09 + Math.sin(t * .9) * .05, pitch = .62 - Math.min(t, 3) * .02, dist = 23 - 4 * eOut(t / 1.2) - t * .12 + (t > SHARE ? (t - SHARE) * .8 : 0);
+  S.camera([0, .2, .3], yaw, pitch, dist, 40);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960);
+  const pal = [['#2a2a2e', '#4a4a50'], ['#28394f', '#5b7896'], ['#3a2318', '#a5643a']][st];
+  g.addColorStop(0, pal[0]); g.addColorStop(1, pal[1]); x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = [40, 40, 50]; S.fog = [40, 90]; S.L = M3.norm([.4, .9, .5]); S.amb = .58; S.dif = .48;
+  S.tint = st === 2 ? [1.06, 1, .92] : [1, 1, 1];
+  // удар при смене этапа
+  const hit = Math.max(0, 1 - Math.abs(t - S2) / .25, 1 - Math.abs(t - S3) / .25);
+  flat(st); lines(st, t);
+  x.save(); const sc = 1 + hit * .06; x.translate(270 * (1 - sc), 480 * (1 - sc)); x.scale(sc, sc); S.render(); x.restore();
+  $('flash').style.opacity = hit * .7;
+
+  // крючок — с первого кадра, с пульсом
+  $('hook').innerHTML = 'Сколько стоит<br><b>ремонт однушки</b><br>в СПб в 2026? 😳';
+  $('hook').style.opacity = win(t, 0, 2.3, .01, .25);
+  $('hook').style.transform = `scale(${1.08 + Math.sin(t * 9) * .03 - eOut(t / .3) * .08})`;
+  // счётчик денег
+  const target = t < S2 ? TOT[0] * eOut((t - .4) / 3.4) : t < S3 ? lerp(TOT[0], TOT[1], eOut((t - S2) / 1.6)) : lerp(TOT[1], TOT[2], eOut((t - S3) / 2.4));
+  $('money').innerHTML = `${fmt(Math.max(0, target))} ₽`;
+  $('money').style.opacity = win(t, .35, SHARE, .15, .2);
+  const mb = Math.max(0, 1 - Math.abs(t - S2 - .1) / .3, 1 - Math.abs(t - S3 - .1) / .3);
+  $('money').style.transform = `scale(${1 + mb * .15})`;
+  $('meta').style.opacity = win(t, .6, SHARE, .2, .2);
+  const P = $('stagePill'), labels = [['🧱 ЧЕРНОВАЯ', '#5d5d62'], ['⬜ WHITE BOX', '#3d6a96'], ['✨ ПОД КЛЮЧ', '#c96f2a']];
+  P.textContent = labels[st][0]; P.style.background = labels[st][1];
+  P.style.opacity = win(t, 2.3, SHARE, .15, .2);
+  const ps = st === 0 ? 2.3 : st === 1 ? S2 : S3;
+  P.style.transform = `translateX(-50%) scale(${back((t - ps) / .35)})`;
+  $('note').style.opacity = win(t, 2.5, SHARE, .2, .2);
+  // итоговые полоски
+  $('bars').style.opacity = win(t, BARS, SHARE + .2, .2, .2);
+  [...$('bars').children].forEach((b, i) => { b.firstElementChild.style.width = `${eOut((t - BARS - i * .25) / .6) * TOT[i] / TOT[2] * 100}%`; b.style.transform = `translateX(${(1 - eOut((t - BARS - i * .2) / .4)) * -60}px)`; });
+
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  // летящие ₽ из счётчика, пока он крутится
+  const spin = t > .4 && t < S3 + 2.4;
+  if (spin) for (let i = 0; i < 18; i++) {
+    const k = (t * 1.3 + R(i)) % 1, x0 = 120 + R(i + 3) * 300;
+    FX.globalAlpha = (1 - k) * .9; FX.font = `700 ${18 + R(i) * 16}px PT`; FX.fillStyle = '#FFD43B'; FX.strokeStyle = '#3a2000'; FX.lineWidth = 3;
+    const yy = 150 - k * 120, xx = x0 + Math.sin(k * 6 + i) * 20; FX.strokeText('₽', xx, yy); FX.fillText('₽', xx, yy);
+  }
+  FX.globalAlpha = 1;
+  // искры при ударе этапа
+  if (hit > 0) for (let i = 0; i < 26; i++) { const a = R(i) * 7, r = (1 - hit) * 220 + 40; FX.fillStyle = `rgba(255,212,59,${hit})`; FX.beginPath(); FX.arc(270 + Math.cos(a) * r, 520 + Math.sin(a) * r * .7, 3 + R(i + 2) * 4, 0, 7); FX.fill(); }
+  // пыль в черновой, свет лампы в финале
+  if (st === 0) for (let i = 0; i < 30; i++) { FX.fillStyle = `rgba(220,210,190,${.25 + R(i) * .3})`; FX.beginPath(); FX.arc((R(i) * 540 + t * 12 * (R(i + 1) - .5) * 4 + 540) % 540, (R(i + 5) * 600 + 250 - t * 8) % 960, 1.5 + R(i + 2) * 2.5, 0, 7); FX.fill(); }
+  if (st === 2) { const p = S.proj([0, 2.05, .6]); const gr = FX.createRadialGradient(p[0], p[1], 0, p[0], p[1], 160); gr.addColorStop(0, 'rgba(255,220,140,.45)'); gr.addColorStop(1, 'rgba(255,220,140,0)'); FX.fillStyle = gr; FX.fillRect(p[0] - 160, p[1] - 160, 320, 320); }
+  // призыв переслать: самолётик летит через экран
+  $('dim').style.opacity = win(t, SHARE, END + .1, .2, .2) * .6;
+  $('share').style.opacity = win(t, SHARE, END + .1, .15, .2);
+  $('share').style.transform = `scale(${back((t - SHARE) / .4) + Math.sin(t * 8) * .015})`;
+  $('ask').style.opacity = win(t, SHARE + .8, END + .1, .2, .2);
+  if (t > SHARE + .2 && t < END) {
+    const k = clamp((t - SHARE - .2) / 1.4), px = lerp(-60, 600, k), py = 520 - Math.sin(k * Math.PI) * 140;
+    FX.save(); FX.translate(px, py); FX.rotate(-.35 + k * .5); FX.font = '64px "Noto Color Emoji"'; FX.fillText('📩', -32, 22); FX.restore();
+    for (let i = 1; i < 12; i++) { const kk = k - i * .02; if (kk < 0) break; FX.fillStyle = `rgba(255,255,255,${.5 - i * .04})`; FX.beginPath(); FX.arc(lerp(-60, 600, kk), 520 - Math.sin(kk * Math.PI) * 140, 4, 0, 7); FX.fill(); }
+  }
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith([]);
+</script>
+</body></html>
