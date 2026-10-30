@@ -49,18 +49,28 @@ export const DIRECTIONS: Direction[] = [
     ...tpls('flat1-turnkey', 'flat2-turnkey', 'newbuild-45', 'bath-turnkey', 'shower-room', 'toilet-room', 'room-cosmetic', 'room-paint', 'kitchen-apron', 'demo-flat', 'handy-move'),
   ] },
   { id: 'commerce', icon: '🏢', title: 'Коммерция', text: 'Офис, магазин, кафе, салон', kinds: [...tpls('office-60', 'shop-40', 'cafe-80', 'salon-50')] },
-  { id: 'finish', icon: '🎨', title: 'Отделка', text: 'Штукатурка, покраска, обои, потолки', kinds: [
+  { id: 'finish', icon: '🎨', title: 'Стены: отделка', text: 'Штукатурка, покраска, обои, декор, панели — 29 видов', kinds: [
     master('m-finish', 'Комната под ключ', 'Стены, потолок, откосы — по размерам комнаты'),
-    master('m-stretch', 'Натяжные потолки', 'Полотно, профиль, светильники, обходы труб'),
-    ...fromMaster('m-gkl', 'kind'),
-    ...tpls('room-cosmetic', 'room-paint', 'stretch-flat', 'gkl-partition', 'gkl-ceil2'),
+    ...fromMaster('m-finish', 'walls', undefined, { tile: 'Выравнивание стен под плитку', none: 'Только потолок' }).filter((k) => !k.id.endsWith(':none')),
+    ...fromMaster('m-gkl', 'kind', ['part', 'wall', 'glue', 'box']),
+    ...tpls('room-cosmetic', 'room-paint', 'gkl-partition'),
+  ] },
+  { id: 'ceilings', icon: '💡', title: 'Потолки', text: 'Натяжные, ГКЛ, покраска, реечные, Армстронг, дерево', kinds: [
+    master('m-stretch', 'Натяжные потолки', 'Полотно, профиль, светильники, световые линии, 2 уровня'),
+    ...Object.entries({ paint: 'Шпаклёвка и покраска потолка', plaster: 'Штукатурка потолка по маякам', gkl: 'Потолок из ГКЛ в 1 уровень', gkl2: 'Потолок из ГКЛ в 2 уровня', shadow: 'ГКЛ с теневым швом', wallpaper: 'Обои на потолок', rack: 'Реечный потолок', armstrong: 'Армстронг / кассетный', grilyato: 'Грильято', wood: 'Деревянный потолок (вагонка, рейки)', coffer: 'Кессонный потолок', foam: 'Потолочная плитка' })
+      .map(([c, t]) => ({ id: `m-finish:ceil-${c}`, title: t, to: `/calculators/m-finish?set=walls:none,level:none,slopes:no,ceil:${c}` })),
+    ...fromMaster('m-gkl', 'kind', ['ceil1', 'ceil2'], { ceil1: 'ГКЛ-потолок (только монтаж)', ceil2: 'ГКЛ-потолок в 2 уровня (только монтаж)' }),
+    ...tpls('stretch-flat', 'gkl-ceil2'),
   ] },
   { id: 'tile', icon: '🧱', title: 'Плитка', text: 'Санузел, пол, стены, фартук', kinds: [...fromMaster('m-tile', 'obj'), ...tpls('bath-turnkey', 'shower-room', 'toilet-room', 'kitchen-apron')] },
   { id: 'floor', icon: '🪵', title: 'Полы', text: 'Ламинат, кварцвинил, паркет, стяжка', kinds: [
-    ...([['laminate', 'Ламинат'], ['spc', 'Кварцвинил (SPC)'], ['parquet', 'Паркетная доска'], ['lino', 'Линолеум'], ['carpet', 'Ковролин']] as const).map(([c, t]) => ({
+    ...([['laminate', 'Ламинат'], ['laminateHB', 'Ламинат ёлочкой'], ['spc', 'Кварцвинил (SPC) замковый'], ['spcGlue', 'Кварцвинил клеевой'], ['lvt', 'ПВХ-плитка (LVT)'], ['parquet', 'Паркетная доска'],
+      ['engineered', 'Инженерная доска'], ['massive', 'Массивная доска'], ['piece', 'Штучный паркет'], ['herring', 'Паркет ёлочкой'], ['chevron', 'Французская ёлка'], ['cork', 'Пробковый пол'],
+      ['lino', 'Линолеум'], ['carpet', 'Ковролин'], ['carpetTile', 'Ковровая плитка'], ['rubber', 'Резиновое покрытие'], ['tile', 'Керамогранит на пол'], ['tileXL', 'Керамогранит 120×60'], ['microcement', 'Микроцемент на пол'], ['polymer', 'Наливной полимерный пол']] as const).map(([c, t]) => ({
       id: `m-floor:cover-${c}`, title: t, text: 'Укладка на готовое основание: подложка, плинтус, пороги', to: `/calculators/m-floor?set=base:none,cover:${c}`,
     })),
-    ...fromMaster('m-floor', 'base', ['cps', 'semi', 'self', 'joists'], { cps: 'Стяжка ЦПС', semi: 'Полусухая стяжка', self: 'Наливной пол', joists: 'Лаги + фанера' }),
+    ...fromMaster('m-floor', 'base', ['cps', 'semi', 'float', 'keramzit', 'self', 'joists', 'osb', 'dry', 'screws', 'plyglue'], { cps: 'Стяжка ЦПС', semi: 'Полусухая стяжка', float: 'Стяжка по утеплителю', keramzit: 'Стяжка с керамзитом', self: 'Наливной пол', joists: 'Лаги + фанера', osb: 'Лаги + OSB', dry: 'Сухой пол Кнауф', screws: 'Регулируемые полы', plyglue: 'Фанера на клей по стяжке' }),
+    ...fromMaster('m-floor', 'heat', ['water', 'electric', 'film'], { water: 'Водяной тёплый пол', electric: 'Электрический тёплый пол', film: 'Инфракрасный плёночный пол' }),
     ...tpls('laminate-50', 'spc-40', 'screed-100', 'warm-floor-80'),
   ] },
   { id: 'windows', icon: '🪟', title: 'Окна и двери', text: 'Окна, откосы, подоконники, двери', kinds: [...fromMaster('m-windows', 'kind', undefined, { windows: 'Пластиковые окна', interior: 'Межкомнатные двери', entrance: 'Входная дверь', all: 'Окна и двери вместе' }), ...tpls('windows-flat', 'doors-4', 'door-entrance')] },
