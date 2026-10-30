@@ -16,9 +16,10 @@ await Promise.all([...Array(C)].map(async (_, k) => {
   const p = await b.newPage({ viewport: { width: 540, height: 960 }, deviceScaleFactor: 2 });
   await p.goto(url); await p.waitForFunction(() => window.OK || window.READY === true);
   for (let t = 0; t < N / 30; t += 1.5) { await p.evaluate((t) => window.render(t), t); await p.waitForTimeout(60); }
-  for (let i = k * st; i < Math.min(N, (k + 1) * st); i++) { await p.evaluate((t) => window.render(t), i / 30); await p.screenshot({ path: `${dir}/${String(i).padStart(4, '0')}.png` }); }
+  for (let i = k * st; i < Math.min(N, (k + 1) * st); i++) { await p.evaluate((t) => window.render(t), i / 30); await p.screenshot({ path: `${dir}/${String(i).padStart(4, '0')}.jpg`, type: 'jpeg', quality: 92 }); }
   await b.close();
 }));
-execSync(`ffmpeg -y -loglevel error -framerate 30 -i ${dir}/%04d.png -i ${wav} -c:v libx264 -pix_fmt yuv420p -crf 23 -preset slow -c:a aac -b:a 160k -shortest -movflags +faststart "${out}"`);
+execSync(`ffmpeg -y -loglevel error -framerate 30 -i ${dir}/%04d.jpg -i ${wav} -c:v libx264 -pix_fmt yuv420p -crf 23 -preset slow -c:a aac -b:a 160k -shortest -movflags +faststart "${out}.part.mp4"`);
+fs.renameSync(`${out}.part.mp4`, out);
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('ok', out, N, 'frames');
