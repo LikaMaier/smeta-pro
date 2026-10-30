@@ -1,6 +1,6 @@
 """Звук «полезных хэллоуинских» роликов: жуткая шкатулка и терменвокс в «плохой» части, «у-у-у» призрака,
 потом тёплая акустика по шагам с колокольчиками и шумами работ, весёлый финал. Всё синтезировано.
-python3 audio-night.py podval|krysha out.wav"""
+python3 audio-night.py podval|krysha|kotel|voda out.wav"""
 import sys, numpy as np, wave
 MODE, OUT = sys.argv[1], sys.argv[2]
 src = open(__file__.replace('audio-night.py', 'audio-terrasy.py'), encoding='utf-8').read()
@@ -46,6 +46,16 @@ whoo(2.6 if MODE == 'podval' else 2.6, 1.8, .06, 300 if MODE == 'podval' else 36
 if MODE == 'podval':
     for k in range(18): drip(2.6 + rng.random() * 5.4, .05)
     whoo(5.0, 1.6, .05)
+elif MODE == 'kotel':
+    x = lp(rng.standard_normal(int(7.5 * SR)), 260) * np.minimum(1, t_(7.5) / 1.5); add(x, .5, .07)
+    for k in range(5): drip(3 + k * .9, .02)
+    whoo(4.2, 2.0, .06, 260)
+elif MODE == 'voda':
+    def bubble2(at, g=.05):
+        tt = t_(.1); fr = 300 + 1500 * tt / .1; add(np.sin(2 * np.pi * np.cumsum(fr) / SR) * np.exp(-tt * 25), at, g, rng.random() - .5)
+    x = bp(rng.standard_normal(int(5.6 * SR)), 400, 3000) * np.minimum(1, t_(5.6) / .6); add(x, 2.4, .035)
+    for k in range(40): bubble2(2.6 + rng.random() * 5.4, .045)
+    whoo(4.4, 1.6, .05, 340)
 else:
     for k in range(16): crackle(4.0 + rng.random() * 2.8, .035)
     glass(6.75, .3); thud(6.8, .3)
@@ -75,6 +85,18 @@ if MODE == 'podval':
     thud(ST[2] + .6, .2); scrape(ST[3] + .1, .8, .045); scrape(ST[4] + .1, 1.0, .045); thud(ST[4] + 1.4, .15)
     for k in range(10): drip(FIN + .3 + k * .14, .03)
     whoo(FIN + .3, 1.4, .05, 420)
+elif MODE == 'kotel':
+    thud(ST[0] + .6, .15)
+    x = bp(rng.standard_normal(int(1.6 * SR)), 300, 1500) * np.sin(np.pi * t_(1.6) / 1.6); add(x, ST[1] + .4, .035)
+    scrape(ST[2] + .2, 1.2, .035); thud(ST[2] + 1.3, .1)
+    for k in range(3): glock(96, ST[3] + .5 + k * .25, .03)
+    for k in range(5): thud(ST[4] + .4 + k * .2, .05)
+    whoo(FIN + .3, 1.4, .05, 420)
+elif MODE == 'voda':
+    for k in range(3): glock(91 + k * 2, ST[0] + .4 + k * .15, .03)
+    for i in range(1, 5): thud(ST[i] + .5, .15)
+    x = bp(rng.standard_normal(int(2.2 * SR)), 2500, 6000) * np.sin(np.pi * t_(2.2) / 2.2); add(x, FIN - .2, .03)
+    whoo(FIN + .4, 1.4, .05, 420)
 else:
     x = lp(rng.standard_normal(int(.7 * SR)), 2500) * np.sin(np.pi * t_(.7) / .7); add(x, ST[0] + .1, .03)
     scrape(ST[1] + .1, 1.0, .04); x = lp(rng.standard_normal(int(.7 * SR)), 2500) * np.sin(np.pi * t_(.7) / .7); add(x, ST[2] + .1, .03)

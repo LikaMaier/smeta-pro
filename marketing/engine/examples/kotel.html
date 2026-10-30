@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Ведьмин котёл 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }
+.lbl { position: absolute; z-index: 14; transform: translate(-50%, -100%); font-family: 'PT', 'Noto Color Emoji'; font-size: 19px; color: #1a0b2e; background: rgba(255,255,255,.94); padding: 4px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.35); opacity: 0; }
+.lbl.o { background: #ff9f3a; } .lbl.b { background: #d6ecff; } .lbl.r { background: #ffe1e1; color: #a1121f; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="bG" class="bub">«Я — угарный газ.<br>Меня не видно и не слышно» 👻</div>
+<div id="bBye" class="bub">«Тяга есть… улетаю» 😱</div>
+<div id="lShort" class="lbl r">⬇️ дымоход ниже конька — тяги нет</div>
+<div id="lRoom" class="lbl">отдельная котельная, окно</div>
+<div id="lAir" class="lbl b">🌬 приток воздуха</div>
+<div id="lChim" class="lbl o">сэндвич выше конька</div>
+<div id="lSens" class="lbl">датчики CO и газа</div>
+<div id="lTo" class="lbl o">🔧 ТО раз в год</div>
+<div id="dimD" style="position:absolute;inset:0;background:#0b0616;opacity:0;z-index:11"></div>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">❌ НЕТ ТЯГИ И ПРИТОКА</div>
+<div id="tagBad2" class="tag err" style="left:24px;top:212px;font-size:23px">☠️ угарный газ в доме</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ ТЯГА ЕСТЬ — В ДОМЕ БЕЗОПАСНО</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🎃</div><div class="logo">СМЕТА PRO</div><div class="l2">Котельная под ключ —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="night.js"></script>
+<script>
+window.DUR = 28.8;
+const A = 2.4, B = 8.2, SD = 2.6;
+const ST = [...Array(5)].map((_, i) => 8.4 + i * SD);
+const FIN = 8.4 + 5 * SD, PHONE = FIN + 2.4, END = PHONE + 2.0;
+const STEPS = [
+  ['Котёл — в <b>отдельной котельной</b><br>с окном и дверью', '🚪 объём от 7,5 м³'],
+  ['<b>Приток воздуха</b> —<br>решётка внизу стены', '🌬 без притока нет горения'],
+  ['Дымоход-сэндвич<br><b>выше конька</b> — есть тяга', '🔥 утеплённый дымоход'],
+  ['Датчики <b>CO и газа</b><br>с клапаном-отсекателем', '🚨 сигнал + отсечка газа'],
+  ['<b>ТО котла</b> и чистка<br>дымохода раз в год', '🔧 раз в сезон'],
+];
+const SUBS = [
+  [A + .1, 5.2, 'Труба ниже конька, притока нет —<br><b>тяги нет</b>…'],
+  [5.2, B - .1, '…и угарный газ идёт в дом.<br>Его <b>не видно и не слышно</b> ☠️'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || FIN) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [FIN + .1, PHONE, 'Дым уходит в трубу —<br><b>в доме тепло и безопасно</b> 🔥'],
+  [PHONE + .1, END, 'Смета на котельную<br>под ключ — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+const K = (t, ...v) => [t, ...v];
+const VIEW = {
+  over: [.05, .14, 15.5, -1.0, 2.4, -2.4], s1: [0, .1, 9.5, -2.4, 1.6, -2.4], s2: [-.25, .08, 9, -3.0, 1.0, -2.6],
+  s3: [0, .28, 14, -2.4, 4.6, -3.6], s4: [0, .06, 8, -2.0, 2.0, -3.4], s5: [-.05, .06, 8, -2.7, 1.7, -3.4], fin: [.05, .18, 17, -1.0, 3.0, -2.4],
+};
+const CAM = [
+  K(0, ...VIEW.over), K(A, .02, .12, 14, -.6, 1.8, -2.4), K(B - .02, 0, .12, 13.5, -.4, 1.8, -2.4),
+  K(B, ...VIEW.s1), K(ST[1] - .2, ...VIEW.s1), K(ST[1] + .4, ...VIEW.s2), K(ST[2] - .2, ...VIEW.s2), K(ST[2] + .4, ...VIEW.s3), K(ST[3] - .2, ...VIEW.s3),
+  K(ST[3] + .4, ...VIEW.s4), K(ST[4] - .2, ...VIEW.s4), K(ST[4] + .4, ...VIEW.s5), K(FIN - .2, ...VIEW.s5), K(FIN + .5, ...VIEW.fin), K(99, .1, .18, 17, -1.0, 3.0, -2.4),
+];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+
+const S = new M3.Scene($('cv')); NIGHT.setup(S); S.amb = .46; S.dif = .58; S.tint = [.82, .82, 1.0];
+const WALL = '#d8c8b0', FLOOR = '#8a6a4a', ROOF = '#3a2f3f';
+const roofY = (x) => 3 + (1 - Math.abs(x) / 4.6) * 2.4;     // конёк x=0, y=5.4
+const CH = -2.8;                                                // ось дымохода
+function house(warm, doorK, winK) {
+  S.box(-4.2, 4.2, -.2, 0, -5.4, .2, '#6f7378');                 // плита пола
+  S.box(-4, 4, 0, .05, -5, 0, FLOOR);
+  S.box(-4.2, -4, 0, 3, -5.2, 0, WALL); S.box(4, 4.2, 0, 3, -5.2, 0, WALL); S.box(-4, 4, 0, 3, -5.2, -5, WALL);
+  // перегородка с проёмом
+  S.box(-1.1, -.9, 0, 3, -5, -2.6, WALL); S.box(-1.1, -.9, 2.2, 3, -2.6, -1.2, WALL); S.box(-1.1, -.9, 0, 3, -1.2, 0, WALL);
+  if (doorK > .01) S.box(-1.06, -.94, 0, 2.2, -2.6, lerp(-2.6, -1.2, doorK), '#6b432a');
+  // перекрытие (тонкое, по краю — чтобы видно было разрез)
+  S.box(-4.2, 4.2, 3, 3.15, -5.2, -4.4, '#bfb2a0');
+  // крыша
+  S.extrude([[-4.6, 3], [4.6, 3], [0, 5.4], ], -5.5, -.1, ROOF, { front: '#4a3b4f', alpha: .9 });
+  // окно котельной
+  if (winK > .01) S.poly([[-3.4, 1.4, -4.98], [-2.0, 1.4, -4.98], [-2.0, 2.4, -4.98], [-3.4, 2.4, -4.98]], '#2c3f6a', { two: true, bias: -.3 });
+  // гостиная
+  S.box(.4, 3.0, 0, .55, -4.8, -3.9, '#7a3d4a'); S.box(.4, 3.0, .55, 1.2, -4.95, -4.75, '#7a3d4a');
+  S.cyl('y', [3.4, .8, -4.4], .05, 1.6, '#3b3f44', { seg: 8 }); S.sphere([3.4, 1.75, -4.4], .28, warm ? '#ffcf7a' : '#7a6a5a', { emit: warm, seg: 12, rings: 7 });
+  S.box(1.2, 2.2, 0, .45, -3.2, -2.4, '#5a3a2a');
+  S.poly([[1.2, 1.2, -4.98], [2.6, 1.2, -4.98], [2.6, 2.4, -4.98], [1.2, 2.4, -4.98]], warm ? '#ffb347' : '#3b4b6e', { two: true, emit: warm, bias: -.3 });
+}
+function boiler() {
+  S.box(-3.3, -2.3, 1.1, 2.3, -4.98, -4.55, '#f2f3f5');
+  S.box(-3.0, -2.6, 1.2, 1.35, -4.55, -4.53, '#1f2226');
+  S.cyl('y', [-3.0, .55, -4.75], .04, 1.1, '#c27a3a', { seg: 6 }); S.cyl('y', [-2.6, .55, -4.75], .04, 1.1, '#4a6fb0', { seg: 6 });
+}
+function chimney(top, sandwich) {
+  S.cyl('y', [CH, 2.55, -4.75], .1, .5, '#9aa0a6', { seg: 12 });
+  const y0 = 2.8, h = top - y0;
+  S.cyl('y', [CH, y0 + h / 2, -4.75], sandwich ? .17 : .1, h, sandwich ? '#c9cdd1' : '#8a9096', { seg: 14, shadow: true });
+  S.cyl('y', [CH, top + .05, -4.75], sandwich ? .24 : .12, .1, '#6b7480', { seg: 14 });
+}
+const PUMP = [[1.7, -2.8, .32]];
+
+const FX = $('fx').getContext('2d');
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = '<b>Ведьмин котёл</b>:<br>невидимый убийца в доме 👻';
+  $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const inB = t >= B, cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0); NIGHT.sky(x, t, cam[1]);
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+
+  S.box(-30, 30, -.6, -.2, -30, 12, '#dfe6f0', { groundTop: true });
+  for (let i = 0; i < 7; i++) { const tx = -13 + i * 4.3, tz = -10 - R(i) * 3; S.cyl('y', [tx, .9, tz], .14, 1.8, '#2a1d14', { seg: 6 }); S.cone([tx, 1.4, tz], 1.1, 3.4, '#1d3324', {}); S.cone([tx, 3.8, tz], .45, 1.0, '#eef3f8', {}); }
+  const s1 = inB ? ease((t - ST[0] - .2) / .8) : 0;
+  house(true, s1, inB ? 1 : 0);
+  boiler();
+  PUMP.forEach((p) => NIGHT.pumpkin(S, [p[0], p[1], p[2]]));
+  const s3 = inB ? ease((t - ST[2] - .2) / 1.2) : 0;
+  chimney(lerp(4.2, 6.0, s3), s3 > .05);
+  // решётка притока
+  const s2 = inB ? ease((t - ST[1] - .1) / .6) : 0;
+  if (s2 > .01) S.box(-4.22, -3.98, .3, .7, -3.6, -2.8, '#4a4f55', { alpha: s2 });
+  // датчики
+  const s4 = inB ? eOut((t - ST[3] - .1) / .5) : 0;
+  if (s4 > .01) { S.box(-1.8, -1.4, 2.5, 2.75, -4.99, -4.9, '#f4f4f4'); S.box(-1.7, -1.5, .9, 1.1, -4.99, -4.88, '#ffd43b'); }
+  S.render();
+
+  PUMP.forEach((p, i) => NIGHT.face(FX, S, [p[0], p[1], p[2]], i, t));
+  if (s4 > .5) { const q = S.proj([-1.6, 2.62, -4.88]); FX.fillStyle = `rgba(80,255,120,${.6 + .4 * Math.sin(t * 6)})`; FX.beginPath(); FX.arc(q[0], q[1], 4, 0, 7); FX.fill(); }
+  // пламя в котле
+  { const q = S.proj([-2.8, 1.28, -4.53]); FX.fillStyle = `rgba(80,160,255,${.7 + .3 * Math.sin(t * 20)})`; FX.beginPath(); FX.ellipse(q[0], q[1], 9, 4, 0, 0, 7); FX.fill(); }
+  // дым / угарный газ
+  const bad = !inB, spread = bad ? ease((t - 1.8) / 5) : 0;
+  if (bad) {
+    for (let i = 0; i < 26; i++) {
+      const k = ((t * .18 + i / 26) % 1), sx = lerp(-2.8, lerp(-2.8, 3.2, spread), k * (.4 + R(i) * .6)), sy = 2.6 + k * .2 + Math.sin(t + i) * .2, sz = -4.3 + R(i + 2) * 3.6 * k;
+      const q = S.proj([sx, sy, sz]); if (q[2] < .3) continue; const rr = (30 + k * 60) / q[2] * 9;
+      const g = FX.createRadialGradient(q[0], q[1], 0, q[0], q[1], rr); g.addColorStop(0, `rgba(150,175,140,${.38 * spread * (1 - k * .5)})`); g.addColorStop(1, 'rgba(150,175,140,0)');
+      FX.fillStyle = g; FX.beginPath(); FX.arc(q[0], q[1], rr, 0, 7); FX.fill();
+    }
+    // дым у оголовка — обратная тяга
+    for (let i = 0; i < 6; i++) { const k = ((t * .5 + i / 6) % 1), q = S.proj([CH + Math.sin(i + t) * .2, 4.4 - k * .9, -4.75]); FX.fillStyle = `rgba(170,180,170,${.5 * (1 - k)})`; FX.beginPath(); FX.arc(q[0], q[1], 8 + k * 6, 0, 7); FX.fill(); }
+    // стрелки ветра вниз
+    if (t > 1.6) for (let i = 0; i < 3; i++) { const q0 = S.proj([CH - .6 + i * .6, 5.6 - ((t * .8 + i / 3) % 1) * .8, -4.75]); FX.fillStyle = 'rgba(229,56,59,.9)'; FX.font = '22px PT'; FX.fillText('↓', q0[0] - 6, q0[1]); }
+  } else if (t > ST[2] + 1.2) {
+    for (let i = 0; i < 10; i++) { const k = ((t * .45 + i / 10) % 1), q = S.proj([CH + Math.sin(i * 2 + t) * .15 * k, 6.1 + k * 1.8, -4.75]); FX.fillStyle = `rgba(210,210,220,${.5 * (1 - k)})`; FX.beginPath(); FX.arc(q[0], q[1], 6 + k * 14, 0, 7); FX.fill(); }
+  }
+  // приток воздуха
+  if (s2 > .5 && t < PHONE) for (let i = 0; i < 4; i++) { const k = ((t * .7 + i / 4) % 1), q = S.proj([lerp(-5.2, -3.4, k), .5, -3.2 + (i - 1.5) * .25]); FX.fillStyle = `rgba(140,210,255,${.9 * Math.sin(k * Math.PI)})`; FX.beginPath(); FX.arc(q[0], q[1], 4, 0, 7); FX.fill(); }
+  // призрак угарного газа
+  const ga = bad ? win(t, 3.0, B - .1, .6, .3) : (t > FIN ? win(t, FIN + .1, FIN + 2.2, .2, .6) : 0);
+  const gp = bad ? [lerp(-1.6, 1.6, ease((t - 3) / 4)), 1.7, -3.0] : [CH, lerp(3.4, 7.5, ease((t - FIN - .6) / 1.4)), -4.75];
+  const gh = NIGHT.ghost(FX, S, gp, .7, ga, t, 'rgba(190,215,180,.88)');
+  const bub = (id, at, a) => { const el = $(id); if (!at) { el.style.opacity = 0; return; } el.style.left = at[0] + 'px'; el.style.top = (at[1] - 8) + 'px'; el.style.opacity = a; };
+  bub('bG', gh, bad ? win(t, 4.0, B - .3, .3, .3) : 0);
+  bub('bBye', gh, !bad ? win(t, FIN + .2, FIN + 1.4, .2, .3) : 0);
+  if (s4 > .5 && t < ST[4]) { const q = S.proj([-1.6, 3.05, -4.9]); FX.font = '26px "Noto Color Emoji"'; FX.fillText('🚨', q[0] - 13, q[1]); }
+  if (inB && t > ST[4] && t < FIN) { const q = S.proj([-2.2, 2.6, -4.4]); FX.save(); FX.translate(q[0], q[1]); FX.rotate(Math.sin(t * 6) * .4); FX.font = '34px "Noto Color Emoji"'; FX.fillText('🔧', -17, 12); FX.restore(); }
+  NIGHT.bats(FX, t, 5); NIGHT.fog(FX, t, .08);
+
+  placeLbl('lShort', [CH + 1.6, 4.9, -4.75], bad ? win(t, 1.4, B - .2) : 0);
+  placeLbl('lRoom', [-2.4, 2.9, -4.6], inB ? win(t, ST[0] + .7, ST[1] - .1) : 0);
+  placeLbl('lAir', [-4.1, .9, -3.2], inB ? win(t, ST[1] + .6, ST[2] - .1) : 0);
+  placeLbl('lChim', [CH, 6.3, -4.75], inB ? win(t, ST[2] + 1.0, ST[3] - .1) : 0);
+  placeLbl('lSens', [-1.6, 2.95, -4.9], inB ? win(t, ST[3] + .6, ST[4] - .1) : 0);
+  placeLbl('lTo', [-2.8, 2.55, -4.5], inB ? win(t, ST[4] + .6, FIN - .1) : 0);
+  renderTag('tagBad', t, A + .2, B - .2); renderTag('tagBad2', t, 5.4, B - .2);
+  let si = 0; for (let i = 0; i < 5; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 5`;
+  $('step').style.opacity = win(t, ST[0], FIN - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, FIN - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, FIN + 1.0, PHONE - .1);
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .72;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+function placeLbl(id, p, op) { const q = S.proj(p), el = $(id); el.style.left = q[0] + 'px'; el.style.top = (q[1] - 6) + 'px'; el.style.opacity = q[2] > .3 ? op : 0; }
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>

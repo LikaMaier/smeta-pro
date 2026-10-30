@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Ведьмин отвар из крана 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }
+.lbl { position: absolute; z-index: 14; transform: translate(-50%, -100%); font-family: 'PT', 'Noto Color Emoji'; font-size: 19px; color: #1a0b2e; background: rgba(255,255,255,.94); padding: 4px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.35); opacity: 0; }
+.lbl.o { background: #ff9f3a; } .lbl.b { background: #d6ecff; } .lbl.v { background: #e6d9ff; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="bG" class="bub">«Это не зелье —<br>это железо и сероводород!» 🧪</div>
+<div id="bBye" class="bub">«Чистая?! Мне тут<br>больше нечего делать…» 😱</div>
+<div id="lWell" class="lbl b">скважина</div>
+<div id="lLab" class="lbl">🧪 анализ воды</div>
+<div id="lF1" class="lbl">фильтр грубой очистки</div>
+<div id="lF2" class="lbl o">обезжелезиватель</div>
+<div id="lF3" class="lbl">умягчитель</div>
+<div id="lF4" class="lbl v">уголь + УФ-лампа</div>
+<div id="dimD" style="position:absolute;inset:0;background:#0b0616;opacity:0;z-index:11"></div>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">❌ ВОДА БЕЗ ОЧИСТКИ</div>
+<div id="tagBad2" class="tag err" style="left:24px;top:212px;font-size:23px">🟤 ржавчина, запах, налёт</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ ЧИСТАЯ ВОДА ИЗ КРАНА</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🎃</div><div class="logo">СМЕТА PRO</div><div class="l2">Скважина и водоочистка —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="night.js"></script>
+<script>
+window.DUR = 28.8;
+const A = 2.4, B = 8.2, SD = 2.6;
+const ST = [...Array(5)].map((_, i) => 8.4 + i * SD);
+const FIN = 8.4 + 5 * SD, PHONE = FIN + 2.4, END = PHONE + 2.0;
+const STEPS = [
+  ['Сначала — <b>анализ воды</b>:<br>что именно убирать', '🧪 железо, жёсткость, запах'],
+  ['<b>Фильтр грубой очистки</b> —<br>песок и окалина', '🟫 сетка 100 мкм'],
+  ['<b>Обезжелезиватель</b> —<br>уходит ржавчина', '🟠 железо и марганец'],
+  ['<b>Умягчитель</b> —<br>нет накипи на технике', '⚪ жёсткость'],
+  ['<b>Уголь и УФ-лампа</b> —<br>запах и бактерии', '🟣 вкус и безопасность'],
+];
+const SUBS = [
+  [A + .1, 5.2, 'Из скважины — вода<br><b>прямо в кран</b>, без очистки…'],
+  [5.2, B - .1, '…и из крана течёт<br><b>ведьмин отвар</b> 🟤'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || FIN) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [FIN + .1, PHONE, 'Из крана — <b>чистая вода</b>,<br>техника цела ✅'],
+  [PHONE + .1, END, 'Смета на скважину<br>и водоочистку — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+const K = (t, ...v) => [t, ...v];
+// техпомещение слева (x -4..-.5), кухня справа (x -.5..4); скважина за левой стеной
+const FX0 = [-3.4, -2.6, -1.8, -1.0];    // фильтры: грубый, обезжел., умягч., уголь+УФ
+const VIEW = {
+  over: [.0, .14, 16, -.6, 1.6, -2.2], s1: [.05, .1, 11, -1.4, 1.4, -2.6], s2: [0, .08, 8.5, -2.6, 1.2, -3.2], s3: [0, .08, 8.5, -2.2, 1.3, -3.2],
+  s4: [0, .08, 8.5, -1.8, 1.3, -3.2], s5: [0, .08, 8.5, -1.4, 1.3, -3.2], fin: [.12, .1, 9.5, 1.8, 1.4, -3.4],
+};
+const CAM = [
+  K(0, ...VIEW.over), K(A, .12, .1, 10.5, 1.8, 1.4, -3.4), K(B - .02, .12, .1, 9.5, 1.8, 1.4, -3.4),
+  K(B, ...VIEW.s1), K(ST[1] - .2, ...VIEW.s1), K(ST[1] + .4, ...VIEW.s2), K(ST[2] - .2, ...VIEW.s2), K(ST[2] + .4, ...VIEW.s3), K(ST[3] - .2, ...VIEW.s3),
+  K(ST[3] + .4, ...VIEW.s4), K(ST[4] - .2, ...VIEW.s4), K(ST[4] + .4, ...VIEW.s5), K(FIN - .2, ...VIEW.s5), K(FIN + .5, ...VIEW.fin), K(99, .16, .1, 9.5, 1.8, 1.4, -3.4),
+];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+
+const S = new M3.Scene($('cv')); NIGHT.setup(S); S.amb = .5; S.dif = .58; S.tint = [.86, .84, 1.0];
+const WALL = '#d8c8b0';
+function house() {
+  S.box(-4.2, 4.2, -.2, 0, -5.4, .2, '#6f7378');
+  S.box(-4, -.5, 0, .05, -5, 0, '#6f7378'); S.box(-.5, 4, 0, .05, -5, 0, '#8a6a4a');
+  S.box(-4.2, -4, 0, 3, -5.2, 0, WALL); S.box(4, 4.2, 0, 3, -5.2, 0, WALL); S.box(-4, 4, 0, 3, -5.2, -5, WALL);
+  S.box(-.6, -.4, 0, 3, -5, -2.4, WALL); S.box(-.6, -.4, 2.2, 3, -2.4, -1.2, WALL); S.box(-.6, -.4, 0, 3, -1.2, 0, WALL);
+  S.box(-4.2, 4.2, 3, 3.15, -5.2, -4.4, '#bfb2a0');
+  S.extrude([[-4.6, 3], [4.6, 3], [0, 5.4]], -5.5, -.1, '#3a2f3f', { front: '#4a3b4f', alpha: .9 });
+  // кухня: столешница, мойка, кран, шкафы
+  S.box(.6, 3.6, 0, .9, -5, -4.3, '#6b4a3a'); S.box(.6, 3.6, .9, .98, -5, -4.25, '#e6e1d8');
+  S.box(1.7, 2.5, .72, .98, -4.85, -4.42, '#b7bcc2');
+  S.cyl('y', [2.1, 1.25, -4.85], .04, .55, '#c9cdd1', { seg: 8 }); S.box(2.06, 2.14, 1.48, 1.54, -4.85, -4.6, '#c9cdd1');
+  S.box(.6, 3.6, 1.7, 2.6, -5, -4.65, '#7a5a48');
+  S.poly([[.9, 1.25, -4.98], [1.5, 1.25, -4.98], [1.5, 1.6, -4.98], [.9, 1.6, -4.98]], '#ffb347', { two: true, emit: true, bias: -.3 });
+}
+function well() {
+  S.cyl('y', [-5.6, -2.2, -2.6], .09, 4.6, '#5d6268', { seg: 10 });
+  S.cyl('y', [-5.6, .15, -2.6], .3, .3, '#2f6b4a', { seg: 14 });
+}
+const PUMP = [[3.1, -4.5, .26]];
+function filt(i, k, kind) {
+  if (k < .01) return;
+  const x = FX0[i], z = -4.5, y0 = (1 - eOut(k)) * 3;
+  if (kind === 'coarse') { S.cyl('y', [x, 1.1 + y0, z], .13, .45, '#cfe6ff', { seg: 14, alpha: .8 }); S.cyl('y', [x, 1.38 + y0, z], .15, .1, '#3b5fa8', { seg: 14 }); }
+  else if (kind === 'iron') { S.cyl('y', [x, .75 + y0, z], .24, 1.5, '#2e5a9a', { seg: 18, shadow: true }); S.cyl('y', [x, 1.58 + y0, z], .16, .16, '#1f2226', { seg: 14 }); }
+  else if (kind === 'soft') { S.cyl('y', [x, .75 + y0, z], .22, 1.5, '#3f6fb0', { seg: 18, shadow: true }); S.box(x - .3, x + .3, 0 + y0, .7 + y0, z + .3, z + .75, '#e8eef3'); S.cyl('y', [x, 1.58 + y0, z], .15, .16, '#1f2226', { seg: 14 }); }
+  else { S.cyl('y', [x, 1.0 + y0, z], .13, .9, '#3a3f45', { seg: 14 }); S.cyl('x', [x + .35, 1.6 + y0, z], .06, .5, '#c9b3ff', { seg: 10, emit: true }); }
+}
+
+const FX = $('fx').getContext('2d');
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = 'Из крана течёт<br><b>ведьмин отвар</b>? 🧙';
+  $('hook').style.opacity = win(t, .05, A - .1, .2, .25);
+  $('hook').style.transform = `scale(${back((t - .05) / .4)})`;
+  const inB = t >= B, cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0); NIGHT.sky(x, t, cam[1]);
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+
+  S.box(-30, 30, -.6, -.2, -30, 12, '#2f4a2a', { groundTop: true });
+  for (let i = 0; i < 7; i++) { const tx = -13 + i * 4.3, tz = -10 - R(i) * 3; S.cyl('y', [tx, .9, tz], .14, 1.8, '#2a1d14', { seg: 6 }); S.cone([tx, 1.4, tz], 1.1, 3.4, '#1d3324', {}); }
+  house(); well();
+  PUMP.forEach((p) => NIGHT.pumpkin(S, [p[0], p[1], p[2]]));
+  // насос/гидроаккумулятор
+  S.cyl('y', [-3.7, .45, -3.4], .3, .9, '#3b6fd0', { seg: 18, shadow: true });
+  const kF = (i) => (inB ? ease((t - ST[i + 1] - .1) / .6) : 0);
+  filt(0, kF(0), 'coarse'); filt(1, kF(1), 'iron'); filt(2, kF(2), 'soft'); filt(3, kF(3), 'uv');
+  // магистраль
+  const pipe = [[-5.6, .35, -2.6], [-4.0, .35, -2.6], [-3.7, .35, -3.4], [-3.7, 1.7, -4.5], [-.5, 1.7, -4.5], [2.1, 1.7, -4.85], [2.1, 1.5, -4.85]];
+  S.line(pipe, { color: '#4a4f55', w: 9 });
+  // лаборатория (шаг 1)
+  if (inB && t > ST[0] && t < ST[1]) { S.box(-1.5, -1.0, .9, 1.0, -4.0, -3.6, '#e6e1d8'); }
+  S.render();
+
+  PUMP.forEach((p, i) => NIGHT.face(FX, S, [p[0], p[1], p[2]], i, t));
+  // цвет воды: плохо — бурый; по мере фильтров — светлеет
+  const nF = !inB ? 0 : [0, 1, 2, 3].filter((i) => kF(i) > .9).length;
+  const fin = inB && t > FIN;
+  const col = (pos) => {
+    // pos — номер участка трубы после n-го фильтра
+    const lvl = fin ? 4 : Math.min(nF, pos);
+    return ['rgba(140,95,40,.95)', 'rgba(150,110,55,.95)', 'rgba(180,170,120,.95)', 'rgba(160,200,215,.95)', 'rgba(120,200,255,.95)'][lvl];
+  };
+  // поток по трубе
+  for (let i = 0; i < 22; i++) {
+    const k = ((t * .35 + i / 22) % 1), segs = pipe.length - 1, sp = k * segs, si = Math.floor(sp), f = sp - si;
+    const a = pipe[si], b = pipe[si + 1], p = [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f)];
+    const after = FX0.filter((fx, j) => p[0] > fx && kF(j) > .9 && p[1] > 1.6).length;
+    const q = S.proj(p); if (q[2] < .3) continue;
+    FX.fillStyle = col(fin ? 4 : after); FX.beginPath(); FX.arc(q[0], q[1], 5.5, 0, 7); FX.fill();
+  }
+  // струя из крана и раковина
+  const tapP = S.proj([2.1, 1.48, -4.68]), sinkP = S.proj([2.1, .98, -4.65]);
+  const wc = fin ? 'rgba(130,205,255,.95)' : !inB ? 'rgba(120,95,30,.95)' : col(nF);
+  FX.save(); FX.shadowColor = wc; FX.shadowBlur = 10; FX.strokeStyle = wc; FX.lineWidth = 8; FX.lineCap = 'round'; FX.beginPath(); FX.moveTo(tapP[0], tapP[1]); FX.lineTo(sinkP[0] + Math.sin(t * 20) * 1.5, sinkP[1]); FX.stroke(); FX.restore();
+  { const s0 = S.proj([1.75, .97, -4.62]), s1 = S.proj([2.45, .97, -4.62]); FX.fillStyle = wc; FX.globalAlpha = .85; FX.beginPath(); FX.ellipse((s0[0] + s1[0]) / 2, s0[1], Math.abs(s1[0] - s0[0]) / 2, 7, 0, 0, 7); FX.fill(); FX.globalAlpha = 1; }
+  // пузыри «зелья» и пятна ржавчины
+  if (!inB || (inB && nF < 2 && !fin)) {
+    for (let i = 0; i < 14; i++) { const k = ((t * .9 + i / 14) % 1), q = S.proj([2.1 + Math.sin(i * 3) * .3, .98 + k * .8, -4.6]); FX.strokeStyle = `rgba(140,230,90,${.9 * (1 - k)})`; FX.fillStyle = `rgba(140,230,90,${.25 * (1 - k)})`; FX.lineWidth = 2.2; FX.beginPath(); FX.arc(q[0], q[1], 4 + k * 7, 0, 7); FX.fill(); FX.stroke(); }
+    const rust = !inB ? ease((t - 3.2) / 3) : .6;
+    for (let i = 0; i < 4; i++) { const q = S.proj([1.85 + i * .15, .95, -4.5]); const g = FX.createRadialGradient(q[0], q[1], 0, q[0], q[1], 14); g.addColorStop(0, `rgba(150,80,20,${.6 * rust})`); g.addColorStop(1, 'rgba(150,80,20,0)'); FX.fillStyle = g; FX.beginPath(); FX.arc(q[0], q[1], 14, 0, 7); FX.fill(); }
+  }
+  if (fin) for (let i = 0; i < 5; i++) { const q = S.proj([2.1 + (i - 2) * .12, 1.2 + Math.sin(t * 3 + i) * .05, -4.6]); FX.fillStyle = `rgba(255,255,255,${.5 + .5 * Math.sin(t * 8 + i)})`; FX.font = '16px "Noto Color Emoji"'; FX.fillText('✨', q[0] - 8, q[1]); }
+  // УФ-свечение
+  if (kF(3) > .9) { const q = S.proj([FX0[3] + .35, 1.6, -4.5]); const g = FX.createRadialGradient(q[0], q[1], 0, q[0], q[1], 40); g.addColorStop(0, 'rgba(190,150,255,.55)'); g.addColorStop(1, 'rgba(190,150,255,0)'); FX.fillStyle = g; FX.beginPath(); FX.arc(q[0], q[1], 40, 0, 7); FX.fill(); }
+  // колба анализа
+  if (inB && t > ST[0] && t < ST[1]) { const q = S.proj([-1.25, 1.35, -3.8]); FX.font = '40px "Noto Color Emoji"'; FX.fillText('🧪', q[0] - 20, q[1] + Math.sin(t * 3) * 3); }
+  // призрак-зельевар
+  const bad = !inB;
+  const ga = bad ? win(t, 3.0, B - .1, .6, .3) : (fin ? win(t, FIN + .1, FIN + 2.2, .2, .6) : 0);
+  const gp = bad ? [1.1, 1.45, -3.2] : [1.1, lerp(1.45, 4.8, ease((t - FIN - .9) / 1.3)), -3.2];
+  const gh = NIGHT.ghost(FX, S, gp, .6, ga, t, 'rgba(200,240,190,.9)');
+  const bub = (id, at, a) => { const el = $(id); if (!at) { el.style.opacity = 0; return; } el.style.left = at[0] + 'px'; el.style.top = (at[1] - 8) + 'px'; el.style.opacity = a; };
+  bub('bG', gh, bad ? win(t, 3.8, B - .3, .3, .3) : 0);
+  bub('bBye', gh, fin ? win(t, FIN + .2, FIN + 1.5, .2, .3) : 0);
+  NIGHT.bats(FX, t, 5); NIGHT.fog(FX, t, .08);
+
+  placeLbl('lWell', [-5.6, .7, -2.6], win(t, .6, B - .2) + (inB ? win(t, B + .2, ST[0] + .8) : 0));
+  placeLbl('lLab', [-1.25, 1.9, -3.8], inB ? win(t, ST[0] + .5, ST[1] - .1) : 0);
+  ['lF1', 'lF2', 'lF3', 'lF4'].forEach((id, i) => placeLbl(id, [FX0[i], 1.95 + (i % 2) * .3, -4.5], inB ? win(t, ST[i + 1] + .6, ST[i + 2] ? ST[i + 2] - .1 : FIN - .1) : 0));
+  renderTag('tagBad', t, A + .2, B - .2); renderTag('tagBad2', t, 5.4, B - .2);
+  let si = 0; for (let i = 0; i < 5; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 5`;
+  $('step').style.opacity = win(t, ST[0], FIN - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, FIN - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, FIN + 1.0, PHONE - .1);
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .72;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+function placeLbl(id, p, op) { const q = S.proj(p), el = $(id); el.style.left = q[0] + 'px'; el.style.top = (q[1] - 6) + 'px'; el.style.opacity = q[2] > .3 ? op : 0; }
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>
