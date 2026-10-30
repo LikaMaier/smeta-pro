@@ -45,7 +45,7 @@ const M3 = (() => {
       if (!o.two && dot(n, sub(this.C, fc)) <= 0) return;
       const p2 = []; let dz = 0;
       for (const p of pts) { const q = this.proj(p); if (q[2] < .3) return; p2.push(q); dz += q[2]; }
-      this.faces.push({ p2, z: dz / pts.length + (o.bias || 0), color, n, o });
+      this.faces.push({ p2, z: dz / pts.length + (o.bias || 0), color, n, o, wy: pts.map((p) => p[1]) });
     }
     box(x0, x1, y0, y1, z0, z1, color, o = {}) {
       const c = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], oo = { ...o, center: c };
@@ -114,7 +114,17 @@ const M3 = (() => {
     draw(f) {
       const x = this.ctx, c = this.shade(f), a = f.o.alpha == null ? 1 : f.o.alpha;
       x.beginPath(); f.p2.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]))); x.closePath();
-      x.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`; x.fill();
+      // мягкое затенение у пола (имитация ambient occlusion) — только если включено: this.ao = сила
+      if (this.ao && !f.o.emit && Math.abs(f.n[1]) < .6 && f.wy) {
+        let lo = 0, hi = 0; f.wy.forEach((y, i) => { if (y < f.wy[lo]) lo = i; if (y > f.wy[hi]) hi = i; });
+        const near = Math.max(0, 1 - (f.wy[lo] - this.groundY) / (this.aoH || 1.4));
+        if (near > 0 && f.wy[hi] - f.wy[lo] > .05) {
+          const k = 1 - this.ao * near, gr = x.createLinearGradient(f.p2[lo][0], f.p2[lo][1], f.p2[hi][0], f.p2[hi][1]);
+          gr.addColorStop(0, `rgba(${c[0] * k | 0},${c[1] * k | 0},${c[2] * k | 0},${a})`); gr.addColorStop(Math.min(1, .55 / near), `rgba(${c[0]},${c[1]},${c[2]},${a})`);
+          x.fillStyle = gr;
+        } else x.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+      } else x.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+      x.fill();
       if (a > .9) {
         x.lineJoin = 'round';
         if (f.o.smooth) { x.strokeStyle = `rgb(${c[0]},${c[1]},${c[2]})`; x.lineWidth = .9; }

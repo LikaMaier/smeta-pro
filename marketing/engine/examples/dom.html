@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Дом 10×10 за 30 секунд 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#hook { top: 250px !important; font-size: 46px !important; }
+#money { position: absolute; left: 0; right: 0; top: 74px; z-index: 20; text-align: center; font-family: 'PTN'; font-size: 92px; line-height: 1; color: #FFD43B; -webkit-text-stroke: 7px #1b0f05; paint-order: stroke fill; opacity: 0; }
+#meta { position: absolute; left: 0; right: 0; top: 172px; z-index: 20; text-align: center; font-family: 'PT'; font-size: 23px; color: #fff; -webkit-text-stroke: 5px #000; paint-order: stroke fill; opacity: 0; }
+#card { position: absolute; left: 22px; right: 22px; top: 720px; z-index: 20; display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,.97); border-radius: 22px; padding: 14px 18px; box-shadow: 0 14px 34px rgba(0,0,0,.35); opacity: 0; border-left: 10px solid #FFD43B; }
+#card .i { font-family: 'Noto Color Emoji'; font-size: 44px; }
+#card .n { font-family: 'PT'; font-size: 30px; color: #0d2440; line-height: 1.05; }
+#card .w { font-family: 'PT'; font-size: 26px; color: #c96f2a; margin-top: 3px; }
+#bars { position: absolute; left: 24px; right: 24px; top: 640px; z-index: 20; display: flex; flex-direction: column; gap: 8px; opacity: 0; }
+.bar { position: relative; height: 46px; border-radius: 12px; background: rgba(0,0,0,.5); overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 12px; background: linear-gradient(90deg, #e0a050, #FFD43B); }
+.bar span { position: absolute; left: 12px; right: 12px; top: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 22px; color: #fff; -webkit-text-stroke: 4px #000; paint-order: stroke fill; }
+#share { position: absolute; left: 20px; right: 20px; top: 300px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 48px; line-height: 1.1; color: #fff; -webkit-text-stroke: 8px #000; paint-order: stroke fill; opacity: 0; }
+#share b { color: #FFD43B; }
+#ask { position: absolute; left: 20px; right: 20px; top: 560px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 36px; color: #fff; -webkit-text-stroke: 7px #000; paint-order: stroke fill; opacity: 0; }
+#note { position: absolute; left: 0; right: 0; bottom: 60px; z-index: 20; text-align: center; font-family: 'PTR'; font-size: 17px; color: rgba(255,255,255,.9); opacity: 0; }
+#dim { position: absolute; inset: 0; background: #070b14; opacity: 0; z-index: 21; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="money"></div>
+<div id="meta">каркасный дом 10×10 · тёплый контур · ЛО</div>
+<div id="card"><div class="i"></div><div><div class="n"></div><div class="w"></div></div></div>
+<div id="bars"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:220px">🏡 ≈ 2,3 млн ₽ под тёплый контур</div>
+<div id="note">ориентир по ценам СПб и ЛО, октябрь 2026 · расчёт в СМЕТА PRO</div>
+<div id="dim"></div>
+<div id="share">📩 Отправь тому,<br>кто <b>мечтает о доме</b> 🏡</div>
+<div id="ask">Какой бюджет у вас? 👇</div>
+<div id="hook" class="cap"></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🏡</div><div class="logo">СМЕТА PRO</div><div class="l2">Посчитайте свой дом<br><span style="color:#FFD43B">по этапам за 2 минуты</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">День бесплатно + 12 дней за подписку на Instagram</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script>
+window.DUR = 24;
+const ST = [0.6, 5.0, 10.0, 14.0], FIN = 17.6, SHARE = 20.0, END = 22.0;
+const STAGES = [
+  ['🔩', 'Винтовые сваи и обвязка', 367900],
+  ['🪵', 'Каркас, перекрытия, утепление', 963599],
+  ['🏠', 'Кровля из металлочерепицы', 602507],
+  ['🪟', 'Фасад, окна, двери', 348148],
+];
+const CUM = STAGES.reduce((a, s) => [...a, (a[a.length - 1] || 0) + s[2]], []);
+const TOTAL = CUM[3];
+const S = new M3.Scene($('cv'));
+const FX = $('fx').getContext('2d');
+const fmt = (n) => Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ');
+const H0 = .9, WH = 2.8, TOP = H0 + WH, RIDGE = TOP + 2.3, HX = 5, HZ = 5;
+const k = (t, a, d) => clamp((t - a) / d);
+
+function land(t) {
+  S.box(-30, 30, -.6, 0, -30, 30, '#5f8f45', { top: '#6fa04f', groundTop: true });
+  for (const [x, z, s] of [[-11, -9, 1.3], [-14, 3, 1], [11, -10, 1.4], [13, 4, 1.1], [-9, 12, .9], [9, 13, 1.2], [0, -14, 1.5]]) {
+    S.cyl('y', [x, .5 * s, z], .15 * s, 1 * s, '#6d4a2b', { shadow: true, seg: 7 });
+    S.cone([x, .8 * s, z], 1.1 * s, 2.8 * s, '#2f6b3d', { shadow: true }); S.cone([x, 2.1 * s, z], .8 * s, 2 * s, '#3b7d48', { shadow: true });
+  }
+  S.box(-7, 7, 0, .02, -7, 7, '#9c8a6a', {}); // площадка
+}
+function piles(t) {
+  const P = []; for (const x of [-HX, -HX / 3, HX / 3, HX]) for (const z of [-HZ, -HZ / 3, HZ / 3, HZ]) P.push([x, z]);
+  P.forEach(([x, z], i) => {
+    const kk = k(t, ST[0] + i * .2, .5); if (kk <= 0) return;
+    const y = lerp(2.2, 0, eOut(kk));
+    S.cyl('y', [x, y + .3, z], .09, .9, '#5a6170', { seg: 10, shadow: true }); S.box(x - .16, x + .16, y + .72, y + .78, z - .16, z + .16, '#3c424c', {});
+  });
+  // обвязка брусом
+  const g = k(t, ST[0] + 3.4, .9); if (g > 0) {
+    const e = eOut(g);
+    S.box(-HX - .1, -HX - .1 + (2 * HX + .2) * e, .78, H0 - .02, HZ - .1, HZ + .1, '#c49a62', { shadow: true });
+    S.box(-HX - .1, -HX - .1 + (2 * HX + .2) * e, .78, H0 - .02, -HZ - .1, -HZ + .1, '#c49a62', { shadow: true });
+    S.box(-HX - .1, -HX + .1, .78, H0 - .02, -HZ, -HZ + 2 * HZ * e, '#c49a62', { shadow: true });
+    S.box(HX - .1, HX + .1, .78, H0 - .02, -HZ, -HZ + 2 * HZ * e, '#c49a62', { shadow: true });
+  }
+}
+function frame(t) {
+  const deck = k(t, ST[1], .7); if (deck > 0) S.box(-HX, -HX + 2 * HX * eOut(deck), H0 - .02, H0 + .03, -HZ, HZ, '#d9b77c', { shadow: true });
+  // стойки по периметру
+  const studs = []; for (let x = -HX; x <= HX + .01; x += .8) { studs.push([x, HZ]); studs.push([x, -HZ]); } for (let z = -HZ + .8; z < HZ - .01; z += .8) { studs.push([HX, z]); studs.push([-HX, z]); }
+  studs.sort((a, b) => Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]));
+  const hideStuds = k(t, ST[1] + 3.6, 1.2) >= 1;
+  if (!hideStuds) studs.forEach(([x, z], i) => { const kk = k(t, ST[1] + .6 + i * .035, .35); if (kk <= 0) return; S.box(x - .05, x + .05, H0, H0 + WH * eOut(kk), z - .07, z + .07, '#e2c08a', { shadow: true }); });
+  const plate = k(t, ST[1] + 2.4, .4); if (plate > 0 && !hideStuds) for (const [a, b, c, d] of [[-HX, HX, HZ - .07, HZ + .07], [-HX, HX, -HZ - .07, -HZ + .07], [HX - .07, HX + .07, -HZ, HZ], [-HX - .07, -HX + .07, -HZ, HZ]]) S.box(a, b, TOP - .1 * plate, TOP, c, d, '#d8b479', {});
+  // утеплитель и обшивка OSB (+ фасад позже)
+  const ins = k(t, ST[1] + 2.8, .8), osb = k(t, ST[1] + 3.6, 1.2), clad = k(t, ST[3], 1.6);
+  const wallCol = clad > 0 ? null : '#d6b071';
+  const walls = [[-HX, HX, HZ, HZ + .14, 'z'], [-HX, HX, -HZ - .14, -HZ, 'z'], [HX, HX + .14, -HZ, HZ, 'x'], [-HX - .14, -HX, -HZ, HZ, 'x']];
+  if (ins > 0 && osb < 1) walls.forEach(([a, b, c, d]) => S.box(a + .02, b - .02, H0, H0 + WH * eOut(ins), c + .01, d - .01, '#f2cf55', { alpha: .9 }));
+  if (osb > 0) walls.forEach(([a, b, c, d, ax], wi) => {
+    const e = eOut(clamp(osb * 1.4 - wi * .12));
+    const h = WH * e;
+    const cc = clad > 0 ? (clamp(clad * 1.3 - wi * .1) > .5 ? '#c98d5a' : '#d6b071') : wallCol;
+    S.box(a, b, H0, H0 + h, c, d, cc, { shadow: true, side: cc });
+  });
+  // горизонтальные ламели имитации бруса
+  if (clad > .3) for (let y = H0 + .2; y < TOP; y += .2) { S.line([[-HX, y, HZ + .15], [HX, y, HZ + .15]], { color: 'rgba(110,60,25,.35)', w: 1 }); S.line([[HX + .15, y, -HZ], [HX + .15, y, HZ]], { color: 'rgba(110,60,25,.35)', w: 1 }); }
+}
+function roof(t) {
+  // фермы (под готовыми листами кровли не рисуем)
+  const shk = k(t, ST[2] + 1.6, 1.6), covered = -HX - .6 + (2 * HX + 1.2) * eOut(shk);
+  for (let i = 0; i <= 10; i++) {
+    const x = -HX - .3 + i * (2 * HX + .6) / 10, kk = k(t, ST[2] + i * .12, .35); if (kk <= 0 || (shk > 0 && x < covered - .05)) continue;
+    const y = TOP + (1 - eOut(kk)) * 3;
+    S.poly([[x, y, HZ + .6], [x, y + RIDGE - TOP, 0], [x, y, -HZ - .6]], '#e3c48f', { two: true, alpha: .95 });
+  }
+  const sh = k(t, ST[2] + 1.6, 1.6); if (sh > 0) {
+    const e = eOut(sh), x1 = -HX - .6 + (2 * HX + 1.2) * e;
+    const col = '#6e2b2b';
+    S.poly([[-HX - .6, TOP - .05, HZ + .8], [x1, TOP - .05, HZ + .8], [x1, RIDGE + .05, 0], [-HX - .6, RIDGE + .05, 0]], col, { center: [0, 0, 0], shadow: true });
+    S.poly([[-HX - .6, TOP - .05, -HZ - .8], [-HX - .6, RIDGE + .05, 0], [x1, RIDGE + .05, 0], [x1, TOP - .05, -HZ - .8]], col, { center: [0, 0, 0], shadow: true });
+    // фронтон
+    if (e > .99) for (const x of [-HX - .1, HX + .1]) S.poly([[x, TOP, HZ], [x, RIDGE - .1, 0], [x, TOP, -HZ]], '#c98d5a', { two: true });
+    for (let x = -HX; x <= x1; x += .45) { S.line([[x, TOP - .04, HZ + .82], [x, RIDGE + .06, 0]], { color: 'rgba(40,10,10,.35)', w: 1 }); }
+  }
+}
+function openings(t, lights) {
+  const W = [[-3.2, HZ + .15, 'z'], [0, HZ + .15, 'z'], [3.2, HZ + .15, 'z'], [HX + .15, -2.5, 'x'], [HX + .15, 2.5, 'x']];
+  W.forEach(([a, b, ax], i) => {
+    const kk = k(t, ST[3] + .8 + i * .2, .4); if (kk <= 0) return;
+    const s = back(kk) * .7, y0 = H0 + 1.0, y1 = H0 + 2.3;
+    const col = lights ? '#ffd27a' : '#35577a';
+    if (ax === 'z') { S.box(a - s - .08, a + s + .08, y0 - .08, y1 + .08, b, b + .06, '#ffffff', {}); S.box(a - s, a + s, y0, y1, b + .06, b + .08, col, { emit: lights > .5 }); }
+    else { S.box(a, a + .06, y0 - .08, y1 + .08, b - s - .08, b + s + .08, '#ffffff', {}); S.box(a + .06, a + .08, y0, y1, b - s, b + s, col, { emit: lights > .5 }); }
+  });
+  const d = k(t, ST[3] + 1.9, .4); if (d > 0) { S.box(1.6, 2.6, H0, H0 + 2.1 * eOut(d), HZ + .15, HZ + .23, '#5b3a24', {}); S.box(1.5, 2.7, .5, H0, HZ + .2, HZ + 1.2, '#8b6a4a', {}); }
+}
+window.render = function (t) {
+  const night = clamp((t - FIN + .4) / 1.2);
+  const yaw = .55 + t * .055, pitch = .42 - night * .08, dist = 55 - 7 * eOut(t / 2) - Math.min(t, FIN) * .35 + (t > SHARE ? (t - SHARE) * 1.5 : 0);
+  S.camera([0, 1.2, 0], yaw, pitch, dist, 40);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960);
+  const sky = [lerp(120, 30, night), lerp(180, 40, night), lerp(235, 90, night)], hor = [lerp(235, 245, night), lerp(240, 150, night), lerp(245, 110, night)];
+  g.addColorStop(0, `rgb(${sky.map((v) => v | 0)})`); g.addColorStop(.55, `rgb(${hor.map((v) => v | 0)})`); g.addColorStop(1, '#3d5a33');
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = [lerp(210, 120, night), lerp(225, 100, night), lerp(240, 120, night)]; S.fog = [40, 110]; S.L = M3.norm([-.5, .8, .45]);
+  S.amb = lerp(.55, .38, night); S.dif = lerp(.55, .3, night); S.tint = [1, lerp(1, .9, night), lerp(1, .95, night)]; S.ao = .3; S.aoH = 1.6; S.shadowA = lerp(.28, .1, night);
+  land(t); piles(t); frame(t); if (t > ST[2] - .1) roof(t); openings(t, night);
+  S.render();
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  // искры/пыль на каждом новом элементе
+  const glows = [];
+  if (night > .3) for (const p of [[-3.2, 2.5, HZ + .2], [0, 2.5, HZ + .2], [3.2, 2.5, HZ + .2], [HX + .2, 2.5, -2.5], [HX + .2, 2.5, 2.5]]) { const q = S.proj(p); glows.push([q[0], q[1], 60, `rgba(255,190,90,${.45 * night})`]); }
+  // звёзды ночью
+  if (night > 0) for (let i = 0; i < 60; i++) { FX.fillStyle = `rgba(255,255,255,${night * (.4 + R(i) * .6) * (.6 + .4 * Math.sin(t * 3 + i))})`; FX.fillRect(R(i + 1) * 540, R(i + 2) * 300, 1.6, 1.6); }
+  PFX.apply(x, t, { bloom: .16 + night * .1, glows, vignette: .38 });
+
+  $('hook').innerHTML = 'Дом 10×10 в 2026 —<br><b>сколько стоит?</b> 🏡<br>Досмотри до цифры';
+  $('hook').style.opacity = win(t, 0, 2.4, .01, .25);
+  $('hook').style.transform = `scale(${1.05 + Math.sin(t * 9) * .025 - eOut(t / .3) * .05})`;
+  // счётчик
+  let si = -1; for (let i = 0; i < 4; i++) if (t >= ST[i]) si = i;
+  const prev = si > 0 ? CUM[si - 1] : 0, cur = si >= 0 ? lerp(prev, CUM[si], eOut((t - ST[si] - .3) / (si === 0 ? 3.6 : 2.6))) : 0;
+  $('money').innerHTML = `${fmt(Math.max(0, cur))} ₽`;
+  $('money').style.opacity = win(t, .3, SHARE, .15, .2);
+  const mb = si >= 0 && t - ST[si] < .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('money').style.transform = `scale(${1 + mb * .14})`;
+  $('meta').style.opacity = win(t, 2.4, SHARE, .2, .2);
+  // карточка этапа
+  const card = $('card');
+  if (si >= 0 && t < FIN) {
+    if (card._i !== si) { card._i = si; card.querySelector('.i').textContent = STAGES[si][0]; card.querySelector('.n').textContent = `${si + 1}. ${STAGES[si][1]}`; card.querySelector('.w').textContent = `+ ${fmt(STAGES[si][2])} ₽`; }
+    const end = si < 3 ? ST[si + 1] : FIN;
+    card.style.opacity = win(t, ST[si] + (si === 0 ? 2.0 : 0), end - .05, .15, .12);
+    card.style.transform = `translateX(${(1 - eOut((t - ST[si] - (si === 0 ? 2 : 0)) / .3)) * -50}px)`;
+  } else card.style.opacity = 0;
+  // итог
+  renderTag('tagGood', t, FIN + .3, SHARE - .05);
+  const bars = $('bars'); if (!bars.children.length) STAGES.forEach(([i, n, v]) => { bars.insertAdjacentHTML('beforeend', `<div class="bar"><i></i><span><b>${i} ${n}</b><em>${(v / 1000).toFixed(0)} тыс</em></span></div>`); });
+  bars.style.opacity = win(t, FIN + .4, SHARE, .2, .2);
+  [...bars.children].forEach((b, i) => { b.firstElementChild.style.width = `${eOut((t - FIN - .5 - i * .2) / .5) * STAGES[i][2] / STAGES[1][2] * 100}%`; });
+  $('note').style.opacity = win(t, 2.4, SHARE, .2, .2);
+  $('dim').style.opacity = win(t, SHARE, END + .1, .3, .2) * .55;
+  $('share').style.opacity = win(t, SHARE, END + .1, .15, .2);
+  $('share').style.transform = `scale(${back((t - SHARE) / .4) + Math.sin(t * 7) * .015})`;
+  $('ask').style.opacity = win(t, SHARE + .6, END + .1, .2, .2);
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith([]);
+</script>
+</body></html>

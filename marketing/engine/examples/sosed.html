@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Почему слышно соседей 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#hook { top: 112px !important; font-size: 42px !important; }
+#db { position: absolute; left: 22px; top: 100px; z-index: 20; width: 150px; padding: 10px 12px; border-radius: 18px; background: rgba(8,12,22,.82); border: 2px solid rgba(255,255,255,.18); color: #fff; font-family: 'PT', 'Noto Color Emoji'; opacity: 0; box-shadow: 0 10px 26px rgba(0,0,0,.4); }
+#db .v { font-family: 'PTN'; font-size: 54px; line-height: 1; }
+#db .u { font-size: 18px; color: #b9c6d8; }
+#db .bar { height: 10px; border-radius: 6px; background: rgba(255,255,255,.15); margin-top: 8px; overflow: hidden; }
+#db .bar i { display: block; height: 100%; border-radius: 6px; }
+#card { position: absolute; left: 22px; right: 22px; top: 700px; z-index: 20; background: rgba(255,255,255,.97); border-radius: 22px; padding: 14px 18px 16px; box-shadow: 0 14px 34px rgba(0,0,0,.4); opacity: 0; border-left: 10px solid #e5383b; }
+#card.fix { border-left-color: #2fa36b; }
+#card .n { font-family: 'PT', 'Noto Color Emoji'; font-size: 31px; color: #0d2440; line-height: 1.08; }
+#card .w { font-family: 'PTR', 'Noto Color Emoji'; font-size: 24px; color: #334; margin-top: 5px; line-height: 1.18; }
+#nich { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); z-index: 21; background: #0d2440; color: #FFD43B; font-family: 'PTN', 'Noto Color Emoji'; font-size: 24px; padding: 6px 14px; border-radius: 12px; white-space: nowrap; border: 2px solid #FFD43B; }
+#share { position: absolute; left: 20px; right: 20px; top: 300px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 48px; line-height: 1.1; color: #fff; -webkit-text-stroke: 8px #000; paint-order: stroke fill; opacity: 0; }
+#share b { color: #FFD43B; }
+#ask { position: absolute; left: 20px; right: 20px; top: 560px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 34px; color: #fff; -webkit-text-stroke: 7px #000; paint-order: stroke fill; opacity: 0; }
+#dim { position: absolute; inset: 0; background: #070b14; opacity: 0; z-index: 21; }
+.side { position: absolute; z-index: 15; font-family: 'PT', 'Noto Color Emoji'; font-size: 20px; color: #fff; background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 10px; transform: translate(-50%, -50%); opacity: 0; white-space: nowrap; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="nich">🤫 9 из 10 думают, что дело в стене</div>
+<div id="db"><div class="u">у вас слышно</div><div class="v">58</div><div class="u">дБ ≈</div><div class="bar"><i></i></div></div>
+<div id="sMe" class="side">🛏 вы</div>
+<div id="sHim" class="side">🔊 сосед</div>
+<div id="card"><div class="n"></div><div class="w"></div></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ −20 дБ: на слух в 4 раза тише</div>
+<div id="dim"></div>
+<div id="share">📩 Отправь соседу 😅<br>или тому, кому <b>мешают спать</b></div>
+<div id="ask">Что слышно у вас? 👇</div>
+<div id="hook" class="cap"></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🤫</div><div class="logo">СМЕТА PRO</div><div class="l2">Шумоизоляция квартиры —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">День бесплатно + 12 дней за подписку на Instagram</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script>
+window.DUR = 23.6;
+const A = 2.6, XR = 4.2, LD = 2.6, L = [XR, XR + LD, XR + 2 * LD], F0 = XR + 3 * LD;
+const FD = [1.6, 1.6, 1.6, 2.4], F = [F0, F0 + 1.6, F0 + 3.2, F0 + 4.8], RES = F0 + 7.2, END = RES + 2.4;
+const DB = [58, 52, 47, 44, 38];
+const LEAKS = [
+  ['№1. Розетки спина к спине', 'в стене — <b>сквозная дыра</b>, звук идёт прямо в комнату', [0, .38, .9]],
+  ['№2. Щель у пола', 'между стеной и плитой перекрытия — <b>звуковой мост</b>', [0, .03, -.4]],
+  ['№3. Труба сквозь стену', 'вокруг трубы <b>пустота</b> — как открытая форточка', [0, .55, -1.45]],
+];
+const FIXES = [
+  ['Розетки', 'дыру — гипсом, подрозетники — <b>звукоизоляционные</b>'],
+  ['Примыкания', 'щели у пола и потолка — <b>акустический герметик</b>'],
+  ['Труба', 'гильза + <b>звукоизоляция</b> трубы и короб с минватой'],
+  ['Стена', 'каркас на <b>виброподвесах</b> + минвата + 2 слоя ГКЛ'],
+];
+const S = new M3.Scene($('cv'));
+const FX = $('fx').getContext('2d');
+const SPK = [2.7, .55, -1.3];
+const VIEW = { hook: [.18, .2, 9.5, 1.5, 1.0, 0], all: [.2, .3, 19, 0, 1.2, 0], l1: [.48, .16, 8.5, -.4, .6, .7], l2: [.62, .34, 9.5, -.4, .3, -.3], l3: [.36, .24, 9, -.4, .8, -1.2], fix: [-.5, .27, 13, -1.2, 1.1, 0], res: [.12, .32, 20, 0, 1.2, 0] };
+const K = (t, ...v) => [t, ...v];
+const CAM = [K(0, ...VIEW.hook), K(A - .2, .1, .2, 10.5, 1.3, 1.0, 0), K(A + .6, ...VIEW.all), K(L[0] - .1, .24, .3, 18, 0, 1.2, 0), K(L[0] + .6, ...VIEW.l1), K(L[1] - .1, ...VIEW.l1), K(L[1] + .6, ...VIEW.l2), K(L[2] - .1, ...VIEW.l2), K(L[2] + .6, ...VIEW.l3),
+  K(F0 - .1, ...VIEW.l3), K(F0 + .7, ...VIEW.fix), K(RES - .2, -.3, .27, 13.5, -.9, 1.0, 0), K(RES + 1.2, ...VIEW.res), K(99, .22, .32, 21, 0, 1.2, 0)];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+const fixK = (i, t) => clamp((t - F[i] - .2) / .6);
+
+function scene(t) {
+  const xr = clamp((t - A - .2) / .8) * (1 - clamp((t - RES) / .6) * .4); // рентген стены
+  // перекрытие и пол
+  S.box(-4.2, 4.2, -.35, 0, -2.2, 2.2, '#8b8f97', { top: '#b7a184' });
+  S.box(-4.2, -.15, 0, .01, -2.1, 2.1, '#c7b08f', {}); S.box(.15, 4.2, 0, .01, -2.1, 2.1, '#a98d6c', {});
+  // задняя стена (две квартиры)
+  S.box(-4.2, -.15, 0, 2.8, -2.4, -2.2, '#e8e1d6', { front: '#efe6da' });
+  S.box(.15, 4.2, 0, 2.8, -2.4, -2.2, '#d9e2ea', { front: '#dfe7ef' });
+  // общая стена-панель
+  S.box(-.15, .15, 0, 2.8, -2.2, 2.1, '#9ea3ab', { alpha: 1 - xr * .62, side: '#c9cdd3', bias: -.3 });
+  // соседняя комната: колонка, диван, ТВ
+  const beat = Math.max(0, Math.sin(t * 2 * Math.PI * 2)) ** 3 * (t < F[3] + 1 ? 1 : .2);
+  S.box(2.35, 3.05, 0, 1.25, -1.6, -1.0, '#1d2028', { shadow: true });
+  S.cyl('z', [2.7, .55, -.99 + beat * .03], .22 + beat * .03, .05, '#3a3f4b', { seg: 18, cap: '#555c6b' }); S.cyl('z', [2.7, 1.0, -.99], .1, .04, '#3a3f4b', { seg: 14, cap: '#555c6b' });
+  S.box(1.2, 3.6, 0, .45, .8, 1.7, '#d2573d', { shadow: true }); S.box(1.2, 3.6, .45, 1.0, 1.45, 1.75, '#c24a32', {});
+  S.box(.16, .2, 1.1, 1.8, -1.6, -.3, '#16181d', { emit: t % .5 < .25 && t < F[3] + 1 });
+  // ваша комната: кровать, тумба с лампой
+  S.box(-3.6, -1.2, 0, .5, -.6, 1.6, '#f3efe8', { shadow: true, side: '#e4ddd2' }); S.box(-3.6, -3.3, .5, 1.15, -.6, 1.6, '#8e7259', {});
+  S.box(-3.25, -2.6, .5, .66, -.4, 1.4, '#ffffff', {}); S.box(-2.6, -1.25, .5, .62, -.55, 1.55, '#7d9cc4', {});
+  S.box(-3.9, -3.4, 0, .6, -1.6, -1.05, '#a6876a', { shadow: true }); S.sphere([-3.65, .82, -1.3], .16, '#ffe2a2', { emit: true, seg: 10 });
+  // розетки с обеих сторон (напротив друг друга) + сквозная дыра
+  const fk = [0, 1, 2, 3].map((i) => fixK(i, t));
+  const wallX = -.15 - fk[3] * .6;
+  S.box(.15, .17, .3, .46, .82, .98, '#ffffff', {}); S.box(wallX - .02, wallX, .3, .46, .82, .98, '#ffffff', { bias: -2.5 });
+  if (xr > .1 && fk[0] < 1) S.cyl('x', [0, .38, .9], .05, .3, fk[0] > .5 ? '#d9d4ca' : '#1a0d0d', { seg: 12, bias: -.4 });
+  // труба сквозь стену
+  S.cyl('x', [.9, .55, -1.45], .08, 1.5, '#e9edf2', { seg: 14 });
+  S.cyl('y', [1.65, 1.4, -1.45], .1, 2.8, '#e9edf2', { seg: 14 });
+  if (fk[2] > 0) S.cyl('x', [-.05, .55, -1.45], .08 + .07 * fk[2], .4, '#d8c46a', { seg: 14 }); // изоляция трубы
+  if (fk[2] > .5) S.box(1.4, 1.9, 0, 2.8, -1.75, -1.2, '#f2f2ee', { alpha: .9 * (fk[2] - .5) * 2 });
+  // каркас шумоизоляции на вашей стороне
+  if (fk[3] > 0) {
+    const k = fk[3], n = 7;
+    for (let i = 0; i < n; i++) { const z = -2.1 + i * (4.2 / (n - 1)), h = 2.8 * clamp(k * 3 - i * .15); if (h > .02) S.box(-.55, -.5, 0, h, z - .03, z + .03, '#b7c0cc', {}); }
+    const w = clamp((t - F[3] - .9) / .5); if (w > 0) S.box(-.5, -.17, 0, 2.8 * w, -2.1, 2.1, '#f0c94e', { alpha: .95, bias: -.3 });
+    const g1 = clamp((t - F[3] - 1.4) / .4), g2 = clamp((t - F[3] - 1.8) / .4);
+    if (g1 > 0) S.box(-.68, -.55, 0, 2.8, -2.1, -2.1 + 4.2 * g1, '#f7f6f2', { bias: -1.5 });
+    if (g2 > 0) S.box(-.76, -.68, 0, 2.8, -2.1, -2.1 + 4.2 * g2, '#ffffff', { bias: -2 });
+  }
+  return { xr, beat, fk };
+}
+let wallSX = 270;
+function sound(t, st) {
+  const { beat, fk } = st, leakOn = [fk[0] < .6, fk[1] < .6, fk[2] < .6], loud = t < F[3] + 1.2;
+  const sp = S.proj(SPK), w0 = S.proj([0, 1.4, 0]); wallSX = w0[0];
+  // кольца звука на стороне соседа (обрезаны стеной)
+  FX.save(); FX.beginPath(); FX.rect(w0[0], 0, 540, 960); FX.clip();
+  for (let i = 0; i < 6; i++) { const k = ((t * .9 + i / 6) % 1); FX.strokeStyle = `rgba(255,120,80,${(1 - k) * (loud ? .55 : .15)})`; FX.lineWidth = 4; FX.beginPath(); FX.ellipse(sp[0], sp[1], 30 + k * 300, (30 + k * 300) * .55, 0, 0, 7); FX.stroke(); }
+  FX.restore();
+  // ноты над колонкой
+  if (loud) for (let i = 0; i < 6; i++) { const k = ((t * .6 + i / 6) % 1); FX.globalAlpha = 1 - k; FX.font = '28px "Noto Color Emoji"'; FX.fillText(i % 2 ? '🎵' : '🎶', sp[0] - 20 + Math.sin(i * 3 + t * 2) * 30, sp[1] - 40 - k * 160); }
+  FX.globalAlpha = 1;
+  // струи звука через утечки на вашу сторону
+  LEAKS.forEach(([, , p], i) => {
+    if (!leakOn[i] || t < A) return;
+    const focus = t >= L[i] && t < L[i] + LD, a = focus ? 1 : .55;
+    for (let j = 0; j < 9; j++) {
+      const k = ((t * 1.1 + j / 9 + i * .3) % 1), q = S.proj([.15 - k * 2.2, p[1] + Math.sin(j * 2 + k * 6) * .25 * k, p[2] + Math.cos(j * 3) * .5 * k]);
+      FX.fillStyle = `rgba(255,${80 + 60 * k | 0},60,${(1 - k) * a})`; FX.beginPath(); FX.arc(q[0], q[1], (focus ? 7 : 5) * (1 - k * .5), 0, 7); FX.fill();
+    }
+    if (focus || t < L[0]) { const q = S.proj(p), pul = 1 + Math.sin(t * 10) * .2; FX.strokeStyle = 'rgba(255,60,60,.95)'; FX.lineWidth = 4; FX.beginPath(); FX.arc(q[0], q[1], 22 * pul, 0, 7); FX.stroke(); }
+  });
+  // эмоция на кровати
+  const bed = S.proj([-2.2, 1.2, .5]), calm = t > F[3] + 1.6;
+  FX.font = `${calm ? 44 : 50 + beat * 8}px "Noto Color Emoji"`; FX.fillText(calm ? '😴' : '😫', bed[0] - 25, bed[1]);
+  if (calm) { FX.font = '700 26px PT'; FX.fillStyle = '#fff'; FX.fillText('z', bed[0] + 30, bed[1] - 30 - (t * 20 % 30)); }
+}
+window.render = function (t) {
+  const cam = camAt(t);
+  // удар баса — лёгкая тряска камеры до тишины
+  const shake = t < F[3] + 1 ? Math.max(0, Math.sin(t * 2 * Math.PI * 2)) ** 6 * .035 : 0;
+  S.camera([cam[4], cam[5] + shake, cam[6]], cam[1], cam[2], cam[3], 40);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const night = clamp((t - RES + .5) / 1);
+  const g = x.createLinearGradient(0, 0, 0, 960); g.addColorStop(0, night ? '#0f1830' : '#1b2233'); g.addColorStop(1, '#2c3a55');
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = [30, 40, 60]; S.fog = [25, 70]; S.L = M3.norm([.25, .85, .6]); S.amb = .56; S.dif = .5; S.ao = .38; S.aoH = 1.2; S.shadowA = .3;
+  const st = scene(t);
+  S.render();
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  sound(t, st);
+  const lamp = S.proj([-3.65, .82, -1.3]);
+  PFX.apply(x, t, { bloom: .18, glows: [[lamp[0], lamp[1], 70, 'rgba(255,200,120,.35)']], vignette: .45 });
+
+  $('hook').innerHTML = 'Слышно, как сосед<br><b>чихает</b>? 🤧<br>Звук идёт <b>не через стену</b>';
+  $('hook').style.opacity = win(t, 0, A - .1, .01, .25);
+  $('hook').style.transform = `scale(${1.05 + Math.sin(t * 4 * Math.PI) * .025 - eOut(t / .3) * .05})`;
+  $('nich').style.opacity = win(t, A, END, .3, .2);
+  // шумомер
+  let di = 0; for (let i = 0; i < 4; i++) if (t > F[i] + .8) di = i + 1;
+  const dv = DB[di] + (t < F[3] + 1 ? st.beat * 3 : 0);
+  $('db').style.opacity = win(t, A, RES + 2.2, .2, .2);
+  $('db').querySelector('.v').textContent = Math.round(dv);
+  const bi = $('db').querySelector('.bar i'); bi.style.width = `${clamp((dv - 25) / 40) * 100}%`; bi.style.background = dv > 50 ? '#e5383b' : dv > 42 ? '#f4a62a' : '#2fa36b';
+  $('db').style.transform = `scale(${1 + (t > F[di - 1] + .8 && t < F[di - 1] + 1.1 ? .12 : 0)})`;
+  // подписи сторон
+  const pm = S.proj([-2.2, 2.3, 1.6]), ph = S.proj([2.2, 2.3, 1.6]);
+  for (const [id, p] of [['sMe', pm], ['sHim', ph]]) { const el = $(id); el.style.left = p[0] + 'px'; el.style.top = p[1] + 'px'; el.style.opacity = win(t, A + .3, RES, .3, .3); }
+  // карточки
+  const card = $('card'); let ci = -1, fix = false;
+  for (let i = 0; i < 3; i++) if (t >= L[i]) ci = i;
+  for (let i = 0; i < 4; i++) if (t >= F[i]) { ci = i; fix = true; }
+  const ct = fix ? F[ci] : L[ci], cdur = fix ? FD[ci] : LD;
+  if (ci >= 0 && t < RES) {
+    const key = (fix ? 'f' : 'l') + ci;
+    if (card._k !== key) { card._k = key; card.className = fix ? 'fix' : ''; card.querySelector('.n').innerHTML = fix ? `✅ ${FIXES[ci][0]}` : `🔴 ${LEAKS[ci][0]}`; card.querySelector('.w').innerHTML = fix ? FIXES[ci][1] : LEAKS[ci][1]; }
+    card.style.opacity = win(t, ct, ct + cdur - .05, .12, .1);
+    card.style.transform = `translateY(${(1 - eOut((t - ct) / .3)) * 40}px)`;
+  } else card.style.opacity = 0;
+  renderTag('tagGood', t, F[3] + 1.8, RES + .1);
+  $('dim').style.opacity = win(t, RES, END + .1, .3, .2) * .55;
+  $('share').style.opacity = win(t, RES, END + .1, .15, .2);
+  $('share').style.transform = `scale(${back((t - RES) / .4) + Math.sin(t * 7) * .015})`;
+  $('ask').style.opacity = win(t, RES + .7, END + .1, .2, .2);
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith([]);
+</script>
+</body></html>

@@ -63,7 +63,7 @@ async function refreshToken(log: any) {
 }
 
 // ---------- очередь роликов ----------
-interface Item { id: string; video: string; caption: string; title?: string }
+interface Item { id: string; video: string; caption: string; title?: string; at?: string }
 function queue(): Item[] {
   if (!fs.existsSync(QUEUE_DIR)) return [];
   return fs.readdirSync(QUEUE_DIR).filter((f) => f.endsWith('.json')).sort().flatMap((f) => {
@@ -91,6 +91,7 @@ const slotText = (t: number) => {
   const diff = Math.round((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())) / 864e5);
   return `${diff === 0 ? 'сегодня' : diff === 1 ? 'завтра' : d.toISOString().slice(8, 10) + '.' + d.toISOString().slice(5, 7)} в ${d.getUTCHours()}:00`;
 };
+const slotTextExact = (t: number) => { const d = new Date(t + 3 * 3600e3); return `${slotText(t).split(' в ')[0]} в ${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
 const notifyAll = (bot: Bot, text: string, extra: any = {}) =>
   Promise.all(reportTo().map((id) => bot.api.sendMessage(Number(id), text, { link_preview_options: { is_disabled: true }, ...extra }).catch(() => null)));
 
@@ -100,15 +101,18 @@ async function offerNew(bot: Bot, log: any) {
     if (!fs.existsSync(videoPath(it))) continue;
     const auto = (await autoOn()) && (await igEnabled());
     const taken = (await prisma.appKV.findMany({ where: { key: { startsWith: 'ig:item:' }, value: { startsWith: 'scheduled:' } } })).map((r) => Number(r.value.split(':')[1]));
-    const at = nextSlot(Date.now(), taken);
-    if (!(await kvClaim(`ig:item:${it.id}`, auto ? `scheduled:${at}` : 'offered'))) continue;
-    const kb = auto
+    // точное время из json («at»: ISO) — по просьбе владелицы, ставим в расписание даже без автопубликации
+    const fixed = it.at && Date.parse(it.at) > Date.now() - 3600e3 ? Date.parse(it.at) : 0;
+    const at = fixed || nextSlot(Date.now(), taken);
+    const sched = auto || (fixed > 0 && (await igEnabled()));
+    if (!(await kvClaim(`ig:item:${it.id}`, sched ? `scheduled:${at}` : 'offered'))) continue;
+    const kb = sched
       ? new InlineKeyboard().text('🚫 Не публиковать', `ig:skip:${it.id}`).text('⚡ Сейчас', `ig:pub:${it.id}`)
       : new InlineKeyboard().text('✅ Опубликовать', `ig:pub:${it.id}`).text('🚫 Не публиковать', `ig:skip:${it.id}`);
     for (const id of reportTo()) {
       const { InputFile } = await import('grammy');
       await bot.api.sendVideo(Number(id), new InputFile(videoPath(it)), {
-        caption: `🎬 <b>Новый ролик для Instagram</b>${it.title ? ` — ${esc(it.title)}` : ''}\n${auto ? `🤖 Выйдет сам ${slotText(at)}. Ничего делать не нужно.` : ''}\n\n${esc(it.caption).slice(0, 700)}`,
+        caption: `🎬 <b>Новый ролик для Instagram</b>${it.title ? ` — ${esc(it.title)}` : ''}\n${sched ? `🤖 Выйдет сам ${fixed ? slotTextExact(at) : slotText(at)}. Ничего делать не нужно.` : ''}\n\n${esc(it.caption).slice(0, 700)}`,
         parse_mode: 'HTML', reply_markup: kb, supports_streaming: true,
       }).catch((e: any) => log.error({ err: e }, 'ig offer'));
     }
@@ -119,10 +123,16 @@ async function offerNew(bot: Bot, log: any) {
 async function publishDue(bot: Bot, log: any) {
   const rows = await prisma.appKV.findMany({ where: { key: { startsWith: 'ig:item:' }, value: { startsWith: 'scheduled:' } } });
   for (const r of rows) {
-    if (Number(r.value.split(':')[1]) > Date.now()) continue;
     const id = r.key.slice('ig:item:'.length);
     const it = queue().find((x) => x.id === id);
     if (!it) { await kvSet(r.key, 'skipped'); continue; }
+    // время в json («at») главнее слота из расписания — так можно перенести уже запланированный ролик
+    const fixed = it.at ? Date.parse(it.at) : NaN;
+    if (Number.isFinite(fixed) && fixed !== Number(r.value.split(':')[1])) {
+      const moved = await prisma.appKV.updateMany({ where: { key: r.key, value: r.value }, data: { value: `scheduled:${fixed}` } });
+      if (moved.count) { r.value = `scheduled:${fixed}`; await notifyAll(bot, `🗓 «${it.title || it.id}» перенесён: выйдет ${slotTextExact(fixed)}`); }
+    }
+    if (Number(r.value.split(':')[1]) > Date.now()) continue;
     await publishItem(bot, it, r.value, log);
   }
 }
