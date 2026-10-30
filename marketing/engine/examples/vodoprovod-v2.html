@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Замёрз водопровод 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+.tag.err { background: #fff; color: #c1121f; border: 3px solid #e5383b; }
+.lbl { position: absolute; z-index: 14; transform: translate(-50%, -100%); font-family: 'PT', 'Noto Color Emoji'; font-size: 19px; color: #0d2440; background: rgba(255,255,255,.93); padding: 4px 10px; border-radius: 10px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.25); opacity: 0; }
+.lbl.y { background: #FFD43B; } .lbl.b { background: #d6ecff; } .lbl.r { background: #ffe1e1; color: #a1121f; } .lbl.g { background: #d9f7e3; color: #11643a; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="lFrost" class="lbl b">❄️ граница промерзания</div>
+<div id="lNo" class="lbl r">🚰 воды нет</div>
+<div id="lIce" class="lbl b">🧊 ледяная пробка</div>
+<div id="lDepth" class="lbl y">📏 ниже промерзания ~1,5 м</div>
+<div id="lSand" class="lbl">песок 10 см</div>
+<div id="lIns" class="lbl">утеплитель-скорлупа</div>
+<div id="lCab" class="lbl y">🔥 греющий кабель</div>
+<div id="lCais" class="lbl">утеплённый кессон</div>
+<div id="lYes" class="lbl g">🚰 вода есть</div>
+<div id="dimD" style="position:absolute;inset:0;background:#06101f;opacity:0;z-index:11"></div>
+<div id="tagBad" class="tag bad" style="left:24px;top:150px">❌ ТРУБА ВЫШЕ ПРОМЕРЗАНИЯ</div>
+<div id="tagBad2" class="tag err" style="left:24px;top:212px;font-size:23px">🥶 вода замёрзла, трубу рвёт</div>
+<div id="step" class="tag info" style="left:24px;top:150px">ШАГ 1 из 5</div>
+<div id="info" class="tag good" style="left:24px;top:212px;font-size:24px"></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ −30 °C — ВОДА ЕСТЬ</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="phone"><div class="scr"><img id="imA"><img id="imB"><div id="tap"></div></div></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">❄️</div><div class="logo">СМЕТА PRO</div><div class="l2">Водопровод от скважины —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">14 дней — всё бесплатно</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script>
+window.DUR = 28.5;
+const A = 2.2, B = 8.1, SD = 2.6;
+const ST = [...Array(5)].map((_, i) => 8.3 + i * SD);
+const FIN = 8.3 + 5 * SD, PHONE = FIN + 2.6, END = PHONE + 2.0;
+const STEPS = [
+  ['Траншея <b>ниже промерзания</b> —<br>в Ленобласти ~1,5 м', '📏 глубина ~1,5 м'],
+  ['На дно — <b>песчаная подушка</b><br>10 см', '🟨 песок 10 см'],
+  ['Труба ПНД —<br>в <b>утеплителе</b>', '🧣 скорлупа ЭППС'],
+  ['Вдоль трубы —<br><b>греющий кабель</b>', '🔥 саморегулирующийся'],
+  ['<b>Утеплённый кессон</b>,<br>ввод в дом — в гильзе', '🏠 ввод в гильзе'],
+];
+const SUBS = [
+  [A + .1, 5.0, 'Трубу от скважины положили<br>всего на <b>60 см</b>…'],
+  [5.0, B - .1, '…мороз ушёл глубже —<br><b>вода в трубе замёрзла</b> 🧊'],
+  ...STEPS.map(([s], i) => [ST[i] + .1, (ST[i + 1] || FIN) - .05, `<b>${i + 1}.</b> ${s}`]),
+  [FIN + .1, PHONE, 'Вода есть всю зиму ✅<br>📩 <b>Перешли соседу со скважиной</b>'],
+  [PHONE + .1, END, 'Смета на водопровод<br>от скважины — <b>за 2 минуты</b>'],
+];
+const SCREENS = [[PHONE + .1, '2dirs', 130, 300], [PHONE + 1.0, '5result', 120, 470]];
+const K = (t, ...v) => [t, ...v];
+const VIEW = {
+  s1: [.6, .42, 15, -3, -1.2, -1.2], s2: [.5, .35, 10, -2, -1.9, -1.1], s3: [.62, .3, 9, -3, -1.7, -1.1],
+  s4: [.45, .28, 8, -3, -1.7, -1.1], s5: [.75, .3, 11, 1.5, -1, -1.1], fin: [.8, .36, 17, -4, -.6, -1.5],
+};
+const CAM = [
+  [0, .85, .38, 16.5, -4, -.6, -1.5], [A, .75, .35, 15, -3.5, -.8, -1.3], [B - .02, .7, .33, 14, -3, -.8, -1.2],
+  K(B, ...VIEW.s1), K(ST[1] - .2, ...VIEW.s1), K(ST[1] + .4, ...VIEW.s2), K(ST[2] - .2, ...VIEW.s2), K(ST[2] + .4, ...VIEW.s3), K(ST[3] - .2, ...VIEW.s3),
+  K(ST[3] + .4, ...VIEW.s4), K(ST[4] - .2, ...VIEW.s4), K(ST[4] + .4, ...VIEW.s5), K(FIN - .2, ...VIEW.s5), K(FIN + .5, ...VIEW.fin), [99, .86, .36, 17, -4, -.6, -1.5],
+];
+function camAt(t) { let i = 0; while (i < CAM.length - 2 && t >= CAM[i + 1][0]) i++; const a = CAM[i], b = CAM[i + 1], k = b[0] - a[0] < .05 ? 1 : ease((t - a[0]) / (b[0] - a[0])); return a.map((v, j) => lerp(v, b[j], k)); }
+
+const S = new M3.Scene($('cv'));
+const SOIL = { top: '#4e3420', mid: '#a17549', deep: '#7e5a39' }, GRASS = '#7d9b5f', SNOW = '#f4f8fc';
+const TX0 = -10, TX1 = 4.8, TZ = -2.2, TD = -2.0, PZ = -1.1;
+function soil(dig, snowH) {
+  const layers = [[-.35, 0, SOIL.top], [-1.6, -.35, SOIL.mid], [-3.2, -1.6, SOIL.deep]];
+  const blk = (x0, x1, z0, z1, yb = -3.2, yt = 0) => layers.forEach(([y0, y1, c]) => { const a = Math.max(y0, yb), b = Math.min(y1, yt); if (b - a < .01) return; S.box(x0, x1, a, b, z0, z1, c, { top: b >= -.001 ? (snowH > .05 ? SNOW : GRASS) : c, groundTop: b >= -.001 }); });
+  blk(-19, TX0, -10, 0); blk(TX1, 9, -10, 0); blk(TX0, TX1, -10, TZ); blk(TX0, TX1, TZ, 0, -3.2, TD);
+  const top = lerp(0, TD, dig); if (top - TD > .02) blk(TX0, TX1, TZ, 0, TD, top);
+}
+function tree(x, z, s = 1) { S.cyl('y', [x, .5 * s, z], .14 * s, 1 * s, '#7a5230', { shadow: true, seg: 7 }); S.cone([x, .8 * s, z], .9 * s, 2.6 * s, '#3b6e45', { shadow: true }); S.cone([x, 2 * s, z], .65 * s, 1.8 * s, '#477d50', { shadow: true }); S.cone([x, 3.1 * s, z], .35 * s, .8 * s, '#f4f8fc', {}); }
+function house(snowR) {
+  const x0 = -15.5, x1 = -10.5, z0 = -8, z1 = -3, xm = (x0 + x1) / 2, cr = [xm, 4, -5.5], roof = snowR ? '#eef4fa' : '#8a4b3a', yr = 3.2, yt = 5.1;
+  S.box(x0, x1, 0, 3.2, z0, z1, '#e9dcc9', { shadow: true });
+  S.poly([[x0 - .3, yr, z1 + .3], [xm, yt, z1 + .3], [xm, yt, z0 - .3], [x0 - .3, yr, z0 - .3]], roof, { center: cr, shadow: true });
+  S.poly([[xm, yt, z1 + .3], [x1 + .3, yr, z1 + .3], [x1 + .3, yr, z0 - .3], [xm, yt, z0 - .3]], roof, { center: cr, shadow: true });
+  S.poly([[x0, yr, z1], [x1, yr, z1], [xm, yt, z1]], '#ddcdb5', { center: cr }); S.poly([[x0, yr, z0], [xm, yt, z0], [x1, yr, z0]], '#ddcdb5', { center: cr });
+  for (const wx of [-14.7, -12.9]) S.poly([[wx, 1.1, z1 + .02], [wx + 1.1, 1.1, z1 + .02], [wx + 1.1, 2.3, z1 + .02], [wx, 2.3, z1 + .02]], '#ffd27a', { two: true, emit: true, bias: -.1 });
+}
+/** кессон и скважина; insulated — утеплён */
+function well(insulated, iceK) {
+  const cx = 3.6, cz = PZ;
+  S.cyl('y', [cx, -2.6, cz], .08, 1.4, '#5d6268', { seg: 10 });
+  S.cyl('y', [cx, -1.05, cz], .62, 2.1, '#3f7f5a', { alpha: .55, caps: false, seg: 26 });
+  if (insulated > .01) S.cyl('y', [cx, -1.05, cz], .7, 2.1 * insulated, '#f4a9c4', { alpha: .5, caps: false, seg: 26 });
+  if (iceK > .01) S.cyl('y', [cx, -2.05, cz], .58, .1 + iceK * .7, '#cfeeff', { alpha: .85, seg: 20 });
+  S.cyl('y', [cx, .12, cz], .32, .3, '#2f6b4a', { seg: 18, shadow: true });
+  S.cyl('y', [cx, .3, cz], .4, .06, '#245a3d', { seg: 18 });
+}
+
+const FX = $('fx').getContext('2d');
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = '−20° и из крана<br><b>ни капли</b>? 🥶<br>Виновата 1 ошибка';
+  $('hook').style.opacity = win(t, 0, A - .1, .01, .25);
+  $('hook').style.transform = `scale(${1.06 + Math.sin(t * 9) * .03 - eOut(t / .3) * .06})`;
+  const inB = t >= B, cam = camAt(t);
+  S.camera([cam[4], cam[5], cam[6]], cam[1], cam[2], cam[3]);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const winter = !inB ? 1 : clamp((t - FIN + .4) / .8);
+  const g = x.createLinearGradient(0, 0, 0, 960);
+  g.addColorStop(0, winter > .5 ? '#6f7fa8' : '#7fb8e8'); g.addColorStop(.55, winter > .5 ? '#c9cfe6' : '#cfe8f8'); g.addColorStop(1, '#f1f6fa');
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = winter > .5 ? [222, 230, 238] : [214, 234, 247]; S.tint = winter > .5 ? [.96, .99, 1.06] : [1, 1, 1];
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  const snowH = !inB ? clamp(t / 2) * .22 : winter * .22;
+
+  tree(-7, -9, 1.1); tree(-20, -8, 1.3); tree(6.5, -11, 1.2); tree(-1, -12.5, 1); tree(11, -7, 1.1);
+  house(snowH > .05);
+  if (snowH > .01) S.box(-19, 9, 0, snowH, -10, 0, SNOW, { groundTop: true, alpha: 1 });
+
+  let frost = 0, pipeY, iceK = 0;
+  if (!inB) {
+    soil(1, snowH);
+    frost = lerp(.25, 1.5, ease((t - 1.0) / 6.2));
+    pipeY = -.6;
+    S.box(TX0, TX1, TD, -.35, TZ, 0, '#d9c08a', { alpha: .35 });
+    const frozen = clamp((frost - .55) / .25);
+    iceK = frozen;
+    S.cyl('x', [(TX0 + 3.0) / 2 - .2, pipeY, PZ], .1, 3.0 - TX0 + .4, frozen > .5 ? '#bfe6ff' : '#2b55a5', { seg: 12, bias: -40 });
+    S.cyl('y', [TX0 - .45, (pipeY + .4) / 2, PZ], .1, .4 - pipeY, '#2b55a5', { seg: 12, bias: -40 });
+    well(0, frozen);
+    // кристаллы льда на трубе
+    if (frozen > 0) for (let i = 0; i < 18; i++) { const px = lerp(TX0, 3, i / 17), q = S.proj([px, pipeY + .02, PZ + .1]); if (q[2] < .3) continue; const s = (4 + (i % 3) * 2) * frozen; FX.strokeStyle = 'rgba(255,255,255,.95)'; FX.lineWidth = 1.6; FX.beginPath(); for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; FX.moveTo(q[0] - Math.cos(a) * s, q[1] - Math.sin(a) * s); FX.lineTo(q[0] + Math.cos(a) * s, q[1] + Math.sin(a) * s); } FX.stroke(); }
+    placeLbl('lNo', [-13, 2.6, -3], win(t, 6.0, B - .2));
+    placeLbl('lIce', [-3.5, pipeY + .25, 0], win(t, 5.4, B - .2));
+  } else {
+    const dig = ease((t - ST[0] - .1) / 1.4);
+    soil(t < ST[0] ? 0 : dig, snowH);
+    frost = winter * lerp(.3, 1.42, ease((t - FIN) / 2.2));
+    pipeY = -1.78;
+    const sand = ease((t - ST[1] - .1) / .8);
+    if (sand > .01) S.box(TX0, TX1, TD, TD + .1 * sand, TZ, 0, '#e3c88a');
+    const pk = eOut((t - ST[2] - .1) / .7), shell = ease((t - ST[2] - .9) / .7);
+    if (pk > .01) {
+      const py = pipeY + (1 - pk) * 2.2;
+      S.cyl('x', [(TX0 + 3.0) / 2 - .2, py, PZ], .1, 3.0 - TX0 + .4, '#2b55a5', { seg: 12, bias: -40 });
+      if (shell > .01) S.cyl('x', [(TX0 + 3.0) / 2 - .2, py, PZ], .22, (3.0 - TX0 + .4) * shell, '#f4a9c4', { seg: 14, alpha: .55, bias: -45 });
+    }
+    const cab = ease((t - ST[3] - .1) / 1.0);
+    if (cab > 0) S.line([[3.0, pipeY + .1, PZ + .12], [lerp(3.0, TX0 - .4, cab), pipeY + .1, PZ + .12]], { color: '#ff7a1a', w: 3, glow: 'rgba(255,140,40,.9)' });
+    const wk = t > ST[4] ? 1 : 0;
+    well(t > ST[4] ? ease((t - ST[4] - .1) / .7) : 0, 0);
+    if (t > ST[4] - .2 || t < 0) {}
+    if (wk) {
+      const sl = ease((t - ST[4] - .7) / .5);
+      S.cyl('y', [TX0 - .45, (pipeY + .4) / 2, PZ], .1, .4 - pipeY, '#2b55a5', { seg: 12, bias: -40 });
+      if (sl > .01) S.cyl('y', [TX0 - .45, (pipeY + .4) / 2, PZ], .2, (.4 - pipeY) * sl, '#9aa0a6', { seg: 12, alpha: .6, bias: -45 });
+      const bf = ease((t - ST[4] - 1.2) / 1.0);
+      if (bf > .01) S.box(TX0, TX1, TD + .1, lerp(TD + .1, -.35, bf), TZ, 0, '#d9c08a', { alpha: .32 });
+      if (bf > .99) S.box(TX0, TX1, -.35, 0, TZ, 0, SOIL.top, { top: snowH > .05 ? SNOW : GRASS, groundTop: true, alpha: .9 });
+    }
+    if (t > FIN) S.line([[3.0, pipeY, PZ + .08], [TX0 - .4, pipeY, PZ + .08], [TX0 - .45, .3, PZ + .08]], { color: '#7cc4ff', w: 3, dash: [8, 12], offset: t * 40 });
+    placeLbl('lDepth', [0, -1.0, 0], win(t, ST[0] + .8, ST[1] - .1));
+    placeLbl('lSand', [-1, TD + .25, 0], win(t, ST[1] + .6, ST[2] - .1));
+    placeLbl('lIns', [-2, pipeY + .35, 0], win(t, ST[2] + 1.2, ST[3] - .1));
+    placeLbl('lCab', [-3, pipeY + .4, 0], win(t, ST[3] + .8, ST[4] - .1));
+    placeLbl('lCais', [3.6, .8, PZ], win(t, ST[4] + .7, FIN - .1));
+    placeLbl('lYes', [-13, 2.6, -3], win(t, FIN + .9, PHONE - .1));
+    if (t > ST[0] + .6 && t < ST[1] - .1) S.line([[-.5, 0, .05], [-.5, TD, .05]], { color: '#FFD43B', w: 4 });
+  }
+  if (!inB) ['lDepth', 'lSand', 'lIns', 'lCab', 'lCais', 'lYes'].forEach((id) => ($(id).style.opacity = 0)); else { $('lNo').style.opacity = 0; $('lIce').style.opacity = 0; }
+  // мёрзлый слой грунта
+  if (frost > .02) S.box(-19, 9, -frost, 0, -10, .03, '#d8efff', { alpha: .36 });
+  if (frost > .02) S.line([[-19, -frost, .04], [9, -frost, .04]], { color: '#3d8fd6', w: 2.5, dash: [8, 6] });
+  placeLbl('lFrost', [-4.2, -frost + .05, .05], (frost > .3 ? 1 : 0) * (!inB ? win(t, 1.8, B - .2) : win(t, FIN + .3, PHONE - .1)));
+  S.render();
+  // снегопад
+  const sk = !inB ? 1 : winter;
+  if (sk > 0) { FX.fillStyle = 'rgba(255,255,255,.9)'; for (let i = 0; i < 90; i++) { const sp = 50 + R(i) * 50; const y = ((t * sp / 700 + R(i + 7)) % 1) * 1000 - 40; FX.globalAlpha = sk * (.5 + R(i + 4) * .5); FX.beginPath(); FX.arc(R(i + 3) * 580 - 20 + Math.sin(t * 1.4 + i) * 14, y, 1.5 + R(i) * 2.5, 0, 7); FX.fill(); } FX.globalAlpha = 1; }
+
+  renderTag('tagBad', t, A + .2, B - .2); renderTag('tagBad2', t, 5.6, B - .2);
+  let si = 0; for (let i = 0; i < 5; i++) if (t >= ST[i]) si = i;
+  $('step').textContent = `ШАГ ${si + 1} из 5`;
+  $('step').style.opacity = win(t, ST[0], FIN - .05, .2, .2);
+  const bump = t > ST[si] && t < ST[si] + .35 ? Math.sin((t - ST[si]) / .35 * Math.PI) : 0;
+  $('step').style.transform = `scale(${1 + bump * .12})`;
+  $('info').textContent = STEPS[si][1];
+  $('info').style.opacity = win(t, ST[0] + .2, FIN - .05, .2, .2) * clamp((t - ST[si] - .2) / .25);
+  $('info').style.transform = `translateX(${(1 - eOut((t - ST[si] - .2) / .35)) * -30}px)`;
+  renderTag('tagGood', t, FIN + .8, PHONE - .1);
+  $('dimD').style.opacity = clamp((t - PHONE) / .4) * .72;
+  renderPhone(t, PHONE, END + .2, SCREENS);
+  $('fade').style.opacity = clamp(1 - Math.abs(t - B) / .25) * .9;
+  renderEnd(t, END);
+};
+function placeLbl(id, p, op) { const q = S.proj(p), el = $(id); el.style.left = q[0] + 'px'; el.style.top = (q[1] - 6) + 'px'; el.style.opacity = q[2] > .3 ? op : 0; }
+readyWith(['2dirs', '5result']);
+</script>
+</body></html>
