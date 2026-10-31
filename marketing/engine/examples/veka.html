@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Строили на века 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#hook { top: 300px !important; font-size: 44px !important; }
+#year { position: absolute; left: 0; right: 0; top: 64px; z-index: 20; text-align: center; font-family: 'PTN'; font-size: 120px; line-height: 1; color: #FFD43B; -webkit-text-stroke: 8px #1b0f05; paint-order: stroke fill; opacity: 0; letter-spacing: 2px; }
+#year.now { color: #7fd0ff; }
+#what { position: absolute; left: 20px; right: 20px; top: 192px; z-index: 20; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 32px; line-height: 1.12; color: #fff; -webkit-text-stroke: 6px #000; paint-order: stroke fill; opacity: 0; }
+#what b { color: #FFD43B; }
+#card { position: absolute; left: 22px; right: 22px; top: 712px; z-index: 20; background: rgba(255,255,255,.97); border-radius: 22px; padding: 14px 18px 16px; box-shadow: 0 14px 34px rgba(0,0,0,.4); opacity: 0; border-left: 10px solid #2fa36b; }
+#card .n { font-family: 'PT', 'Noto Color Emoji'; font-size: 28px; color: #11643a; line-height: 1.08; }
+#card .w { font-family: 'PTR', 'Noto Color Emoji'; font-size: 24px; color: #233; margin-top: 5px; line-height: 1.18; }
+#card .w b { color: #0d2440; }
+#share { position: absolute; left: 20px; right: 20px; top: 300px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 46px; line-height: 1.12; color: #fff; -webkit-text-stroke: 8px #000; paint-order: stroke fill; opacity: 0; }
+#share b { color: #FFD43B; }
+#ask { position: absolute; left: 20px; right: 20px; top: 590px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 34px; color: #fff; -webkit-text-stroke: 7px #000; paint-order: stroke fill; opacity: 0; }
+#dim { position: absolute; inset: 0; background: #0b0a08; opacity: 0; z-index: 21; }
+#flash { position: absolute; inset: 0; background: #fff8e8; opacity: 0; z-index: 18; pointer-events: none; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="year"></div>
+<div id="what"></div>
+<div id="card"><div class="n"></div><div class="w"></div></div>
+<div id="flash"></div>
+<div id="dim"></div>
+<div id="share">Раньше — <b>на века</b>.<br>Сейчас — до первой зимы 😅<br>📩 Отправь своему прорабу</div>
+<div id="ask">Какой «год» у вашей стройки? 👇</div>
+<div id="hook" class="cap"></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🏛</div><div class="logo">СМЕТА PRO</div><div class="l2">Стройте как в 1495-м —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">День бесплатно + 12 дней за подписку на Instagram</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script>
+window.DUR = 27;
+const RD = 7.0, R0 = 2.4, RS = [R0, R0 + RD, R0 + 2 * RD], SHARE = R0 + 3 * RD, END = SHARE + 2.6;
+const OLD = 3.0, NOW = 2.2; // в каждом раунде: тогда (3 с) → сейчас (2,2 с) → как надо (1,8 с)
+const ROUNDS = [
+  { y: 1495, what: 'Стены Кремля — <b>стоят 530 лет</b>', now: 'Плитку во дворе <b>повело</b><br>после первой зимы 🙃', tip: ['Как надо', '<b>щебень 15–20 см + песок 5 см</b>, каждый слой трамбовать виброплитой, бордюр на бетон'] },
+  { y: 1714, what: 'Кижи: сруб без гвоздей —<br><b>стоит 312 лет</b>', now: 'Каркасник за 3 года<br><b>покрылся плесенью</b> 🤢', tip: ['Как надо', '<b>пароизоляция внутри</b> со склейкой стыков лентой, ветрозащита снаружи и вентзазор'] },
+  { y: 1858, what: 'Исаакий: <b>10 762 сваи</b> в болото —<br>стоит 168 лет', now: 'Дом на болоте <b>треснул</b><br>в первый же год 🫠', tip: ['Как надо', 'перед фундаментом — <b>геология участка</b>: бурение покажет торф и подскажет сваи или плиту'] },
+];
+const S = new M3.Scene($('cv'));
+const FX = $('fx').getContext('2d');
+const phase = (t) => { for (let i = 2; i >= 0; i--) if (t >= RS[i]) { const u = t - RS[i]; return { i, u, p: u < OLD ? 'old' : u < OLD + NOW ? 'now' : 'tip' }; } return { i: 0, u: t - R0, p: 'hook' }; };
+
+// ---------- 1. Кремль / плитка ----------
+function kremlin(t) {
+  const red = '#a5412f', dark = '#8a3426';
+  S.box(-7, 5, 0, 3.4, -.6, .6, red, { shadow: true, top: '#8f3a2b' });
+  for (let x = -6.7; x < 4.8; x += 1.05) S.extrude([[x - .38, 3.4], [x + .38, 3.4], [x + .44, 4.35], [x, 3.95], [x - .44, 4.35]], -.42, .42, dark, { shadow: true, front: red });
+  S.box(5, 7.6, 0, 6.2, -1.3, 1.3, red, { shadow: true }); S.box(5.3, 7.3, 6.2, 7.4, -1.0, 1.0, red, {});
+  S.cone([6.3, 7.4, 0], 1.45, 3.4, '#3d7a52', { seg: 4, shadow: true }); S.sphere([6.3, 11.0, 0], .22, '#e05a4a', { emit: true, seg: 10 });
+  for (let x = -6.5; x < 5; x += 1.4) for (let y = .5; y < 3.2; y += .5) S.line([[x, y, .61], [x + 1.2, y, .61]], { color: 'rgba(70,20,10,.25)', w: 1 });
+  S.box(-9, 9, -.05, 0, -6, 6, '#7a8a5a', { groundTop: true });
+}
+function paving(t, k) {
+  S.box(-6, 6, -.4, 0, -6, 6, '#6f7d55', { groundTop: true });
+  for (let ix = -6; ix < 6; ix++) for (let iz = -4; iz < 4; iz++) {
+    const cx = ix * .6 + .3, cz = iz * .6 + .3, bump = Math.exp(-((cx - .4) ** 2 + (cz - .2) ** 2) / 2.2), wav = Math.sin(cx * 2.1 + cz * 1.3) * .06;
+    const dy = -k * (bump * .32 + wav * (1 - bump)), tilt = k * Math.sin(cx * 3 + cz) * .05;
+    S.box(cx - .28, cx + .28, dy, dy + .08 + tilt, cz - .28, cz + .28, (ix + iz) % 2 ? '#b8b2a8' : '#a7a197', {});
+  }
+  S.box(-3.7, 3.7, -.1, .2, 2.45, 2.6, '#9a958c', {}); S.box(-3.7, 3.7, -.1, .2, -2.6, -2.45, '#9a958c', {});
+  S.box(-1.8, -.6, 0, 1.6, -5, -3.6, '#cfd6dd', { shadow: true }); S.cone([-1.2, 1.6, -4.3], 1.0, .9, '#8b4a3a', { seg: 4 });
+}
+// ---------- 2. Кижи / каркасник ----------
+function kizhi(t) {
+  const wood = '#8a6a48', dome = '#b9c3cb';
+  S.box(-9, 9, -.05, 0, -7, 7, '#7d8f60', { groundTop: true });
+  const tiers = [[3.0, 0, 3.2], [2.3, 3.2, 2.2], [1.7, 5.4, 1.8], [1.2, 7.2, 1.5]];
+  tiers.forEach(([r, y0, h]) => { S.cyl('y', [0, y0 + h / 2, 0], r, h, wood, { seg: 8, shadow: true, cap: '#6c5236' }); for (let y = y0 + .2; y < y0 + h; y += .22) { const pts = []; for (let i = 0; i <= 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; pts.push([Math.cos(a) * r * 1.01, y, Math.sin(a) * r * 1.01]); } S.line(pts, { color: 'rgba(50,30,15,.28)', w: 1 }); } });
+  const domes = [[0, 9.6, 0, .75]];
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; domes.push([Math.cos(a) * 2.6, 3.9, Math.sin(a) * 2.6, .45]); }
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; domes.push([Math.cos(a) * 1.9, 6.0, Math.sin(a) * 1.9, .4]); }
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; domes.push([Math.cos(a) * 1.3, 7.9, Math.sin(a) * 1.3, .36]); }
+  for (const [x, y, z, r] of domes) { S.cyl('y', [x, y - r * .9, z], r * .45, r * .8, wood, { seg: 8 }); S.sphere([x, y, z], r, dome, { sy: 1.25, seg: 12 }); S.cone([x, y + r * 1.15, z], r * .25, r * .9, dome, { seg: 6 }); }
+}
+function frameHouse(t, k) {
+  S.box(-7, 7, -.05, 0, -6, 6, '#6f7d55', { groundTop: true });
+  S.box(-3, 3, 0, 2.8, -2.5, 2.5, '#f1efe9', { shadow: true, front: '#f4f2ec' });
+  S.poly([[-3.3, 2.8, 2.8], [0, 4.6, 2.8], [3.3, 2.8, 2.8]], '#f1efe9', { two: true });
+  S.poly([[-3.4, 2.75, 2.9], [0, 4.7, 2.9], [0, 4.7, -2.9], [-3.4, 2.75, -2.9]], '#4b5563', { center: [0, 0, 0], shadow: true });
+  S.poly([[0, 4.7, 2.9], [3.4, 2.75, 2.9], [3.4, 2.75, -2.9], [0, 4.7, -2.9]], '#4b5563', { center: [0, 0, 0], shadow: true });
+  S.box(-1.9, -.9, 1.0, 2.0, 2.5, 2.53, '#35577a', {}); S.box(.9, 1.9, 1.0, 2.0, 2.5, 2.53, '#35577a', {}); S.box(-.4, .4, 0, 2.0, 2.5, 2.54, '#6b4a33', {});
+}
+// ---------- 3. Исаакий / дом на болоте ----------
+function isaac(t) {
+  const st = '#d9cdb5', gold = '#d8a93b';
+  S.box(-9, 9, -3.2, 0, -7, 7, '#6b5a40', { alpha: .45, top: '#7d8a5c', bias: -40 });
+  for (let x = -3.6; x <= 3.6; x += .6) for (let z = -3.6; z <= 3.6; z += 1.2) S.cyl('y', [x, -1.6, z], .07, 3.0, '#8a6a42', { seg: 6, bias: -45 });
+  S.box(-4, 4, 0, 3.6, -4, 4, st, { shadow: true }); S.box(-4.3, 4.3, 3.6, 4.0, -4.3, 4.3, '#cbbfa6', {});
+  for (let x = -3.2; x <= 3.21; x += .8) S.cyl('y', [x, 1.8, 4.5], .22, 3.6, '#c8b9a0', { seg: 10, shadow: true });
+  S.poly([[-3.6, 3.6, 4.6], [3.6, 3.6, 4.6], [0, 5.0, 4.6]], '#d2c5ab', { two: true });
+  S.cyl('y', [0, 5.2, 0], 2.0, 2.4, st, { seg: 16, shadow: true }); for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) S.cyl('y', [Math.cos(a) * 2.15, 5.2, Math.sin(a) * 2.15], .1, 2.2, '#c8b9a0', { seg: 6 });
+  S.sphere([0, 6.4, 0], 2.1, gold, { sy: 1.0, seg: 18, rings: 10 }); S.cyl('y', [0, 8.9, 0], .35, 1.0, gold, { seg: 10 }); S.cone([0, 9.4, 0], .25, 1.0, gold, { seg: 8 });
+}
+function swampHouse(t, k) {
+  S.box(-8, 8, -3, 0, -6, 6, '#5a4a32', { alpha: .45, top: '#6f7d55', bias: -40 });
+  S.box(-8, 8, -2.6, -1.0, -6, 6.01, '#3d3324', { alpha: .5, bias: -38 });
+  const ang = -.09 * k, c = [2.5, 0, 0], tf = (p) => M3.rotZ([p[0], p[1] - .35 * k * (p[0] > 0 ? p[0] / 3 : 0), p[2]], c, ang);
+  S.box(-3, 3, -.4, 0, -2.5, 2.5, '#9aa0a6', { tf });
+  S.box(-3, 3, 0, 2.6, -2.5, 2.5, '#e9dcc9', { tf, shadow: true });
+  S.poly([[-3.3, 2.6, 2.6], [0, 4.2, 2.6], [0, 4.2, -2.6], [-3.3, 2.6, -2.6]], '#7a3b2e', { tf, center: [0, 0, 0] });
+  S.poly([[0, 4.2, 2.6], [3.3, 2.6, 2.6], [3.3, 2.6, -2.6], [0, 4.2, -2.6]], '#7a3b2e', { tf, center: [0, 0, 0] });
+  S.box(-1.8, -.8, 1, 2, 2.5, 2.53, '#35577a', { tf }); S.box(.8, 1.8, 1, 2, 2.5, 2.53, '#35577a', { tf });
+  return tf;
+}
+const VIEWS = [[.55, .3, 44, -.5, 2.6, 0], [.6, .55, 17, 0, 0, 0], [.45, .22, 32, 0, 4.6, 0], [.55, .25, 24, 0, 1.6, 0], [.55, .1, 34, 0, 2.2, 0], [.5, .12, 27, 0, .6, 0]];
+window.render = function (t) {
+  const ph = phase(t), r = ph.i, isOld = ph.p === 'old' || ph.p === 'hook';
+  const vi = r * 2 + (isOld ? 0 : 1), v = VIEWS[vi];
+  const local = isOld ? Math.max(0, ph.u) : ph.u - OLD;
+  const yaw = v[0] + local * .06 + (ph.p === 'hook' ? t * .05 : 0), dist = v[2] * (1 - Math.min(local, 3) * .03) * (ph.p === 'hook' ? 1.25 - eOut(t / 2.4) * .25 : 1);
+  S.camera([v[3], v[4], v[5]], yaw, v[1], dist, 40);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960);
+  if (isOld) { g.addColorStop(0, '#d9c49a'); g.addColorStop(.6, '#efe2c4'); g.addColorStop(1, '#bfa77a'); } else { g.addColorStop(0, '#7fb4e6'); g.addColorStop(.6, '#d4e7f5'); g.addColorStop(1, '#9fb07e'); }
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = isOld ? [225, 210, 180] : [210, 225, 240]; S.fog = [40, 110]; S.L = M3.norm([-.45, .85, .5]); S.amb = .55; S.dif = .52; S.ao = .3; S.aoH = 1.6; S.shadowA = .26;
+  const k = ph.p === 'old' || ph.p === 'hook' ? 0 : ease((ph.u - OLD - .5) / 1.2);
+  let tf = null;
+  if (r === 0) isOld ? kremlin(t) : paving(t, k);
+  if (r === 1) isOld ? kizhi(t) : frameHouse(t, k);
+  if (r === 2) isOld ? isaac(t) : (tf = swampHouse(t, k));
+  S.render();
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  // «сейчас»: последствия
+  if (!isOld && r === 0 && k > .3) { const q = S.proj([.4, .02, .2]); FX.fillStyle = `rgba(90,140,200,${.55 * k})`; FX.beginPath(); FX.ellipse(q[0], q[1], 70 * k, 28 * k, 0, 0, 7); FX.fill(); FX.strokeStyle = `rgba(255,255,255,${.5 * k})`; FX.lineWidth = 2; FX.beginPath(); FX.ellipse(q[0] - 15, q[1] - 5, 30 * k, 9 * k, 0, 0, 7); FX.stroke(); }
+  if (!isOld && r === 1 && k > 0) for (let i = 0; i < 26; i++) { const p = S.proj([-2.6 + R(i) * 5.2, .3 + R(i + 3) * 2.1, 2.52]); const rr = (4 + R(i + 5) * 10) * k; FX.fillStyle = `rgba(${40 + R(i) * 30 | 0},${60 + R(i + 1) * 30 | 0},${35},${.75 * k})`; FX.beginPath(); FX.arc(p[0], p[1], rr, 0, 7); FX.fill(); }
+  if (!isOld && r === 2 && k > .2 && tf) { const pts = [[-.5, 2.6, 2.52], [-.2, 2.1, 2.52], [-.6, 1.6, 2.52], [-.1, 1.0, 2.52], [-.4, .4, 2.52], [-.15, 0, 2.52]].map((p) => S.proj(tf(p))); FX.strokeStyle = '#2a1a10'; FX.lineWidth = 3; FX.beginPath(); pts.forEach((p, i) => { const q = [lerp(pts[0][0], p[0], 1), lerp(pts[0][1], p[1], clamp((k - .2) / .8))]; i ? FX.lineTo(q[0], q[1]) : FX.moveTo(q[0], q[1]); }); FX.stroke(); }
+  // пылинки старой плёнки
+  if (isOld) for (let i = 0; i < 18; i++) { FX.fillStyle = `rgba(60,40,20,${.25 * R(i + Math.floor(t * 12))})`; FX.fillRect(R(i * 7 + Math.floor(t * 12)) * 540, R(i * 3 + Math.floor(t * 12)) * 960, 2, 2 + R(i) * 8); }
+  PFX.apply(x, t, isOld ? { grade: 'sepia(.55) contrast(1.06) saturate(.95) brightness(1.03)', vignette: .5, grain: .06, bloom: .1 } : { bloom: .12, vignette: .32 });
+
+  $('hook').innerHTML = 'Раньше строили <b>на века</b>.<br>Сейчас — <b>до первой зимы</b> 😅';
+  $('hook').style.opacity = win(t, 0, R0 - .1, .01, .25);
+  $('hook').style.transform = `scale(${1.04 + Math.sin(t * 3) * .02 - eOut(t / .3) * .04})`;
+  // год: в начале раунда — «перемотка» назад от 2026
+  const Y = $('year'), RR = ROUNDS[r];
+  let yr;
+  if (ph.p === 'hook') yr = Math.round(lerp(2026, RR.y, eOut((t - .3) / 2.0)));
+  else if (ph.p === 'old') yr = r === 0 ? RR.y : Math.round(lerp(2026, RR.y, eOut(ph.u / .7)));
+  else yr = Math.round(lerp(RR.y, 2026, eOut((ph.u - OLD) / .5)));
+  Y.textContent = yr; Y.className = isOld ? '' : 'now';
+  Y.style.opacity = win(t, .2, SHARE, .2, .2);
+  const pop = ph.p !== 'hook' && (ph.u < .3 || (ph.u > OLD && ph.u < OLD + .3)) ? 1 : 0;
+  Y.style.transform = `scale(${1 + pop * .08})`;
+  const W = $('what'); const txt = ph.p === 'hook' ? '' : isOld ? RR.what : RR.now;
+  if (W._t !== txt) { W._t = txt; W.innerHTML = txt; }
+  W.style.opacity = ph.p === 'hook' ? 0 : ph.p === 'tip' ? .0 : clamp(Math.min((ph.u - (isOld ? .4 : OLD + .3)) / .25, 1));
+  // карточка «как надо»
+  const C = $('card');
+  if (C._r !== r) { C._r = r; C.querySelector('.n').textContent = `✅ ${RR.tip[0]}`; C.querySelector('.w').innerHTML = RR.tip[1]; }
+  C.style.opacity = ph.p === 'tip' ? clamp((ph.u - OLD - NOW) / .2) * clamp((RD - ph.u) / .15) : 0;
+  C.style.transform = `translateY(${(1 - eOut((ph.u - OLD - NOW) / .3)) * 40}px)`;
+  $('flash').style.opacity = ph.p !== 'hook' ? Math.max(0, 1 - Math.abs(ph.u) / .18, 1 - Math.abs(ph.u - OLD) / .18) * .75 : 0;
+  $('dim').style.opacity = win(t, SHARE, END + .1, .3, .2) * .6;
+  $('share').style.opacity = win(t, SHARE, END + .1, .15, .2);
+  $('share').style.transform = `scale(${back((t - SHARE) / .4) + Math.sin(t * 5) * .012})`;
+  $('ask').style.opacity = win(t, SHARE + .7, END + .1, .2, .2);
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith([]);
+</script>
+</body></html>

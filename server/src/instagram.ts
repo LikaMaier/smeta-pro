@@ -309,7 +309,8 @@ export function attachInstagram(bot: Bot) {
     if (!(await igEnabled())) return ctx.answerCallbackQuery({ text: 'Instagram ещё не подключён — отправьте боту /instagram', show_alert: true });
     await ctx.answerCallbackQuery({ text: 'Публикую… это 1–3 минуты' });
     await ctx.editMessageReplyMarkup().catch(() => {});
-    await publishItem(bot, it, state, console);
+    // не ждём публикацию (1–3 мин): иначе бот стоит и остальные кнопки «протухают»
+    void publishItem(bot, it, state, console).catch((e) => console.error('ig pub', e));
   });
   bot.callbackQuery('ig:auto', async (ctx) => {
     if (!isAdmin(ctx.from?.id)) return ctx.answerCallbackQuery();
