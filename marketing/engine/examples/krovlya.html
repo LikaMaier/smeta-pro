@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>8 слоёв кровли 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#hook { top: 92px !important; font-size: 42px !important; }
+#cnt { position: absolute; left: 22px; top: 96px; z-index: 20; font-family: 'PTN'; font-size: 92px; line-height: .9; color: #FFD43B; -webkit-text-stroke: 6px #0d2440; paint-order: stroke fill; opacity: 0; }
+#cnt small { font-size: 46px; color: #fff; }
+#card { position: absolute; left: 22px; right: 22px; top: 210px; z-index: 20; background: rgba(255,255,255,.96); border-radius: 22px; padding: 14px 18px 16px; box-shadow: 0 14px 34px rgba(0,0,0,.35); opacity: 0; border-left: 10px solid #FFD43B; }
+#card .n { font-family: 'PT', 'Noto Color Emoji'; font-size: 36px; color: #0d2440; line-height: 1.05; }
+#card .w { font-family: 'PTR', 'Noto Color Emoji'; font-size: 26px; color: #334; margin-top: 4px; line-height: 1.15; }
+#card.warn { border-left-color: #e5383b; }
+#card .flag { display: inline-block; margin-top: 8px; font-family: 'PT'; font-size: 20px; background: #e5383b; color: #fff; padding: 3px 10px; border-radius: 8px; }
+#nich { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); z-index: 21; background: #0d2440; color: #FFD43B; font-family: 'PTN', 'Noto Color Emoji'; font-size: 24px; padding: 6px 14px; border-radius: 12px; white-space: nowrap; border: 2px solid #FFD43B; }
+#ask { position: absolute; left: 24px; right: 24px; top: 330px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 40px; line-height: 1.12; color: #fff; -webkit-text-stroke: 7px #000; paint-order: stroke fill; opacity: 0; }
+#ask b { color: #FFD43B; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="nich">🤓 слой №5 забывают 7 бригад из 10</div>
+<div id="cnt"></div>
+<div id="card"><div class="n"></div><div class="w"></div><div class="flag" style="display:none">⚠️ ПРОПУСКАЮТ ЧАЩЕ ВСЕГО</div></div>
+<div id="tagGood" class="tag good" style="left:24px;top:150px">✅ КРОВЛЯ НА 30 ЛЕТ</div>
+<div id="dimA" style="position:absolute;inset:0;background:#06101f;opacity:0;z-index:21"></div>
+<div id="ask">Какой слой <b>пропустили у вас?</b><br>📩 Перешли тому, кто строит дом</div>
+<div id="hook" class="cap"></div>
+<div id="sub" class="cap"></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🏠</div><div class="logo">СМЕТА PRO</div><div class="l2">Кровля под ключ — все 8 слоёв<br><span style="color:#FFD43B">в смете за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">День бесплатно + 12 дней за подписку на Instagram</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script>window.V3 = true;</script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script>
+window.DUR = 20.5;
+const T0 = 1.5, DT = 1.55, NL = 8;
+const LT = [...Array(NL)].map((_, i) => T0 + i * DT);   // момент падения слоя
+const DONE = LT[NL - 1] + 1.1, ASK = DONE + 2.6, END = ASK + 2.3;
+const LAYERS = [
+  ['Обшивка мансарды', 'вагонка или ГКЛ изнутри', '#d9b98a'],
+  ['Пароизоляция', 'стыки — <b>на ленту</b>, иначе утеплитель намокнет', '#cfe3f5'],
+  ['Стропила + утеплитель 200 мм', 'минвата <b>враспор</b>, без щелей', '#f0c94e'],
+  ['Ветро-влагозащитная мембрана', 'нахлёст 15 см, <b>надписью наружу</b>', '#5aa0d8'],
+  ['Контррейка', 'вентзазор 40–50 мм — <b>без него сгниёт</b>', '#b9855a', 1],
+  ['Обрешётка', 'шаг — под волну металлочерепицы', '#c8955f'],
+  ['Металлочерепица', 'саморезы с резиновой шайбой', '#8a2f2f'],
+  ['Снегозадержатели', 'над входом и машиной — <b>обязательно</b>', '#3b3f46'],
+];
+const SUBS = [
+  [DONE, DONE + 2.5, 'Сохрани 📌 — пригодится<br>на <b>ремонте</b>'],
+];
+const STEP = .6, X0 = -3, X1 = 3, Z0 = -2.2, Z1 = 2.2;
+const xr = (i) => X1 - i * STEP;                // правый край слоя i (лесенка)
+const Y = [[-.08, 0], [0, .03], [.03, .5], [.5, .53], [.53, .6], [.6, .66], [.66, .8], [.8, .95]];
+const S = new M3.Scene($('cv'));
+const FX = $('fx').getContext('2d');
+
+function drop(i, t) { const k = (t - LT[i]) / .42; if (k < 0) return null; return k >= 1 ? 0 : (1 - eOut(k)) * 3 + Math.sin(clamp(k) * Math.PI) * .0; }
+function room() {}
+function layer(i, dy) {
+  const [, , c] = LAYERS[i], x1 = xr(i), [y0, y1] = Y[i];
+  if (i === 2) { for (let z = Z0; z < Z1; z += .6) S.box(X0, x1, y0 + dy, y1 + dy, z, z + .1, '#b98a55', { shadow: true, bias: -i * .8 }); S.box(X0, x1, y0 + dy, y1 + dy - .02, Z0, Z1, c, { alpha: .9, bias: -i * .8 }); return; }
+  if (i === 4) { for (let z = Z0 + .05; z < Z1; z += .6) S.box(X0, x1, y0 + dy, y1 + dy, z, z + .06, c, { shadow: true, bias: -i * .8 }); return; }
+  if (i === 5) { for (let x = X0 + .05; x < x1; x += .35) S.box(x, x + .1, y0 + dy, y1 + dy, Z0, Z1, c, { shadow: true, bias: -i * .8 }); return; }
+  if (i === 7) { for (const x of [X0 + .5, X0 + .65]) S.cyl('z', [x, y1 + dy - .05, 0], .03, Z1 - Z0, c, { seg: 8, bias: -i * .8 }); for (let z = Z0 + .3; z < Z1; z += .8) S.box(X0 + .45, X0 + .7, Y[6][1] + dy, y1 + dy, z, z + .04, c, { bias: -i * .8 }); return; }
+  S.box(X0, x1, y0 + dy, y1 + dy, Z0, Z1, c, { alpha: i === 1 ? .85 : 1, bias: -i * .8 });
+}
+function overlays(i, dy, t) {
+  const x1 = xr(i), [, y1] = Y[i];
+  if (i === 6) for (let x = X0 + .2; x < x1; x += .35) S.line([[x, y1 + dy + .004, Z0], [x, y1 + dy + .004, Z1]], { color: 'rgba(40,10,10,.5)', w: 1.5 });
+  if (i === 0) for (let z = Z0 + .2; z < Z1; z += .2) S.line([[X0, y1 + dy + .002, z], [x1, y1 + dy + .002, z]], { color: 'rgba(120,80,40,.4)', w: 1 });
+}
+// камера: облёт по мере роста пирога, в финале — разворот
+function cam(t) {
+  const k = clamp(t / DONE), f = ease((t - DONE) / 3);
+  const yaw = lerp(.7, .86, k) + f * .3, pitch = lerp(.62, .58, k) + f * .04, dist = lerp(18.5, 17.5, k) - f * 1.5;
+  return [[lerp(.2, -.9, k), lerp(-.9, -.6, k), lerp(.2, 0, k)], yaw, pitch, dist];
+}
+let shake = 0;
+window.render = function (t) {
+  renderSubs(t, SUBS);
+  $('hook').innerHTML = window.V3 ? 'Крыша течёт и <b>промерзает</b>? 🥶<br>Значит, пропустили<br><b>1 из 8 слоёв</b>' : window.V2 ? 'Пол скрипит и холодный? 🤔<br>Значит, пропустили<br><b>1 из 11 слоёв</b>' : 'Под ламинатом —<br><b>11 слоёв</b>. Пропустишь<br>один — <b>переделка</b> 💸';
+  $('hook').style.opacity = win(t, .02, T0 + .9, .15, .25);
+  $('hook').style.transform = `scale(${back((t - .02) / .35)})`;
+  $('nich').style.opacity = win(t, .15, END - .1, .2, .3);
+  // тряска при падении
+  let sh = 0; for (let i = 0; i < NL; i++) { const d = t - LT[i] - .42; if (d > 0 && d < .25) sh = Math.max(sh, (1 - d / .25) * (i === 0 ? 6 : 3.5)); }
+  const [tg, yaw, pitch, dist] = cam(t);
+  S.camera(tg, yaw, pitch, dist, 40);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960); if (window.V3) { g.addColorStop(0, '#1e3a34'); g.addColorStop(.6, '#2f5a4f'); g.addColorStop(1, '#4b7a6a'); } else if (window.V2) { g.addColorStop(0, '#2a2140'); g.addColorStop(.6, '#43365f'); g.addColorStop(1, '#5d4f7c'); } else { g.addColorStop(0, '#20314a'); g.addColorStop(.6, '#33506f'); g.addColorStop(1, '#4a6b8c'); }
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = [60, 85, 115]; S.fog = [30, 90]; S.L = M3.norm([.35, .9, .55]); S.amb = .55; S.dif = .5; S.ao = .32; S.aoH = .8; S.shadowA = .28;
+  room();
+  for (let i = 0; i < NL; i++) { const dy = i === 0 ? 0 : drop(i, t); if (dy === null && i) continue; layer(i, dy || 0); overlays(i, dy || 0, t); }
+  x.save(); x.translate((R(Math.floor(t * 60)) - .5) * sh, (R(Math.floor(t * 60) + 5) - .5) * sh); S.render(); x.restore();
+  PFX.apply(x, t, { bloom: .14, vignette: .4 });
+
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  // пыль при ударе
+  for (let i = 1; i < NL; i++) {
+    const d = t - LT[i] - .42; if (d < 0 || d > .7) continue;
+    const yy = Y[i][1], p = S.proj([xr(i) - .1, yy, Z1 - .2]);
+    for (let k = 0; k < 14; k++) { const a = R(i * 31 + k) * Math.PI, sp = 40 + R(k + i) * 90; FX.fillStyle = `rgba(235,225,205,${(1 - d / .7) * .7})`; FX.beginPath(); FX.arc(p[0] + Math.cos(a) * sp * d * 1.6 - 60 * R(k), p[1] - Math.sin(a) * sp * d, 2 + 4 * d, 0, 7); FX.fill(); }
+  }
+  // номера на ступеньках
+  for (let i = 0; i < NL; i++) {
+    if (t < LT[i] + .45) continue;
+    const yy = Y[i][1], xx = xr(i) - STEP / 2;
+    const p = S.proj([xx, yy + .02, Z1 - .25]);
+    const pop = back((t - LT[i] - .45) / .3), cur = t < (LT[i + 1] || DONE) && t < DONE;
+    FX.save(); FX.translate(p[0], p[1]); FX.scale(pop * (cur ? 1.25 : .9), pop * (cur ? 1.25 : .9));
+    FX.fillStyle = i === 4 ? '#e5383b' : cur ? '#FFD43B' : '#0d2440'; FX.strokeStyle = '#fff'; FX.lineWidth = 2.5;
+    FX.beginPath(); FX.arc(0, 0, 13, 0, 7); FX.fill(); FX.stroke();
+    FX.fillStyle = i === 4 || !cur ? '#fff' : '#0d2440'; FX.font = '700 15px PT'; FX.textAlign = 'center'; FX.fillText(String(i + 1), 0, 5.5); FX.restore();
+  }
+  // счётчик и карточка слоя
+  let ci = -1; for (let i = 0; i < NL; i++) if (t >= LT[i]) ci = i;
+  const build = ci >= 0 && t < DONE;
+  $('cnt').innerHTML = ci >= 0 ? `${ci + 1}<small>/8</small>` : '';
+  $('cnt').style.opacity = build ? 1 : 0;
+  const bump = ci >= 0 && t - LT[ci] < .3 ? Math.sin((t - LT[ci]) / .3 * Math.PI) : 0;
+  $('cnt').style.transform = `scale(${1 + bump * .2})`;
+  if (ci >= 0) {
+    const L = LAYERS[ci], card = $('card');
+    if (card._i !== ci) { card._i = ci; card.querySelector('.n').innerHTML = `${ci + 1}. ${L[0]}`; card.querySelector('.w').innerHTML = L[1]; card.querySelector('.flag').style.display = L[3] ? 'inline-block' : 'none'; card.className = L[3] ? 'warn' : ''; }
+    card.style.top = '700px'; card.style.left = '22px'; card.style.right = '22px';
+    card.style.opacity = build ? clamp((t - LT[ci]) / .15) : 0;
+    card.style.transform = `translateX(${(1 - eOut((t - LT[ci]) / .3)) * 60}px)`;
+  }
+  renderTag('tagGood', t, DONE + .2, ASK - .1);
+  $('dimA').style.opacity = win(t, ASK, END + .1, .2, .2) * .55;
+  $('ask').style.opacity = win(t, ASK, END + .1, .2, .2);
+  $('ask').style.transform = `scale(${back((t - ASK) / .4)})`;
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith([]);
+</script>
+</body></html>

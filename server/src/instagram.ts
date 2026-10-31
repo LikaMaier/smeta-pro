@@ -63,7 +63,7 @@ async function refreshToken(log: any) {
 }
 
 // ---------- очередь роликов ----------
-interface Item { id: string; video: string; caption: string; title?: string; at?: string }
+interface Item { id: string; video: string; caption: string; title?: string; at?: string; manual?: boolean }
 function queue(): Item[] {
   if (!fs.existsSync(QUEUE_DIR)) return [];
   return fs.readdirSync(QUEUE_DIR).filter((f) => f.endsWith('.json')).sort().flatMap((f) => {
@@ -99,6 +99,19 @@ const notifyAll = (bot: Bot, text: string, extra: any = {}) =>
 async function offerNew(bot: Bot, log: any) {
   for (const it of queue()) {
     if (!fs.existsSync(videoPath(it))) continue;
+    // «manual»: владелица выкладывает сама — в нужное время присылаем файл в исходном качестве и подпись отдельным сообщением
+    if (it.manual) {
+      if (it.at && Date.parse(it.at) > Date.now()) continue;
+      if (!(await kvClaim(`ig:item:${it.id}`, 'manual'))) continue;
+      const { InputFile } = await import('grammy');
+      for (const id of reportTo()) {
+        await bot.api.sendDocument(Number(id), new InputFile(videoPath(it), path.basename(it.video)), {
+          caption: `🎬 <b>Ролик для Instagram</b>${it.title ? ` — ${esc(it.title)}` : ''}\nФайл в исходном качестве — выложите сами. Подпись — следующим сообщением 👇`, parse_mode: 'HTML',
+        }).catch((e: any) => log.error({ err: e }, 'ig manual'));
+        await bot.api.sendMessage(Number(id), it.caption).catch(() => {});
+      }
+      continue;
+    }
     const auto = (await autoOn()) && (await igEnabled());
     const taken = (await prisma.appKV.findMany({ where: { key: { startsWith: 'ig:item:' }, value: { startsWith: 'scheduled:' } } })).map((r) => Number(r.value.split(':')[1]));
     // точное время из json («at»: ISO) — по просьбе владелицы, ставим в расписание даже без автопубликации

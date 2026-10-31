@@ -19,7 +19,7 @@ await Promise.all([...Array(C)].map(async (_, k) => {
   for (let i = k * st; i < Math.min(N, (k + 1) * st); i++) { await p.evaluate((t) => window.render(t), i / 30); await p.screenshot({ path: `${dir}/${String(i).padStart(4, '0')}.jpg`, type: 'jpeg', quality: 92 }); }
   await b.close();
 }));
-execSync(`ffmpeg -y -loglevel error -framerate 30 -i ${dir}/%04d.jpg -i ${wav} -c:v libx264 -pix_fmt yuv420p -crf 23 -preset slow -c:a aac -b:a 160k -shortest -movflags +faststart "${out}.part.mp4"`);
+execSync(`ffmpeg -y -loglevel error -framerate 30 -i ${dir}/%04d.jpg -i ${wav} -c:v libx264 -pix_fmt yuv420p -crf ${process.env.CRF || 23} -preset slow -c:a aac -b:a 160k -shortest -movflags +faststart "${out}.part.mp4"`);
 fs.renameSync(`${out}.part.mp4`, out);
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('ok', out, N, 'frames');

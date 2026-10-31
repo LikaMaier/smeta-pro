@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Санузел под ключ 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#hook { top: 300px !important; font-size: 46px !important; }
+#money { position: absolute; left: 0; right: 0; top: 70px; z-index: 20; text-align: center; font-family: 'PTN'; font-size: 96px; line-height: 1; color: #FFD43B; -webkit-text-stroke: 7px #1b0f05; paint-order: stroke fill; opacity: 0; }
+#meta { position: absolute; left: 0; right: 0; top: 172px; z-index: 20; text-align: center; font-family: 'PT'; font-size: 24px; color: #fff; -webkit-text-stroke: 5px #000; paint-order: stroke fill; opacity: 0; }
+#stagePill { position: absolute; left: 50%; top: 214px; z-index: 20; transform: translateX(-50%); font-family: 'PT', 'Noto Color Emoji'; font-size: 30px; padding: 6px 18px; border-radius: 14px; color: #fff; white-space: nowrap; box-shadow: 0 8px 20px rgba(0,0,0,.35); opacity: 0; }
+#bars { position: absolute; left: 24px; right: 24px; bottom: 120px; z-index: 20; display: flex; flex-direction: column; gap: 10px; opacity: 0; }
+.bar { position: relative; height: 54px; border-radius: 14px; background: rgba(0,0,0,.45); overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 14px; }
+.bar span { position: absolute; left: 14px; right: 14px; top: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 25px; color: #fff; -webkit-text-stroke: 4px #000; paint-order: stroke fill; }
+#share { position: absolute; left: 20px; right: 20px; top: 250px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 46px; line-height: 1.12; color: #fff; -webkit-text-stroke: 8px #000; paint-order: stroke fill; opacity: 0; }
+#share b { color: #FFD43B; }
+#ask { position: absolute; left: 20px; right: 20px; top: 560px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 36px; color: #fff; -webkit-text-stroke: 7px #000; paint-order: stroke fill; opacity: 0; }
+#note { position: absolute; left: 0; right: 0; bottom: 74px; z-index: 20; text-align: center; font-family: 'PTR'; font-size: 17px; color: rgba(255,255,255,.85); opacity: 0; }
+#dim { position: absolute; inset: 0; background: #0b0614; opacity: 0; z-index: 21; }
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 18; pointer-events: none; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="money"></div>
+<div id="meta">санузел 4 м² · работа + материалы</div>
+<div id="stagePill"></div>
+<div id="bars">
+  <div class="bar"><i style="background:#8d8d88"></i><span><b>🔨 Демонтаж и вывоз</b><em>30 тыс</em></span></div>
+  <div class="bar"><i style="background:#5b8fd6"></i><span><b>🚿 Сантехника</b><em>129 тыс</em></span></div>
+  <div class="bar"><i style="background:#9fcbe6"></i><span><b>🧱 Плитка</b><em>156 тыс</em></span></div>
+  <div class="bar"><i style="background:#e0a050"></i><span><b>✨ Потолок и прочее</b><em>21 тыс</em></span></div>
+</div>
+<div id="note">ориентир по ценам СПб, октябрь 2026 · расчёт в СМЕТА PRO</div>
+<div id="flash"></div>
+<div id="dim"></div>
+<div id="share">📩 Отправь тому,<br>кто <b>затеял ремонт<br>ванной</b></div>
+<div id="ask">А сколько отдали вы? 👇</div>
+<div id="hook" class="cap"></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🛁</div><div class="logo">СМЕТА PRO</div><div class="l2">Посчитайте свой санузел<br><span style="color:#FFD43B">по этапам за 2 минуты</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">День бесплатно + 12 дней за подписку на Instagram</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script>
+window.DUR = 20;
+const ST4 = [0, 4.0, 7.4, 10.8], S2 = ST4[1], S3 = ST4[2], S4 = ST4[3], BARS = 13.6, SHARE = 15.6, END = 17.8;
+const PART = [30235, 129312, 155796, 20262], CUMV = PART.reduce((a, v) => [...a, (a[a.length - 1] || 0) + v], []);
+const TOT = [0, 0, 0, 0];
+const S = new M3.Scene($('cv'));
+const FX = $('fx').getContext('2d');
+const fmt = (n) => Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ');
+function stageAt(t) { return t < S2 ? 0 : t < S3 ? 1 : t < S4 ? 2 : 3; }
+function flat(st, t) {
+  const H = 2.7, W = 2.0, T = .12;
+  const wall = st === 0 ? '#9b9a95' : st === 1 ? '#a9a8a2' : '#a9d3ec', floor = st === 0 ? '#8f8e89' : st === 1 ? '#b9b2a4' : '#e8eef2';
+  S.box(-W, W, -.2, 0, -W, W, '#6c6b67', { top: floor });
+  S.box(-W - T, -W, -.2, H, -W, W, wall, { side: wall });
+  S.box(-W - T, W, -.2, H, -W - T, -W, wall, { front: wall });
+  if (st === 0) { // старая плитка отбита, мусор
+    for (let i = 0; i < 14; i++) S.box(-1.5 + R(i) * 3, -1.5 + R(i) * 3 + .25, 0, .06 + R(i + 1) * .12, -1.5 + R(i + 2) * 3, -1.5 + R(i + 2) * 3 + .2, i % 2 ? '#d7dde2' : '#8a8780', { shadow: true });
+    S.box(1.0, 1.6, 0, .9, .8, 1.4, '#3a3d44', { shadow: true });
+  }
+  if (st === 1) { // разводка (после плитки — скрыта в стене)
+    S.cyl('x', [-.3, .35, -W + .12], .06, 3.2, '#e04848', { seg: 8, bias: -2 }); S.cyl('x', [-.3, .55, -W + .12], .06, 3.2, '#3c84e0', { seg: 8, bias: -2 }); S.cyl('y', [-1.2, .9, -W + .12], .05, 1.1, '#e04848', { seg: 8, bias: -2 }); S.cyl('y', [-1.0, .95, -W + .12], .05, 1.0, '#3c84e0', { seg: 8, bias: -2 });
+    S.cyl('x', [-.6, .12, -W + .2], .09, 2.6, '#c9ced6', { seg: 10, bias: -2 });
+  }
+  if (st >= 1) S.box(-.55, .25, 0, 1.15, -W + .02, -W + .22, st >= 2 ? '#a9d3ec' : '#7a8b9a', { shadow: true, bias: -1.5 }); // инсталляция (после плитки — короб в плитке)
+  if (st >= 2) { // плитка: сетка швов
+    for (let y = .3; y < H; y += .3) { S.line([[-W + .01, y, -W], [-W + .01, y, W]], { color: 'rgba(255,255,255,.7)', w: 1 }); S.line([[-W, y, -W + .01], [W, y, -W + .01]], { color: 'rgba(255,255,255,.7)', w: 1 }); }
+    for (let x = -W; x < W; x += .6) S.line([[x, .003, -W], [x, .003, W]], { color: 'rgba(120,140,150,.5)', w: 1 });
+    for (let z = -W; z < W; z += .6) S.line([[-W, .003, z], [W, .003, z]], { color: 'rgba(120,140,150,.5)', w: 1 });
+  }
+  if (st >= 3) { // приборы
+    S.box(.3, W - .05, 0, .6, -W + .05, -W + .85, '#ffffff', { shadow: true, top: '#f2f6f8' }); S.box(.45, W - .2, .45, .62, -W + .2, -W + .7, '#bfe3f3', {});
+    S.box(-.42, .12, .3, .75, -W + .22, -W + .75, '#ffffff', { shadow: true }); S.box(-.38, .08, .75, .8, -W + .25, -W + .7, '#f4f4f4', {});
+    S.box(-W + .05, -W + .5, .8, .95, -.3, .5, '#ffffff', { shadow: true }); S.box(-W + .02, -W + .05, 1.15, 2.0, -.25, .45, '#cfe6f2', { emit: true });
+    S.box(-W + .05, -W + .18, 1.0, 1.6, .9, 1.4, '#c0c4c8', {}); for (let y = 1.05; y < 1.6; y += .1) S.box(-W + .05, -W + .2, y, y + .03, .9, 1.4, '#d9dde1', {});
+    S.box(-W, W, H - .03, H, -W, W, '#f8f8fb', { alpha: .25 });
+  }
+}
+function lines() {}
+window.render = function (t) {
+  const st = stageAt(t);
+  // камера: всегда в движении — облёт + наезд в начале
+  const yaw = .6 + t * .05 + Math.sin(t * .9) * .05, pitch = .5 - Math.min(t, 3) * .02, dist = 16 - 3 * eOut(t / 1.2) - Math.min(t, BARS) * .08 + (t > SHARE ? (t - SHARE) * .8 : 0);
+  S.camera([0, .9, 0], yaw, pitch, dist, 40);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960);
+  const pal = [['#2a2a2e', '#4a4a50'], ['#28394f', '#5b7896'], ['#1e3d4f', '#4f8fb0'], ['#3a2a40', '#8a6aa5']][st];
+  g.addColorStop(0, pal[0]); g.addColorStop(1, pal[1]); x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = [40, 40, 50]; S.fog = [40, 90]; S.L = M3.norm([.4, .9, .5]); S.amb = .58; S.dif = .48;
+  S.tint = [1, 1, 1]; S.ao = .3; S.aoH = 1.2;
+  // удар при смене этапа
+  const hit = Math.max(0, 1 - Math.abs(t - S2) / .25, 1 - Math.abs(t - S3) / .25, 1 - Math.abs(t - S4) / .25);
+  flat(st, t);
+  x.save(); const sc = 1 + hit * .06; x.translate(270 * (1 - sc), 480 * (1 - sc)); x.scale(sc, sc); S.render(); x.restore();
+  PFX.apply(x, t, { bloom: .14, vignette: .38 });
+  $('flash').style.opacity = hit * .7;
+
+  // крючок — с первого кадра, с пульсом
+  $('hook').innerHTML = 'Ванная 4 м²<br><b>под ключ</b> в 2026 —<br>сколько стоит? 🛁';
+  $('hook').style.opacity = win(t, 0, 2.3, .01, .25);
+  $('hook').style.transform = `scale(${1.08 + Math.sin(t * 9) * .03 - eOut(t / .3) * .08})`;
+  // счётчик денег
+  const stx = stageAt(t), target = lerp(stx ? CUMV[stx - 1] : 0, CUMV[stx], eOut((t - ST4[stx] - (stx ? 0 : .4)) / 2.2));
+  $('money').innerHTML = `${fmt(Math.max(0, target))} ₽`;
+  $('money').style.opacity = win(t, .35, SHARE, .15, .2);
+  const mb = Math.max(0, 1 - Math.abs(t - S2 - .1) / .3, 1 - Math.abs(t - S3 - .1) / .3, 1 - Math.abs(t - S4 - .1) / .3);
+  $('money').style.transform = `scale(${1 + mb * .15})`;
+  $('meta').style.opacity = win(t, .6, SHARE, .2, .2);
+  const P = $('stagePill'), labels = [['🔨 ДЕМОНТАЖ', '#5d5d62'], ['🚿 САНТЕХНИКА', '#3d6a96'], ['🧱 ПЛИТКА', '#2a7f9e'], ['✨ ГОТОВО', '#c96f2a']];
+  P.textContent = labels[st][0]; P.style.background = labels[st][1];
+  P.style.opacity = win(t, 2.3, SHARE, .15, .2);
+  const ps = st === 0 ? 2.3 : ST4[st];
+  P.style.transform = `translateX(-50%) scale(${back((t - ps) / .35)})`;
+  $('note').style.opacity = win(t, 2.5, SHARE, .2, .2);
+  // итоговые полоски
+  $('bars').style.opacity = win(t, BARS, SHARE + .2, .2, .2);
+  [...$('bars').children].forEach((b, i) => { b.firstElementChild.style.width = `${eOut((t - BARS - i * .25) / .6) * PART[i] / PART[2] * 100}%`; b.style.transform = `translateX(${(1 - eOut((t - BARS - i * .2) / .4)) * -60}px)`; });
+
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  // летящие ₽ из счётчика, пока он крутится
+  const spin = t > .4 && t < S4 + 2.2;
+  if (spin) for (let i = 0; i < 18; i++) {
+    const k = (t * 1.3 + R(i)) % 1, x0 = 120 + R(i + 3) * 300;
+    FX.globalAlpha = (1 - k) * .9; FX.font = `700 ${18 + R(i) * 16}px PT`; FX.fillStyle = '#FFD43B'; FX.strokeStyle = '#3a2000'; FX.lineWidth = 3;
+    const yy = 150 - k * 120, xx = x0 + Math.sin(k * 6 + i) * 20; FX.strokeText('₽', xx, yy); FX.fillText('₽', xx, yy);
+  }
+  FX.globalAlpha = 1;
+  // искры при ударе этапа
+  if (hit > 0) for (let i = 0; i < 26; i++) { const a = R(i) * 7, r = (1 - hit) * 220 + 40; FX.fillStyle = `rgba(255,212,59,${hit})`; FX.beginPath(); FX.arc(270 + Math.cos(a) * r, 520 + Math.sin(a) * r * .7, 3 + R(i + 2) * 4, 0, 7); FX.fill(); }
+  // пыль в черновой, свет лампы в финале
+  if (false) for (let i = 0; i < 30; i++) { FX.fillStyle = `rgba(220,210,190,${.25 + R(i) * .3})`; FX.beginPath(); FX.arc((R(i) * 540 + t * 12 * (R(i + 1) - .5) * 4 + 540) % 540, (R(i + 5) * 600 + 250 - t * 8) % 960, 1.5 + R(i + 2) * 2.5, 0, 7); FX.fill(); }
+  if (false) { const p = S.proj([0, 2.05, .6]); const gr = FX.createRadialGradient(p[0], p[1], 0, p[0], p[1], 160); gr.addColorStop(0, 'rgba(255,220,140,.45)'); gr.addColorStop(1, 'rgba(255,220,140,0)'); FX.fillStyle = gr; FX.fillRect(p[0] - 160, p[1] - 160, 320, 320); }
+  // призыв переслать: самолётик летит через экран
+  $('dim').style.opacity = win(t, SHARE, END + .1, .2, .2) * .6;
+  $('share').style.opacity = win(t, SHARE, END + .1, .15, .2);
+  $('share').style.transform = `scale(${back((t - SHARE) / .4) + Math.sin(t * 8) * .015})`;
+  $('ask').style.opacity = win(t, SHARE + .8, END + .1, .2, .2);
+  if (t > SHARE + .2 && t < END) {
+    const k = clamp((t - SHARE - .2) / 1.4), px = lerp(-60, 600, k), py = 520 - Math.sin(k * Math.PI) * 140;
+    FX.save(); FX.translate(px, py); FX.rotate(-.35 + k * .5); FX.font = '64px "Noto Color Emoji"'; FX.fillText('📩', -32, 22); FX.restore();
+    for (let i = 1; i < 12; i++) { const kk = k - i * .02; if (kk < 0) break; FX.fillStyle = `rgba(255,255,255,${.5 - i * .04})`; FX.beginPath(); FX.arc(lerp(-60, 600, kk), 520 - Math.sin(kk * Math.PI) * 140, 4, 0, 7); FX.fill(); }
+  }
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith([]);
+</script>
+</body></html>

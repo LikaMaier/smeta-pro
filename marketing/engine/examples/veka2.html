@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Строили на века 3D</title>
+<style>
+#cv { position: absolute; inset: 0; }
+#fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+#hook { top: 300px !important; font-size: 44px !important; }
+#year { position: absolute; left: 0; right: 0; top: 64px; z-index: 20; text-align: center; font-family: 'PTN'; font-size: 120px; line-height: 1; color: #FFD43B; -webkit-text-stroke: 8px #1b0f05; paint-order: stroke fill; opacity: 0; letter-spacing: 2px; }
+#year.now { color: #7fd0ff; }
+#what { position: absolute; left: 20px; right: 20px; top: 192px; z-index: 20; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 32px; line-height: 1.12; color: #fff; -webkit-text-stroke: 6px #000; paint-order: stroke fill; opacity: 0; }
+#what b { color: #FFD43B; }
+#card { position: absolute; left: 22px; right: 22px; top: 712px; z-index: 20; background: rgba(255,255,255,.97); border-radius: 22px; padding: 14px 18px 16px; box-shadow: 0 14px 34px rgba(0,0,0,.4); opacity: 0; border-left: 10px solid #2fa36b; }
+#card .n { font-family: 'PT', 'Noto Color Emoji'; font-size: 28px; color: #11643a; line-height: 1.08; }
+#card .w { font-family: 'PTR', 'Noto Color Emoji'; font-size: 24px; color: #233; margin-top: 5px; line-height: 1.18; }
+#card .w b { color: #0d2440; }
+#share { position: absolute; left: 20px; right: 20px; top: 300px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 46px; line-height: 1.12; color: #fff; -webkit-text-stroke: 8px #000; paint-order: stroke fill; opacity: 0; }
+#share b { color: #FFD43B; }
+#ask { position: absolute; left: 20px; right: 20px; top: 590px; z-index: 22; text-align: center; font-family: 'PT', 'Noto Color Emoji'; font-size: 34px; color: #fff; -webkit-text-stroke: 7px #000; paint-order: stroke fill; opacity: 0; }
+#dim { position: absolute; inset: 0; background: #0b0a08; opacity: 0; z-index: 21; }
+#flash { position: absolute; inset: 0; background: #fff8e8; opacity: 0; z-index: 18; pointer-events: none; }
+</style></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="year"></div>
+<div id="what"></div>
+<div id="card"><div class="n"></div><div class="w"></div></div>
+<div id="flash"></div>
+<div id="dim"></div>
+<div id="share">Раньше — <b>на века</b>.<br>Сейчас — до первой зимы 😅<br>📩 Отправь своему прорабу</div>
+<div id="ask">Какой «год» у вашей стройки? 👇</div>
+<div id="hook" class="cap"></div>
+<div id="fade"></div>
+<div id="end"><div class="ic">🚂</div><div class="logo">СМЕТА PRO</div><div class="l2">Стройте как в 1851-м —<br><span style="color:#FFD43B">смета за 2 минуты в Telegram</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">День бесплатно + 12 дней за подписку на Instagram</div></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script>
+window.DUR = 27;
+const RD = 7.0, R0 = 2.4, RS = [R0, R0 + RD, R0 + 2 * RD], SHARE = R0 + 3 * RD, END = SHARE + 2.6;
+const OLD = 3.0, NOW = 2.2; // в каждом раунде: тогда (3 с) → сейчас (2,2 с) → как надо (1,8 с)
+const ROUNDS_OLD = [
+  { y: 1495, what: 'Стены Кремля — <b>стоят 530 лет</b>', now: 'Плитку во дворе <b>повело</b><br>после первой зимы 🙃', tip: ['Как надо', '<b>щебень 15–20 см + песок 5 см</b>, каждый слой трамбовать виброплитой, бордюр на бетон'] },
+  { y: 1714, what: 'Кижи: сруб без гвоздей —<br><b>стоит 312 лет</b>', now: 'Каркасник за 3 года<br><b>покрылся плесенью</b> 🤢', tip: ['Как надо', '<b>пароизоляция внутри</b> со склейкой стыков лентой, ветрозащита снаружи и вентзазор'] },
+  { y: 1858, what: 'Исаакий: <b>10 762 сваи</b> в болото —<br>стоит 168 лет', now: 'Дом на болоте <b>треснул</b><br>в первый же год 🫠', tip: ['Как надо', 'перед фундаментом — <b>геология участка</b>: бурение покажет торф и подскажет сваи или плиту'] },
+];
+const ROUNDS = [
+  { y: 1851, what: 'Дорога Петербург–Москва:<br><b>650 км почти по линейке</b>', now: 'Забор на 20 метров —<br><b>волной</b> 🌊', tip: ['Как надо', 'натянуть <b>шнур</b>, столбы — по уровню и <b>в бетон ниже промерзания</b> (~1,2–1,5 м)'] },
+  { y: 1896, what: 'Шуховская башня — <b>сетка из прямых балок</b>,<br>стоит 130 лет', now: 'Навес <b>сложился</b><br>под первым снегом ❄️', tip: ['Как надо', 'считать на снег: в СПб <b>≈ 150 кг/м²</b>, профтруба 60×60–80×80, фермы с шагом ≤ 1 м'] },
+  { y: 1850, what: 'Русская печь: протопил утром —<br><b>тепло до утра</b>', now: 'Тёплый пол <b>греет соседей</b><br>снизу 🔥⬇️', tip: ['Как надо', 'под трубы — <b>утеплитель ЭППС 30–50 мм</b>, по краям — демпферная лента'] },
+];
+const S = new M3.Scene($('cv'));
+const FX = $('fx').getContext('2d');
+const phase = (t) => { for (let i = 2; i >= 0; i--) if (t >= RS[i]) { const u = t - RS[i]; return { i, u, p: u < OLD ? 'old' : u < OLD + NOW ? 'now' : 'tip' }; } return { i: 0, u: t - R0, p: 'hook' }; };
+
+// ---------- 1. Железная дорога / забор ----------
+function kremlin(t) {
+  S.box(-30, 30, -.05, 0, -60, 12, '#8a8f5c', { groundTop: true });
+  S.box(-1.6, 1.6, 0, .25, -60, 12, '#9b8f7a', {});
+  for (let z = 11; z > -60; z -= .9) S.box(-1.3, 1.3, .25, .38, z - .15, z + .15, '#6b4a2e', {});
+  for (const xx of [-.72, .72]) S.box(xx - .06, xx + .06, .38, .52, -60, 12, '#4b4f57', { top: '#9aa0aa' });
+  for (let z = 8; z > -60; z -= 8) { S.cyl('y', [2.6, 2.2, z], .08, 4.4, '#5b4a3a', { seg: 6 }); }
+  S.line([[2.6, 4.2, 12], [2.6, 4.2, -60]], { color: 'rgba(40,30,20,.6)', w: 1.5 });
+}
+function paving(t, k) {
+  S.box(-14, 14, -.05, 0, -12, 12, '#6f8f4f', { groundTop: true });
+  for (let i = 0; i < 9; i++) {
+    const x = -8 + i * 2, off = Math.sin(i * 1.7) * .9 * k, lean = Math.sin(i * 2.3 + 1) * .22 * k, hh = 2 + Math.sin(i * 1.1) * .35 * k;
+    const tf = (p) => M3.rotZ(p, [x, 0, off], lean);
+    S.box(x - .08, x + .08, 0, hh, off - .08, off + .08, '#4d535c', { tf, shadow: true });
+    if (i < 8) { const x2 = x + 2, off2 = Math.sin((i + 1) * 1.7) * .9 * k; S.poly([[x, .25, off], [x2, .25, off2], [x2, 1.95, off2], [x, 1.95, off]], i % 2 ? '#3f6d8f' : '#467aa0', { two: true, shadow: true }); }
+  }
+}
+// ---------- 2. Шуховская башня / навес под снегом ----------
+function kizhi(t) {
+  S.box(-14, 14, -.05, 0, -12, 12, '#8a8f5c', { groundTop: true });
+  const lv = [[0, 3.2], [6, 2.2], [11, 1.7], [15, 1.3]], n = 24;
+  lv.forEach(([y0, r0], s) => { if (s === lv.length - 1) return; const [y1, r1] = lv[s + 1];
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, tw = Math.PI * 2 / n * 5;
+      S.line([[Math.cos(a) * r0, y0, Math.sin(a) * r0], [Math.cos(a + tw) * r1, y1, Math.sin(a + tw) * r1]], { color: '#3c3a36', w: 2 });
+      S.line([[Math.cos(a) * r0, y0, Math.sin(a) * r0], [Math.cos(a - tw) * r1, y1, Math.sin(a - tw) * r1]], { color: '#3c3a36', w: 2 }); }
+    for (const [yy, rr] of [[y0, r0], [y1, r1]]) { const pts = []; for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2; pts.push([Math.cos(a) * rr, yy, Math.sin(a) * rr]); } S.line(pts, { color: '#2a2826', w: 3 }); } });
+  S.cyl('y', [0, 15.6, 0], 1.0, 1.2, '#5b5650', { seg: 14 }); S.box(-3.5, 3.5, 0, .4, -3.5, 3.5, '#9a958b', {});
+}
+function frameHouse(t, k) {
+  S.box(-12, 12, -.05, 0, -10, 10, '#eef3f8', { groundTop: true });
+  const sag = .9 * k;
+  for (const [x, z] of [[-3, -2.5], [3, -2.5], [-3, 2.5], [3, 2.5]]) S.box(x - .08, x + .08, 0, 2.6 - (Math.abs(x) < 1 ? sag : 0), z - .08, z + .08, '#5a6170', { shadow: true });
+  const roofY = (x) => 2.6 - sag * Math.cos(x / 3 * Math.PI / 2);
+  for (let i = 0; i < 12; i++) { const x0 = -3.3 + i * .55, x1 = x0 + .55; S.poly([[x0, roofY(x0) + .05, -2.8], [x1, roofY(x1) + .05, -2.8], [x1, roofY(x1) + .05, 2.8], [x0, roofY(x0) + .05, 2.8]], '#3c6e8f', { two: true, shadow: true }); S.poly([[x0, roofY(x0) + .45, -2.8], [x1, roofY(x1) + .45, -2.8], [x1, roofY(x1) + .45, 2.8], [x0, roofY(x0) + .45, 2.8]], '#ffffff', { two: true }); }
+  S.box(-1.8, 1.8, 0, 1.3, -1.6, 1.6, '#c0392b', { shadow: true }); S.box(-1.2, 1.2, 1.3, 1.9, -1.0, 1.0, '#a93226', {});
+}
+// ---------- 3. Русская печь / тёплый пол «на соседей» ----------
+function isaac(t) {
+  S.box(-8, 8, -.3, 0, -6, 6, '#7a5a3a', { top: '#a07850' });
+  S.box(-8, 8, 0, 4, -6.2, -6, '#8a6a48', {}); for (let y = .3; y < 4; y += .32) S.line([[-8, y, -5.99], [8, y, -5.99]], { color: 'rgba(50,30,15,.35)', w: 1 });
+  S.box(-2.5, 2.5, 0, 1.9, -4.5, -.5, '#f2ede2', { shadow: true }); S.box(-2.5, 2.5, 1.9, 2.4, -4.5, -1.8, '#ece6d9', {});
+  S.box(-1.4, 1.4, 1.9, 4, -4.5, -3.7, '#f2ede2', { shadow: true });
+  const f = .8 + .2 * Math.sin(t * 12); S.box(-.8, .8, .4, 1.4, -.52, -.48, `rgb(255,${140 + 40 * f | 0},40)`, { emit: true });
+  S.extrude([[-1.0, .3], [1.0, .3], [1.0, 1.1], [.7, 1.45], [0, 1.6], [-.7, 1.45], [-1.0, 1.1]], -.5, -.44, '#2a2018', {});
+  S.box(-2.6, 2.6, 0, .35, -.5, -.3, '#e2dccf', {}); S.cyl('y', [0, 4.6, -4.1], .35, 1.4, '#c9c2b4', { seg: 10 });
+  for (const xx of [-1.8, 1.8]) S.box(xx - .3, xx + .3, 1.0, 1.4, -.52, -.46, '#6b5a48', {});
+}
+function swampHouse(t, k) {
+  S.box(-8, 8, -1.6, -1.3, -6, 6, '#c9c2b6', { alpha: .95, top: '#d8d1c4' });
+  S.box(-8, 8, -1.3, 0, -6, 6, '#9aa0a8', { alpha: .55, top: '#c98f58', bias: -2 });
+  for (let z = -5; z <= 5; z += .5) S.cyl('x', [0, -.9, z], .08, 15, '#ff7a1a', { seg: 8 });
+  S.box(-8, 8, -4.6, -1.6, -6, 6, '#e9e4dc', { alpha: .3, bias: -30 });
+  S.box(-3, 0, -4.6, -4.1, -2, 1, '#5f7aa3', {}); S.box(-3, 0, -4.1, -3.7, -2, -1.6, '#6d88b2', {});
+  return null;
+}
+const VIEWS = [[.3, .18, 22, 0, 1.0, -8], [.55, .32, 36, 0, 1.0, 0], [.5, .1, 56, 0, 7.5, 0], [.6, .3, 22, 0, 1.2, 0], [.55, .22, 24, 0, 1.6, -2.5], [.25, .14, 26, 0, -2.0, 0]];
+window.render = function (t) {
+  const ph = phase(t), r = ph.i, isOld = ph.p === 'old' || ph.p === 'hook';
+  const vi = r * 2 + (isOld ? 0 : 1), v = VIEWS[vi];
+  const local = isOld ? Math.max(0, ph.u) : ph.u - OLD;
+  const yaw = v[0] + local * .06 + (ph.p === 'hook' ? t * .05 : 0), dist = v[2] * (1 - Math.min(local, 3) * .03) * (ph.p === 'hook' ? 1.25 - eOut(t / 2.4) * .25 : 1);
+  S.camera([v[3], v[4], v[5]], yaw, v[1], dist, 40);
+  const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, 960);
+  if (isOld) { g.addColorStop(0, '#d9c49a'); g.addColorStop(.6, '#efe2c4'); g.addColorStop(1, '#bfa77a'); } else { g.addColorStop(0, '#7fb4e6'); g.addColorStop(.6, '#d4e7f5'); g.addColorStop(1, '#9fb07e'); }
+  x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+  S.fogColor = isOld ? [225, 210, 180] : [210, 225, 240]; S.fog = [40, 110]; S.L = M3.norm([-.45, .85, .5]); S.amb = .55; S.dif = .52; S.ao = .3; S.aoH = 1.6; S.shadowA = .26;
+  const k = ph.p === 'old' || ph.p === 'hook' ? 0 : ease((ph.u - OLD - .5) / 1.2);
+  let tf = null;
+  if (r === 0) isOld ? kremlin(t) : paving(t, k);
+  if (r === 1) isOld ? kizhi(t) : frameHouse(t, k);
+  if (r === 2) isOld ? isaac(t) : (tf = swampHouse(t, k));
+  S.render();
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  // «сейчас»: последствия
+  if (!isOld && r === 1 && k > 0) for (let i = 0; i < 40; i++) { const p = S.proj([-3.5 + R(i) * 7, 3.6 - ((t * .6 + R(i + 1)) % 1) * 3.6, -2.5 + R(i + 2) * 5]); FX.fillStyle = 'rgba(255,255,255,.9)'; FX.beginPath(); FX.arc(p[0], p[1], 2 + R(i) * 2, 0, 7); FX.fill(); }
+  if (!isOld && r === 2) { const q = S.proj([-1.5, -2.6, 0]); FX.font = '46px "Noto Color Emoji"'; FX.fillText(k > .5 ? '🥵' : '🙂', q[0] - 23, q[1]); FX.font = '700 18px PT'; FX.fillStyle = '#fff'; FX.strokeStyle = '#000'; FX.lineWidth = 4; FX.strokeText('сосед снизу', q[0] - 45, q[1] + 26); FX.fillText('сосед снизу', q[0] - 45, q[1] + 26); }
+  if (!isOld && r === 2 && k > 0) for (let i = 0; i < 10; i++) { const kk = ((t * .7 + i / 10) % 1), x0 = -6 + i * 1.3, a = S.proj([x0, -1.0, 2]), b = S.proj([x0, -1.0 - kk * 3.2, 2]); FX.strokeStyle = `rgba(255,80,40,${(1 - kk) * k})`; FX.lineWidth = 4; FX.beginPath(); FX.moveTo(a[0], a[1]); FX.lineTo(b[0], b[1]); FX.stroke(); FX.fillStyle = FX.strokeStyle; FX.beginPath(); FX.arc(b[0], b[1], 5, 0, 7); FX.fill(); }
+  if (isOld && r === 0 && ph.p !== 'hook') { const p = S.proj([0, 3.4, -30 + ((t * 6) % 40)]); for (let i = 0; i < 8; i++) { FX.fillStyle = `rgba(240,240,240,${.35 - i * .03})`; FX.beginPath(); FX.arc(p[0] + i * 6, p[1] - i * 10, 8 + i * 4, 0, 7); FX.fill(); } }
+  // пылинки старой плёнки
+  if (isOld) for (let i = 0; i < 18; i++) { FX.fillStyle = `rgba(60,40,20,${.25 * R(i + Math.floor(t * 12))})`; FX.fillRect(R(i * 7 + Math.floor(t * 12)) * 540, R(i * 3 + Math.floor(t * 12)) * 960, 2, 2 + R(i) * 8); }
+  const fireG = (r === 2 && isOld) ? [[S.proj([0, .9, -.4])[0], S.proj([0, .9, -.4])[1], 90, 'rgba(255,150,60,.5)']] : [];
+  PFX.apply(x, t, isOld ? { grade: 'sepia(.55) contrast(1.06) saturate(.95) brightness(1.03)', vignette: .5, grain: .06, bloom: .1, glows: fireG } : { bloom: .12, vignette: .32 });
+
+  $('hook').innerHTML = 'Раньше строили <b>по линейке</b>.<br>Сейчас — <b>как получится</b> 😅';
+  $('hook').style.opacity = win(t, 0, R0 - .1, .01, .25);
+  $('hook').style.transform = `scale(${1.04 + Math.sin(t * 3) * .02 - eOut(t / .3) * .04})`;
+  // год: в начале раунда — «перемотка» назад от 2026
+  const Y = $('year'), RR = ROUNDS[r];
+  let yr;
+  if (ph.p === 'hook') yr = Math.round(lerp(2026, RR.y, eOut((t - .3) / 2.0)));
+  else if (ph.p === 'old') yr = r === 0 ? RR.y : Math.round(lerp(2026, RR.y, eOut(ph.u / .7)));
+  else yr = Math.round(lerp(RR.y, 2026, eOut((ph.u - OLD) / .5)));
+  Y.textContent = yr; Y.className = isOld ? '' : 'now';
+  Y.style.opacity = win(t, .2, SHARE, .2, .2);
+  const pop = ph.p !== 'hook' && (ph.u < .3 || (ph.u > OLD && ph.u < OLD + .3)) ? 1 : 0;
+  Y.style.transform = `scale(${1 + pop * .08})`;
+  const W = $('what'); const txt = ph.p === 'hook' ? '' : isOld ? RR.what : RR.now;
+  if (W._t !== txt) { W._t = txt; W.innerHTML = txt; }
+  W.style.opacity = ph.p === 'hook' ? 0 : ph.p === 'tip' ? .0 : clamp(Math.min((ph.u - (isOld ? .4 : OLD + .3)) / .25, 1));
+  // карточка «как надо»
+  const C = $('card');
+  if (C._r !== r) { C._r = r; C.querySelector('.n').textContent = `✅ ${RR.tip[0]}`; C.querySelector('.w').innerHTML = RR.tip[1]; }
+  C.style.opacity = ph.p === 'tip' ? clamp((ph.u - OLD - NOW) / .2) * clamp((RD - ph.u) / .15) : 0;
+  C.style.transform = `translateY(${(1 - eOut((ph.u - OLD - NOW) / .3)) * 40}px)`;
+  $('flash').style.opacity = ph.p !== 'hook' ? Math.max(0, 1 - Math.abs(ph.u) / .18, 1 - Math.abs(ph.u - OLD) / .18) * .75 : 0;
+  $('dim').style.opacity = win(t, SHARE, END + .1, .3, .2) * .6;
+  $('share').style.opacity = win(t, SHARE, END + .1, .15, .2);
+  $('share').style.transform = `scale(${back((t - SHARE) / .4) + Math.sin(t * 5) * .012})`;
+  $('ask').style.opacity = win(t, SHARE + .7, END + .1, .2, .2);
+  $('fade').style.opacity = 0;
+  renderEnd(t, END);
+};
+readyWith([]);
+</script>
+</body></html>

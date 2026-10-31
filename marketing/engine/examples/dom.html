@@ -48,7 +48,7 @@ const STAGES = [
   ['🪟', 'Фасад, окна, двери', 348148],
 ];
 const CUM = STAGES.reduce((a, s) => [...a, (a[a.length - 1] || 0) + s[2]], []);
-const TOTAL = CUM[3];
+const TOTAL = CUM[CUM.length - 1];
 const S = new M3.Scene($('cv'));
 const FX = $('fx').getContext('2d');
 const fmt = (n) => Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ');
@@ -155,7 +155,7 @@ window.render = function (t) {
   $('hook').style.opacity = win(t, 0, 2.4, .01, .25);
   $('hook').style.transform = `scale(${1.05 + Math.sin(t * 9) * .025 - eOut(t / .3) * .05})`;
   // счётчик
-  let si = -1; for (let i = 0; i < 4; i++) if (t >= ST[i]) si = i;
+  let si = -1; for (let i = 0; i < ST.length; i++) if (t >= ST[i]) si = i;
   const prev = si > 0 ? CUM[si - 1] : 0, cur = si >= 0 ? lerp(prev, CUM[si], eOut((t - ST[si] - .3) / (si === 0 ? 3.6 : 2.6))) : 0;
   $('money').innerHTML = `${fmt(Math.max(0, cur))} ₽`;
   $('money').style.opacity = win(t, .3, SHARE, .15, .2);
@@ -166,7 +166,7 @@ window.render = function (t) {
   const card = $('card');
   if (si >= 0 && t < FIN) {
     if (card._i !== si) { card._i = si; card.querySelector('.i').textContent = STAGES[si][0]; card.querySelector('.n').textContent = `${si + 1}. ${STAGES[si][1]}`; card.querySelector('.w').textContent = `+ ${fmt(STAGES[si][2])} ₽`; }
-    const end = si < 3 ? ST[si + 1] : FIN;
+    const end = si < ST.length - 1 ? ST[si + 1] : FIN;
     card.style.opacity = win(t, ST[si] + (si === 0 ? 2.0 : 0), end - .05, .15, .12);
     card.style.transform = `translateX(${(1 - eOut((t - ST[si] - (si === 0 ? 2 : 0)) / .3)) * -50}px)`;
   } else card.style.opacity = 0;
@@ -174,7 +174,7 @@ window.render = function (t) {
   renderTag('tagGood', t, FIN + .3, SHARE - .05);
   const bars = $('bars'); if (!bars.children.length) STAGES.forEach(([i, n, v]) => { bars.insertAdjacentHTML('beforeend', `<div class="bar"><i></i><span><b>${i} ${n}</b><em>${(v / 1000).toFixed(0)} тыс</em></span></div>`); });
   bars.style.opacity = win(t, FIN + .4, SHARE, .2, .2);
-  [...bars.children].forEach((b, i) => { b.firstElementChild.style.width = `${eOut((t - FIN - .5 - i * .2) / .5) * STAGES[i][2] / STAGES[1][2] * 100}%`; });
+  [...bars.children].forEach((b, i) => { b.firstElementChild.style.width = `${eOut((t - FIN - .5 - i * .2) / .5) * STAGES[i][2] / Math.max(...STAGES.map((x) => x[2])) * 100}%`; });
   $('note').style.opacity = win(t, 2.4, SHARE, .2, .2);
   $('dim').style.opacity = win(t, SHARE, END + .1, .3, .2) * .55;
   $('share').style.opacity = win(t, SHARE, END + .1, .15, .2);
