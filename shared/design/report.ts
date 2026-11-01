@@ -9,7 +9,7 @@ export const fenceCloseup = (r: FenceResult) => (r.params.sides.front ? buildFen
 import { siteParamRows, type SiteResult } from './site';
 import { mepParamRows, type MepResult } from './mep';
 
-export const WALL_LABEL: Record<Wall, string> = { open: 'открыто', prof: 'профлист', prof_full: 'профлист на всю высоту', mesh: 'сетка', prof_mesh: 'профлист + сетка до кровли', rail: 'перила 1,0 м', poly: 'поликарбонат', sandwich: 'сэндвич-панели 100 мм', wood: 'обшивка доской', wood_low: 'доска снизу до 1,0 м' };
+export const WALL_LABEL: Record<Wall, string> = { open: 'открыто', prof: 'профлист', prof_full: 'профлист на всю высоту', mesh: 'сетка', prof_mesh: 'профлист + сетка до кровли', rail: 'перила 1,0 м', poly: 'поликарбонат', sandwich: 'сэндвич-панели 100 мм', wood: 'обшивка доской', wood_low: 'доска снизу до 1,0 м' , bars: 'решётка из профтрубы (вольер)' };
 const SIDE_LABEL = { front: 'Спереди (въезд)', back: 'Сзади', left: 'Слева', right: 'Справа' } as const;
 
 export function paramRows(r0: CanopyResult | FenceResult | SiteResult | MepResult): [string, string][] {

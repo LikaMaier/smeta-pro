@@ -117,6 +117,7 @@ export const DIRECTIONS: Direction[] = [
   { id: 'build', icon: '🏡', title: 'Постройки', text: 'Навесы, бытовки, гаражи, беседки — 3D', kinds: [
     { id: 'd-canopy', icon: '🚗', title: 'Навес', text: 'Для машины, террасы, двора', to: '/designer?preset=car' },
     { id: 'd-bytovka', icon: '🏠', title: 'Бытовка / хозблок', text: 'Каркасная, утеплённая, с окнами', to: '/designer?preset=bytovka' },
+    { id: 'd-aviary', icon: '🐕', title: 'Вольер для собак', text: 'Решётка из профтрубы, профнастил, бетонный пол', to: '/designer?preset=aviary' },
     { id: 'd-gazebo', icon: '⛺', title: 'Беседка', text: 'Деревянная или металлическая', to: '/designer?preset=gazebo-wood' },
     { id: 'd-garage', icon: '🚙', title: 'Гараж', text: 'Каркасный из профиля', to: '/designer?preset=garage' },
     d3('car2', '🚗', 'Навес на 2 машины 6×6', 'профлист, водосток'),
@@ -244,6 +245,7 @@ const KEYWORDS: Record<string, string> = {
   'm-paving:rubble': 'щебень площадка парковка отсыпка стоянка',
   't:tko': 'площадка тко мусорные контейнеры',
   'd-canopy': 'навес для машины автомобиля карпорт двор',
+  'd-aviary': 'вольер собака собак псарня будка клетка для собак',
   'd-bytovka': 'бытовка хозблок сарай вагончик каркасный домик',
   'd-gazebo': 'беседка барбекю мангал',
   'd-garage': 'гараж мастерская бокс',

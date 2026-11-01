@@ -10,10 +10,10 @@ import { Builder } from '../masters';
 import { mergePrices, type DesignPrices } from './prices';
 
 export type V3 = [number, number, number];
-export type MemberKind = 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster' | 'brace' | 'tie' | 'bollard' | 'bumper' | 'pillar' | 'cpillar' | 'trunk' | 'wireL' | 'wireS' | 'wireP' | 'wireN' | 'pipeC' | 'pipeH' | 'pipeS';
+export type MemberKind = 'bar' | 'post' | 'beam' | 'rafter' | 'chord' | 'web' | 'purlin' | 'rail' | 'frame' | 'hip' | 'handrail' | 'baluster' | 'brace' | 'tie' | 'bollard' | 'bumper' | 'pillar' | 'cpillar' | 'trunk' | 'wireL' | 'wireS' | 'wireP' | 'wireN' | 'pipeC' | 'pipeH' | 'pipeS';
 export interface Member { kind: MemberKind; profile: string; a: V3; b: V3 }
 export interface Panel { kind: 'window' | 'roof' | 'prof' | 'mesh' | 'slab' | 'deck' | 'gate' | 'door' | 'house' | 'poly' | 'sandwich' | 'wood' | 'paving' | 'strip' | 'container' | 'curb' | 'plank' | 'concrete' | 'block' | 'stone' | 'tree' | 'grass' | 'gravel' | 'wall' | 'lid' | 'soil' | 'floor' | 'tile' | 'fixture' | 'pointE' | 'pointL' | 'pipeBox' | 'cut'; pts: V3[] }
-export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh' | 'rail' | 'poly' | 'sandwich' | 'wood' | 'wood_low';
+export type Wall = 'open' | 'prof' | 'prof_full' | 'mesh' | 'prof_mesh' | 'rail' | 'bars' | 'poly' | 'sandwich' | 'wood' | 'wood_low';
 export type Side = 'front' | 'back' | 'left' | 'right';
 export type ObjKind = 'canopy' | 'tko' | 'lean' | 'visor' | 'gazebo' | 'garage' | 'greenhouse' | 'woodshed';
 export const OBJ_LABEL: Record<ObjKind, string> = { canopy: 'Навес', tko: 'Площадка ТКО', lean: 'Пристенный навес', visor: 'Козырёк', gazebo: 'Беседка', garage: 'Гараж / ангар', greenhouse: 'Теплица', woodshed: 'Дровник / хозблок' };
@@ -65,6 +65,8 @@ export interface CanopyParams {
   rebar: 'steel' | 'composite';
   snow: number;         // снеговой район 1–8
   color: string;        // RAL; 'none' — без покраски (оцинковка / естественный металл)
+  sheetZinc?: boolean;  // профлист оцинкованный (эконом), каркас при этом красится в color
+  barStep?: number;     // решётка «bars»: шаг прутьев, м (по умолчанию 0,1)
   postA?: number; postB?: number; postT?: number; // свой столб: ширина × длина сечения × толщина стенки, мм (пусто — подбирается сам)
   waste: number;        // запас на материалы, %
 }
@@ -531,7 +533,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
   }
 
   // ---------- стены: обшивка, перила, проёмы ----------
-  let profFixedSheets = 0, profFixedArea = 0, profFullArea = 0, meshArea = 0, railLen = 0, wallAvgH = 0, polyWall = 0, sandWall = 0, woodWall = 0;
+  let profFixedSheets = 0, profFixedArea = 0, profFullArea = 0, meshArea = 0, railLen = 0, barsArea = 0, wallAvgH = 0, polyWall = 0, sandWall = 0, woodWall = 0;
   const wallRun = (d: { pt: (t: number) => [number, number]; len: number }, w: Wall, ops: Opening[], extra: number[], tA: number, tB: number) => {
     if (w === 'open' && !ops.length) return;
     const top = (t: number) => topAt(...d.pt(t)) - 0.05;
@@ -575,6 +577,13 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
         if (w === 'prof_mesh') meshArea += quad(t0, t1, c(Math.max(zb, p.profH)), top, 'mesh');
         if (!op) [0.2, p.profH - 0.1].forEach((z) => railAt(t0, t1, z));
         if (w === 'prof_mesh') railAt(t0, t1, Math.max(zb, p.profH));
+      } else if (w === 'bars') {
+        // решётка вольера: вертикальные прутья из профтрубы 25×25 с шагом barStep, рёбра 40×20 внизу, посередине и (над дверью) по низу
+        const st = p.barStep || 0.1, z0 = op ? op.h : 0.1;
+        const n = Math.max(1, Math.round((t1 - t0) / st));
+        for (let k2 = 1; k2 < n; k2++) { const tt = t0 + ((t1 - t0) * k2) / n, [x, y] = d.pt(tt); if (top(tt) - z0 > 0.05) add('bar', '25×25×1.5', [x, y, z0], [x, y, top(tt)]); }
+        if (!op) [0.1, 1.0].forEach((z) => railAt(t0, t1, z));
+        barsArea += (t1 - t0) * Math.max(0, (top(t0) + top(t1)) / 2 - z0);
       } else if (w === 'rail' && !op) {
         const [x0, y0] = d.pt(t0), [x1, y1] = d.pt(t1);
         add('handrail', '40×40×2', [x0, y0, 1.0], [x1, y1, 1.0]);
@@ -600,7 +609,14 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     for (const o of ops) {
       const [x0, y0] = d.pt(o.a0), [x1, y1] = d.pt(o.a1);
       const z0 = o.z0 ?? 0.05;
-      panels.push({ kind: o.kind, pts: [[x0, y0, z0], [x1, y1, z0], [x1, y1, o.h], [x0, y0, o.h]] });
+      const barsWall = p.walls[side] === 'bars' && o.kind === 'door';
+      if (barsWall) {
+        // дверь-решётка: рамка 40×40 + прутья 25×25 с тем же шагом
+        add('frame', '40×40×2', [x0, y0, 0.1], [x1, y1, 0.1]); add('frame', '40×40×2', [x0, y0, 0.95], [x1, y1, 0.95]);
+        const st = p.barStep || 0.1, n = Math.max(2, Math.round((o.a1 - o.a0) / st));
+        for (let k2 = 1; k2 < n; k2++) { const [x, y] = d.pt(o.a0 + ((o.a1 - o.a0) * k2) / n); add('bar', '25×25×1.5', [x, y, 0.1], [x, y, o.h - 0.04]); }
+        barsArea += (o.a1 - o.a0) * (o.h - 0.1);
+      } else panels.push({ kind: o.kind, pts: [[x0, y0, z0], [x1, y1, z0], [x1, y1, o.h], [x0, y0, o.h]] });
       const fp = o.kind === 'gate' ? postProf : wood ? '100×50×0' : '60×40×2';
       add('frame', fp, [x0, y0, 0], [x0, y0, top(o.a0) + 0.05]);
       add('frame', fp, [x1, y1, 0], [x1, y1, top(o.a1) + 0.05]);
@@ -782,7 +798,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     const g = byProf.get(m.profile) || { pieces: [], kinds: new Set() };
     g.pieces.push(dist(m.a, m.b)); g.kinds.add(m.kind); byProf.set(m.profile, g);
   }
-  const KIND: Record<string, string> = { post: 'столбы', beam: 'обвязка', rafter: 'стропила', chord: 'пояса ферм', web: 'решётка ферм', purlin: slats ? 'ламели' : wood ? 'обрешётка' : 'прогоны', rail: 'ригели обшивки', frame: 'рамы проёмов', hip: 'конёк и рёбра', handrail: 'перила', baluster: 'балясины', brace: 'консоли', tie: 'связи жёсткости', bollard: 'колесоотбойники', bumper: 'отбойник' };
+  const KIND: Record<string, string> = { post: 'столбы', beam: 'обвязка', rafter: 'стропила', chord: 'пояса ферм', web: 'решётка ферм', purlin: slats ? 'ламели' : wood ? 'обрешётка' : 'прогоны', rail: 'ригели обшивки', bar: 'решётка вольера, прутья', frame: 'рамы проёмов', hip: 'конёк и рёбра', handrail: 'перила', baluster: 'балясины', brace: 'консоли', tie: 'связи жёсткости', bollard: 'колесоотбойники', bumper: 'отбойник' };
   const steel = [...byProf.entries()].map(([profile, g]) => {
     const pr = P(profile);
     const len = g.pieces.reduce((a, b) => a + b, 0);
@@ -848,10 +864,11 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
 
   b.sec('Кровля');
   // без покраски: листы — оцинкованные, у сэндвича и черепицы покрытие заводское
-  const ral = noPaint ? 'оцинкованный' : p.color;
+  const zincSheets = noPaint || !!p.sheetZinc;
+  const ral = zincSheets ? 'оцинкованный' : p.color;
   const ralF = noPaint ? '(заводское покрытие)' : p.color;
   const pg0 = PROF_GRADE[p.profGrade] || PROF_GRADE.C8;
-  const pg = { ...pg0, price: Math.round((p.profGrade === 'HC35' ? PR.profHC35 : p.profGrade === 'C20' ? PR.profC20 : PR.profC8) * (noPaint ? 0.88 : 1)) };
+  const pg = { ...pg0, price: Math.round((p.profGrade === 'HC35' ? PR.profHC35 : p.profGrade === 'C20' ? PR.profC20 : PR.profC8) * (zincSheets ? 0.88 : 1)) };
   if (p.cover === 'prof' && !arch) {
     const deg = (Math.atan((hHigh - hLow) / (hip ? hs / 2 : p.roof === 'gable' ? span / 2 : span)) * 180) / Math.PI;
     if (deg < pg.minDeg) warnings.push(`Уклон кровли ${r2(deg, 1)}° — для профнастила ${pg.name} нужно не меньше ${pg.minDeg}°, иначе возможны протечки по нахлёстам. Увеличьте перепад высот или возьмите ${pg.name === 'НС-35' ? 'сэндвич-панели' : 'НС-35'}.`);
@@ -895,10 +912,10 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
 
   b.sec('Ограждение');
   if (profFixedArea > 0) {
-    b.mat(`Профнастил стеновой С-8 ${ral}, лист 1,2 × ${p.profH} м`, Math.ceil(profFixedSheets * k), 'лист', Math.round(1.2 * p.profH * PR.profC8));
+    b.mat(`Профнастил стеновой С-8 ${ral}, лист 1,2 × ${p.profH} м`, Math.ceil(profFixedSheets * k), 'лист', Math.round(1.2 * p.profH * PR.profC8 * (zincSheets ? 0.88 : 1)));
   }
   if (profFullArea > 0) {
-    b.mat(`Профнастил стеновой С-8 ${ral}${kinkSide('front') || kinkSide('left') ? ' (с подрезкой фронтонов)' : ''}`, profFullArea * 1.1 * k, 'м²', PR.profC8);
+    b.mat(`Профнастил стеновой С-8 ${ral}${kinkSide('front') || kinkSide('left') ? ' (с подрезкой фронтонов)' : ''}`, profFullArea * 1.1 * k, 'м²', Math.round(PR.profC8 * (zincSheets ? 0.88 : 1)));
     b.mat('Уголки наружные и обрамление проёмов', (4 * Math.max(wallAvgH, 2) + openings.reduce((a, o) => a + 2 * o.h + (o.a1 - o.a0), 0)) * k, 'пог. м', 350);
   }
   if (profArea > 0) {
@@ -947,7 +964,11 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     if (!gate) b.sec('Ворота и двери');
     for (const o of doors) {
       const sz = `${Math.round((o.a1 - o.a0) * 1000)}×${Math.round(o.h * 1000)}`;
-      if (light) {
+      if (p.walls[o.side] === 'bars') {
+        b.mat(`Фурнитура двери-решётки ${sz}: петли гаражные 3 шт, задвижка, проушины под замок`, 1, 'компл', 1200);
+        b.mat('Замок навесной', 1, 'шт', 600);
+        b.work('Монтаж калитки', 1);
+      } else if (light) {
         b.mat(`Дверь теплицы ${sz} из профиля с поликарбонатом, петли, ручка`, 1, 'шт', 4500);
         b.mat('Форточка теплицы с ручкой', 2, 'шт', 1800);
         b.work('Монтаж калитки', 1);
@@ -1009,7 +1030,9 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     b.sec('Основание (плита)');
     const depth = p.slabT + p.sand + p.gravel;
     const digArea = (sx + 0.6) * (sy + 0.6);
-    b.work('Разработка грунта экскаватором', digArea * depth); b.work('Вывоз грунта', digArea * depth * 1.2); b.work('Экскаватор-погрузчик', 1);
+    // маленькая площадка (вольер, дровник) — копаем вручную, технику не заказываем
+    if (digArea * depth < 6) { b.work('Разработка грунта вручную', digArea * depth); b.work('Вывоз грунта', digArea * depth * 1.2); }
+    else { b.work('Разработка грунта экскаватором', digArea * depth); b.work('Вывоз грунта', digArea * depth * 1.2); b.work('Экскаватор-погрузчик', 1); }
     b.work('Укладка геотекстиля', digArea); b.mat('Геотекстиль 200 г/м²', digArea * 1.15, 'м²', 45);
     b.work('Устройство песчаной подушки с уплотнением', slabArea * p.sand); b.mat('Песок крупный/средний', slabArea * p.sand * 1.2, 'м³', 1100);
     b.work('Устройство щебёночной подушки с уплотнением', slabArea * p.gravel); b.mat('Щебень фр. 20–40', slabArea * p.gravel * 1.25, 'м³', 2300);
@@ -1213,6 +1236,7 @@ export function buildCanopy(p0: Partial<CanopyParams>, ownPrices?: Partial<Desig
     { label: 'Сэндвич-панели на стенах', value: r2(sandWall, 1), unit: 'м²' },
     { label: 'Обшивка доской', value: r2(woodWall, 1), unit: 'м²' },
     { label: 'Сетка', value: r2(meshArea, 1), unit: 'м²' },
+    { label: 'Решётка', value: r2(barsArea, 1), unit: 'м²' },
     { label: 'Перила', value: r2(railLen, 1), unit: 'пог. м' },
     { label: 'Столбов', value: nPosts, unit: 'шт' },
     { label: p.contType === '8' ? 'Бункеров' : 'Контейнеров', value: contPlaced, unit: `шт по ${p.contType} м³` },

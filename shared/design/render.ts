@@ -132,7 +132,7 @@ export function render3d(res: RenderRes, yawDeg = -35, pitchDeg = 28, width = 80
     }
   }
   // панели: кровля, профлист, сетка
-  const col = colorOf(res.params.color);
+  const col = res.params.sheetZinc ? NO_PAINT_COLOR : colorOf(res.params.color);
   const roofCol = res.params.roofColor ? colorOf(res.params.roofColor) : col;
   // насколько выступает каркас из плоскости стены: полстолба + запас
   const cladOff = Math.max(0.03, ...res.members.filter((m) => m.kind === 'post' || m.kind === 'frame' || m.kind === 'rail').map((m) => Math.max(...sizeOf(m.profile)) / 2)) + 0.012;
@@ -278,7 +278,7 @@ export function drawings(res0: CanopyResult | FenceResult | SiteResult | MepResu
   if ((res0 as any).site) return siteDrawings(res0 as SiteResult);
   const res = res0 as CanopyResult;
   const { L, W, overhang: ov, walls } = res.params;
-  const col = colorOf(res.params.color);
+  const col = res.params.sheetZinc ? NO_PAINT_COLOR : colorOf(res.params.color);
   const sheets: Sheet[] = [];
   const posts = res.members.filter((m) => m.kind === 'post');
 
@@ -436,7 +436,7 @@ export function drawings(res0: CanopyResult | FenceResult | SiteResult | MepResu
     const wt = res.params.walls[side];
     const isHouse = res.params.attach && side === res.params.highSide;
     const ops = res.openings.filter((o) => o.side === side).map((o: any) => o.kind === 'gate' ? `ворота ${res.params.gate === 'sectional' ? 'секционные' : 'распашные'} ${f2(o.a1 - o.a0)}×${f2(o.h)} м` : o.kind === 'window' ? `окно ${f2(o.a1 - o.a0)}×${f2(o.h - (o.z0 || 0))} м` : `дверь ${f2(o.a1 - o.a0)}×${f2(o.h)} м`);
-    const wtLabel = (isHouse ? 'со стороны дома (стена дома не показана)' : { open: 'открытая сторона', prof: `профлист ${res.params.profH} м`, prof_full: 'профлист на всю высоту', mesh: 'сетка на всю высоту', prof_mesh: `профлист ${res.params.profH} м + сетка до кровли`, rail: 'перила 1,0 м', poly: 'поликарбонат', sandwich: 'сэндвич-панели 100 мм', wood: 'обшивка доской', wood_low: 'доска до 1,0 м' }[wt]) + (ops.length ? `; ${ops.join(', ')}` : '');
+    const wtLabel = (isHouse ? 'со стороны дома (стена дома не показана)' : { open: 'открытая сторона', prof: `профлист ${res.params.profH} м`, bars: 'решётка из профтрубы 25×25, шаг 100 мм', prof_full: 'профлист на всю высоту', mesh: 'сетка на всю высоту', prof_mesh: `профлист ${res.params.profH} м + сетка до кровли`, rail: 'перила 1,0 м', poly: 'поликарбонат', sandwich: 'сэндвич-панели 100 мм', wood: 'обшивка доской', wood_low: 'доска до 1,0 м' }[wt]) + (ops.length ? `; ${ops.join(', ')}` : '');
     const [l1, l2] = wtLabel.split('; ');
     pr.push({ t: 'text', x: width / 2, y: -1.55, s: l1, size: 0.3, anchor: 'middle', c: '#555' });
     if (l2) pr.push({ t: 'text', x: width / 2, y: -1.95, s: l2, size: 0.3, anchor: 'middle', c: '#555' });
