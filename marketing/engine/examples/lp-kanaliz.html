@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Канализация в частном доме</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('🚽', 'Канализация под ключ —', 'смета за 2 минуты в Telegram'));
+window.DUR = 40;
+const T1 = 3.2, T2 = 9, T3 = 14, T4 = 21, T5 = 26, T6 = 31, TE = 36;
+const STEPS = [[T1, 'ШАГ 1', 'Траншея'], [T2, 'ШАГ 2', 'Песчаная подушка'], [T3, 'ШАГ 3', 'Труба и уклон'], [T4, 'ШАГ 4', 'Ввод в дом'], [T5, 'ШАГ 5', 'Септик'], [T6, 'ШАГ 6', 'Засыпка и проверка']];
+const SUBS = [
+  [T1 + .2, 6.2, 'Траншея от дома к септику —<br>глубина <b>1–1,2 м</b>'],
+  [6.2, T2 - .1, 'Мельче — нужна <b>утеплённая труба</b>,<br>иначе зимой замёрзнет'],
+  [T2 + .2, T3 - .1, 'На дно — <b>песок 10–15 см</b>,<br>проливаем и трамбуем'],
+  [T3 + .2, 17, 'Труба ПВХ <b>110 мм</b> — раструбом<br>навстречу стокам'],
+  [17, T4 - .1, 'Уклон <b>2 см на метр</b>: меньше — засор,<br>больше — вода убегает, мусор остаётся'],
+  [T4 + .2, T5 - .1, 'Через фундамент — <b>в гильзе</b>,<br>на поворотах — <b>ревизия</b> для прочистки'],
+  [T5 + .2, T6 - .1, 'Септик — <b>не ближе 5 м</b> от дома,<br>колодца с водой — от 50 м'],
+  [T6 + .2, TE - .1, 'Засыпаем песком, <b>без камней</b> —<br>и всё уходит самотёком'],
+];
+const CAM = [
+  [0, .42, .2, 15.5, -4, 1.3, -1.6], [T1, .38, .19, 15, -3.2, 1.0, -1.4], [T1 + 1.6, .26, .17, 14, 1.8, -.2, -1.0], [T2 - .4, .24, .16, 13.5, 2.5, -.3, -1.0],
+  [T2 + .6, .14, .13, 8.5, 1.4, -1.0, -.8], [T3 - .3, .14, .13, 8.5, 1.2, -1.0, -.8], [T3 + .8, .3, .16, 11, -1.5, -.4, -.9], [16.6, .3, .16, 11, -.5, -.6, -.9],
+  [17.6, .12, .08, 6.2, 2.7, -.9, -.5], [T4 - .3, .16, .08, 6.4, 3.0, -.9, -.5], [T4 + .7, .62, .13, 6.4, -2.3, -.5, -.6], [T5 - .4, .55, .13, 6.2, -2.1, -.4, -.6],
+  [T5 + .8, .2, .2, 13.5, 7.3, -.6, -1.4], [T6 - .3, .2, .2, 13, 7.6, -.7, -1.4], [T6 + 1.2, .3, .2, 19, 1.4, .3, -1.6], [TE, .34, .2, 18.5, 1, .4, -1.6], [99, .34, .2, 18.5, 1, .4, -1.6],
+];
+const S = LP.init(), P = LP.P;
+const HX0 = -8.4, HX1 = -2, HZ0 = -4.2, FY = .5, WY = 3.2, PZ = -.55;
+const pY = (x) => -.95 - (x - -3.4) * .028; // уклон (визуально чуть преувеличен)
+const PIPE = [[-3.4, FY + .05, -.95], [-3.4, -.8, PZ], [-3.25, pY(-3.25), PZ], [7.6, pY(7.6), PZ]];
+
+function house() {
+  // плита пола, стены, крыша — фасад срезан плоскостью z = 0
+  S.box(HX0, HX1, FY - .25, FY, HZ0, 0, '#d0d3d2', { top: '#d6dfe0' });
+  S.box(HX0, HX1, FY, WY, HZ0, HZ0 + .3, '#e6e0d6', { front: '#d9e5e8' });
+  S.box(HX0, HX0 + .3, FY, WY, HZ0, 0, '#ece6dc', { front: '#e3ddd2' });
+  S.box(HX1 - .3, HX1, FY, WY, HZ0, 0, '#ece6dc', { front: '#e3ddd2' });
+  S.box(HX0, HX1, WY, WY + .25, HZ0, 0, '#e1dbd0');
+  const xm = (HX0 + HX1) / 2, yr = WY + 2.3, c = [xm, WY + 1, HZ0 / 2];
+  S.poly([[HX0 - .4, WY + .1, 0], [xm, yr, 0], [xm, yr, HZ0 - .4], [HX0 - .4, WY + .1, HZ0 - .4]], P.roof, { center: c, shadow: true });
+  S.poly([[xm, yr, 0], [HX1 + .4, WY + .1, 0], [HX1 + .4, WY + .1, HZ0 - .4], [xm, yr, HZ0 - .4]], P.roof, { center: c, shadow: true });
+  S.poly([[HX0, WY + .25, -.02], [HX1, WY + .25, -.02], [xm, yr - .15, -.02]], '#e9e2d5', { two: true, bias: .5 });
+  for (let i = 1; i < 6; i++) { const x = lerp(HX0 + .3, xm, i / 6); S.box(x - .05, x + .05, WY + .25, lerp(WY + .25, yr - .2, i / 6), -.3, -.05, '#8a5a3c', { bias: -.1 }); }
+  // санузел: унитаз, раковина, ванна
+  S.box(-3.75, -3.05, FY, FY + .42, -1.35, -.65, '#fbfbfa'); S.box(-3.8, -3.0, FY + .42, FY + .48, -1.4, -.6, '#f1f1ef');
+  S.box(-3.8, -3.0, FY + .45, FY + 1.05, -1.75, -1.45, '#fbfbfa');
+  S.box(-5.8, -5.0, FY + .8, FY + 1.0, HZ0 + .3, HZ0 + .85, '#fbfbfa'); S.box(-5.5, -5.3, FY, FY + .8, HZ0 + .35, HZ0 + .6, '#f1f1ef');
+  S.box(-5.65, -5.15, FY + 1.3, FY + 2.0, HZ0 + .31, HZ0 + .33, '#b9d3db');
+  S.box(-8.1, -6.4, FY, FY + .6, HZ0 + .3, HZ0 + 1.1, '#fbfbfa', { top: '#e8f1f3' });
+  // фундамент-лента с гильзой под трубу
+  for (const [a, b] of [[HX0, HX0 + .4], [HX1 - .4, HX1]]) { S.box(a, b, -1.3, FY - .25, -2, 0, P.concrete, { front: '#c4c7c8' }); }
+}
+const FX = LP.FX;
+window.render = function (t) {
+  LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fenceZ: -9.5 });
+  [[13, -6, 1.1, 2], [-12.5, -5, 1.2, 0], [4, -7.5, .95, 3]].forEach((q) => LP.tree(...q));
+  const dig = ease((t - T1 - .3) / 4.8), pit = ease((t - T5 + .3) / 1.6);
+  const tx1 = lerp(-1.6, 6.9, dig);
+  const holes = [{ x0: HX0 + .4, x1: HX1 - .4, y: -1.35, z0: -1.0 }];
+  if (dig > .01) holes.push({ x0: HX1 - .4, x1: tx1, y: -1.45 * clamp(dig * 3), z0: -1.0 });
+  holes.push({ x0: 6.9, x1: 10.8, y: t > T5 - .3 ? -2.9 * pit : 0, z0: -2.7 });
+  if (dig > .99) holes[1].x1 = 6.9;
+  LP.ground({ x0: -15, x1: 16, zBack: -9.5, yB: -9, holes: holes.filter((h) => h.x1 > h.x0) });
+  // фундамент поверх (перекрывает ямы), в правой ленте — проём под трубу
+  house();
+  const sand = ease((t - T2 - .2) / 1.4);
+  if (sand > .01) { S.box(HX1, lerp(HX1, 6.9, sand), -1.45, -1.3, -1.0, 0, P.sand, { bias: -.2 }); S.box(HX0 + .4, HX1 - .4, -1.35, -1.25, -1.0, 0, P.sand, { bias: -.2 }); }
+  // труба появляется по частям
+  const pk = clamp((t - T3 - .2) / 2.2);
+  if (pk > 0) {
+    const n = PIPE.length - 1, f = pk * n, pts = [PIPE[0]];
+    for (let i = 0; i < n; i++) { if (f <= i) break; const k = Math.min(1, f - i); pts.push(PIPE[i].map((v, j) => lerp(v, PIPE[i + 1][j], k))); }
+    LP.pipe(pts, .09, P.pipe, { bias: -1.5 });
+    // раструбы каждые ~2 м
+    for (let x = -1.5; x < lerp(-3.4, 7.6, pk) - .5; x += 2.1) LP.rod([x, pY(x), PZ], [x + .25, pY(x + .25), PZ], .118, '#e2e2dc', { seg: 12, bias: -1.6 });
+  }
+  if (t > T4) { // гильза и ревизия
+    LP.rod([HX1 - .5, pY(HX1 - .5), PZ], [HX1 + .1, pY(HX1 + .1), PZ], .15, '#6e7378', { seg: 12, caps: false, bias: -1.2, alpha: .85 });
+    const rv = ease((t - T4 - 1.5) / .8);
+    if (rv > .01) { LP.rod([1.6, pY(1.6), PZ], [1.6, lerp(pY(1.6), -.25, rv), PZ], .1, P.pipe, { seg: 12, bias: -1.7 }); S.cyl('y', [1.6, lerp(pY(1.6), -.25, rv) + .04, PZ], .13, .08, '#d9dcd9', { seg: 12, bias: -1.8 }); }
+  }
+  // септик
+  if (t > T5 - .3) {
+    const drop = eOut((t - T5 - .9) / 1.3), y0 = lerp(3.5, 0, drop);
+    if (t > T5 + .9) {
+      S.box(7.4, 10.3, -2.8 + y0, .15 + y0, -2.4, -.35, '#5f8f6a', { alpha: .58, bias: -1 });
+      S.box(8.8, 8.9, -2.6 + y0, -.3 + y0, -2.35, -.4, '#4c7a57', { alpha: .7, bias: -1.1 });
+      S.cyl('y', [8.1, .3 + y0, -1.4], .3, .35, '#3f6d4b', { seg: 14, bias: -1.2 }); S.cyl('y', [9.6, .3 + y0, -1.4], .3, .35, '#3f6d4b', { seg: 14, bias: -1.2 });
+      const lvl = t > T6 ? ease((t - T6 - 1.5) / 3) * .25 : 0;
+      S.box(7.45, 8.78, -2.75 + y0, -1.6 + lvl + y0, -2.35, -.4, '#7a8a5a', { alpha: .55, bias: -1.05 });
+    }
+  }
+  // землекоп
+  if (t < T2 + .5) LP.person(lerp(-.4, 6.2, dig), 0, -1.55, -.5, t, dig > 0 && dig < 1 ? 'dig' : 'stand');
+  else if (t > T6 - .2) LP.person(-.6, 0, -1.6, .2, t, 'stand');
+  if (dig > .01 && t < T3) { const h = ease(dig) * .55; S.sphere([lerp(-.5, 3, dig), 0, -2.6], 1.6 * Math.sqrt(dig) + .2, '#a77a4b', { seg: 9, rings: 5, sy: h / (1.6 * Math.sqrt(dig) + .2) }); }
+  // засыпка
+  const bf = ease((t - T6 - .2) / 1.4);
+  if (bf > .01) S.box(HX1, 6.9, -1.3, lerp(-1.3, -.12, bf), -1.0, 0, '#d9be86', { alpha: .45, bias: -2 });
+  // вода
+  if (t > T6 + 1.2) { const fp = [[-3.4, FY + .4, -1.1], ...PIPE.slice(1), [7.9, pY(7.9) - .3, PZ]]; LP.flow(fp, t, win(t, T6 + 1.2, TE - .1, .4, .3)); }
+  S.render();
+  if (t > 17 && t < T4) { // уровень на трубе
+    const lv = win(t, 17.2, T4 - .2, .3, .3), x0 = 2.0, x1 = 3.4;
+    const L = (x) => S.proj([x, pY(x) + .12, PZ + .1]);
+    const a = L(x0), b = L(x1);
+    FX.save(); FX.globalAlpha = lv; FX.strokeStyle = '#3b3b2a'; FX.lineWidth = 1; FX.fillStyle = '#f2cc2f';
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    FX.translate(a[0], a[1]); FX.rotate(ang); FX.beginPath(); FX.roundRect(0, -14, len, 14, 3); FX.fill(); FX.stroke();
+    FX.fillStyle = '#7fd36a'; FX.fillRect(len / 2 - 9, -11, 18, 8); FX.fillStyle = '#245c1a'; FX.beginPath(); FX.arc(len / 2 + 3.5 * clamp((t - 18) / .6), -7, 2.6, 0, 7); FX.fill();
+    FX.restore();
+  }
+  // выноски
+  LP.label('Глубина 1–1,2 м', [2.2, -.7, -.98], -60, -150, win(t, T1 + 2.2, T2 - .2));
+  LP.label('Песок 10–15 см', [2.4, -1.38, -.5], -40, -120, win(t, T2 + 1.3, T3 - .2));
+  LP.label('ПВХ 110 мм', [-.3, pY(-.3), PZ + .1], 30, -130, win(t, T3 + 1.6, 16.9));
+  LP.label('2 см на 1 метр', [2.7, pY(2.7) + .55, PZ + .1], 0, -95, win(t, 17.7, T4 - .2), 'o', 21);
+  LP.label('Гильза', [HX1 - .2, pY(HX1 - .2) + .1, PZ], 50, -120, win(t, T4 + .5, T5 - .2));
+  LP.label('Ревизия', [1.6, -.3, PZ], 60, -90, win(t, T4 + 2.2, T5 - .2));
+  LP.label('≥ 5 м от дома', [7.4, .2, -.4], -40, -130, win(t, T5 + 2.2, T6 - .2), 'o');
+  LP.label('Самотёком', [4.5, pY(4.5), PZ], -10, -200, win(t, T6 + 2.0, TE - .2), 'g');
+  if (t > T5 + 2.2 && t < T6 - .2) S.line([[HX1, .05, .02], [7.4, .05, .02]], { color: '#ff8a3d', w: 2.5, dash: [6, 6], alpha: win(t, T5 + 2.2, T6 - .2) });
+  if (t > T5 + 2.2 && t < T6 - .2) { const a = S.proj([HX1, .05, .02]), b = S.proj([7.4, .05, .02]), al = win(t, T5 + 2.2, T6 - .2); FX.save(); FX.globalAlpha = al; FX.strokeStyle = '#ff8a3d'; FX.lineWidth = 2.5; FX.setLineDash([6, 6]); FX.beginPath(); FX.moveTo(a[0], a[1]); FX.lineTo(b[0], b[1]); FX.stroke(); FX.restore(); }
+  LP.post(t);
+  LP.hook(t, 'Канализация в частном доме:<br><b>как сделать правильно</b>', T1);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+  $('fade').style.opacity = 0;
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Забор из профлиста</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('🏡', 'Забор под ключ —', 'смета за 2 минуты в Telegram'));
+window.DUR = 40;
+const T1 = 3.2, T2 = 7.8, T3 = 12.6, T4 = 17.4, T5 = 22, T6 = 26.6, T7 = 31.6, TE = 36;
+const STEPS = [[T1, 'ШАГ 1', 'Разметка'], [T2, 'ШАГ 2', 'Бурение'], [T3, 'ШАГ 3', 'Столбы'], [T4, 'ШАГ 4', 'Бетон'], [T5, 'ШАГ 5', 'Лаги'], [T6, 'ШАГ 6', 'Профлист'], [T7, 'ШАГ 7', 'Заглушки и покраска']];
+const SUBS = [
+  [T1 + .2, T2 - .1, 'Шнур по линии забора,<br>столбы — <b>через 2,5 м</b>'],
+  [T2 + .2, T3 - .1, 'Бурим <b>Ø 200 мм</b> на 1,2 м —<br>чтобы зимой столб не выдавило'],
+  [T3 + .2, T4 - .1, 'На дно — щебень, столб <b>60×60</b> —<br>по шнуру и уровню'],
+  [T4 + .2, T5 - .1, 'Бетонируем. Лаги варим —<br>через <b>3–7 дней</b>'],
+  [T5 + .2, T6 - .1, 'Лаги <b>40×20</b> — 2 ряда,<br>забор выше 2 м — 3 ряда'],
+  [T6 + .2, T7 - .1, 'Профлист — саморезами<br>с шайбой <b>через волну</b> на каждую лагу'],
+  [T7 + .2, TE - .1, '<b>Заглушки</b> на столбы — вода не попадёт<br>внутрь, каркас — грунт-эмаль'],
+];
+const PX = [-5, -2.5, 0, 2.5, 5], PZ = -.15, H = 2.0, D = 1.2;
+const CAM = [
+  [0, .3, .2, 13, 0, .9, -.8], [T1, .26, .16, 12, 0, .6, -.6], [T2 - .2, .24, .16, 11.5, 0, .5, -.6],
+  [T2 + .7, .32, .1, 5.2, -1.6, -.2, -.3], [T3 - .2, .32, .1, 5.2, -1.2, -.2, -.3], [T3 + .7, .2, .1, 6.5, -1.3, .3, -.3], [T4 - .2, .24, .1, 6.5, -1.1, .3, -.3],
+  [T4 + .7, .12, .05, 4.6, -2.5, -.3, -.2], [T5 - .2, .16, .05, 4.6, -2.3, -.3, -.2], [T5 + .7, .4, .12, 7.5, -1.3, 1.0, -.4], [T6 - .2, .44, .12, 7.5, -1.1, 1.0, -.4],
+  [T6 + .7, .2, .1, 8.5, 0, 1.0, -.4], [T7 - .2, .24, .1, 8.5, .3, 1.0, -.4], [T7 + .6, .55, .25, 3.2, -2.5, 1.8, -.2], [T7 + 2.3, .6, .25, 3.2, -2.4, 1.8, -.2], [TE - .3, .32, .16, 12, 0, .8, -.6], [99, .32, .16, 12, 0, .8, -.6],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const order = (i) => [2, 1, 3, 0, 4].indexOf(i);
+function sheet(x0, x1, y0, y1, z, k) {
+  const w = .114, d = .035; let x = x0, col = '#2f6b4f';
+  const yt = lerp(y0 + 2.5, y1, k), yb = yt - (y1 - y0);
+  for (let i = 0; x < x1 - .001; i++) { const xa = x, xb = Math.min(x1, x + w * .5); const za = i % 2 ? z + d : z, zb = i % 2 ? z : z + d; S.poly([[xa, yb, za], [xb, yb, zb], [xb, yt, zb], [xa, yt, za]], col, { two: true, bias: -.8, shadow: true }); x = xb; }
+}
+window.render = function (t) {
+  LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fence: false, fenceZ: -6, houses: [[-6, -15, 6, 5, 3.4, '#ece5da', '#8d6e60'], [3, -16, 7, 6, 3.6, '#e2e7ea', '#6f6a66'], [12, -14, 6, 5, 3.2, '#efe6d6', '#a0574a']] });
+  [[-9, -4, 1.1, 2], [8.5, -3.5, 1.2, 0]].forEach((q) => LP.tree(...q));
+  const holes = PX.map((x, i) => { const st = T2 + .3 + order(i) * .8, k = ease((t - st) / .8); return { x0: x - .1, x1: x + .1, y: -D * k, z0: -.3 }; });
+  LP.ground({ x0: -14, x1: 14, zBack: -3.2, yB: -9, holes });
+  S.box(-14, 14, -.02, 0, -6, -3.2, P.grass, { groundTop: true });
+  // шнур и колышки
+  const sa = win(t, T1 + .4, T5, .5, .5);
+  if (sa > .01) { for (const x of [-6.5, 6.5]) S.box(x - .03, x + .03, 0, .6, PZ - .03, PZ + .03, '#a07a50'); S.line([[-6.5, .5, PZ], [6.5, .5, PZ]], { color: '#ffffff', w: 1.4, alpha: sa }); }
+  // бур
+  for (let i = 0; i < 5; i++) { const st = T2 + .3 + order(i) * .8; if (t > st - .3 && t < st + 1.0) { const k = ease((t - st) / .8), y = -D * k, c = [PX[i], 0, PZ]; LP.rod([PX[i], y + 1.6, PZ], [PX[i], y, PZ], .025, '#666', { seg: 6, bias: -2 }); for (let j = 0; j < 5; j++) { const a = t * 14 + j * 1.3, yy = y + .1 + j * .17; S.box(PX[i] - .09, PX[i] + .09, yy, yy + .03, PZ - .01, PZ + .01, '#8a8f95', { tf: (p) => M3.rotY(p, c, a), bias: -2.1 }); } S.box(PX[i] - .25, PX[i] + .25, y + 1.6, y + 1.7, PZ - .05, PZ + .05, '#e8590c', { bias: -2 }); } }
+  if (t > T1 - .2 && t < T2 + .3) LP.person(-6.1, 0, -.7, .4, t, 'point');
+  // столбы, щебень, бетон
+  const conc = ease((t - T4 - .3) / 2.2);
+  PX.forEach((x, i) => {
+    const st = T3 + .2 + order(i) * .5, k = eOut((t - st) / .6);
+    if (t > T3) S.box(x - .1, x + .1, -D, -D + .12, -.3, 0, P.gravel, { bias: -.5 });
+    if (k > .01) { const y = lerp(3, 0, k); S.box(x - .03, x + .03, -D + .12 + y, H + y, PZ - .03, PZ + .03, '#4a4f55', { bias: -1.2, shadow: true }); }
+    if (conc > .01) S.box(x - .1, x + .1, -D + .12, lerp(-D + .12, 0, clamp(conc * 1.4 - order(i) * .1)), -.3, 0, '#a9acac', { bias: -1 });
+    if (t > T7 + .3) { const ck = eOut((t - T7 - .3 - order(i) * .15) / .5); if (ck > .01) S.box(x - .045, x + .045, H + lerp(.4, 0, ck), H + .035 + lerp(.4, 0, ck), PZ - .045, PZ + .045, '#2a2d31', { bias: -1.3 }); }
+  });
+  // лаги
+  const lag = ease((t - T5 - .2) / 1.8);
+  if (lag > .01) for (const y of [.35, H - .3]) S.box(PX[0] - .3, lerp(PX[0] - .3, PX[4] + .3, lag), y - .01, y + .01, PZ + .03, PZ + .05, '#4f555b', { bias: -1.25 });
+  // профлист
+  const nS = 12, sw = (PX[4] - PX[0] + .6) / nS;
+  for (let i = 0; i < nS; i++) { const k = eOut((t - T6 - .3 - i * .28) / .5); if (k > .01) sheet(PX[0] - .3 + i * sw, PX[0] - .3 + (i + 1) * sw, .08, H, PZ + .055, k); }
+  if (t > T6 + 2) { const a = win(t, T6 + 2, T7 + .1, .3, .3); for (let i = 0; i < 26; i++) for (const y of [.35, H - .3]) { const x = PX[0] - .25 + i * .228; if (clamp((t - T6 - 2) * 18 - i) <= 0) continue; S.cyl('z', [x, y, PZ + .1], .012, .01, '#e9ecef', { seg: 6, bias: -1.5, alpha: a > .5 ? 1 : a }); } }
+  // уровень на столбе
+  S.render();
+  if (t > T3 + 1.4 && t < T4) { const a = win(t, T3 + 1.4, T4 - .2), q0 = S.proj([PX[1] + .05, .3, PZ + .05]), q1 = S.proj([PX[1] + .05, 1.3, PZ + .05]); FX.save(); FX.globalAlpha = a; FX.fillStyle = '#f2cc2f'; FX.strokeStyle = '#3b3b2a'; FX.lineWidth = 1; FX.beginPath(); FX.roundRect(q0[0], q1[1], 11, q0[1] - q1[1], 3); FX.fill(); FX.stroke(); FX.fillStyle = '#7fd36a'; FX.fillRect(q0[0] + 2, (q0[1] + q1[1]) / 2 - 7, 7, 14); FX.restore(); }
+  if (t > T1 + .8 && t < T2 - .1) { const a = win(t, T1 + .8, T2 - .2); FX.save(); FX.globalAlpha = a; FX.strokeStyle = '#ff8a3d'; FX.lineWidth = 2; for (let i = 0; i < 5; i++) { const q = S.proj([PX[i], .02, PZ]); FX.fillStyle = '#ff8a3d'; FX.beginPath(); FX.arc(q[0], q[1], 5, 0, 7); FX.fill(); } FX.restore(); }
+  LP.label('2,5 м', [-1.25, .6, PZ], 0, -90, win(t, T1 + 1.2, T2 - .2), 'o');
+  LP.label('Ø 200 · 1,2 м', [PX[1], -.6, 0], 50, -150, win(t, T2 + 2.2, T3 - .2));
+  LP.label('Щебень', [PX[1] + .1, -D + .06, 0], 55, -40, win(t, T3 + 1.2, T4 - .2));
+  LP.label('60×60', [PX[1] + .03, 1.6, PZ], 50, -70, win(t, T3 + 1.6, T4 - .2));
+  LP.label('Бетон', [PX[1], -.5, 0], 55, -60, win(t, T4 + 1.6, T5 - .2));
+  LP.label('Лага 40×20', [PX[1] + 1.2, H - .3, PZ + .05], 0, -90, win(t, T5 + 1.6, T6 - .2));
+  LP.label('Через волну', [PX[2] + .5, H - .3, PZ + .1], 0, -100, win(t, T6 + 2.8, T7 - .2), 'o');
+  LP.label('Заглушка', [PX[1], H + .04, PZ], 40, -80, win(t, T7 + .9, T7 + 3.2));
+  LP.post(t);
+  LP.hook(t, 'Забор из профлиста,<br><b>который не завалится</b>', T1);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

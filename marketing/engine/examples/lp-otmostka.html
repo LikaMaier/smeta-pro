@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Отмостка вокруг дома</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('🏠', 'Отмостка под ключ —', 'смета за 2 минуты в Telegram'));
+window.DUR = 40;
+const T1 = 3.2, T2 = 7.6, T3 = 12, T4 = 16.4, T5 = 21, T6 = 25.6, T7 = 30.4, TE = 36;
+const STEPS = [[T1, 'БЕЗ ОТМОСТКИ', 'вода у фундамента'], [T2, 'ШАГ 1', 'Траншея'], [T3, 'ШАГ 2', 'Геотекстиль и песок'], [T4, 'ШАГ 3', 'Щебень и утеплитель'], [T5, 'ШАГ 4', 'Шов и сетка'], [T6, 'ШАГ 5', 'Бетон с уклоном'], [T7, 'ИТОГ', 'вода уходит от дома']];
+const SUBS = [
+  [T1 + .2, T2 - .1, 'Вода с крыши льёт у самой стены,<br>зимой грунт <b>пучит</b> фундамент'],
+  [T2 + .2, T3 - .1, 'Снимаем грунт на <b>30 см</b>. Ширина —<br>свес крыши <b>+ 20 см</b>, обычно от 1 м'],
+  [T3 + .2, T4 - .1, '<b>Геотекстиль</b> — чтобы слои не смешались,<br>песок <b>10 см</b> с трамбовкой'],
+  [T4 + .2, T5 - .1, 'Щебень <b>10 см</b> и ЭППС <b>50 мм</b> —<br>фундамент рядом не промерзает'],
+  [T5 + .2, T6 - .1, 'У стены — <b>демпферный шов</b>,<br>сверху сетка: бетон не треснет'],
+  [T6 + .2, T7 - .1, 'Бетон <b>7–10 см</b> с уклоном<br><b>2–3 см на метр</b> от дома'],
+  [T7 + .2, TE - .1, 'Дождь стекает по отмостке<br>и уходит <b>от фундамента</b>'],
+];
+const CAM = [
+  [0, .7, .26, 15, -2, 1.5, -4], [T1, .3, .14, 5.6, -.4, .2, -.6], [T2 - .2, .32, .14, 5.6, -.3, .2, -.6],
+  [T2 + .7, .4, .2, 5.2, .1, .2, -.9], [T3 - .2, .44, .2, 5.2, .1, .2, -.9], [T3 + .6, .18, .1, 3.2, 0, -.15, -.3], [T6 - .2, .24, .1, 3.2, 0, -.1, -.3],
+  [T6 + .6, .3, .14, 3.6, 0, 0, -.4], [T7 - .2, .34, .14, 3.6, .1, 0, -.4], [T7 + 1, .28, .16, 5.2, .3, .6, -.6], [TE, .33, .16, 5.2, .3, .6, -.6], [99, .33, .16, 5.2, .3, .6, -.6],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const WX = -.6, EX = .6, ZB = -9;
+function house() {
+  S.box(-1.0, WX, -1.0, .45, ZB, 0, P.concrete, { front: '#b3b6b7', bias: -.4 });
+  S.box(-6, WX, .45, 3.0, ZB, 0, '#efe7da', { front: '#e8e0d2', bias: -.3, shadow: true });
+  S.box(-6, -1.0, 0, .45, ZB, 0, '#cfc8bb', { bias: -.2 });
+  const c = [-2.5, 3.6, -4];
+  S.poly([[.15, 2.95, .25], [-4.5, 5.2, .25], [-4.5, 5.2, ZB], [.15, 2.95, ZB]], '#8b4a3a', { center: c, shadow: true, two: true, bias: -.2 });
+  S.box(-.05, .15, 2.88, 3.0, ZB, .25, '#6f3b2e', { bias: -.3 });
+  for (const z of [-2, -5.5]) S.poly([[WX + .01, 1.2, z], [WX + .01, 1.2, z + 1.1], [WX + .01, 2.3, z + 1.1], [WX + .01, 2.3, z]], '#8fb0bd', { two: true, bias: -.35 });
+}
+window.render = function (t) {
+  LP.sky(); LP.cam(CAM, t);
+  const rain = t < T2 + .3 ? clamp((t - .3) / 1) * (1 - clamp((t - T2) / .3)) : t > T7 - .3 ? clamp((t - T7 + .3) / .8) : 0;
+  LP.backdrop({ fenceZ: -12, road: false, houses: [[7, -18, 6, 5, 3.4, '#e2e7ea', '#6f6a66'], [16, -16, 6, 5, 3.2, '#efe6d6', '#a0574a']], trees: [[4, -8, 1.1, 1], [9, -10, 1.2, 2], [13, -6, 1, 3]] });
+  const dig = ease((t - T2 - .3) / 1.6);
+  LP.ground({ x0: -14, x1: 14, zBack: ZB, holes: [{ x0: -1.0, x1: WX, y: -1.0, z0: ZB }, { x0: WX, x1: EX, y: -.33 * dig, z0: ZB }] });
+  house();
+  // слои
+  const L = (a, d) => ease((t - a) / d);
+  const geo = L(T3 + .2, .8), sand = L(T3 + 1.2, 1.4), grav = L(T4 + .2, 1.2), eps = L(T4 + 1.8, 1.0), damp = L(T5 + .2, .8), mesh = L(T5 + 1.4, 1.2), conc = L(T6 + .3, 1.8);
+  if (geo > .01) S.box(WX, EX, -.33, -.32, lerp(0, ZB, 1 - geo) - 0, 0, '#f1f3f5', { bias: -.5 });
+  if (sand > .01) S.box(WX, EX, -.32, lerp(-.32, -.22, sand), ZB, 0, P.sand, { bias: -.55 });
+  if (grav > .01) { S.box(WX, EX, -.22, lerp(-.22, -.12, grav), ZB, 0, P.gravel, { bias: -.6 }); for (let i = 0; i < 26; i++) { const x = lerp(WX + .03, EX - .03, R(i)), y = lerp(-.215, -.125, R(i + 40)); if (y > lerp(-.22, -.12, grav)) continue; S.poly([[x - .015, y - .01, .003], [x + .015, y - .012, .003], [x + .012, y + .01, .003], [x - .013, y + .012, .003]], '#6f6b66', { two: true, bias: -.9 }); } }
+  if (eps > .01) S.box(WX, lerp(WX, EX, eps), -.12, -.07, ZB, 0, '#86b9de', { front: '#7fb3d9', bias: -.65 });
+  if (damp > .01) S.box(WX, WX + .02, -.07, lerp(-.07, .1, damp), ZB, 0, '#e7f5ff', { bias: -.7 });
+  if (mesh > .01 && conc < .5) { const a = mesh * (1 - clamp(conc * 2)); for (let x = WX + .1; x < EX; x += .15) S.line([[x, -.03, -.02], [x, -.03, lerp(-.02, -3.5, mesh)]], { color: '#5c636a', w: 1.2, alpha: a }); for (let z = -.1; z > -3.5; z -= .15) if (z > lerp(0, -3.5, mesh)) S.line([[WX + .05, -.03, z], [EX - .05, -.03, z]], { color: '#5c636a', w: 1.2, alpha: a }); }
+  if (conc > .01) { const top = (x) => lerp(-.07, lerp(.08, .05, (x - WX) / (EX - WX)), conc); S.extrude([[WX + .02, -.07], [EX, -.07], [EX, top(EX)], [WX + .02, top(WX + .02)]], ZB, 0, '#b8bbbb', { front: '#aeb1b1', bias: -.75 }); }
+  // человек на рытье
+  if (t > T2 && t < T3 + .3) LP.person(1.5, 0, -1.6, -.9, t, dig > 0 && dig < 1 ? 'dig' : 'stand');
+  S.render();
+  // дождь
+  if (rain > .01) { FX.save(); FX.strokeStyle = 'rgba(120,150,175,.55)'; FX.lineWidth = 1.3; for (let i = 0; i < 100; i++) { const sp = 1.2 + R(i) * .6, y = ((t * sp + R(i + 5)) % 1) * 1000 - 40, x = R(i + 2) * 600 - 30; FX.globalAlpha = rain * (.4 + R(i + 9) * .5); FX.beginPath(); FX.moveTo(x, y); FX.lineTo(x - 3, y + 16); FX.stroke(); } FX.restore(); }
+  // вода без отмостки: с крыши в грунт вдоль фундамента
+  const P2 = (p) => S.proj(p);
+  if (t < T2 + .2 && t > T1 - .5) {
+    const a = win(t, T1 - .3, T2 + .1, .4, .3);
+    LP.flow; FX.save(); FX.globalAlpha = a; FX.strokeStyle = '#5fb4e6'; FX.lineWidth = 3; FX.setLineDash([9, 8]); FX.lineDashOffset = -t * 40; FX.shadowColor = 'rgba(95,180,230,.8)'; FX.shadowBlur = 8;
+    for (const dz of [-.02]) { const pts = [[.1, 2.9, dz], [.1, 0, dz], [-.5, -.3, dz], [-.55, -.95, dz]].map(P2); FX.beginPath(); pts.forEach((q, i) => (i ? FX.lineTo(q[0], q[1]) : FX.moveTo(q[0], q[1]))); FX.stroke(); }
+    FX.restore();
+    const ice = clamp((t - T1 - 2) / 1.5) * a;
+    if (ice > 0) { FX.save(); FX.globalAlpha = ice; FX.strokeStyle = '#ffffff'; FX.lineWidth = 1.8; for (let i = 0; i < 7; i++) { const q = P2([-.45 + R(i) * .4, -.9 + R(i + 4) * .6, .01]), s = 7; for (let k = 0; k < 3; k++) { const an = k * Math.PI / 3; FX.beginPath(); FX.moveTo(q[0] - Math.cos(an) * s, q[1] - Math.sin(an) * s); FX.lineTo(q[0] + Math.cos(an) * s, q[1] + Math.sin(an) * s); FX.stroke(); } } FX.strokeStyle = '#e03131'; FX.lineWidth = 3; for (const x of [-.95, -.7]) { const q0 = P2([x, -1.25, .01]), q1 = P2([x, -1.05, .01]); FX.beginPath(); FX.moveTo(q0[0], q0[1]); FX.lineTo(q1[0], q1[1]); FX.lineTo(q1[0] - 5, q1[1] + 8); FX.moveTo(q1[0], q1[1]); FX.lineTo(q1[0] + 5, q1[1] + 8); FX.stroke(); } FX.restore(); }
+  }
+  // вода с отмосткой
+  if (t > T7) { const a = win(t, T7 + .2, TE - .1, .4, .3); FX.save(); FX.globalAlpha = a; FX.strokeStyle = '#5fb4e6'; FX.lineWidth = 3; FX.setLineDash([9, 8]); FX.lineDashOffset = -t * 40; FX.shadowColor = 'rgba(95,180,230,.8)'; FX.shadowBlur = 8; const pts = [[.1, 2.9, -.02], [.1, .07, -.02], [EX, .055, -.02], [EX + .1, 0, -.02], [EX + .9, .0, -.02]].map(P2); FX.beginPath(); pts.forEach((q, i) => (i ? FX.lineTo(q[0], q[1]) : FX.moveTo(q[0], q[1]))); FX.stroke(); FX.restore(); }
+  // уклон-стрелка
+  if (t > T6 + 1.6 && t < T7 + .2) { const a = win(t, T6 + 1.6, T7, .3, .2), q0 = P2([WX + .15, .2, -.02]), q1 = P2([EX - .05, .14, -.02]); FX.save(); FX.globalAlpha = a; FX.strokeStyle = '#ff8a3d'; FX.fillStyle = '#ff8a3d'; FX.lineWidth = 3; FX.beginPath(); FX.moveTo(q0[0], q0[1]); FX.lineTo(q1[0], q1[1]); FX.stroke(); const an = Math.atan2(q1[1] - q0[1], q1[0] - q0[0]); FX.beginPath(); FX.moveTo(q1[0], q1[1]); FX.lineTo(q1[0] - Math.cos(an - .45) * 12, q1[1] - Math.sin(an - .45) * 12); FX.lineTo(q1[0] - Math.cos(an + .45) * 12, q1[1] - Math.sin(an + .45) * 12); FX.fill(); FX.restore(); }
+  LP.label('Пучение', [-.8, -1.0, .01], 70, 60, win(t, T1 + 2.6, T2 - .1), 'r');
+  LP.label('Свес + 20 см', [EX, .02, -.02], 10, -150, win(t, T2 + 1.8, T3 - .2), 'o');
+  LP.label('Глубина 30 см', [0, -.33 * dig, -.02], -40, 120, win(t, T2 + 2.2, T3 - .2));
+  LP.label('Геотекстиль', [.3, -.325, -.01], 90, -120, win(t, T3 + .9, T4 - .2));
+  LP.label('Песок 10 см', [-.2, -.27, -.01], -50, -190, win(t, T3 + 2.2, T4 - .2));
+  LP.label('Щебень 10 см', [.2, -.17, -.01], 60, 70, win(t, T4 + 1.2, T5 - .2));
+  LP.label('ЭППС 50 мм', [-.1, -.095, -.01], -30, -170, win(t, T4 + 2.6, T5 - .2));
+  LP.label('Демпферный шов', [WX + .01, .05, -.01], 90, -170, win(t, T5 + .9, T6 - .2));
+  LP.label('Сетка', [.3, -.03, -.5], 50, -120, win(t, T5 + 2.4, T6 - .2));
+  LP.label('2–3 см на метр', [0, .16, -.02], 0, -110, win(t, T6 + 2.0, T7 - .2), 'o');
+  LP.label('Вода уходит от дома', [EX + .5, 0, -.02], -40, -170, win(t, T7 + 1.2, TE - .2), 'g');
+  LP.post(t);
+  LP.hook(t, 'Отмостка, которая<br><b>спасает фундамент</b>', T1);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

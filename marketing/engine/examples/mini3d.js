@@ -9,6 +9,7 @@ const M3 = (() => {
   const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
   const avg = (ps) => { const s = [0, 0, 0]; for (const p of ps) { s[0] += p[0]; s[1] += p[1]; s[2] += p[2]; } return mul(s, 1 / ps.length); };
   const hexc = {};
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
   const rgb = (h) => { if (Array.isArray(h)) return h; if (hexc[h]) return hexc[h]; const v = parseInt(h.slice(1), 16); return (hexc[h] = [(v >> 16) & 255, (v >> 8) & 255, v & 255]); };
   // повороты точки вокруг центра
   const rotZ = (p, c, a) => { const s = Math.sin(a), k = Math.cos(a), x = p[0] - c[0], y = p[1] - c[1]; return [c[0] + x * k - y * s, c[1] + x * s + y * k, p[2]]; };
@@ -43,8 +44,17 @@ const M3 = (() => {
       if (o.center) { const c = o.tf ? o.tf(o.center) : o.center; if (dot(n, sub(fc, c)) < 0) n = mul(n, -1); }
       if (o.shadow) this.shadows.push(pts);
       if (!o.two && dot(n, sub(this.C, fc)) <= 0) return;
+      const zs = pts.map((p) => dot(sub(p, this.C), this.f));
+      if (zs.some((z) => z < .3)) { // отсечение ближней плоскостью вместо выброса всей грани
+        if (zs.every((z) => z < .3)) return;
+        const cp = [];
+        for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length, a = zs[i], b = zs[j];
+          if (a >= .3) cp.push(pts[i]);
+          if ((a >= .3) !== (b >= .3)) { const k = (.3 - a) / (b - a); cp.push(add(pts[i], mul(sub(pts[j], pts[i]), k))); } }
+        if (cp.length < 3) return; pts = cp;
+      }
       const p2 = []; let dz = 0;
-      for (const p of pts) { const q = this.proj(p); if (q[2] < .3) return; p2.push(q); dz += q[2]; }
+      for (const p of pts) { const q = this.proj(p); p2.push(q); dz += Math.max(.3, q[2]); }
       this.faces.push({ p2, z: dz / pts.length + (o.bias || 0), color, n, o, wy: pts.map((p) => p[1]) });
     }
     box(x0, x1, y0, y1, z0, z1, color, o = {}) {
@@ -117,7 +127,7 @@ const M3 = (() => {
       // мягкое затенение у пола (имитация ambient occlusion) — только если включено: this.ao = сила
       if (this.ao && !f.o.emit && Math.abs(f.n[1]) < .6 && f.wy) {
         let lo = 0, hi = 0; f.wy.forEach((y, i) => { if (y < f.wy[lo]) lo = i; if (y > f.wy[hi]) hi = i; });
-        const near = Math.max(0, 1 - (f.wy[lo] - this.groundY) / (this.aoH || 1.4));
+        const near = f.wy[lo] < this.groundY - .3 ? 0 : clamp01(1 - (f.wy[lo] - this.groundY) / (this.aoH || 1.4));
         if (near > 0 && f.wy[hi] - f.wy[lo] > .05) {
           const k = 1 - this.ao * near, gr = x.createLinearGradient(f.p2[lo][0], f.p2[lo][1], f.p2[hi][0], f.p2[hi][1]);
           gr.addColorStop(0, `rgba(${c[0] * k | 0},${c[1] * k | 0},${c[2] * k | 0},${a})`); gr.addColorStop(Math.min(1, .55 / near), `rgba(${c[0]},${c[1]},${c[2]},${a})`);

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Водяной тёплый пол</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('🔥', 'Тёплый пол под ключ —', 'смета за 2 минуты в Telegram'));
+window.DUR = 40;
+const T1 = 3.2, T2 = 7.6, T3 = 11.8, T4 = 16.2, T5 = 20.4, T6 = 26.6, T7 = 31.2, TE = 36;
+const STEPS = [[T1, 'ШАГ 1', 'Основание'], [T2, 'ШАГ 2', 'Демпферная лента'], [T3, 'ШАГ 3', 'Утеплитель'], [T4, 'ШАГ 4', 'Плёнка и сетка'], [T5, 'ШАГ 5', 'Труба'], [T6, 'ШАГ 6', 'Опрессовка и стяжка'], [T7, 'ШАГ 7', 'Покрытие']];
+const SUBS = [
+  [T1 + .2, T2 - .1, 'Основание — ровное и чистое:<br>перепады <b>до 5 мм</b>'],
+  [T2 + .2, T3 - .1, '<b>Демпферная лента</b> по периметру —<br>стяжке есть куда расширяться'],
+  [T3 + .2, T4 - .1, 'Утеплитель <b>ЭППС 50 мм</b>,<br>над холодным подвалом — от 100 мм'],
+  [T4 + .2, T5 - .1, 'Плёнка внахлёст<br>и <b>сетка</b> для крепления трубы'],
+  [T5 + .2, 23.6, 'Труба <b>PEX 16 мм</b>, шаг <b>15 см</b> —<br>змейкой или улиткой'],
+  [23.6, T6 - .1, 'Одна петля — <b>не длиннее 80 м</b>,<br>все петли — в коллектор'],
+  [T6 + .2, T7 - .1, '<b>Опрессовка</b> под давлением,<br>стяжка — <b>от 3 см</b> над трубой'],
+  [T7 + .2, TE - .1, 'Плитка — и тепло снизу. Первый<br>запуск — через <b>28 дней</b>, вода до 45 °C'],
+];
+const CAM = [
+  [0, .5, .42, 10, 0, .5, -1.5], [T1, .45, .4, 9, 0, .4, -1.5], [T2 - .2, .42, .38, 8.6, 0, .4, -1.5],
+  [T2 + .7, .22, .45, 5.4, -.4, .3, -1.6], [T3 - .2, .27, .45, 5.4, -.4, .3, -1.6], [T3 + .7, .32, .2, 2.8, -.6, .25, -.5], [T4 - .2, .36, .22, 2.8, -.5, .25, -.5],
+  [T4 + .7, .4, .55, 4.8, 0, .25, -1.2], [T5 - .2, .42, .55, 4.8, 0, .25, -1.2], [T5 + .6, .3, .8, 7.2, 0, .25, -1.5], [T6 - .2, .36, .76, 7, 0, .25, -1.5],
+  [T6 + .7, .22, .16, 2.2, -.6, .35, -.3], [T7 - .2, .26, .16, 2.2, -.5, .35, -.3], [T7 + 1, .45, .32, 8, 0, .6, -1.5], [TE, .5, .32, 8, 0, .6, -1.5], [99, .5, .32, 8, 0, .6, -1.5],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const X0 = -1.8, X1 = 1.8, Z0 = -3, Y0 = .2, YE = Y0 + .1, YP = YE + .026, YS = YE + .1, YT = YS + .02;
+// змейка трубы
+const PATH = []; { const n = 21; for (let i = 0; i < n; i++) { const x = X0 + .25 + i * (X1 - X0 - .5) / (n - 1), a = i % 2 ? [-.15, Z0 + .2] : [Z0 + .2, -.15]; PATH.push([x, YP, a[0]], [x, YP, a[1]]); } }
+const LEN = []; let TOT = 0; for (let i = 1; i < PATH.length; i++) { TOT += Math.hypot(PATH[i][0] - PATH[i - 1][0], PATH[i][2] - PATH[i - 1][2]); LEN.push(TOT); }
+function room() {
+  S.box(X0 - .25, X1 + .25, 0, Y0, Z0 - .25, 0, P.concrete, { front: '#b4b7b8', top: '#c4c6c4' });
+  S.box(X0 - .25, X1 + .25, Y0, 2.9, Z0 - .25, Z0, '#ece6dc', { front: '#efe9df' });
+  S.box(X0 - .25, X0, Y0, 2.9, Z0, 0, '#ece6dc', { front: '#e0dacf', side: '#efe9df' });
+  S.box(X1, X1 + .25, Y0, 2.9, Z0, 0, '#ece6dc', { front: '#e0dacf', side: '#efe9df' });
+  S.poly([[-.9, 1.1, Z0 + .01], [.9, 1.1, Z0 + .01], [.9, 2.3, Z0 + .01], [-.9, 2.3, Z0 + .01]], '#cfe6f2', { two: true, emit: true, bias: -.1 });
+  S.poly([[-.02, 1.1, Z0 + .02], [.02, 1.1, Z0 + .02], [.02, 2.3, Z0 + .02], [-.02, 2.3, Z0 + .02]], '#ffffff', { two: true, bias: -.2 });
+  // коллектор
+  S.box(X0, X0 + .14, .55, 1.25, -2.5, -1.7, '#f4f4f2', { side: '#e9e9e6', bias: -.1 });
+  for (const [y, c] of [[.95, '#e03131'], [.75, '#1c7ed6']]) LP.rod([X0 + .16, y, -2.45], [X0 + .16, y, -1.75], .025, c, { seg: 8, bias: -.2 });
+}
+function pipeTo(k, color) {
+  const L = TOT * k, pts = [PATH[0]];
+  for (let i = 1; i < PATH.length; i++) { if (LEN[i - 1] <= L) pts.push(PATH[i]); else { const a = PATH[i - 1], l0 = i > 1 ? LEN[i - 2] : 0, f = (L - l0) / (LEN[i - 1] - l0); pts.push(a.map((v, j) => lerp(v, PATH[i][j], f))); break; } }
+  for (let i = 0; i < pts.length - 1; i++) LP.rod(pts[i], pts[i + 1], .02, color, { seg: 6, caps: false, bias: -3 });
+  return pts[pts.length - 1];
+}
+window.render = function (t) {
+  LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fenceZ: -12 });
+  [[6, -7, 1.1, 2], [-6.5, -6, 1.2, 0]].forEach((q) => LP.tree(...q));
+  LP.ground({ x0: -14, x1: 14, zBack: -12, yB: -9, holes: [{ x0: X0 - .25, x1: X1 + .25, y: -.001, z0: Z0 }] });
+  room();
+  const tape = ease((t - T2 - .3) / 1.4);
+  if (tape > .01) { S.box(X0, X0 + .03, Y0, Y0 + .3, lerp(-.02, Z0, tape), -.02, '#3d8fe0', { bias: -2 }); S.box(X0, lerp(X0, X1, tape), Y0, Y0 + .3, Z0, Z0 + .03, '#3d8fe0', { bias: -2 }); S.box(X1 - .03, X1, Y0, Y0 + .3, lerp(-.02, Z0, tape), -.02, '#3d8fe0', { bias: -2 }); }
+  // ЭППС: плиты 1.2×0.6 по одной
+  const eps = clamp((t - T3 - .2) / 2.6);
+  if (eps > 0) { let i = 0; const N = 3 * 5; for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) { const k = clamp(eps * N - i++); if (k <= 0) continue; const x = X0 + .012 + c * 1.2, z = Z0 + .03 + r * .594, y = Y0 + (1 - eOut(k)) * .6; S.box(x + .02, Math.min(x + 1.2, X1 - .03), y, y + .1, z, Math.min(z + .594, -.002), (r + c) % 2 ? '#7fb3d9' : '#86b9de', { front: '#6aa0c8', side: '#6aa0c8', bias: -.25 }); } }
+  const pk = ease((t - T5 - .2) / 4.2), tile = ease((t - T7 - .2) / 2.2), screed = ease((t - T6 - 1.6) / 2.2);
+  // плёнка и сетка
+  const film = ease((t - T4 - .2) / 1.2), mesh = ease((t - T4 - 1.6) / 1.4);
+  if (film > .01) S.box(X0 + .012, X1 - .012, YE, YE + .002, Z0 + .012, lerp(Z0 + .012, -.002, film), '#dfe9ec', { alpha: .65, bias: -.3 });
+  const ma = .8 * (1 - clamp((t - T5 - .6) / .8)); if (mesh > .01 && ma > .01) { for (let x = X0 + .1; x < X1; x += .1) S.line([[x, YE + .004, Z0 + .05], [x, YE + .004, lerp(Z0 + .05, -.01, mesh)]], { color: '#6a6f73', w: .8, alpha: ma }); for (let z = Z0 + .1; z < 0; z += .1) if (z < lerp(Z0, 0, mesh)) S.line([[X0 + .05, YE + .004, z], [X1 - .05, YE + .004, z]], { color: '#6a6f73', w: .8, alpha: ma }); }
+  // труба
+  if (pk > .01) {
+    const end = pipeTo(pk, t > T6 + .5 ? '#e8590c' : '#f08c3a');
+    LP.pipe([[X0 + .16, .95, -2.3], [X0 + .1, YP, -2.3], [X0 + .25, YP, PATH[0][2]]], .02, '#e8590c', { bias: -3 });
+    if (pk >= 1) { const e = PATH[PATH.length - 1]; LP.pipe([[X0 + .16, .75, -1.9], [X0 + .1, YP, -1.9], [X0 + .1, YP, -.08], [e[0], YP, -.08], e], .02, '#1c7ed6', { bias: -3 }); }
+    void end;
+  }
+  if (screed > .01) S.box(X0 + .012, X1 - .012, YE + .002, lerp(YE + .002, YS, screed), Z0 + .012, -.001, '#c9c4ba', { front: '#bdb8ae', bias: -4, alpha: t > T7 ? 1 : .97 });
+  if (tile > .01) { const warm = clamp((t - T7 - 2.4) / 1.5); for (let i = 0; i < 6; i++) for (let j = 0; j < 5; j++) { const k = clamp(tile * 30 - (i * 5 + j)); if (k <= 0) continue; const x = X0 + .03 + i * .59, z = Z0 + .03 + j * .594; S.box(x + .006, Math.min(x + .584, X1 - .03), YS, YS + .02 * k, z + .006, Math.min(z + .588, -.001), (i + j) % 2 ? '#e8dccb' : '#efe4d4', { front: '#d6c8b4', side: '#d6c8b4', bias: -5 }); } void warm; }
+  if (t > T7 + 2.6) LP.person(.7, YT, -1.9, -.4, t, 'stand', { shirt: '#4c9be0' });
+  // манометр
+  if (t > T6 + .2 && t < T7) { S.box(X0 + .14, X0 + .2, .95, 1.03, -1.5, -1.42, '#3a3a3a', { bias: -.5 }); }
+  S.render();
+  if (t > T6 + .2 && t < T7) { const q = S.proj([X0 + .2, 1.0, -1.46]), a = win(t, T6 + .3, T7 - .2); FX.save(); FX.globalAlpha = a; FX.fillStyle = '#fff'; FX.strokeStyle = '#333'; FX.lineWidth = 3; FX.beginPath(); FX.arc(q[0] + 40, q[1] - 40, 26, 0, 7); FX.fill(); FX.stroke(); FX.strokeStyle = '#e03131'; FX.lineWidth = 2.5; const ang = -2.4 + clamp((t - T6 - .4) / 1) * 2.1; FX.beginPath(); FX.moveTo(q[0] + 40, q[1] - 40); FX.lineTo(q[0] + 40 + Math.cos(ang) * 19, q[1] - 40 + Math.sin(ang) * 19); FX.stroke(); FX.fillStyle = '#333'; FX.font = '700 9px PT'; FX.textAlign = 'center'; FX.fillText('6 бар', q[0] + 40, q[1] - 24); FX.restore(); }
+  // тепло
+  if (t > T7 + 2) { const a = win(t, T7 + 2, TE - .1, .8, .3); FX.save(); FX.lineCap = 'round'; for (let i = 0; i < 9; i++) { const x = -1.5 + i * .37, ph = (t * .5 + R(i)) % 1; const q0 = S.proj([x, YT + ph * 1.6, -1.6 + R(i + 3)]); if (q0[2] < .3) continue; FX.globalAlpha = a * Math.sin(ph * Math.PI) * .75; FX.strokeStyle = '#ff9f43'; FX.lineWidth = 3; FX.beginPath(); for (let k = 0; k < 6; k++) { const yy = q0[1] - k * 7, xx = q0[0] + Math.sin(k * 1.2 + t * 3 + i) * 5; k ? FX.lineTo(xx, yy) : FX.moveTo(xx, yy); } FX.stroke(); } FX.restore(); }
+  LP.label('Ровное основание', [-1, Y0, -.02], -10, -130, win(t, T1 + 1.4, T2 - .2));
+  LP.label('Демпферная лента', [-.4, Y0 + .28, Z0 + .03], 30, -110, win(t, T2 + 1.6, T3 - .2));
+  LP.label('ЭППС 50 мм', [-.7, Y0 + .03, -.01], 0, -120, win(t, T3 + 2.6, T4 - .2));
+  LP.label('Сетка', [.4, YE, -1.3], 30, -110, win(t, T4 + 2.2, T5 - .2));
+  LP.label('Шаг 15 см', [X0 + .25 + .155 * 5, YP, -.3], 20, -100, win(t, T5 + 2.2, T6 - .2), 'o');
+  LP.label('Коллектор', [X0 + .14, 1.2, -2.1], 60, -70, win(t, 23.8, T6 - .2));
+  LP.label('≥ 3 см над трубой', [-.6, YS, -.01], 0, -120, win(t, T6 + 2.6, T7 - .2), 'o');
+  LP.label('Тепло снизу', [-.5, YT, -1.6], 0, -150, win(t, T7 + 2.4, TE - .2), 'g');
+  LP.post(t);
+  LP.hook(t, 'Водяной тёплый пол:<br><b>что внутри</b>', T1);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>
