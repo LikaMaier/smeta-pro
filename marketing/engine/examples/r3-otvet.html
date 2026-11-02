@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Ответственность строителя: тогда и сейчас</title></head><body><div id="stage">
+<canvas id="gl"></canvas><canvas id="fx" width="1080" height="1920"></canvas><div id="vig"></div>
+<div id="year"></div><div id="hook"></div><div id="sub"></div>
+<div id="phone" class="card" style="left:170px;top:190px;width:200px;height:370px;border-radius:34px;background:#0b0f16;box-shadow:0 30px 60px rgba(0,0,0,.6),inset 0 0 0 3px #2a3140;padding:10px">
+  <div style="height:100%;border-radius:26px;background:linear-gradient(#2b3646,#141a24);display:flex;flex-direction:column;align-items:center;padding-top:40px;font-family:PT;color:#fff;text-align:center">
+    <div style="width:84px;height:84px;border-radius:50%;background:#55667a;display:flex;align-items:center;justify-content:center;font-size:40px">👷</div>
+    <div style="font-size:24px;margin-top:14px">Прораб Виталий</div><div id="ph2" style="font-size:16px;color:#ff8787;margin-top:8px">Абонент временно<br>недоступен</div>
+    <div style="margin-top:auto;margin-bottom:40px;width:62px;height:62px;border-radius:50%;background:#e03131;display:flex;align-items:center;justify-content:center;font-size:28px">📵</div></div></div>
+<div id="flash"></div>
+</div>
+<script src="r3d.js"></script>
+<script src="r3kit.js"></script>
+<script>
+const { M, Mesh } = R3, { B, $, clamp, ease, eOut, lerp, win, R } = K;
+$('stage').insertAdjacentHTML('beforeend', K.END('Раньше за брак отвечали <b>головой</b>.<br>Сейчас — <b>отзывом на Авито</b>'));
+R3.init($('gl'));
+const FX = $('fx').getContext('2d');
+window.DUR = 34.5;
+const S1 = 0, S2 = 9.6, S3 = 16.6, S4 = 24, SE = 30.6;
+const YEARS = [[2.6, S2 - .1, '1754 до н. э.<small>Вавилон</small>'], [S2 + .2, S3 - .1, '2026<small>Ленобласть</small>'], [S3 + .2, S4 - .1, 'II век<small>Рим · легенда</small>'], [S4 + .2, SE - .1, '2026<small>новостройка</small>']];
+const SUBS = [
+  [2.8, 6.1, 'Законы Хаммурапи: если дом рухнул<br>и убил хозяина —'],
+  [6.1, S2 - .1, '<b>казнили строителя</b>.<br>Вот это была гарантия'],
+  [S2 + .3, 13.1, 'Дом треснул<br>через год…'],
+  [13.1, S3 - .1, 'Прораб <b>сменил номер</b><br>и уехал «на объект в Сочи»'],
+  [S3 + .3, 20.4, 'По легенде, когда снимали<br>опалубку арки,'],
+  [20.4, S4 - .1, '<b>под ней стоял сам инженер</b>.<br>Римские мосты стоят до сих пор'],
+  [S4 + .3, 27.2, 'Опалубку балкона сняли<br><b>на второй день</b>…'],
+  [27.2, SE - .1, 'Хорошо, что инженер<br>под ним <b>не стоял</b>'],
+];
+// ---------- Вавилон ----------
+const sand = B((m) => m.box(-120, 120, -1, 0, -120, 120, { color: '#c9a77a', mat: 'sand' }));
+const MUD = '#b48d64';
+const babHouse = B((m) => {
+  m.box(-2.6, 2.6, 0, 2.6, -2.2, -1.9, { color: MUD, mat: 'brick' }); m.box(-2.6, -2.3, 0, 2.6, -1.9, 2.2, { color: MUD, mat: 'brick' }); m.box(2.3, 2.6, 0, 2.0, -1.9, 2.2, { color: MUD, mat: 'brick' });
+  m.box(-2.3, -.5, 0, 2.6, 1.9, 2.2, { color: MUD, mat: 'brick' }); m.box(.5, 2.3, 0, 2.6, 1.9, 2.2, { color: MUD, mat: 'brick' }); m.box(-.5, .5, 1.8, 2.6, 1.9, 2.2, { color: MUD, mat: 'brick' });
+  m.box(-.5, .5, 0, 1.8, 1.95, 2.0, { color: '#1c140d', mat: 'plain' }); m.box(-1.9, -1.2, 1.4, 1.9, 2.18, 2.22, { color: '#1c140d' });
+  m.box(-2.7, 2.7, 0, .25, -2.3, 2.35, { color: '#a7845d', mat: 'mud', top: false });
+});
+const babTop = B((m) => m.box(2.3, 2.6, 2.0, 2.6, -1.9, 2.2, { color: MUD, mat: 'brick' }));
+const babRoof = B((m) => { m.box(-2.6, 2.6, 2.6, 2.85, -2.2, 2.2, { color: '#a07c56', mat: 'mud' }); for (let i = 0; i < 9; i++) m.rod([-2.4 + i * .6, 2.55, -2.5], [-2.4 + i * .6, 2.55, 2.55], .09, { color: '#6a5136', mat: 'wood', seg: 8 }); });
+const zigg = B((m) => { for (let i = 0; i < 4; i++) { const s = 16 - i * 3.6; m.box(-s / 2, s / 2, i * 3, i * 3 + 3, -s / 2, s / 2, { color: '#b08a60', mat: 'brick' }); } m.box(-1.2, 1.2, 0, 12.5, 7.6, 9.5, { color: '#a88259', mat: 'brick' }); });
+const mudHouses = B((m) => { for (const [x, z, w, h] of [[-9, -8, 4, 3], [8, -10, 5, 2.6], [-15, 2, 4, 2.8], [12, -2, 4, 3.2], [-4, -16, 5, 3]]) m.box(x - w / 2, x + w / 2, 0, h, z - 2, z + 2, { color: '#b9946a', mat: 'brick' }); });
+const palms = [K.palm([5.5, 0, -3], 1, .2), K.palm([-6, 0, -1.5], 1.15, -.1), K.palm([9, 0, 3], .9, .25), K.palm([-11, 0, -6], 1.1, .1)];
+const builder = K.person({ robe: true, top: '#cdb68e', skin: '#9c6b4a', hair: '#1d1712' });
+// ---------- 2026 дом ----------
+const lawn = B((m) => m.box(-120, 120, -1, 0, -120, 120, { color: '#4f7535', mat: 'grass' }));
+const modern = B((m) => {
+  m.box(-4, 4, 0, .5, -3, 3, { color: '#8e9092', mat: 'concrete' });
+  m.box(-4, 4, .5, 3.4, -3, 3, { color: '#e6e0d6', mat: 'plaster' });
+  m.poly([[-4.4, 3.3, 3.5], [4.4, 3.3, 3.5], [4.4, 5.3, 0], [-4.4, 5.3, 0]], { color: '#3d4247', mat: 'metal' }); m.poly([[4.4, 3.3, -3.5], [-4.4, 3.3, -3.5], [-4.4, 5.3, 0], [4.4, 5.3, 0]], { color: '#3d4247', mat: 'metal' });
+  m.poly([[4, 3.4, 3], [4, 3.4, -3], [4, 5.2, 0]], { color: '#e6e0d6', mat: 'plaster' }); m.poly([[-4, 3.4, -3], [-4, 3.4, 3], [-4, 5.2, 0]], { color: '#e6e0d6', mat: 'plaster' });
+  for (const x of [-3, -.8]) { m.box(x - .08, x + 1.28, 1.1, 2.6, 3, 3.06, { color: '#f4f4f2' }); m.box(x, x + 1.2, 1.18, 2.52, 3.06, 3.08, { color: '#22303a', mat: 'glass' }); }
+  m.box(1.6, 2.7, .5, 2.7, 3, 3.06, { color: '#4a3526', mat: 'wood' });
+  m.box(1.2, 3.1, 0, .5, 3, 4.2, { color: '#9a9c9e', mat: 'concrete' });
+  for (let x = -12; x < 12; x += 2.2) m.box(x, x + .08, 0, 1.6, -8.6, -8.5, { color: '#6d6a66', mat: 'metal' });
+});
+const owner = K.person({ top: '#4f6d8f', bottom: '#2f3540', hair: '#3a2a20', skin: '#d8a888' });
+const birch = [K.tree([-8, 0, -4], 1.1, '#50752f'), K.tree([7.5, 0, -6], 1.3, '#456b2a'), K.tree([10, 0, 2], 1, '#5a7d35')];
+// ---------- Рим ----------
+const romeG = B((m) => { m.box(-120, -1.6, -1, 0, -120, 120, { color: '#7d8550', mat: 'grass' }); m.box(1.6, 120, -1, 0, -120, 120, { color: '#7d8550', mat: 'grass' });
+  m.box(-1.6, 1.6, -1, -1.45, -120, 120, { color: '#8a7a60', mat: 'soil' }); for (const [x, z, r] of [[-30, -60, 18], [25, -70, 22], [0, -90, 26]]) m.sphere([x, -6, z], r, { color: '#6f7448', mat: 'grass', sy: .45, seg: 18, rings: 9 }); });
+const river = B((m) => m.box(-1.6, 1.6, -1.4, -1.0, -120, 120, { color: '#3b6273', mat: 'water' }));
+const CR = 4, CY = -.2, DY = 4.6, BZ = 1.8;
+const bridge = B((m) => {
+  const n = 28, arc = (r, i) => { const a = Math.PI - i / n * Math.PI; return [Math.cos(a) * r, CY + Math.sin(a) * r]; };
+  for (const z of [BZ, -BZ]) for (let i = 0; i < n; i++) { const a = arc(CR, i), b = arc(CR, i + 1); const pts = [[a[0], a[1], z], [b[0], b[1], z], [b[0], DY, z], [a[0], DY, z]]; m.poly(z > 0 ? pts : pts.slice().reverse(), { color: '#b8ab90', mat: 'stone' }); }
+  for (let i = 0; i < n; i++) { const a = arc(CR, i), b = arc(CR, i + 1); m.poly([[a[0], a[1], BZ], [a[0], a[1], -BZ], [b[0], b[1], -BZ], [b[0], b[1], BZ]], { color: '#a99c82', mat: 'stone' }); }
+  for (let i = 0; i <= n; i++) { const a = arc(CR, i), o = arc(CR + .75, i); if (i % 2 === 0) m.rod([a[0], a[1], BZ + .01], [o[0], o[1], BZ + .01], .012, { color: '#6d6352', seg: 4 }); }
+  m.box(-9, -CR, -1.5, DY, -BZ, BZ, { color: '#b8ab90', mat: 'stone' }); m.box(CR, 9, -1.5, DY, -BZ, BZ, { color: '#b8ab90', mat: 'stone' });
+  m.box(-9, 9, DY, DY + .25, -BZ - .1, BZ + .1, { color: '#a99c82', mat: 'stone' });
+  for (const z of [BZ - .1, -BZ + .1]) m.box(-9, 9, DY + .25, DY + 1.0, z - .18, z + .18, { color: '#b5a88d', mat: 'stone' });
+});
+const centering = B((m) => {
+  const W = '#7a5a3a';
+  for (const x of [-3, -1.5, 0, 1.5, 3]) for (const z of [-1.4, 1.4]) { const top = CY + Math.sqrt(CR * CR - x * x) - .25; m.rod([x, -1.45, z], [x, top, z], .1, { color: W, mat: 'wood', seg: 6 }); }
+  for (const z of [-1.4, 1.4]) { m.rod([-3, -1.2, z], [0, 2.5, z], .07, { color: W, mat: 'wood', seg: 6 }); m.rod([3, -1.2, z], [0, 2.5, z], .07, { color: W, mat: 'wood', seg: 6 }); m.rod([-3.6, 1.2, z], [3.6, 1.2, z], .08, { color: W, mat: 'wood', seg: 6 }); }
+  for (let i = 1; i < 18; i++) { const a = Math.PI - i / 18 * Math.PI, x = Math.cos(a) * (CR - .12), y = CY + Math.sin(a) * (CR - .12); m.rod([x, y, -BZ], [x, y, BZ], .07, { color: '#8a6a45', mat: 'wood', seg: 6 }); }
+});
+const cyps = [K.cypress([-8, 0, -6], 1.2), K.cypress([-10, 0, -3], 1), K.cypress([9, 0, -5], 1.3), K.cypress([12, 0, -9], 1.1), K.cypress([-14, 0, -12], 1.4)];
+const engineer = K.person({ robe: true, top: '#ece6d6', skin: '#c48f6a', hair: '#2b211a' });
+// ---------- балкон ----------
+const asph = B((m) => { m.box(-120, 120, -1, 0, -120, 120, { color: '#5a7a3a', mat: 'grass' }); m.box(-30, 30, -.98, .02, -2, 9, { color: '#55585c', mat: 'asphalt' }); });
+const block = B((m) => {
+  m.box(-9, 9, 0, 15, -6, 0, { color: '#d9d2c4', mat: 'plaster' });
+  for (let f = 0; f < 5; f++) for (const x of [-7, -4, 2.2, 5.2]) { const y = .9 + f * 3; m.box(x, x + 1.6, y, y + 1.5, -.05, .02, { color: '#2a343c', mat: 'glass' }); m.box(x - .06, x + 1.66, y - .08, y, 0, .12, { color: '#bfc1c2', mat: 'concrete' }); }
+  for (let f = 0; f < 5; f++) m.box(-1.2, 1.2, f * 3 + .3, f * 3 + 2.6, -.05, .02, { color: f === 2 ? '#2a343c' : '#2a343c', mat: 'glass' });
+  m.box(-1.6, 1.6, 2.85, 3.05, 0, 1.5, { color: '#a7a9aa', mat: 'concrete' }); m.box(-1.6, 1.6, 8.85, 9.05, 0, 1.5, { color: '#a7a9aa', mat: 'concrete' });
+  m.box(-9.5, 9.5, 15, 15.4, -6.5, .4, { color: '#6c6f72', mat: 'concrete' });
+});
+const balc = B((m) => { m.box(-1.6, 1.6, 5.85, 6.05, 0, 1.5, { color: '#a3a5a6', mat: 'concrete' }); for (let x = -1.5; x <= 1.5; x += .25) m.rod([x, 6.05, 1.45], [x, 6.95, 1.45], .015, { color: '#2f3336', mat: 'metal', seg: 5 }); m.box(-1.6, 1.6, 6.92, 6.98, 1.4, 1.5, { color: '#2f3336', mat: 'metal' }); });
+const prop = B((m) => { m.rod([0, 0, 0], [0, 5.85, 0], .04, { color: '#c0392b', mat: 'metal', seg: 8 }); m.box(-.15, .15, 5.8, 5.85, -.15, .15, { color: '#555' }); m.box(-.15, .15, 0, .03, -.15, .15, { color: '#555' }); });
+const workerA = K.person({ top: '#f08c3a', bottom: '#2f3d55', hat: '#f2c230', skin: '#d6a07c' });
+const workerB = K.person({ top: '#3d7a4f', bottom: '#33302c', hat: '#f8f9fa', skin: '#c48f6a' });
+const debris = B((m) => { for (let i = 0; i < 14; i++) { const x = (R(i) - .5) * 3, z = .6 + R(i + 4) * 1.8, s = .08 + R(i + 9) * .18; m.box(x - s, x + s, 0, s * 1.2, z - s, z + s, { color: '#9fa2a3', mat: 'concrete' }); } });
+
+const SUN_DESERT = { dir: [-.55, .62, .55], color: '#ffe2b0', intensity: 3.4 };
+function camLerp(t, a, b, k0, k1) { const k = ease((t - a) / (b - a)); return { pos: R3.V.lerp(k0.pos, k1.pos, k), target: R3.V.lerp(k0.target, k1.target, k), fov: lerp(k0.fov || 40, k1.fov || 40, k) }; }
+window.render = function (t) {
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  let s;
+  if (t < S2) {
+    const col = clamp((t - 6.0) / 1.0), fall = col * col;
+    const roofM = M.chain(M.T(0, -fall * 1.9, 0), M.about([-2.6, 2.6, 0], M.RZ(-fall * .55)));
+    const topM = M.chain(M.T(fall * .9, -fall * 2.0, 0), M.about([2.6, 2.0, 0], M.RZ(-fall * 1.1)));
+    const shake = t > 6 && t < 6.6 ? Math.sin(t * 90) * .03 : 0;
+    const cam = camLerp(t, 0, S2, { pos: [11, 5.2, 19], target: [0, 1.6, 0] }, { pos: [8.5, 4.4, 14.5], target: [.2, 1.3, 0] });
+    cam.pos = [cam.pos[0] + shake, cam.pos[1] + shake, cam.pos[2]];
+    s = { cam, sun: SUN_DESERT, sky: { top: '#3f78c0', horizon: '#ecdcbc', ground: '#a08460' }, fog: .006, fogH: .03, exposure: .95, shadow: { center: [0, 1, 0], radius: 14 },
+      items: [{ mesh: sand }, { mesh: babHouse }, { mesh: babRoof, M: roofM }, { mesh: babTop, M: topM }, { mesh: zigg, M: M.T(-16, 0, -38) }, { mesh: mudHouses }, ...palms.map((p) => ({ mesh: p })),
+        ...builder.items(3.9, 0, 2.6, -.7, t < 6.3 ? 'hands' : 'shrug', t)] };
+    R3.frame({ ...s, t });
+    K.dust(FX, t, 6.25, [0, .8, 0], 46, 3.2, '205,180,140');
+  } else if (t < S3) {
+    const cam = camLerp(t, S2, S3, { pos: [6.5, 2.2, 19], target: [0, 2.0, 2] }, { pos: [4.8, 2.0, 15], target: [.4, 1.9, 2.4] });
+    s = { cam, sun: { dir: [-.5, .55, .62], color: '#fff3df', intensity: 3.1 }, sky: { top: '#6c93c4', horizon: '#dfe6ea', ground: '#5d6b45' }, fog: .008, fogH: .04, exposure: .95, shadow: { center: [0, 1, 2], radius: 13 },
+      items: [{ mesh: lawn }, { mesh: modern }, ...birch.map((b) => ({ mesh: b })), ...owner.items(-1.0, 0, 6.2, .3, t > 12.6 ? 'phone' : 'stand', t)] };
+    R3.frame({ ...s, t });
+    // трещина
+    const cr = clamp((t - 10.6) / 2.0), pts = [[1.0, 3.38], [1.15, 3.0], [.95, 2.7], [1.25, 2.3], [1.1, 1.95], [1.4, 1.5], [1.3, 1.1], [1.55, .55]];
+    if (cr > 0) { const n = cr * (pts.length - 1); FX.save(); FX.strokeStyle = 'rgba(40,32,26,.9)'; FX.lineWidth = 2.2; FX.lineJoin = 'round'; FX.beginPath(); for (let i = 0; i <= Math.floor(n); i++) { const q = R3.proj([pts[i][0], pts[i][1], 3.02]); i ? FX.lineTo(q[0], q[1]) : FX.moveTo(q[0], q[1]); } if (n % 1 > 0 && Math.floor(n) < pts.length - 1) { const a = pts[Math.floor(n)], b = pts[Math.floor(n) + 1], k = n % 1, q = R3.proj([lerp(a[0], b[0], k), lerp(a[1], b[1], k), 3.02]); FX.lineTo(q[0], q[1]); } FX.stroke(); FX.restore(); }
+    const ph = $('phone'); ph._on = 1; ph.style.opacity = win(t, 13.2, S3 - .2, .3, .2); ph.style.transform = `translateY(${(1 - eOut((t - 13.2) / .5)) * 120}px) rotate(${-4 + Math.sin(t * 1.5)}deg)`;
+  } else if (t < S4) {
+    const rm = clamp((t - 19.0) / 1.6), drop = ease(rm);
+    const cam = camLerp(t, S3, S4, { pos: [5, 1.4, 22], target: [0, 2.0, 0], fov: 42 }, { pos: [3, .9, 17], target: [-.4, 1.6, 0], fov: 40 });
+    s = { cam, sun: { dir: [.45, .58, .62], color: '#ffe9c4', intensity: 3.3 }, sky: { top: '#4b84c8', horizon: '#e4e2d6', ground: '#77734d' }, fog: .007, fogH: .03, exposure: .95, shadow: { center: [0, 1, 0], radius: 15 },
+      items: [{ mesh: romeG }, { mesh: river }, { mesh: bridge }, ...cyps.map((c) => ({ mesh: c })), { mesh: centering, M: M.T(lerp(0, 9, ease((t - 20.3) / 1.6)), -drop * .5, 0), alpha: t > 22 ? clamp(1 - (t - 22) / .6) : 1 },
+        ...engineer.items(-.6, -1.45, .4, .2, t > 20.8 ? 'cross' : 'hands', t)] };
+    R3.frame({ ...s, t });
+    if (t > 19.2 && t < 20.5) K.dust(FX, t, 19.2, [0, 3.4, 0], 20, 2.5, '190,175,150');
+  } else {
+    const rm = clamp((t - 25.0) / 1.2), dr = clamp((t - 27.0) / .9), fall = dr * dr;
+    const shake = t > 27.1 && t < 27.8 ? Math.sin(t * 80) * .04 : 0;
+    const cam = camLerp(t, S4, SE, { pos: [9, 3.4, 23], target: [0, 5.0, 0] }, { pos: [7.5, 3.0, 19.5], target: [0, 4.4, .4] });
+    cam.pos = [cam.pos[0] + shake, cam.pos[1] + shake, cam.pos[2]];
+    const balM = M.chain(M.T(0, -fall * 1.1, 0), M.about([0, 5.85, 0], M.RX(fall * 1.15)));
+    const props = [[-1.3, .4], [1.3, .4], [-1.3, 1.2], [1.3, 1.2]].map(([x, z], i) => { const k = clamp(rm * 4 - i); return { mesh: prop, M: M.chain(M.T(x + k * (3 + i), 0, z + k * 2.5), M.about([0, 0, 0], M.RZ(k * 1.45 * (i % 2 ? -1 : 1)))), alpha: 1 - clamp((t - 26.4) / .4) }; });
+    s = { cam, sun: { dir: [-.45, .62, .64], color: '#fff3df', intensity: 3.0 }, sky: { top: '#6d93c2', horizon: '#dde4ea', ground: '#5d6b45' }, fog: .006, fogH: .03, exposure: .95, shadow: { center: [0, 4, 0], radius: 15 },
+      items: [{ mesh: asph }, { mesh: block }, { mesh: balc, M: balM }, ...props, ...(t > 27.5 ? [{ mesh: debris }] : []),
+        ...workerA.items(lerp(2.4, 5.2, clamp((t - 25.8) / 1.4)), 0, 3.6, t > 27.6 ? -2.6 : 1.2, t > 25.8 && t < 27.2 ? 'walk' : t > 27.6 ? 'point' : 'stand', t), ...workerB.items(-3.4, 0, 4.2, t > 27.6 ? -2.9 : .8, t > 27.6 ? 'shrug' : 'stand', t)] };
+    R3.frame({ ...s, t });
+    K.dust(FX, t, 27.6, [0, 1.2, 1.2], 50, 3.4, '200,198,192');
+  }
+  if (t < S2 || t >= S3) $('phone').style.opacity = 0;
+  K.year(t, YEARS); K.subs(t, SUBS);
+  $('hook').innerHTML = 'Раньше за брак строитель<br>отвечал <b>головой</b>'; $('hook').style.opacity = win(t, 0, 2.5, .01, .3);
+  if (t > 2.6) $('hook').style.opacity = 0;
+  const bnd = [S2, S3, S4, SE].map((b) => clamp(1 - Math.abs(t - b) / .22)); $('flash').style.opacity = Math.max(...bnd);
+  $('end').style.opacity = clamp((t - SE) / .35);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

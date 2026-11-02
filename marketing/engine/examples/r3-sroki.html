@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Сроки стройки: тогда и сейчас</title></head><body><div id="stage">
+<canvas id="gl"></canvas><canvas id="fx" width="1080" height="1920"></canvas><div id="vig"></div>
+<div id="year"></div><div id="hook"></div><div id="sub"></div>
+<div id="flash"></div>
+</div>
+<script src="r3d.js"></script>
+<script src="r3kit.js"></script>
+<script>
+const { M, Mesh } = R3, { B, $, clamp, ease, eOut, lerp, win, R } = K;
+$('stage').insertAdjacentHTML('beforeend', K.END('Раньше строили веками — <b>на века</b>.<br>Сейчас годами — потому что<br><b>«завтра приедем»</b>'));
+R3.init($('gl'));
+const FX = $('fx').getContext('2d');
+window.DUR = 34.5;
+const S2 = 9.6, S3 = 16.6, S4 = 24, SE = 30.6;
+const SUBS = [
+  [2.8, 6.2, 'Кёльнский собор строили <b>632 года</b>.<br>Кран простоял на башне 400 лет'],
+  [6.2, S2 - .1, 'Заказчик не дожил.<br><b>Его правнуки — тоже</b>'],
+  [S2 + .3, 13.1, 'Ванную обещали<br>сделать <b>за 2 недели</b>'],
+  [13.1, S3 - .1, 'Идёт <b>8-й месяц</b>.<br>Заказчик моется у тёщи'],
+  [S3 + .3, 20.4, 'Эмпайр-стейт-билдинг:<br><b>102 этажа за 410 дней</b>'],
+  [20.4, S4 - .1, 'В лучшие недели —<br><b>по 4 этажа</b>'],
+  [S4 + .3, 27.4, 'Забор на даче —<br><b>410 дней</b> и три бригады'],
+  [27.4, SE - .1, 'Бригадир обещал «завтра».<br><b>Завтра наступило 410 раз</b>'],
+];
+function yearLabel(t) {
+  let h = '', a = 0;
+  if (t > 2.6 && t < S2) { h = `${Math.round(lerp(1248, 1880, ease((t - 2.8) / 5.6)))}<small>Кёльнский собор</small>`; a = win(t, 2.6, S2 - .1, .25, .25); }
+  else if (t > S2 && t < S3) { h = `День ${Math.round(lerp(1, 243, ease((t - S2 - .3) / 5.5)))}<small>ремонт ванной · 2026</small>`; a = win(t, S2 + .2, S3 - .1, .25, .25); }
+  else if (t > S3 && t < S4) { h = `День ${Math.round(lerp(1, 410, ease((t - S3 - .3) / 6)))}<small>Нью-Йорк · 1930–1931</small>`; a = win(t, S3 + .2, S4 - .1, .25, .25); }
+  else if (t > S4 && t < SE) { h = `День ${Math.round(lerp(380, 410, ease((t - S4 - .3) / 4)))}<small>забор на даче · 2026</small>`; a = win(t, S4 + .2, SE - .1, .25, .25); }
+  $('year').innerHTML = h; $('year').style.opacity = a;
+}
+// ---------- Кёльн ----------
+const square = B((m) => { m.box(-150, 150, -1, 0, -150, 150, { color: '#8a857b', mat: 'stone' }); });
+const ST = '#9d968a', STD = '#7f786d';
+function towerMesh(x0, x1, h) { return B((m) => {
+  m.box(x0, x1, 0, h, -6, 0, { color: ST, mat: 'stone' });
+  for (const bx of [x0 - .3, x1 - .5]) m.box(bx, bx + .8, 0, h - .5, -.3, .6, { color: STD, mat: 'stone' });
+  for (let y = 3; y < h - 3; y += 5.5) { const cx = (x0 + x1) / 2; m.box(cx - .9, cx + .9, y, y + 3.6, .6, .64, { color: '#15181c', mat: 'plain' }); m.poly([[cx - .9, y + 3.6, .64], [cx + .9, y + 3.6, .64], [cx, y + 4.8, .64]], { color: '#15181c', mat: 'plain' }); }
+}); }
+const towerN = towerMesh(-9, -3, 34), towerS = towerMesh(3, 9, 34);
+const spire = (cx) => B((m) => { m.lathe([cx, 0, -3], [[0, 0], [3.4, 0], [3.0, 1.2], [.2, 14], [0, 14.5]], { color: STD, mat: 'stone', seg: 8 }); for (const [dx, dz] of [[-2.6, -.4], [2.6, -.4], [-2.6, -5.6], [2.6, -5.6]]) m.lathe([cx + dx, 0, dz], [[0, 0], [.45, 0], [.05, 4], [0, 4.2]], { color: STD, mat: 'stone', seg: 6 }); });
+const spireN = spire(-6), spireS = spire(6);
+const center = B((m) => { m.box(-3, 3, 0, 13, -6, 0, { color: ST, mat: 'stone' }); m.poly([[-3, 13, .01], [3, 13, .01], [0, 17, .01]], { color: STD, mat: 'stone' }); m.box(-1.6, 1.6, 0, 5.5, .0, .06, { color: '#2a2018', mat: 'wood' }); m.poly([[-1.6, 5.5, .06], [1.6, 5.5, .06], [0, 7.4, .06]], { color: '#2a2018', mat: 'wood' }); m.box(-1.2, 1.2, 8, 11.5, .0, .06, { color: '#1b1f25', mat: 'glass' }); });
+const nave = B((m) => { m.box(-5, 5, 0, 17, -42, -6, { color: ST, mat: 'stone' }); m.poly([[-5.4, 17, -6], [0, 26, -6], [0, 26, -42], [-5.4, 17, -42]], { color: '#4a4d52', mat: 'metal' }); m.poly([[0, 26, -6], [5.4, 17, -6], [5.4, 17, -42], [0, 26, -42]], { color: '#4a4d52', mat: 'metal' }); for (let z = -10; z > -42; z -= 5) for (const x of [-6.5, 5.5]) m.box(x, x + 1, 0, 14, z, z + 1, { color: STD, mat: 'stone' }); });
+const crane = B((m) => { const W = '#6b4e33'; for (const [x, z] of [[0, 0], [2.2, 0], [0, -2.2], [2.2, -2.2]]) m.rod([x, 0, z], [x, 3, z], .09, { color: W, mat: 'wood', seg: 6 }); m.box(-.2, 2.4, 3, 3.3, -2.4, .2, { color: W, mat: 'wood' }); m.poly([[-.2, 3.3, .2], [2.4, 3.3, .2], [1.1, 4.6, -1.1]], { color: '#5a4636', mat: 'wood' }); m.rod([1.1, 3.3, -1.1], [1.1, 3.6, 4.5], .1, { color: W, mat: 'wood', seg: 6 }); m.rod([1.1, 3.55, 4.4], [1.1, -1, 4.4], .015, { color: '#3a3026', seg: 4 }); });
+const timber = B((m) => { const hs = [[-14, 6, 6, 9], [-21, 7, 7, 11], [-15, 15, 6, 8], [14, 6, 6, 10], [21, 8, 7, 8], [15, 16, 6, 9], [-28, 4, 6, 12], [28, 3, 6, 11]];
+  for (const [x, z, w, h] of hs) { m.box(x - w / 2, x + w / 2, 0, h, z - 3, z + 3, { color: '#e8dcc2', mat: 'plaster' }); m.poly([[x - w / 2 - .2, h, z + 3.2], [x + w / 2 + .2, h, z + 3.2], [x + w / 2 + .2, h + 3.5, z], [x - w / 2 - .2, h + 3.5, z]], { color: '#7a3d2b', mat: 'rooftile', two: true }); m.poly([[x + w / 2 + .2, h, z - 3.2], [x - w / 2 - .2, h, z - 3.2], [x - w / 2 - .2, h + 3.5, z], [x + w / 2 + .2, h + 3.5, z]], { color: '#7a3d2b', mat: 'rooftile', two: true });
+    const fz = x < 0 ? x + w / 2 + .02 : x - w / 2 - .02; for (let y = 0; y <= h; y += 2.6) m.box(fz - .03, fz + .03, y, y + .18, z - 3, z + 3, { color: '#4a3424', mat: 'wood' }); for (let k = -3; k <= 3; k += 1.5) m.box(fz - .03, fz + .03, 0, h, z + k - .09, z + k + .09, { color: '#4a3424', mat: 'wood' });
+    for (let y = 1.2; y < h - 1; y += 2.6) for (let k = -2.2; k < 2; k += 1.5) m.box(fz - .04, fz + .04, y + .3, y + 1.6, z + k + .3, z + k + 1.0, { color: '#2b3540', mat: 'glass' }); } });
+const people = [K.person({ robe: true, top: '#5b3f2c', skin: '#d7a684', hair: '#3a2a1c' }), K.person({ robe: true, top: '#2e4a6b', skin: '#d0a07c', hat: '#3b2e25' })];
+// ---------- ванная ----------
+const bath = B((m) => {
+  m.box(-1.4, 1.4, -.1, 0, -1.3, 1.6, { color: '#8f8b84', mat: 'concrete' });
+  m.box(-1.4, 1.4, 0, 2.6, -1.4, -1.25, { color: '#a7a297', mat: 'plaster' }); m.box(-1.55, -1.4, 0, 2.6, -1.4, 1.6, { color: '#a39e93', mat: 'plaster' }); m.box(1.4, 1.55, 0, 2.6, -1.4, 1.6, { color: '#a39e93', mat: 'plaster' });
+  m.box(-1.4, -.1, 0, 1.25, -1.25, -1.22, { color: '#e9edf0', mat: 'tile' }); m.box(-1.4, -1.37, 0, .62, -1.25, .3, { color: '#e9edf0', mat: 'tile' });
+  m.box(-1.3, .3, 0, .58, -1.18, -.45, { color: '#f4f5f6', mat: 'glass', top: false }); m.box(-1.22, .22, .2, .54, -1.1, -.53, { color: '#c9cfd4', mat: 'plain' });
+  m.box(.6, 1.2, 0, .55, .2, .55, { color: '#b08a5a', mat: 'plain' }); m.box(.65, 1.15, .55, 1.0, .25, .5, { color: '#a17b4d', mat: 'plain' });
+  m.cyl([-.9, 0, -.15], .17, .32, { color: '#e8590c', r2: .2, seg: 16 }); m.cyl([-.9, .25, -.15], .16, .02, { color: '#9a9488', seg: 16 });
+  m.rod([1.2, 0, -.9], [.9, 2.2, -1.2], .03, { color: '#9aa3ab', mat: 'metal' }); m.rod([1.35, 0, -.6], [1.05, 2.2, -.9], .03, { color: '#9aa3ab', mat: 'metal' }); for (let i = 1; i < 7; i++) { const k = i / 7; m.rod([lerp(1.2, .9, k), 2.2 * k, lerp(-.9, -1.2, k)], [lerp(1.35, 1.05, k), 2.2 * k, lerp(-.6, -.9, k)], .02, { color: '#9aa3ab', mat: 'metal' }); }
+  m.rod([.2, 2.6, -.1], [.2, 2.15, -.1], .008, { color: '#222', seg: 4 });
+  m.rod([-1.39, 1.9, -.6], [-1.39, 1.2, -.3], .01, { color: '#c92a2a', seg: 4 }); m.rod([-1.39, 1.9, -.5], [-1.39, 1.4, -.1], .01, { color: '#1971c2', seg: 4 });
+});
+const bulb = B((m) => m.sphere([.2, 2.1, -.1], .05, { color: '#ffe8a8', mat: 'emit', seg: 10, rings: 6 }));
+const worker0 = K.person({ top: '#f08c3a', bottom: '#2f3d55', hat: '#f2c230', skin: '#d6a07c' });
+// ---------- Нью-Йорк ----------
+const street = B((m) => { m.box(-200, 200, -1, 0, -200, 200, { color: '#4f5256', mat: 'asphalt' }); });
+const city = B((m) => { for (let i = 0; i < 60; i++) { const x = (R(i) - .5) * 160, z = -20 - R(i + 9) * 120, w = 8 + R(i + 3) * 10, h = 6 + R(i + 5) * 22; if (Math.abs(x) < 14 && z > -30) continue; m.box(x - w / 2, x + w / 2, 0, h, z - w / 2, z + w / 2, { color: R(i + 7) > .5 ? '#9c8b78' : '#8f8f8a', mat: R(i + 7) > .5 ? 'brick' : 'concrete' }); }
+  for (const x of [-26, 26]) for (let z = 20; z > -14; z -= 12) m.box(x - 7, x + 7, 0, 8 + R(x + z) * 10, z - 5, z + 5, { color: '#a08e7b', mat: 'brick' }); });
+const ES = '#cdc6b6';
+const empire = B((m) => {
+  const body = (x, z, y0, y1) => { m.box(-x, x, y0, y1, -z, z, { color: ES, mat: 'plaster' }); for (let k = -x + .5; k < x - .3; k += .9) { m.box(k, k + .35, y0 + .2, y1 - .2, z, z + .02, { color: '#2c3238', mat: 'plain' }); } for (let k = -z + .5; k < z - .3; k += .9) m.box(x, x + .02, y0 + .2, y1 - .2, k, k + .35, { color: '#2c3238', mat: 'plain' }); };
+  body(8, 6, 0, 2.4); body(5.2, 3.8, 2.4, 32); body(3.8, 2.8, 32, 36); body(2.4, 1.8, 36, 40.8);
+  m.lathe([0, 40.8, 0], [[0, 0], [1.4, 0], [1.1, 2.5], [.7, 4], [.25, 6.5], [.05, 9], [0, 9.2]], { color: '#d8d2c4', mat: 'metal', seg: 16 });
+});
+const steel = B((m) => { for (let x = -5; x <= 5.01; x += 2.5) for (let z = -3.75; z <= 3.8; z += 2.5) m.rod([x, 0, z], [x, 50, z], .07, { color: '#7a3b2a', mat: 'metal', seg: 4 }); for (let y = 0; y < 50; y += 1.6) { for (const z of [-3.75, 3.75]) m.rod([-5, y, z], [5, y, z], .05, { color: '#7a3b2a', mat: 'metal', seg: 4 }); for (const x of [-5, 5]) m.rod([x, y, -3.75], [x, y, 3.75], .05, { color: '#7a3b2a', mat: 'metal', seg: 4 }); } });
+const derrick = B((m) => { m.rod([0, 0, 0], [0, 4, 0], .1, { color: '#3c3f43', mat: 'metal', seg: 6 }); m.rod([0, .3, 0], [6, 3.5, 3], .07, { color: '#3c3f43', mat: 'metal', seg: 6 }); m.rod([6, 3.5, 3], [6, -3, 3], .015, { color: '#222', seg: 4 }); m.box(5.2, 6.8, -3.3, -3, 2.9, 3.1, { color: '#7a3b2a', mat: 'metal' }); });
+// ---------- дача ----------
+const field = B((m) => { m.box(-150, 150, -1, 0, -150, 150, { color: '#566f31', mat: 'grass' }); });
+const fence = B((m) => { for (const x of [-3, -.5, 2, 4.5]) { m.box(x - .04, x + .04, 0, 2.0, -.04, .04, { color: '#7a5236', mat: 'metal' }); m.cyl([x, 0, 0], .16, .06, { color: '#8a857a', mat: 'concrete', seg: 12 }); } m.box(-3, -.5, 1.6, 1.64, .04, .08, { color: '#7a5236', mat: 'metal' }); m.box(-1.75, -.5, .3, .34, .04, .08, { color: '#7a5236', mat: 'metal' });
+  m.box(.8, 1.35, 0, .2, .9, 1.3, { color: '#c4bba6', mat: 'concrete' }); m.box(.82, 1.33, .2, .26, .92, 1.28, { color: '#b5ac98', mat: 'concrete' });
+  m.box(-2.4, -1.4, .35, .65, 1.1, 1.75, { color: '#6e5a45', mat: 'metal' }); m.rod([-1.4, .45, 1.2], [-.6, .7, 1.1], .025, { color: '#5a4836', mat: 'metal' }); m.rod([-1.4, .45, 1.65], [-.6, .7, 1.75], .025, { color: '#5a4836', mat: 'metal' }); m.rod([-2.55, .2, 1.42], [-2.35, .2, 1.42], .2, { color: '#2a2a2a', seg: 12 });
+  for (let i = 0; i < 260; i++) { const x = -5.5 + R(i) * 12, z = -1.5 + R(i + 11) * 4, h = .3 + R(i + 22) * .9, a = R(i + 33) * 6.28, w = .025 + R(i + 5) * .03, lx = Math.cos(a) * .25 * h, lz = Math.sin(a) * .25 * h; m.poly([[x - Math.sin(a) * w, 0, z + Math.cos(a) * w], [x + Math.sin(a) * w, 0, z - Math.cos(a) * w], [x + lx, h, z + lz]], { color: ['#6b8a3a', '#7f9a44', '#8c9a4a', '#5f7d34'][i % 4], mat: 'grass', two: true }); }
+  m.box(-9, -3, 0, 3, -16, -11, { color: '#7a5a3c', mat: 'wood' }); m.poly([[-9.4, 3, -10.6], [-2.6, 3, -10.6], [-2.6, 4.8, -13.5], [-9.4, 4.8, -13.5]], { color: '#5b5f63', mat: 'metal' }); m.poly([[-2.6, 3, -16.4], [-9.4, 3, -16.4], [-9.4, 4.8, -13.5], [-2.6, 4.8, -13.5]], { color: '#5b5f63', mat: 'metal' });
+});
+const birches = [K.tree([6.5, 0, -6], 1.2, '#5f7d33'), K.tree([10, 0, -10], 1.4, '#55722e'), K.tree([-12, 0, -7], 1.2, '#61802f')];
+const SUNC = { dir: [-.4, .7, .6], color: '#ffeacc', intensity: 3.0 };
+function camLerp(t, a, b, k0, k1) { const k = ease((t - a) / (b - a)); return { pos: R3.V.lerp(k0.pos, k1.pos, k), target: R3.V.lerp(k0.target, k1.target, k), fov: 40 }; }
+window.render = function (t) {
+  FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  if (t < S2) {
+    const g = ease((t - 7.2) / 1.8), H = lerp(14, 34, g), HS = lerp(22, 34, g), sa = (t - 2.6) / 6 * 2.2;
+    const sun = { dir: [Math.cos(sa) * .6, .55 + .15 * Math.sin(sa), .5 + Math.sin(sa) * .3], color: '#ffe2b8', intensity: 3.0 };
+    const cam = camLerp(t, 0, S2, { pos: [16, 2.2, 44], target: [0, 14, -3] }, { pos: [11, 3.5, 38], target: [1.5, 22, -3] });
+    R3.frame({ t, cam, sun, sky: { top: '#5b86bf', horizon: '#e9dcc4', ground: '#6e675c' }, fog: .006, fogH: .02, exposure: .95, shadow: { center: [0, 10, -6], radius: 34 },
+      items: [{ mesh: square }, { mesh: nave }, { mesh: center }, { mesh: towerN, clip: [-1, H] }, { mesh: towerS, clip: [-1, HS] }, { mesh: timber },
+        ...(g > .98 ? [{ mesh: spireN, M: M.chain(M.T(0, 34, 0), M.S(1, eOut((t - 9) / .5), 1)) }, { mesh: spireS, M: M.chain(M.T(0, 34, 0), M.S(1, eOut((t - 9) / .5), 1)) }] : []),
+        ...(g < .3 ? [{ mesh: crane, M: M.T(5, HS, -3) }] : []),
+        ...people[0].items(-4, 0, 9, .3, 'walk', t), ...people[1].items(lerp(6, 2, (t % 9) / 9), 0, 12, -1.4, 'walk', t)] });
+  } else if (t < S3) {
+    const cam = camLerp(t, S2, S3, { pos: [.6, 1.55, 4.6], target: [-.25, 1.05, -.6] }, { pos: [.35, 1.45, 3.7], target: [-.3, 1.0, -.7] });
+    R3.frame({ t, cam, sun: { dir: [.25, .75, .8], color: '#fff0d8', intensity: 1.6 }, sky: { top: '#7b7f86', horizon: '#9a968c', ground: '#5d5a54' }, fog: .0, fogH: 0, exposure: 1.25, shadow: { center: [0, 1, 0], radius: 4 },
+      items: [{ mesh: bath }, { mesh: bulb, noShadow: true, M: M.about([.2, 2.6, -.1], M.RZ(Math.sin(t * 1.3) * .05)) }, ...(t > 13.4 ? worker0.items(.75, 0, .5, -.5, 'shrug', t) : [])] });
+    const q = R3.proj([.2 + Math.sin(t * 1.3) * .025, 2.1, -.1]); const gr = FX.createRadialGradient(q[0], q[1], 0, q[0], q[1], 90); gr.addColorStop(0, 'rgba(255,230,170,.55)'); gr.addColorStop(1, 'rgba(255,230,170,0)'); FX.fillStyle = gr; FX.fillRect(q[0] - 90, q[1] - 90, 180, 180);
+    // паутина в углу
+    const c0 = R3.proj([1.39, 2.58, -1.24]); FX.save(); FX.strokeStyle = 'rgba(235,235,235,.55)'; FX.lineWidth = .8; for (let i = 0; i < 7; i++) { const a = Math.PI / 2 + i / 6 * Math.PI / 2; FX.beginPath(); FX.moveTo(c0[0], c0[1]); FX.lineTo(c0[0] + Math.cos(a) * 70, c0[1] + Math.sin(a) * 70); FX.stroke(); } for (let r = 14; r < 70; r += 13) { FX.beginPath(); for (let i = 0; i <= 6; i++) { const a = Math.PI / 2 + i / 6 * Math.PI / 2, rr = r * (1 + Math.sin(i * 2) * .06); i ? FX.lineTo(c0[0] + Math.cos(a) * rr, c0[1] + Math.sin(a) * rr) : FX.moveTo(c0[0] + Math.cos(a) * rr, c0[1] + Math.sin(a) * rr); } FX.stroke(); } FX.restore();
+  } else if (t < S4) {
+    const H = lerp(3, 50, ease((t - S3 - .3) / 6.4));
+    const cam = camLerp(t, S3, S4, { pos: [30, 3, 62], target: [0, 16, 0] }, { pos: [27, 16, 58], target: [0, 30, 0] });
+    R3.frame({ t, cam, sun: { dir: [-.5, .65, .55], color: '#fff1d6', intensity: 3.1 }, sky: { top: '#5e8ac4', horizon: '#dcdcd4', ground: '#5c5a56' }, fog: .004, fogH: .01, exposure: .95, shadow: { center: [0, 20, 0], radius: 45 },
+      items: [{ mesh: street }, { mesh: city }, { mesh: empire, clip: [-1, H] }, { mesh: steel, clip: [H - .1, Math.min(H + 3.2, 40.8)] }, ...(H < 40 ? [{ mesh: derrick, M: M.chain(M.T(4, Math.min(H + 3.2, 40.8), 3), M.RY(t * .4)) }] : [])] });
+  } else if (t < SE) {
+    const cam = camLerp(t, S4, SE, { pos: [5.2, 1.7, 8.2], target: [.6, 1.0, 0] }, { pos: [4.1, 1.5, 6.6], target: [.4, .9, .3] });
+    R3.frame({ t, cam, sun: { dir: [-.75, .28, .55], color: '#ffc98a', intensity: 3.2 }, sky: { top: '#6d86b4', horizon: '#f0c896', ground: '#5d5a3c' }, fog: .01, fogH: .05, exposure: 1.0, shadow: { center: [0, 1, 0], radius: 12 },
+      items: [{ mesh: field }, { mesh: fence }, ...birches.map((b) => ({ mesh: b }))] });
+  } else R3.frame({ t, cam: { pos: [0, 2, 10], target: [0, 1, 0] }, sun: SUNC, sky: { top: '#16365e', horizon: '#0a1a30' }, items: [] });
+  yearLabel(t); K.subs(t, SUBS);
+  $('hook').innerHTML = 'Стройка, которая шла<br><b>632 года</b>'; $('hook').style.opacity = win(t, 0, 2.5, .01, .3);
+  const bnd = [S2, S3, S4, SE].map((b) => clamp(1 - Math.abs(t - b) / .22)); $('flash').style.opacity = Math.max(...bnd);
+  $('end').style.opacity = clamp((t - SE) / .35);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

@@ -10,7 +10,7 @@ const url = 'file://' + path.resolve(html);
 const b0 = await chromium.launch({ executablePath: exe, args: ['--allow-file-access-from-files'] });
 const p0 = await b0.newPage(); await p0.goto(url); await p0.waitForFunction(() => window.OK || window.READY === true);
 const N = Math.round((await p0.evaluate(() => window.DUR)) * 30); await b0.close();
-const C = 6, st = Math.ceil(N / C);
+const C = +(process.env.WORKERS || 6), st = Math.ceil(N / C);
 await Promise.all([...Array(C)].map(async (_, k) => {
   const b = await chromium.launch({ executablePath: exe, args: ['--allow-file-access-from-files'] });
   const p = await b.newPage({ viewport: { width: 540, height: 960 }, deviceScaleFactor: 2 });
