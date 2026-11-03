@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Оплата на личную карту</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('💳', 'Смета и чек клиенту —', 'за 2 минуты в Telegram'));
+window.DUR = 40;
+const T1 = 9.2, T2 = 13.8, T3 = 18.6, T4 = 23.4, T5 = 28.2, T6 = 32.4, TE = 36;
+const STEPS = [[3, 'КАК ЕСТЬ', 'оплата на карту'], [T1, 'РИСК', 'банк и 115-ФЗ'], [T2, 'РИСК', 'налоговая'], [T3, 'РИСК', 'чужая карта'], [T4, 'КАК НАДО', 'самозанятость'], [T5, 'КАК НАДО', 'лимит и чеки']];
+const SUBS = [
+  [3.1, 6.2, 'Бригадир берёт оплату<br>на <b>личную карту</b>'],
+  [6.2, T1 - .1, '40 переводов «за плитку» от разных людей —<br>для банка карта выглядит как <b>казино</b>'],
+  [T1 + .2, T2 - .1, 'Это признаки бизнеса без регистрации:<br>банк может <b>ограничить карту</b> по 115-ФЗ'],
+  [T2 + .2, T3 - .1, 'Налоговая видит поступления:<br><b>НДФЛ 13%</b>, пени и штраф'],
+  [T3 + .2, T4 - .1, 'Дал карту другу «принимать оплату» —<br>с 2025 года это <b>дропперство</b>, уголовная статья'],
+  [T4 + .2, T5 - .1, 'Как надо: <b>самозанятость</b> —<br>4% с физлиц, 6% с компаний'],
+  [T5 + .2, T6 - .1, 'Лимит — <b>2,4 млн ₽ в год</b>, больше — ИП.<br>Чек клиенту — в «Мой налог» за минуту'],
+  [T6 + .2, TE - .1, '4% — дешевле, чем объяснять банку,<br>кто такой <b>«Серёга-плитка»</b>'],
+];
+const CAM = [
+  [0, .3, .22, 24, 0, 2.6, -1.5], [3, .25, .16, 19, 0, 2.6, -1], [6.2, .2, .12, 17, 0, 2.8, -.8], [T1 - .2, .22, .12, 17, 0, 2.8, -.8],
+  [T1 + .6, .16, .1, 7.5, 0, 3.6, 1], [T2 - .2, .2, .1, 7.5, 0, 3.6, 1], [T2 + .7, .4, .14, 11, 1.4, 2.0, .6], [T3 - .2, .44, .14, 11, 1.4, 2.0, .6],
+  [T3 + .7, -.3, .14, 10, -1, 2.2, .8], [T4 - .2, -.26, .14, 10, -1, 2.2, .8], [T4 + .7, .15, .1, 8, 0, 3.0, 1], [T5 - .2, .2, .1, 8, 0, 3.0, 1],
+  [T5 + .7, .25, .12, 9, .4, 3.0, 1], [T6 - .2, .28, .12, 9, .4, 3.0, 1], [T6 + .9, .3, .2, 22, 0, 2.6, -1.2], [99, .34, .2, 22, 0, 2.6, -1.2],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const ROOMS = [-4.2, 0, 4.2], CARD = [0, 4.4, 1.2];
+function building() {
+  S.box(-6.5, 6.5, 0, .2, -4.2, 0, '#c9c2b4');
+  S.box(-6.5, 6.5, 3, 3.25, -4.2, 0, '#c9c2b4'); S.box(-6.5, 6.5, 3.25, 6.2, -4.2, -.05, '#d9d2c4', { front: '#cfc8ba' });
+  S.box(-6.5, 6.5, .2, 3, -4.4, -4.2, '#e8e2d8');
+  for (const x of [-6.5, -2.2, 2.0, 6.3]) S.box(x, x + .2, .2, 3, -4.2, 0, '#e3ddd2');
+  ROOMS.forEach((cx, i) => { for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) if (r + c < 6 + i) S.box(cx - 1.8 + c * .6 + .02, cx - 1.8 + (c + 1) * .6 - .02, .2 + r * .5 + .02, .2 + (r + 1) * .5 - .02, -4.2, -4.17, ['#dbe4ff', '#e6fcf5', '#fff4e6'][i], { bias: -.2 }); });
+  for (let f = 0; f < 3; f++) for (const x of [-5.6, -1.4, 2.8]) S.box(x, x + 1.4, 3.8 + f * 0, 5.4, -.05, .02, '#2e3b45');
+}
+function card(col, lock) {
+  const [x, y, z] = CARD; S.box(x - .85, x + .85, y - .55, y + .55, z - .03, z + .03, col, { bias: -3 });
+  S.box(x - .6, x - .25, y + .05, y + .3, z + .03, z + .05, '#f2c230', { bias: -3.1 });
+  for (let i = 0; i < 4; i++) S.box(x - .6 + i * .32, x - .36 + i * .32, y - .3, y - .22, z + .03, z + .05, '#f8f9fa', { bias: -3.1 });
+  if (lock) { S.box(x + .2, x + .7, y - .2, y + .25, z + .06, z + .16, '#e03131', { bias: -3.3 }); LP.rod([x + .3, y + .25, z + .11], [x + .3, y + .45, z + .11], .04, '#adb5bd', { bias: -3.3 }); LP.rod([x + .6, y + .25, z + .11], [x + .6, y + .45, z + .11], .04, '#adb5bd', { bias: -3.3 }); LP.rod([x + .3, y + .45, z + .11], [x + .6, y + .45, z + .11], .04, '#adb5bd', { bias: -3.3 }); }
+}
+function arc(a, b, k) { const pts = []; for (let i = 0; i <= 16; i++) { const u = i / 16 * k; pts.push([lerp(a[0], b[0], u), lerp(a[1], b[1], u) + Math.sin(u * Math.PI) * 1.4, lerp(a[2], b[2], u)]); } return pts; }
+window.render = function (t) {
+  LP.sky.clouds = true; LP.sky.t = t; LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fenceZ: -12 });
+  LP.ground({ x0: -16, x1: 16, zBack: -12 });
+  building();
+  ROOMS.forEach((x, i) => LP.person(x + .6, .2, -2.2, .2 * (i - 1), t, 'phone', { helmet: false, hair: ['#3b2a20', '#a0522d', '#212529'][i], shirt: ['#748ffc', '#e64980', '#20c997'][i] }));
+  const blocked = t > T1 + .8 && t < T4 + .6, good = t > T4 + .6;
+  card(blocked ? '#c92a2a' : good ? '#2f9e44' : '#364fc7', blocked);
+  LP.person(0, 0, 2.2, 0, t, t > T1 + .9 && t < T4 ? 'up' : 'phone', { shirt: '#f08c3a' });
+  if (t > T2 && t < T4) LP.person(lerp(7, 2.0, clamp((t - T2 - .2) / 1.6)), 0, 2.0, -1.4, t, t < T2 + 1.8 ? 'walk' : 'point', { helmet: false, hair: '#343a40', shirt: '#2b3a55', pants: '#2b3a55', suit: true });
+  if (t > T3 && t < T4) LP.person(-2.2, 0, 2.4, .9, t, 'phone', { helmet: false, hair: '#868e96', shirt: '#495057' });
+  // чек
+  if (t > T5 + .6) { const k = eOut((t - T5 - .6) / .8); S.box(.95, 1.55, CARD[1] - .5 - 1.2 * k, CARD[1] - .5, CARD[2], CARD[2] + .01, '#f8f9fa', { bias: -3.2 }); }
+  // переводы
+  if (t < T1 + .8 || good) {
+    const a0 = good ? T4 + .8 : 3.2;
+    ROOMS.forEach((x, i) => { for (let j = 0; j < 5; j++) { const st = a0 + i * .3 + j * .9, k = clamp((t - st) / .9); if (k <= 0 || k >= 1 && t > st + 1.2) continue; S.line(arc([x + .85, 1.6, -2.0], CARD, Math.min(1, k)), { color: '#40c057', w: 4.5, dash: [10, 7], offset: -t * 40, glow: 'rgba(64,192,87,.8)', alpha: 1 - clamp((t - st - .9) / .3) }); } });
+  }
+  S.render();
+  // счётчик переводов
+  if (t > 4 && t < T1 + .8) { const n = Math.min(40, Math.round((t - 4) * 8)), q = S.proj([CARD[0] - .7, CARD[1] + .75, CARD[2]]); FX.save(); FX.fillStyle = '#e03131'; FX.beginPath(); FX.arc(q[0], q[1], 22, 0, 7); FX.fill(); FX.fillStyle = '#fff'; FX.font = '700 20px PT'; FX.textAlign = 'center'; FX.textBaseline = 'middle'; FX.fillText(String(n), q[0], q[1] + 1); FX.restore(); }
+  LP.label('Личная карта', [0, CARD[1] + .55, CARD[2]], 0, -80, win(t, 3.4, T1 - .2));
+  LP.label('115-ФЗ', [CARD[0] + .45, CARD[1] + .3, CARD[2] + .1], 70, -90, win(t, T1 + 1.0, T2 - .2), 'r', 22);
+  LP.label('НДФЛ 13% + пени + штраф', [2.0, 1.9, 2.0], -60, -120, win(t, T2 + 1.9, T3 - .2), 'r');
+  LP.label('Дроппер', [-2.2, 1.9, 2.4], 20, -110, win(t, T3 + 1.0, T4 - .2), 'r');
+  LP.label('Самозанятый', [0, 1.9, 2.2], 70, -60, win(t, T4 + 1.0, T5 - .2), 'g');
+  LP.label('4% / 6%', [CARD[0], CARD[1] + .55, CARD[2]], 0, -80, win(t, T4 + 1.4, T5 - .2), 'o', 22);
+  LP.label('2,4 млн ₽ в год', [CARD[0] - .4, CARD[1] + .55, CARD[2]], -40, -90, win(t, T5 + .5, T6 - .2), 'o', 21);
+  LP.label('Чек «Мой налог»', [1.25, CARD[1] - 1.4, CARD[2]], 70, 40, win(t, T5 + 1.4, T6 - .2), 'g');
+  LP.post(t);
+  LP.hook(t, 'Оплата «на карту»:<br><b>как бригадир становится казино</b>', 3.0);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Субподрядчик-однодневка</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('🔎', 'Честная смета и акты —', 'за 2 минуты в Telegram'));
+window.DUR = 40;
+const T1 = 9.2, T2 = 13.8, T3 = 19, T4 = 23.6, T5 = 28.4, T6 = 32.4, TE = 36;
+const STEPS = [[3, 'СХЕМА', 'дешёвый субподрядчик'], [T1, 'ПРИЗНАКИ', 'однодневки'], [T2, 'ЧТО БУДЕТ', 'ст. 54.1 НК'], [T3, 'ЧТО БУДЕТ', 'доначисления'], [T4, 'КАК НАДО', 'проверка на nalog.ru'], [T5, 'КАК НАДО', 'досье и факты']];
+const SUBS = [
+  [3.1, 6.2, 'Субподрядчик дешевле рынка на треть.<br>Офис — <b>в почтовом ящике</b>'],
+  [6.2, T1 - .1, 'На объекте его никто не видел,<br>но акты — <b>идеальные</b>'],
+  [T1 + .2, T2 - .1, 'Признаки: <b>массовый адрес</b>, нет людей<br>и техники, директор «для галочки»'],
+  [T2 + .2, T3 - .1, 'ФНС по <b>ст. 54.1 НК</b> может снять<br>расходы и <b>вычеты НДС</b> по сделке'],
+  [T3 + .2, T4 - .1, 'Налоги, пени и штраф платишь <b>ты</b>.<br>«Ромашки» к тому времени уже нет'],
+  [T4 + .2, T5 - .1, 'Проверяй на сайте ФНС: <b>ЕГРЮЛ</b><br>и «<b>Прозрачный бизнес</b>»'],
+  [T5 + .2, T6 - .1, 'Собирай досье: кто реально работал —<br>люди, техника, фото, акты'],
+  [T6 + .2, TE - .1, 'Если подрядчика не видел никто —<br>налоговая увидит <b>тебя</b>'],
+];
+const CAM = [
+  [0, .5, .22, 30, 0, 3, -3.5], [3, .45, .2, 26, .8, 2.6, -3], [6.2, .45, .3, 9.5, 3.2, .3, -1.0], [T1 - .2, .48, .3, 9.5, 3.2, .3, -1.0],
+  [T1 + .6, .4, .3, 10.5, 3, .4, -1.0], [T2 - .2, .43, .3, 10.5, 3, .4, -1.0], [T2 + .7, .6, .18, 13, 3.6, 1.2, -1.2], [T3 - .2, .64, .18, 13, 3.6, 1.2, -1.2],
+  [T3 + .6, .4, .2, 27, .6, 2.8, -3.2], [T4 - .2, .44, .2, 27, .6, 2.8, -3.2], [T4 + .7, .45, .3, 9.5, 3.2, .3, -1.0], [T5 - .2, .48, .3, 9.5, 3.2, .3, -1.0],
+  [T5 + .7, .55, .22, 9, 5, .8, -.6], [T6 - .2, .58, .22, 9, 5, .8, -.6], [T6 + .9, .45, .2, 29, .4, 3, -3.4], [99, .5, .2, 29, .4, 3, -3.4],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const X0 = -4, X1 = 4, Z0 = -6.5, Z1 = -1.2;
+function house(tf) {
+  const o = (x) => ({ ...x, tf });
+  S.box(X0, X1, .5, 3.3, Z0, Z1, '#b5583f', o({ shadow: true })); S.box(X0, X1, 3.3, 3.5, Z0, Z1 + .05, '#a9acac', o({})); S.box(X0, X1, 3.5, 6.2, Z0, Z1, '#b5583f', o({ shadow: true }));
+  for (const y of [1.3, 4.3]) for (const x of [-3, -.6, 1.8]) S.poly([[x, y, Z1 + .02], [x + 1.2, y, Z1 + .02], [x + 1.2, y + 1.3, Z1 + .02], [x, y + 1.3, Z1 + .02]], '#2e3b45', o({ two: true, bias: -.1 }));
+  const xm = 0, c = [0, 7, (Z0 + Z1) / 2];
+  S.poly([[X0 - .35, 6.1, Z1 + .35], [X1 + .35, 6.1, Z1 + .35], [X1 + .35, 8.1, (Z0 + Z1) / 2], [X0 - .35, 8.1, (Z0 + Z1) / 2]], '#5b6e7d', o({ center: c, shadow: true }));
+  S.poly([[X0 - .35, 8.1, (Z0 + Z1) / 2], [X1 + .35, 8.1, (Z0 + Z1) / 2], [X1 + .35, 6.1, Z0 - .35], [X0 - .35, 6.1, Z0 - .35]], '#5b6e7d', o({ center: c, shadow: true }));
+  void xm;
+}
+window.render = function (t) {
+  LP.sky.clouds = true; LP.sky.t = t; LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fenceZ: -14 });
+  [[8, -9, 1.2, 1], [-8.5, -10, 1.3, 2]].forEach((q) => LP.tree(...q));
+  LP.ground({ x0: -16, x1: 16, zBack: -14 });
+  const pulled = clamp((t - T2 - 1.6) / 1.0), fixed = t > T4;
+  const tilt = fixed ? lerp(.05, 0, ease((t - T4 - .8) / 1.2)) : ease(pulled) * .05;
+  const pv = [X0, .5, 0], tf = (p) => M3.rotZ(p, pv, -tilt);
+  // фундамент: три бетонных куска и картонная коробка в углу
+  S.box(X0, 1.6, 0, .5, Z0, Z1, P.concrete, { tf });
+  if (!fixed || t < T4 + .8) { const off = ease(pulled) * 2.2; S.box(1.6, X1, 0, .5, Z1 - 1.8 + off, Z1 + off, '#c8a26b', { bias: -.5, shadow: true }); S.box(1.6, X1, .23, .27, Z1 + off, Z1 + off + .01, '#a37b45', { bias: -.6 }); S.box(1.6, X1, 0, .5, Z0, Z1 - 1.8, P.concrete, { tf }); }
+  else { const k = eOut((t - T4) / .8); S.box(1.6, X1, 0, .5, Z0, Z1 + (1 - k) * 3, P.concrete, { bias: -.3 }); }
+  house(tf);
+  // инспектор
+  if (t > T2 - .2 && t < T4) LP.person(lerp(8, 3.0, clamp((t - T2) / 1.5)) , 0, lerp(-.6, -.3, pulled), -1.3 - (pulled > 0 ? 0 : 0), t, t < T2 + 1.5 ? 'walk' : 'pull', { helmet: false, hair: '#343a40', shirt: '#2b3a55', pants: '#2b3a55', suit: true });
+  LP.person(5.9, 0, -.2, -.4, t, t > T2 + 2.6 && t < T4 ? 'up' : 'stand', { shirt: '#f08c3a' });
+  // досье
+  if (t > T5) S.box(4.4, 5.5, 0, .9, -.6, .2, '#8a6440', { shadow: true });
+  if (t > T5) for (let i = 0; i < 5; i++) { const k = eOut((t - T5 - .2 - i * .2) / .5); if (k > .01) S.box(4.6 + i * .03, 5.3 + i * .03, .9 + i * .04 + (1 - k) * 1.5, .93 + i * .04 + (1 - k) * 1.5, -.5, .1, ['#f8f9fa', '#e7f5ff', '#fff9db', '#f8f9fa', '#ebfbee'][i], { bias: -2 }); }
+  S.render();
+  // трещина
+  if (tilt > .01) { FX.save(); FX.strokeStyle = 'rgba(40,30,25,.9)'; FX.lineWidth = 2.4; FX.beginPath(); [[3.2, 6.1], [2.9, 5.2], [3.3, 4.2], [2.8, 3.3], [3.1, 2.3], [2.7, 1.2]].forEach(([x, y], i) => { const q = S.proj(tf([x, y, Z1 + .03])); i ? FX.lineTo(q[0], q[1]) : FX.moveTo(q[0], q[1]); }); FX.globalAlpha = clamp(tilt * 30); FX.stroke(); FX.restore(); }
+  LP.label('ООО «Стройка-Люкс»', [2.8, .5, Z1], 0, -120, win(t, 4.0, T1 - .2), 'o');
+  LP.label('создана 2 месяца назад', [2.8, .2, Z1], 0, 90, win(t, 5.2, T1 - .2));
+  LP.label('массовый адрес', [2.8, .45, Z1], -40, -170, win(t, T1 + .5, T2 - .2), 'r', 17);
+  LP.label('0 сотрудников', [2.8, .45, Z1], 40, -120, win(t, T1 + .9, T2 - .2), 'r', 17);
+  LP.label('директор «номинал»', [2.8, .45, Z1], -30, -70, win(t, T1 + 1.3, T2 - .2), 'r', 17);
+  LP.label('цена −30%', [2.8, .2, Z1], 60, 70, win(t, T1 + 1.7, T2 - .2), 'r', 17);
+  LP.label('ст. 54.1 НК', [3.0, 1.7, -.3], -40, -120, win(t, T2 + 2.4, T3 - .2), 'r');
+  LP.label('− расходы  − вычет НДС', [0, 6.2, Z1], 0, -90, win(t, T3 + .6, T4 - .2), 'r');
+  LP.label('+ налоги, пени, штраф', [5.9, 1.9, -.2], -120, -110, win(t, T3 + 1.2, T4 - .2), 'r');
+  LP.label('ЕГРЮЛ · «Прозрачный бизнес»', [2.8, .5, Z1], -40, -140, win(t, T4 + 1.2, T5 - .2), 'g');
+  LP.label('Досье на подрядчика', [4.9, 1.1, -.2], -30, -120, win(t, T5 + 1.2, T6 - .2), 'g');
+  LP.post(t);
+  LP.hook(t, 'Субподрядчик,<br>которого <b>никто не видел</b>', 3.0);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

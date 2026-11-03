@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Работа на высоте</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('🦺', 'Стройка без сюрпризов —', 'смета за 2 минуты в Telegram'));
+window.DUR = 40;
+const TS = 6.0, T1 = 9.2, T2 = 13.6, T3 = 18.2, T4 = 23, T5 = 27.8, T6 = 32.2, TE = 36;
+const STEPS = [[T1, 'ПРАВИЛО 1', 'от 1,8 м — это высота'], [T2, 'ПРАВИЛО 2', 'ограждение кромки'], [T3, 'ПРАВИЛО 3', 'привязь и анкер'], [T4, 'ПРАВИЛО 4', 'леса'], [T5, 'ПРАВИЛО 5', 'каска с ремешком']];
+const SUBS = [
+  [3.1, TS, 'Кровельщик Петрович<br>30 лет без страховки…'],
+  [TS, 7.1, '…и вот сегодня'],
+  [T1 + .2, T2 - .1, 'От <b>1,8 м</b> — уже работа на высоте:<br>обучение и допуск'],
+  [T2 + .2, T3 - .1, 'Кромка — ограждение <b>от 1,1 м</b><br>и бортовая доска от летящих ключей'],
+  [T3 + .2, T4 - .1, 'Нет ограждения — <b>привязь<br>и строп к анкеру</b>. Пояс<br>в багажнике не считается'],
+  [T4 + .2, T5 - .1, 'Леса — на ровном основании,<br>с настилом и перилами, <b>к стене</b>'],
+  [T5 + .2, T6 - .1, 'Каска — с ремешком. Иначе<br>первой падает каска, <b>следом — ты</b>'],
+  [T6 + .2, TE - .1, 'Без страховки ты не кровельщик,<br>а <b>метеорит</b> ☄️'],
+];
+const CAM = [
+  [0, .55, .2, 26, 0, 4.4, -4], [3, .5, .2, 23, .2, 4.8, -3.6], [TS - .3, .38, .18, 8.5, 1.0, 6.6, -1.6], [8.9, .4, .18, 8.5, 1.2, 6.6, -1.6],
+  [T1 + .6, .55, .12, 20, .6, 4.6, -2.6], [T2 - .2, .5, .12, 20, .6, 4.6, -2.6], [T2 + .7, .32, .22, 9, 0, 6.6, -1.6], [T3 - .2, .36, .22, 9, .4, 6.6, -1.6],
+  [T3 + .7, .62, .2, 7.2, .8, 7.0, -2.2], [T4 - .2, .66, .2, 7.2, 1.0, 7.0, -2.2], [T4 + .8, .5, .1, 18, -.4, 3.5, -2.2], [T5 - .2, .45, .1, 18, -.2, 3.5, -2.2],
+  [T5 + .6, .3, .1, 4.4, 1.2, 7.6, -1.4], [T6 - .2, .26, .1, 4.4, 1.0, 7.6, -1.4], [T6 + .9, .52, .2, 16, 0, 4.6, -3], [99, .58, .2, 16, 0, 4.6, -3],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const HX0 = -4.5, HX1 = 4.5, HZ0 = -8, HZ1 = -1.2, RY = 6.2;
+function house() {
+  for (const [y0, y1] of [[0, 2.9], [3.1, 5.95]]) { S.box(HX0, HX1, y0, y1, HZ0, HZ1, '#b5583f', { front: '#b9593f', shadow: true }); for (const x of [-3.2, -.6, 2.0]) S.poly([[x, y0 + .9, HZ1 + .02], [x + 1.3, y0 + .9, HZ1 + .02], [x + 1.3, y0 + 2.2, HZ1 + .02], [x, y0 + 2.2, HZ1 + .02]], '#2e3b45', { two: true, bias: -.1 }); }
+  for (const y of [2.9, 5.95]) S.box(HX0 - .05, HX1 + .05, y, y + .25, HZ0, HZ1 + .05, '#a9acac');
+  for (let i = 0; i < 4; i++) S.box(HX0 + 4, HX0 + 5.3, 5.95 + .25 + i * .2, 6.4 + i * .2, HZ0 + 2, HZ0 + 3, '#e9e5dc', { shadow: true });
+  for (let i = 0; i < 9; i++) for (let k = 0; k < 2; k++) S.box(HX0 + .3 + i * .9, HX0 + 1.1 + i * .9, RY, RY + .2, HZ0 + .2 + k * .3, HZ0 + .45 + k * .3, '#b9593f');
+}
+const helmetFall = (k) => { const p = [1.0, RY + 1.75 - k * k * 6.3, -1.0 + k * 1.6]; S.sphere(p, .165, '#f2c230', { seg: 10, rings: 6, sy: .62 }); };
+window.render = function (t) {
+  LP.sky.clouds = true; LP.sky.t = t; LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fenceZ: -14 });
+  [[8, -9, 1.2, 1], [-8.5, -10, 1.3, 2], [11, -4, 1, 3]].forEach((q) => LP.tree(...q));
+  LP.ground({ x0: -16, x1: 16, zBack: -14 });
+  house();
+  // сцена «плохо»: идёт вдоль кромки, спотыкается, стоп-кадр, перемотка
+  const inBad = t < T1;
+  let px = .4, lean = 0, pz = -1.55, pose = 'walk';
+  if (inBad) {
+    let tb = t; if (t > 8.0) tb = lerp(7.0, 3.0, ease((t - 8.0) / 1.0));
+    px = lerp(-2.5, 1.0, clamp((tb - 3) / 3.0)); pose = tb < TS ? 'walk' : 'up';
+    lean = tb > TS ? Math.min(.75, (tb - TS) * 1.3) : 0; pz = tb > TS ? -1.55 + Math.min(.35, (tb - TS) * .6) : -1.55;
+    LP.person(px, RY, pz, 0, tb, pose, { helmet: tb < TS + .2, lean });
+    if (tb > TS + .2) helmetFall(Math.min(1, (tb - TS - .2) / .9));
+    S.box(-1.4, -1.0, RY, RY + .12, -1.6, -1.3, '#8a6440');
+  } else {
+    // правильная сцена
+    const rail = ease((t - T2 - .3) / 1.4), harn = t > T3 + .4, scaf = ease((t - T4 - .3) / 2.2), strap = t > T5 + .8;
+    if (rail > .01) { const xe = lerp(HX0, HX1, rail); for (let x = HX0 + .1; x <= xe; x += 1.5) S.box(x - .03, x + .03, RY + .2, RY + 1.3, HZ1 + .02, HZ1 + .08, '#f2c230', { shadow: true }); for (const y of [RY + .75, RY + 1.3]) S.box(HX0, xe, y - .03, y + .03, HZ1 + .02, HZ1 + .08, '#f2c230'); S.box(HX0, xe, RY + .2, RY + .35, HZ1 + .02, HZ1 + .05, '#c49a68'); }
+    if (scaf > .01) { const top = lerp(0, 6.1, scaf); for (let x = -4.2; x <= 4.3; x += 2.1) for (const z of [-1.0, .1]) S.box(x - .03, x + .03, 0, top, z - .03, z + .03, '#9aa3ab', { shadow: true }); for (let y = 2; y <= top; y += 2) { S.box(-4.3, 4.3, y - .02, y + .04, -1.05, .15, '#c49a68'); S.box(-4.3, 4.3, y + .9, y + .95, .08, .12, '#9aa3ab'); } for (let x = -4.2; x <= 4.3; x += 2.1) { S.box(x - .15, x + .15, 0, .05, -1.15, -.85, '#555'); S.box(x - .15, x + .15, 0, .05, -.05, .25, '#555'); } for (let y = 2; y <= top; y += 4) S.box(-.05, .05, y + .4, y + .46, HZ1, -1.0, '#6c757d'); }
+    let x = .4, ps = 'stand';
+    if (t > T6) { x = lerp(-2.4, 2.6, clamp((t - T6 - .3) / 3.4)); ps = 'walk'; }
+    LP.person(x, RY + .2, -1.65, t > T6 ? Math.PI / 2 : 0, t, ps, { harness: harn, strap });
+    if (harn) { const an = [x * .3, RY + 2.2, -4.2]; S.box(an[0] - .05, an[0] + .05, RY + .2, an[1], an[2] - .05, an[2] + .05, '#495057'); LP.rod([x, RY + 1.25, -1.78], an, .015, '#ffd43b', { seg: 4, flat: true }); }
+  }
+  S.render();
+  // размер 1,8 м
+  if (t > T1 + .4 && t < T2) { const a = win(t, T1 + .4, T2 - .1), q0 = S.proj([2.6, 0, HZ1 + .4]), q1 = S.proj([2.6, 1.8, HZ1 + .4]); FX.save(); FX.globalAlpha = a; FX.strokeStyle = '#ff8a3d'; FX.lineWidth = 3; FX.beginPath(); FX.moveTo(q0[0], q0[1]); FX.lineTo(q1[0], q1[1]); FX.moveTo(q0[0] - 8, q0[1]); FX.lineTo(q0[0] + 8, q0[1]); FX.moveTo(q1[0] - 8, q1[1]); FX.lineTo(q1[0] + 8, q1[1]); FX.stroke(); FX.restore(); }
+  LP.label('1,8 м', [2.6, 1.6, HZ1 + .4], -70, -230, win(t, T1 + .6, T2 - .2), 'o', 22);
+  LP.label('Работа на высоте', [-1.5, RY, HZ1], 0, -70, win(t, T1 + 1.2, T2 - .2));
+  LP.label('1,1 м', [1.6, RY + 1.3, HZ1 + .05], 30, -80, win(t, T2 + 1.5, T3 - .2), 'o', 22);
+  LP.label('Бортовая доска', [HX0 + 2, RY + .3, HZ1 + .05], -20, 90, win(t, T2 + 2.1, T3 - .2));
+  LP.label('Анкер', [.12, RY + 2.2, -4.2], -40, -70, win(t, T3 + 1.2, T4 - .2));
+  LP.label('Привязь', [.4, RY + 1.3, -1.6], 70, -40, win(t, T3 + 1.6, T4 - .2), 'g');
+  LP.label('Крепление к стене', [0, 4.4, -1.1], -30, -100, win(t, T4 + 2.4, T5 - .2));
+  LP.label('Подбородочный ремень', [.4, RY + 1.9, -1.5], 70, -110, win(t, T5 + 1.0, T6 - .2), 'o');
+  LP.post(t);
+  LP.freeze(t, 7.0, 8.0, '✋ СТОП');
+  LP.rewind(t, 8.0, 9.1);
+  LP.hook(t, 'Гравитация на стройке<br><b>не опаздывает никогда</b>', 3.0);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

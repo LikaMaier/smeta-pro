@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Сверление и скрытая проводка</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('⚡', 'Электрика под ключ —', 'смета за 2 минуты в Telegram'));
+window.DUR = 40;
+const TZ = 5.6, T1 = 9.2, T2 = 14, T3 = 19, T4 = 23.8, T5 = 28.2, T6 = 32.4, TE = 36;
+const STEPS = [[T1, 'ПРАВИЛО 1', 'где идёт кабель'], [T2, 'ПРАВИЛО 2', 'детектор проводки'], [T3, 'ПРАВИЛО 3', 'обесточь'], [T4, 'ПРАВИЛО 4', 'сверли в стороне'], [T5, 'ПРАВИЛО 5', 'УЗО в щитке']];
+const SUBS = [
+  [3.1, TZ, '«Повешу полку прямо<br>над розеткой — удобно»…'],
+  [6.9, 9.0, 'Свет погас во всей квартире.<br>Зато причёска — <b>как у Эйнштейна</b>'],
+  [T1 + .2, T2 - .1, 'Кабель от розетки обычно идёт<br><b>вертикально вверх</b>, под потолком — <b>вбок</b>'],
+  [T2 + .2, T3 - .1, '<b>Детектор проводки</b> — найди трассу<br>и отметь её на стене'],
+  [T3 + .2, T4 - .1, 'Выключи <b>автомат</b> этой линии<br>и проверь индикатором'],
+  [T4 + .2, T5 - .1, 'Сверли <b>в стороне от трассы</b> —<br>не над и не под розеткой'],
+  [T5 + .2, T6 - .1, 'В щитке — <b>УЗО 30 мА</b>: при утечке<br>отключит за доли секунды'],
+  [T6 + .2, TE - .1, 'Дрель — не металлоискатель.<br>Проводку ищем <b>до</b> сверления'],
+];
+const CAM = [
+  [0, .45, .22, 9.5, -.3, 1.3, -2], [3, .5, .1, 6.2, .1, 1.3, -2.4], [TZ - .2, .62, .06, 4.4, .1, 1.35, -2.6], [9, .62, .06, 4.4, .1, 1.35, -2.6],
+  [T1 + .7, .05, .08, 7.2, .3, 1.35, -2.4], [T2 - .2, .08, .08, 7.2, .3, 1.35, -2.4], [T2 + .7, .5, .08, 5.4, .2, 1.3, -2.6], [T3 - .2, .55, .08, 5.4, .3, 1.3, -2.6],
+  [T3 + .7, -.5, .1, 4.2, -2.1, 1.5, -1.3], [T4 - .2, -.46, .1, 4.2, -2.1, 1.5, -1.3], [T4 + .7, .6, .08, 5, -.7, 1.35, -2.6], [T5 - .2, .55, .08, 5, -.7, 1.35, -2.6],
+  [T5 + .7, -.55, .12, 3.6, -2.2, 1.6, -1.3], [T6 - .2, -.5, .12, 3.6, -2.2, 1.6, -1.3], [T6 + .9, .35, .18, 8.5, -.2, 1.3, -1.8], [99, .4, .18, 8.5, -.2, 1.3, -1.8],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const X0 = -2.5, X1 = 2.5, WZ = -3, H = 2.7;
+const CAB = [[[0, .3, WZ - .08], [0, 2.5, WZ - .08], [-1.8, 2.5, WZ - .08]], [[1.5, 1.0, WZ - .08], [1.5, 2.5, WZ - .08], [0, 2.5, WZ - .08]], [[-1.8, 2.5, WZ - .08], [X0 + .08, 2.5, WZ - .08], [X0 + .08, 2.5, -1.3], [X0 + .08, 1.9, -1.3]]];
+function room(xray) {
+  S.box(X0 - .2, X1 + .2, -.2, 0, WZ - .2, 1, '#b08a64', { top: '#c79f74' });
+  S.box(X0, X1, 0, H, WZ - .2, WZ, '#e8e2d8', { front: '#ece6dc', alpha: xray ? .35 : 1, bias: xray ? -1 : 0 });
+  S.box(X0 - .2, X0, 0, H, WZ - .2, 1, '#e3ddd2', { side: '#e6e0d5' });
+  S.box(-.12, .12, .22, .42, WZ, WZ + .03, '#fbfbfa', { bias: -1.2 }); S.box(1.42, 1.58, .9, 1.1, WZ, WZ + .03, '#fbfbfa', { bias: -1.2 });
+  S.box(X0, X0 + .1, 1.3, 1.95, -1.65, -.95, '#ced4da', { bias: -.5 });
+  S.cyl('y', [.4, H - .1, -1.5], .25, .08, '#fff4cc', { emit: true, seg: 14 });
+  S.box(1.6, 2.4, 0, .9, -2.9, -2.4, '#8a6440', { shadow: true }); S.box(-2.3, -1.2, 0, .45, -2.9, -2.1, '#6c757d', { shadow: true });
+}
+function cables(glow) { for (const c of CAB) LP.pipe(c, .022, glow ? '#ff922b' : '#f08c3a', { bias: -.2, emit: glow }); }
+window.render = function (t) {
+  LP.sky(); LP.cam(CAM, t);
+  const bad = t < T1;
+  let tb = t; if (t > 8.0 && bad) tb = lerp(7.0, 4.6, ease((t - 8.0) / 1.0));
+  const shock = bad && tb > TZ;
+  const xray = !bad && t > T1 + .2 && t < T6;
+  S.tint = shock && tb < TZ + 1.2 ? [.35, .37, .45] : [1, 1, 1];
+  room(xray);
+  if (xray || shock) cables(xray);
+  // щиток: автоматы
+  const off = t > T3 + 1.2 && t < T6;
+  for (let i = 0; i < 4; i++) { const z = -1.58 + i * .17, up = i === 1 && off ? -.06 : 0; S.box(X0 + .1, X0 + .16, 1.55 + up, 1.7 + up, z, z + .1, i === 3 ? '#4dabf7' : '#343a40', { bias: -.6 }); }
+  if (bad) { LP.person(lerp(-1.4, 0, clamp((tb - 3) / 1.5)), 0, -2.35, Math.PI, tb, tb < 4.5 ? 'walk' : (shock ? 'up' : 'drill'), { helmet: false, hair: '#5c4033', spiky: shock }); }
+  else if (t < T6) {
+    const px = t > T4 ? -1.0 : (t > T2 && t < T3 ? lerp(-1.4, 1.4, clamp((t - T2 - .4) / 3.2)) : 0);
+    const pose = (t > T2 && t < T3) ? 'reach' : (t > T4 + .3 && t < T5 ? 'drill' : 'stand');
+    LP.person(px, 0, -2.35, Math.PI, t, pose, { helmet: false, hair: '#5c4033' });
+    if (t > T2 && t < T3) { const dx = lerp(-1.4, 1.4, clamp((t - T2 - .4) / 3.2)); S.box(dx - .07, dx + .07, 1.3, 1.5, WZ, WZ + .06, '#fab005', { bias: -1.5 }); }
+  } else LP.person(lerp(-1.2, 1.0, clamp((t - T6) / 3)), 0, -1.6, Math.PI / 2, t, 'walk', { helmet: false, hair: '#5c4033' });
+  if (t > T4 + 1.0 && t < T6 + 3.5) { S.box(-1.25, -.75, 1.42, 1.47, WZ, WZ + .2, '#adb5bd', { bias: -1.4 }); }
+  S.render();
+  const D = (p) => S.proj(p);
+  // искры
+  if (shock && tb < TZ + 1.4) { const q = D([0, 1.4, WZ + .02]); FX.save(); FX.globalCompositeOperation = 'lighter'; for (let i = 0; i < 26; i++) { const a = R(i + Math.floor(tb * 30)) * 6.28, l = 20 + R(i + 5) * 60; FX.strokeStyle = `rgba(255,${180 + R(i) * 70 | 0},80,.95)`; FX.lineWidth = 2; FX.beginPath(); FX.moveTo(q[0], q[1]); FX.lineTo(q[0] + Math.cos(a) * l, q[1] + Math.sin(a) * l); FX.stroke(); } const g = FX.createRadialGradient(q[0], q[1], 0, q[0], q[1], 90); g.addColorStop(0, 'rgba(160,200,255,.9)'); g.addColorStop(1, 'rgba(160,200,255,0)'); FX.fillStyle = g; FX.fillRect(q[0] - 90, q[1] - 90, 180, 180); FX.restore(); }
+  // детектор: кольца
+  if (t > T2 + .4 && t < T3) { const dx = lerp(-1.4, 1.4, clamp((t - T2 - .4) / 3.2)), near = Math.min(Math.abs(dx), Math.abs(dx - 1.5)) < .25, q = D([dx, 1.4, WZ + .07]); if (near) { FX.save(); FX.strokeStyle = '#e03131'; FX.lineWidth = 3; for (let k = 0; k < 3; k++) { const r = ((t * 2 + k / 3) % 1) * 40; FX.globalAlpha = 1 - r / 40; FX.beginPath(); FX.arc(q[0], q[1], r, 0, 7); FX.stroke(); } FX.restore(); } }
+  // разметка трассы
+  if (t > T2 + 2.2 && t < T6) { FX.save(); FX.globalAlpha = win(t, T2 + 2.2, T6 - .1, .3, .3); FX.strokeStyle = '#e03131'; FX.lineWidth = 2.5; FX.setLineDash([8, 6]); for (const x of [-.15, .15, 1.35, 1.65]) { const a = D([x, .45, WZ + .01]), b = D([x, 2.6, WZ + .01]); FX.beginPath(); FX.moveTo(a[0], a[1]); FX.lineTo(b[0], b[1]); FX.stroke(); } FX.restore(); }
+  // свет лампы
+  if (!(shock && tb < TZ + 1.2)) { const q = D([.4, H - .15, -1.5]); const g = FX.createRadialGradient(q[0], q[1], 0, q[0], q[1], 120); g.addColorStop(0, 'rgba(255,240,200,.35)'); g.addColorStop(1, 'rgba(255,240,200,0)'); FX.fillStyle = g; FX.fillRect(q[0] - 120, q[1] - 120, 240, 240); }
+  LP.label('Кабель', [0, 1.6, WZ - .05], 60, -60, win(t, T1 + .9, T2 - .2), 'o');
+  LP.label('Вертикально вверх', [1.5, 1.8, WZ - .05], -30, -140, win(t, T1 + 1.4, T2 - .2));
+  LP.label('Под потолком — вбок', [-1.2, 2.5, WZ - .05], 50, -90, win(t, T1 + 2.0, T2 - .2));
+  LP.label('Детектор', [lerp(-1.4, 1.4, clamp((t - T2 - .4) / 3.2)), 1.5, WZ + .07], 0, -110, win(t, T2 + .7, T3 - .2));
+  LP.label('Автомат — выкл', [X0 + .16, 1.6, -1.4], 60, -90, win(t, T3 + 1.4, T4 - .2), 'r');
+  LP.label('Здесь можно', [-1.0, 1.45, WZ + .1], -40, -130, win(t, T4 + 1.2, T5 - .2), 'g');
+  LP.label('УЗО 30 мА', [X0 + .16, 1.62, -1.05], 70, -80, win(t, T5 + .9, T6 - .2), 'o', 21);
+  LP.post(t);
+  if (shock && tb < TZ + 1.2) { FX.save(); FX.fillStyle = 'rgba(5,8,20,.45)'; FX.fillRect(0, 0, 540, 960); FX.restore(); }
+  LP.freeze(t, 6.9, 8.0, '✋ СТОП');
+  LP.rewind(t, 8.0, 9.1);
+  LP.hook(t, 'Причёска «Эйнштейн» —<br><b>бесплатно, с дрелью над розеткой</b>', 3.0);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

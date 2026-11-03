@@ -13,7 +13,7 @@ const LP = (() => {
   document.head.insertAdjacentHTML('beforeend', `<style>
 #cv { position: absolute; inset: 0; }
 #fx { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
-#sub { bottom: 205px; font-size: 27px; color: #1d2b3a; -webkit-text-stroke: 0; min-height: 0; }
+#sub { bottom: 205px; font-size: 25px; color: #1d2b3a; -webkit-text-stroke: 0; min-height: 0; }
 #sub span { display: inline-block; background: rgba(255,255,255,.94); padding: 10px 18px 11px; border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 #sub b { color: #d9480f; }
 #hook { top: 92px; font-size: 37px; color: #1d2b3a; -webkit-text-stroke: 0; }
@@ -34,7 +34,20 @@ const LP = (() => {
     const x = S.ctx; x.setTransform(2, 0, 0, 2, 0, 0);
     const g = x.createLinearGradient(0, 0, 0, 960); g.addColorStop(0, P.skyT); g.addColorStop(.6, P.skyB); g.addColorStop(1, '#f1f1ec');
     x.fillStyle = g; x.fillRect(0, 0, 540, 960);
+    if (sky.clouds) { const tt = sky.t || 0; x.save(); x.filter = 'blur(10px)'; for (let i = 0; i < 7; i++) { const cx = ((R(i) * 700 + tt * (6 + R(i + 2) * 8)) % 760) - 110, cy = 40 + R(i + 5) * 230, w = 90 + R(i + 7) * 130; x.fillStyle = `rgba(255,255,255,${.35 + R(i + 3) * .3})`; for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(cx + (k - 1.5) * w * .32, cy + Math.sin(k * 2 + i) * 8, w * .3, w * .16, 0, 0, 7); x.fill(); } } x.restore(); }
     FX.setTransform(2, 0, 0, 2, 0, 0); FX.clearRect(0, 0, 540, 960);
+  }
+  /** «перемотка» поверх кадра */
+  function rewind(t, a, b) {
+    if (t < a || t > b) return; const k = win(t, a, b, .1, .1);
+    FX.save(); FX.globalAlpha = k * .22; FX.fillStyle = '#fff'; for (let y = (t * 900) % 14; y < 960; y += 14) FX.fillRect(0, y, 540, 2); FX.globalAlpha = k * .9;
+    FX.fillStyle = '#fff'; FX.font = "700 34px PT, 'Noto Color Emoji'"; FX.textAlign = 'right'; FX.shadowColor = 'rgba(0,0,0,.6)'; FX.shadowBlur = 8; FX.fillText('⏪ ПЕРЕМОТКА', 516, 200); FX.restore();
+  }
+  /** «стоп-кадр» с красной рамкой */
+  function freeze(t, a, b, text = 'СТОП') {
+    if (t < a || t > b) return; const k = win(t, a, b, .08, .15);
+    FX.save(); FX.globalAlpha = k; FX.strokeStyle = '#e03131'; FX.lineWidth = 10; FX.strokeRect(5, 5, 530, 950); FX.fillStyle = 'rgba(224,49,49,.12)'; FX.fillRect(0, 0, 540, 960);
+    FX.font = "700 44px PT, 'Noto Color Emoji'"; FX.textAlign = 'center'; FX.fillStyle = '#fff'; FX.shadowColor = 'rgba(0,0,0,.7)'; FX.shadowBlur = 12; FX.fillText(text, 270, 200); FX.restore();
   }
   /** стержень/труба между любыми точками */
   function rod(p0, p1, r, color, o = {}) {
@@ -107,28 +120,36 @@ const LP = (() => {
   }
   /** человечек-строитель; face — угол поворота (0 — лицом к камере); pose: 'stand' | 'dig' | 'walk' | 'point' */
   function person(x, y, z, face, t, pose = 'stand', o = {}) {
-    const c = [x, y, z], T = (q) => rotY(add(q, c), c, face);
+    const c = [x, y, z], T = (q) => { let p = add(q, c); if (o.lean) p = rotX(p, c, o.lean); if (o.roll) p = rotZ(p, c, o.roll); return rotY(p, c, face); };
     const part = (x0, x1, y0, y1, z0, z1, col, tf) => S.box(x0, x1, y0, y1, z0, z1, col, { tf: tf ? (p) => T(tf(p)) : T, shadow: true });
     const walk = pose === 'walk' ? Math.sin(t * 7) * .45 : 0;
     const legA = walk, legB = -walk;
     const hipL = [-.09, .88, 0], hipR = [.09, .88, 0];
-    part(-.17, -.02, .02, .88, -.08, .08, '#34507e', (p) => rotX(p, hipL, legA));
-    part(.02, .17, .02, .88, -.08, .08, '#34507e', (p) => rotX(p, hipR, legB));
+    part(-.17, -.02, .02, .88, -.08, .08, o.pants || '#34507e', (p) => rotX(p, hipL, legA));
+    part(.02, .17, .02, .88, -.08, .08, o.pants || '#34507e', (p) => rotX(p, hipR, legB));
     part(-.18, -.01, 0, .07, -.09, .14, '#3a3530', (p) => rotX(p, hipL, legA));
     part(.01, .18, 0, .07, -.09, .14, '#3a3530', (p) => rotX(p, hipR, legB));
     const lean = pose === 'dig' ? .25 + Math.max(0, Math.sin(t * 3.2)) * .25 : 0, hip = [0, .88, 0];
     const body = (p) => rotX(p, hip, lean);
     part(-.21, .21, .86, 1.46, -.12, .12, o.shirt || '#f08c3a', body);
-    part(-.21, .21, .86, 1.12, -.125, .125, '#f4f1ea', (p) => body(p)); // нижняя часть — полоска-жилет
-    part(-.22, .22, 1.0, 1.06, -.13, .13, '#e8e14a', body);
+    if (!o.suit) { part(-.21, .21, .86, 1.12, -.125, .125, '#f4f1ea', (p) => body(p)); part(-.22, .22, 1.0, 1.06, -.13, .13, '#e8e14a', body); }
+    else part(-.05, .05, 1.1, 1.44, .12, .135, o.tie || '#b02a2a', body);
     let armA = -walk, armB = walk;
     if (pose === 'dig') { const k = Math.sin(t * 3.2); armA = armB = -.9 - k * .5; }
     if (pose === 'point') { armB = -1.45; }
+    if (pose === 'drill' || pose === 'reach') { armA = armB = -1.4; }
+    if (pose === 'up') { armA = armB = -2.9 + Math.sin(t * 9) * .15; }
+    if (pose === 'phone') { armB = -2.3; }
+    if (pose === 'pull') { armA = armB = -1.2 + Math.sin(t * 6) * .12; }
     const shL = [-.27, 1.42, 0], shR = [.27, 1.42, 0];
     part(-.33, -.21, .9, 1.44, -.06, .06, o.shirt || '#f08c3a', (p) => body(rotX(p, shL, armA)));
     part(.21, .33, .9, 1.44, -.06, .06, o.shirt || '#f08c3a', (p) => body(rotX(p, shR, armB)));
     const head = T(body([0, 1.62, 0])); S.sphere(head, .14, '#e9b893', { seg: 9, rings: 6, shadow: true });
-    S.sphere(add(head, [0, .06, 0]), .165, '#f2c230', { seg: 10, rings: 6, sy: .62 });
+    if (o.helmet !== false) { S.sphere(add(head, [0, .06, 0]), .165, o.hat || '#f2c230', { seg: 10, rings: 6, sy: .62 }); if (o.strap) rod(add(head, [-.13, .02, 0]), add(head, [.13, .02, 0]), .012, '#333', { seg: 4, flat: true }); }
+    else S.sphere(add(head, [0, .05, -.02]), .145, o.hair || '#4a3424', { seg: 9, rings: 6, sy: .75 });
+    if (o.spiky) for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2, d = [Math.cos(a) * .1, .12, Math.sin(a) * .1]; rod(add(head, d), add(head, [d[0] * 2.6, .3 + R(i) * .1, d[2] * 2.6]), .03, o.hair || '#4a3424', { seg: 4, flat: true, r2: .004 }); }
+    if (o.harness) { const B = (q) => T(body(q)); for (const [a, b] of [[[-.15, 1.45, .13], [.12, .9, .13]], [[.15, 1.45, .13], [-.12, .9, .13]], [[-.15, 1.45, -.13], [.12, .9, -.13]], [[.15, 1.45, -.13], [-.12, .9, -.13]], [[-.22, .9, .13], [.22, .9, .13]]]) rod(B(a), B(b), .022, '#e8590c', { seg: 4, flat: true }); }
+    if (pose === 'drill') { const h = T(body(rotX([.27, .9, 0], shR, armB))); S.box(h[0] - .06, h[0] + .06, h[1] - .05, h[1] + .07, h[2] - .05, h[2] + .25, '#2b8a3e', { tf: (p) => rotY(p, h, face), bias: -.2 }); rod(h, T(body(rotX([.27, .9, .55], shR, armB))), .01, '#adb5bd', { seg: 4, flat: true }); }
     if (pose === 'dig') { // лопата в руках
       const hand = T(body(rotX([0, .9, 0], [0, 1.42, 0], armA))), tip = T(body(rotX([0, .2, .55], [0, 1.42, 0], armA * .7)));
       rod(hand, tip, .025, '#8a6440', { seg: 5, flat: true });
@@ -176,6 +197,6 @@ const LP = (() => {
     el.style.opacity = win(t, 0, until, .01, .35); el.style.transform = `scale(${lerp(.94, 1, eOut(t / .5))})`;
   }
   function post(t) { if (window._np) return; PFX.apply(S.ctx, t, { grade: 'contrast(1.04) saturate(1.08) brightness(1.02)', bloom: .1, vignette: .22, grain: .02 }); }
-  return { P, init, sky, rod, pipe, tree, fence, gable, bgHouse, backdrop, ground, person, label, flow, cam, chip, hook, post, get S() { return S; }, get FX() { return FX; } };
+  return { P, init, sky, rewind, freeze, rod, pipe, tree, fence, gable, bgHouse, backdrop, ground, person, label, flow, cam, chip, hook, post, get S() { return S; }, get FX() { return FX; } };
 })();
 const END_HTML = (ic, l1, l2) => `<div id="end"><div class="ic">${ic}</div><div class="logo">СМЕТА PRO</div><div class="l2">${l1}<br><span style="color:#FFD43B">${l2}</span></div><div class="bot">@CMETA_Pro_bot</div><div class="sm">День бесплатно + 12 дней за подписку на Instagram</div></div>`;
