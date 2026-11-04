@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma, plain, notFound, audit, num, HttpError, accessOf, docsOk, needDocs } from '../util';
 import { loadEstimate, estimateTotals, estimateNumber } from './estimates';
-import { pdfData, renderPdf, renderKs, signedPath, checkSig, fileName } from '../pdf';
+import { pdfData, renderPdf, renderKs, signedPath, checkSig, fileName, expiredLink } from '../pdf';
 import { progress, buildAct, lineKey, priceFactor, ActItem } from '../../../shared/acts';
 import { payStages } from '../../../shared/payments';
 import { brandPath } from '../brand';
@@ -267,7 +267,7 @@ export async function actRoutes(app: FastifyInstance, opts: { bot?: any } = {}) 
     const id = String((req.params as any).file).replace(/\.pdf$/, '');
     const { kind, exp, sig, p } = req.query as any;
     const k = String(kind || '').replace(/^doc-/, '') as Doc;
-    if (!DOCS.includes(k) || !checkSig(`doc-${k}`, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте документ из приложения заново' });
+    if (!DOCS.includes(k) || !checkSig(`doc-${k}`, id, exp, sig)) return expiredLink(reply);
     const e = await prisma.estimate.findFirst({ where: { id, deletedAt: null }, include: { lines: { orderBy: { position: 'asc' } }, user: true } });
     if (!e) return reply.status(404).send({ error: 'Смета не найдена' });
     if (!docsOk(e.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });
@@ -282,7 +282,7 @@ export async function actRoutes(app: FastifyInstance, opts: { bot?: any } = {}) 
     const id = String((req.params as any).file).replace(/\.pdf$/, '');
     const { kind, exp, sig } = req.query as any;
     const form = String(kind || '').replace(/^act-/, '') as Form;
-    if (!FORMS.includes(form) || !checkSig(`act-${form}`, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте документ из приложения заново' });
+    if (!FORMS.includes(form) || !checkSig(`act-${form}`, id, exp, sig)) return expiredLink(reply);
     const a = await prisma.workAct.findFirst({ where: { id, deletedAt: null }, include: { user: true } });
     if (!a) return reply.status(404).send({ error: 'Акт не найден' });
     if (!docsOk(a.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });

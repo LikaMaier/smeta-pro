@@ -91,14 +91,15 @@ export type FileKind = 'pdf' | 'act' | 'contract' | 'xlsx' | 'xlsxown' | 'pxlsx'
 const sign = (kind: string, id: string, exp: number | string) =>
   crypto.createHmac('sha256', env.SESSION_SECRET || 'dev-secret').update(`${kind}:${id}:${exp}`).digest('base64url');
 
-export function fileLink(kind: FileKind, id: string, ttlSec = 3600) {
+export const LINK_TTL = 7 * 24 * 3600; // неделя: ссылку часто пересылают заказчику, и он открывает её не сразу
+export function fileLink(kind: FileKind, id: string, ttlSec = LINK_TTL) {
   const exp = Math.floor(Date.now() / 1000) + ttlSec;
   const base = kind === 'pxlsx' ? `/files/projects/${id}.xlsx` : `/files/estimates/${id}.${kind === 'xlsx' || kind === 'xlsxown' ? 'xlsx' : 'pdf'}`;
   return `${base}?kind=${kind}&exp=${exp}&sig=${sign(kind, id, exp)}`;
 }
 export const pdfLink = (id: string) => fileLink('pdf', id);
 /** Подписанная ссылка на произвольный путь (акты, КС-2, КС-3) */
-export function signedPath(base: string, kind: string, id: string, ttlSec = 3600) {
+export function signedPath(base: string, kind: string, id: string, ttlSec = LINK_TTL) {
   const exp = Math.floor(Date.now() / 1000) + ttlSec;
   return `${base}?kind=${kind}&exp=${exp}&sig=${sign(kind, id, exp)}`;
 }
@@ -106,6 +107,10 @@ export function checkSig(kind: string, id: string, exp: string, sig: string) {
   if (!exp || !sig || Number(exp) < Date.now() / 1000) return false;
   const e = sign(kind, id, exp);
   return e.length === sig.length && crypto.timingSafeEqual(Buffer.from(e), Buffer.from(sig));
+}
+/** Понятная страница вместо JSON, если ссылка на файл устарела (её открывает заказчик в браузере) */
+export function expiredLink(reply: any) {
+  return reply.status(403).header('Content-Type', 'text/html; charset=utf-8').send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ссылка устарела</title><body style="font:17px system-ui;padding:28px;background:#f4f1ea;color:#22180f"><h1>Ссылка устарела</h1><p>Файл доступен по ссылке 7 дней. Попросите исполнителя прислать новую — в СМЕТА PRO это одна кнопка.</p></body>`);
 }
 export const checkPdfSig = (id: string, exp: string, sig: string) => checkSig('pdf', id, exp, sig);
 

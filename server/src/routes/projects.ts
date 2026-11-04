@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma, plain, notFound, audit, num, HttpError, accessOf, docsOk, needDocs } from '../util';
-import { renderXlsx, fileLink, checkSig, fileName } from '../pdf';
+import { renderXlsx, fileLink, checkSig, fileName, expiredLink } from '../pdf';
 import { calcProjectFinance } from '../../../shared/finance';
 import { estimateTotals } from './estimates';
 
@@ -141,7 +141,7 @@ export async function projectRoutes(app: FastifyInstance, opts: { bot?: any } = 
   app.get('/files/projects/:file', async (req, reply) => {
     const id = String((req.params as any).file).replace(/\.xlsx$/, '');
     const { exp, sig } = req.query as any;
-    if (!checkSig('pxlsx', id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте файл из приложения заново' });
+    if (!checkSig('pxlsx', id, exp, sig)) return expiredLink(reply);
     const owner = await prisma.project.findFirst({ where: { id, deletedAt: null }, include: { user: true } });
     if (!owner) return reply.status(404).send({ error: 'Объект не найден' });
     if (!docsOk(owner.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });

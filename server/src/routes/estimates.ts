@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma, plain, notFound, audit, num, HttpError, accessOf, freeCtx, docsOk, needDocs } from '../util';
 import { calcEstimate } from '../../../shared/estimate';
-import { runImport, pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind } from '../pdf';
+import { runImport, pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName, xlsxEstimateData, type FileKind, expiredLink } from '../pdf';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { getTemplate } from '../../../shared/templates';
 import { compositionFor } from '../../../shared/compositions';
@@ -187,7 +187,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
     const id = String((req.params as any).file).replace(/\.(pdf|xlsx)$/, '');
     const { exp, sig } = req.query as any;
     const kind = (KINDS as readonly string[]).includes((req.query as any).kind) ? (req.query as any).kind as EKind : 'pdf';
-    if (!checkSig(kind, id, exp, sig)) return reply.status(403).send({ error: 'Ссылка устарела, откройте файл из приложения заново' });
+    if (!checkSig(kind, id, exp, sig)) return expiredLink(reply);
     const e = await prisma.estimate.findFirst({ where: { id, deletedAt: null }, include: { lines: { orderBy: { position: 'asc' } }, user: true } });
     if (!e) return reply.status(404).send({ error: 'Смета не найдена' });
     if (PAID.includes(kind) && !docsOk(e.user)) return reply.status(402).send({ error: 'Доступно в тарифе «Про»' });
