@@ -79,6 +79,13 @@ export const FIRST_JOBS: FirstJob[] = [
     name: ({ L, W }) => `Комната ${fmtNum(L)}×${fmtNum(W)} м под покраску`,
   },
   {
+    id: 'plaster', icon: '🧱', title: 'Штукатурка стен', text: 'по маякам, гипсовая или машинная', q: 'Какой размер комнаты?',
+    size: [len('L', 'Длина', 5, 1, 30, 0.5), len('W', 'Ширина', 4, 1, 30, 0.5), len('H', 'Высота потолка', 2.7, 2, 6, 0.1), count('rooms', 'Таких комнат', 1, 20, [1, 2, 3])],
+    opts: [{ key: 'slopes', label: 'Откосы окон', on: true }, { key: 'machine', label: 'Машинная штукатурка (быстрее)', on: false }, { key: 'paint', label: 'Дальше шпаклёвка и покраска', on: false }],
+    parts: ({ L, W, H, rooms }, o) => [['m-finish', { L, W, H, rooms, walls: o.paint ? 'paint' : 'tile', level: 'plaster', pmat: o.machine ? 'machine' : 'gypsum', ceil: 'none', slopes: o.slopes ? 'yes' : 'no' }]],
+    name: ({ L, W, rooms }) => `Штукатурка стен: ${rooms > 1 ? `${rooms} комнаты ` : 'комната '}${fmtNum(L)}×${fmtNum(W)} м`,
+  },
+  {
     id: 'room-wallpaper', icon: '🧻', title: 'Комната: обои', text: 'снять старые, шпаклёвка, поклейка', q: 'Какой размер комнаты?',
     size: [len('L', 'Длина', 5, 1, 30, 0.5), len('W', 'Ширина', 3.6, 1, 30, 0.5), len('H', 'Высота потолка', 2.7, 2, 6, 0.1)],
     opts: [{ key: 'demo', label: 'Снять старые обои', on: true }, { key: 'ceil', label: 'Покрасить потолок', on: true }, { key: 'floor', label: 'Ламинат на пол', on: false }],
@@ -257,7 +264,7 @@ export const getJob = (id?: string | null) => FIRST_JOBS.find((j) => j.id === id
 
 /** Что показать первым — по специальности из бота («Чем занимаетесь?») */
 export const TRADE_JOBS: Record<string, string[]> = {
-  finish: ['room-paint', 'room-wallpaper', 'flat', 'stretch', 'gkl', 'laminate'],
+  finish: ['plaster', 'room-paint', 'room-wallpaper', 'flat', 'stretch', 'gkl'],
   tile: ['bath', 'tile-floor', 'apron', 'flat'],
   floor: ['laminate', 'screed', 'tile-floor', 'flat'],
   roof: ['roof', 'roof-new', 'house', 'walls-gas'],
@@ -274,7 +281,7 @@ export const DEFAULT_JOBS = ['bath', 'room-paint', 'flat', 'laminate', 'roof', '
 export const jobsFor = (trade?: string | null) => (TRADE_JOBS[trade || ''] || DEFAULT_JOBS).map((id) => getJob(id)!).filter(Boolean);
 /** Все работы — по группам, для «Другая работа» */
 export const JOB_GROUPS: [string, string[]][] = [
-  ['Квартира и отделка', ['bath', 'flat', 'room-paint', 'room-wallpaper', 'tile-floor', 'apron', 'laminate', 'screed', 'stretch', 'gkl', 'doors', 'handy']],
+  ['Квартира и отделка', ['bath', 'flat', 'plaster', 'room-paint', 'room-wallpaper', 'tile-floor', 'apron', 'laminate', 'screed', 'stretch', 'gkl', 'doors', 'handy']],
   ['Инженерия', ['el-flat', 'el-house', 'plumb', 'heat', 'ac', 'windows']],
   ['Дом и участок', ['found-strip', 'found-slab', 'found-screw', 'walls-gas', 'roof', 'roof-new', 'house', 'sauna', 'fence', 'paving', 'septic']],
 ];

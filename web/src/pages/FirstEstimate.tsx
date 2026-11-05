@@ -340,7 +340,7 @@ function Offer({ onGo }: { onGo: () => void }) {
 }
 
 /** «Как это работает — видео за минуту»: та же видеоинструкция, что присылает бот (/guide) */
-export function GuideVideo({ label = '▶️ Как это работает — видео, 1 минута' }: { label?: string }) {
+export function GuideVideo({ label = '▶️ Как это работает — видео, 1,5 минуты' }: { label?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>

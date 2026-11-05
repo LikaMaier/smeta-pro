@@ -73,7 +73,7 @@ export function createBot() {
   const newcomerKb = () => {
     const kb = new InlineKeyboard().webApp('🧾 Сделать первую смету — 2 минуты', `${env.PUBLIC_URL}/`).row();
     TRADES.forEach((t, i) => { kb.webApp(t.label, `${env.PUBLIC_URL}/?t=${t.id}`); if (i % 2 === 1) kb.row(); });
-    return kb.text('▶️ Видеоинструкция — 1 минута', 'guidevideo');
+    return kb.text('▶️ Видеоинструкция — 1,5 минуты', 'guidevideo');
   };
   // PDF сметы прямо в чат — кнопка под напоминанием «смета готова, но заказчику не ушла»
   bot.callbackQuery(/^pdf:([\w-]{10,40})$/, async (ctx) => {
@@ -104,13 +104,13 @@ export function createBot() {
   bot.hears(/^(как начать|инструкция|видео|видеоинструкция|как пользоваться)\??$/i, (ctx) => sendGuide(ctx).catch(() => {}));
 
   /** «Как сделать первую смету — 4 шага»: альбом с настоящими экранами; file_id кэшируем после первой отправки */
-  /** Видеоинструкция (48 с): от «Сделать первую смету» до PDF заказчику и калькулятора; file_id кэшируем после первой отправки */
+  /** Видеоинструкция (86 с, на примере штукатурки): от «Сделать первую смету» до PDF заказчику и калькулятора; file_id кэшируем после первой отправки */
   async function sendGuide(ctx: any) {
-    const KEY = 'guide:video:v1';
+    const KEY = 'guide:video:v2';
     const cached = await prisma.appKV.findUnique({ where: { key: KEY } }).catch(() => null);
-    const caption = '▶️ <b>Как пользоваться СМЕТА PRO — за минуту</b>\n\n1. «Сделать первую смету»\n2. Выберите работу\n3. Размер — цифры уже стоят\n4. Выберите материалы: эконом, стандарт или премиум\n5. PDF придёт в чат — перешлите заказчику\n6. Калькулятор для заказчиков — заявки с готовой сметой\n\nВопрос? Просто напишите его сюда — ответим.';
+    const caption = '▶️ <b>Как пользоваться СМЕТА PRO — на примере штукатурки стен</b>\n\n1. «Сделать первую смету» → «Штукатурка стен»\n2. Размер комнаты — цифры уже стоят\n3. Галочки: откосы, машинная, шпаклёвка\n4. Смета готова → «Поменять цены и позиции»\n5. «Часто забывают» — забытая работа одним нажатием\n6. Своя работа или свой материал: «Пустая строка» → «⋯» → название, количество, цена\n7. «PDF в Telegram» — и перешлите заказчику\n8. Калькулятор для заказчиков — заявки с готовой сметой\n\nВопрос? Просто напишите его сюда — ответим.';
     const kb = env.PUBLIC_URL ? new InlineKeyboard().webApp('🧾 Сделать смету', `${env.PUBLIC_URL}/`) : undefined;
-    const sent = await ctx.replyWithVideo(cached?.value || new InputFile(path.join(GUIDE_DIR, 'guide.mp4')), { caption, parse_mode: 'HTML', width: 1080, height: 1920, duration: 48, supports_streaming: true, reply_markup: kb });
+    const sent = await ctx.replyWithVideo(cached?.value || new InputFile(path.join(GUIDE_DIR, 'guide.mp4')), { caption, parse_mode: 'HTML', width: 1080, height: 1920, duration: 86, supports_streaming: true, reply_markup: kb });
     const id = sent?.video?.file_id;
     if (!cached && id) await prisma.appKV.upsert({ where: { key: KEY }, create: { key: KEY, value: id }, update: { value: id } }).catch(() => {});
   }
