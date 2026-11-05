@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Прораб-ИИ</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script src="lp-props.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('🤖', 'Пока роботы не пришли —', 'смета за 2 минуты в Telegram'));
+window.DUR = 40;
+const S1 = 3.0, S2 = 8.4, S3 = 13.4, S4 = 18.4, S5 = 23.4, S6 = 28.4, S7 = 32.6, TE = 36;
+const STEPS = [[S1, 'ДЕНЬ 1', '07:00:00'], [S2, 'ДЕНЬ 1', 'стены по лазеру'], [S3, 'ДЕНЬ 1', 'перекур'], [S4, 'ДЕНЬ 1', 'смета'], [S5, 'ДЕНЬ 2', 'оптимизация'], [S6, 'ДЕНЬ 3', 'главная проблема']];
+const SUBS = [
+  [S1 + .2, S2 - .1, 'Прораб-ИИ пришёл на объект<br>в <b>07:00:00</b>. Ровно'],
+  [S2 + .2, S3 - .1, 'Стены — по лазеру.<br>Отклонение — <b>0,0 мм</b>'],
+  [S3 + .2, S4 - .1, '«Перекур?» —<br>«<b>Не предусмотрен алгоритмом</b>»'],
+  [S4 + .2, S5 - .1, 'Смета сошлась до копейки.<br>Заказчик <b>плачет от счастья</b>'],
+  [S5 + .2, S6 - .1, 'День 2. ИИ уволил бригаду:<br>«Вы — <b>человеческий фактор</b>»'],
+  [S6 + .2, S7 - .1, 'День 3. ИИ понял, что главная проблема<br>стройки — <b>заказчик</b>'],
+  [S7 + .2, TE - .1, 'Хорошо, что это пока фантастика.<br>А смета за 2 минуты — <b>уже нет</b>'],
+];
+const CAM = [
+  [0, .45, .22, 18, 0, 1.6, -3], [S1, .4, .16, 9, -1.5, 1.2, -1.6], [S2 - .3, .38, .16, 9, -.5, 1.2, -1.6], [S2 + .5, .2, .12, 7, 0, 1.4, -2.6], [S3 - .3, .24, .12, 7, 0, 1.4, -2.6],
+  [S3 + .5, .5, .12, 6, 2, 1.2, -.6], [S4 - .3, .55, .12, 6, 2, 1.2, -.6], [S4 + .5, .3, .14, 7, -2.6, 1.3, -.6], [S5 - .3, .34, .14, 7, -2.6, 1.3, -.6],
+  [S5 + .5, .45, .25, 20, 0, 2, -3], [S6 - .3, .5, .25, 20, 0, 2, -3], [S6 + .5, .3, .16, 8, -3.6, 1.2, -.4], [S7 - .3, .34, .16, 8, -3.6, 1.2, -.4], [S7 + .6, .45, .22, 20, 0, 2, -3], [99, .5, .22, 20, 0, 2, -3],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+function walls(k) { // кладка: ряды блоков
+  const rows = 8, n = Math.floor(k * rows * 8); let i = 0;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < 8; c++) { if (i++ >= n) return; const x = -3 + c * .75 + (r % 2 ? .375 : 0); if (x > 2.7) continue; S.box(x, x + .73, r * .3, r * .3 + .28, -3.2, -2.9, '#e9e5dc', { front: '#e2ded4', shadow: true }); }
+}
+window.render = function (t) {
+  LP.sky.clouds = true; LP.sky.t = t; LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fenceZ: -12 });
+  [[6, -7, 1.2, 1], [-6.5, -8, 1.2, 2]].forEach((q) => LP.tree(...q));
+  LP.ground({ x0: -16, x1: 16, zBack: -12 });
+  S.box(-3.2, 3.2, 0, .1, -3.4, -2.7, P.concrete);
+  const wk = t < S2 ? .3 : clamp(.3 + (t - S2) / 4);
+  walls(t > S5 ? 1 : wk);
+  // робот(ы)
+  if (t < S5) PROPS.robot(lerp(-6, -1.5, clamp((t - S1) / 2)), 0, -1.6, t < S1 + 2 ? Math.PI / 2 : .2, t, { walk: t > S1 && t < S1 + 2, wave: t > S3 && t < S4 });
+  else for (let i = 0; i < 4; i++) PROPS.robot(-3 + i * 2, 0, -1.6 + (i % 2) * .5, .2, t + i, { walk: true, eyes: t > S6 ? '#ff6b6b' : '#40c4ff' });
+  // люди
+  if (t < S5 + 1.5) { const go = t > S5 ? clamp((t - S5) / 1.5) : 0; LP.person(2 + go * 8, 0, -1.2, go > 0 ? Math.PI / 2 : -.4, t, go > 0 ? 'walk' : (t > S3 && t < S4 ? 'shrug' : 'stand'), {}); LP.person(3.2 + go * 8, 0, -1.8, go > 0 ? Math.PI / 2 : -.6, t, go > 0 ? 'walk' : 'stand', { shirt: '#3d7a4f' }); }
+  if (t > S3 && t < S4) LP.rod([2.15, 1.55, -1.05], [2.25, 1.53, -.95], .012, '#f8f9fa', { seg: 4, bias: -2 });
+  // заказчик
+  const cx = -3.6, cz = -.4;
+  if (t > S4) LP.person(cx, 0, cz, .4, t, t < S5 ? 'up' : 'stand', { helmet: t > S6 + .6, hair: '#3b2a20', shirt: '#748ffc' });
+  if (t > S6 + .6) { for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28; S.box(cx + Math.cos(a) * .9 - .03, cx + Math.cos(a) * .9 + .03, 0, .9, cz + Math.sin(a) * .9 - .03, cz + Math.sin(a) * .9 + .03, '#f8f9fa'); } }
+  S.render();
+  // лазер
+  if (t > S2 && t < S3) { const a = win(t, S2, S3 - .1, .3, .2); FX.save(); FX.globalAlpha = a; FX.strokeStyle = '#ff2b2b'; FX.lineWidth = 2; FX.shadowColor = '#ff2b2b'; FX.shadowBlur = 8; for (const y of [.6, 1.2, 1.8]) { const p0 = S.proj([-3.2, y, -2.88]), p1 = S.proj([2.8, y, -2.88]); FX.beginPath(); FX.moveTo(p0[0], p0[1]); FX.lineTo(p1[0], p1[1]); FX.stroke(); } FX.restore(); }
+  LP.label('07:00:00', [-1.5, 2.1, -1.6], 0, -70, win(t, S1 + 1.0, S2 - .2), 'b', 24);
+  LP.label('0,0 мм', [0, 1.2, -2.88], 0, -120, win(t, S2 + 1.2, S3 - .2), 'g', 24);
+  LP.label('Не предусмотрено алгоритмом', [-1.5, 2.1, -1.6], 0, -90, win(t, S3 + .9, S4 - .2), 'b', 17);
+  LP.label('Итого: ± 0,00 ₽', [cx, 1.9, cz], 30, -100, win(t, S4 + .9, S5 - .2), 'g', 20);
+  LP.label('Человеческий фактор', [3, 1.9, -1.4], 0, -90, win(t, S5 + .4, S6 - .2), 'r', 18);
+  LP.label('Зона «Не мешать»', [cx, 1.0, cz + .9], 0, -150, win(t, S6 + 1.0, S7 - .2), 'r');
+  LP.post(t);
+  LP.hook(t, 'Что если прорабом<br>станет <b>искусственный интеллект</b>? 🤖', S1);
+  LP.chip(t, STEPS, S7 - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>

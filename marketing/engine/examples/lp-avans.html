@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Аванс 100%</title></head><body><div id="stage">
+<canvas id="cv"></canvas>
+<canvas id="fx" width="1080" height="1920" style="width:540px;height:960px"></canvas>
+<div id="chip"></div><div id="hook" class="cap"></div><div id="sub" class="cap"></div><div id="fade"></div>
+</div>
+<script src="drain-common.js"></script>
+<script src="mini3d.js"></script>
+<script src="pfx.js"></script>
+<script src="lp.js"></script>
+<script src="lp-props.js"></script>
+<script>
+$('stage').insertAdjacentHTML('beforeend', END_HTML('💰', 'Смета по этапам —', 'за 2 минуты в Telegram'));
+window.DUR = 40;
+const T1 = 9.2, T2 = 13.8, T3 = 18.6, T4 = 23.4, T5 = 28, T6 = 32.4, TE = 36;
+const STEPS = [[3, 'КАК БЫВАЕТ', '100% вперёд'], [T1, 'КАК НАДО', 'аванс на материалы'], [T2, 'КАК НАДО', 'оплата по этапам'], [T3, 'КАК НАДО', 'акт → оплата'], [T4, 'МАСТЕРУ', 'тоже выгодно'], [T5, 'ЗАКАЗЧИКУ', 'проверь мастера']];
+const SUBS = [
+  [3.1, 6.1, 'Заплатил <b>100% вперёд</b>,<br>«чтобы быстрее»'],
+  [6.1, T1 - .1, 'Мастер залил фундамент<br>и ушёл в <b>ретрит</b>. Телефон — тоже'],
+  [T1 + .2, T2 - .1, 'Аванс — на <b>материалы</b> и первый этап,<br>материалы — по чекам'],
+  [T2 + .2, T3 - .1, 'Дальше — оплата <b>по этапам</b>:<br>фундамент, стены, крыша'],
+  [T3 + .2, T4 - .1, 'Этап принял — подписал <b>акт</b> —<br>заплатил'],
+  [T4 + .2, T5 - .1, 'Мастеру тоже удобно: этап сдал —<br>деньги получил, без «доплачу потом»'],
+  [T5 + .2, T6 - .1, 'Проверь мастера: договор, данные<br>в договоре, <b>реальные объекты</b> и отзывы'],
+  [T6 + .2, TE - .1, 'Предоплата 100% — это не доверие,<br>а <b>лотерея</b> 🎰'],
+];
+const CAM = [
+  [0, .45, .2, 22, 0, 2.2, -3], [3, .4, .18, 19, .6, 2.2, -2.5], [6.2, .5, .14, 18, 1.6, 2.0, -2], [T1 - .2, .55, .14, 18, 1.6, 2.0, -2],
+  [T1 + .6, .4, .18, 19, 0, 2.6, -3], [T5 - .2, .44, .18, 19, 0, 2.6, -3], [T5 + .6, .3, .14, 9, 3, 1.4, -.8], [T6 - .2, .34, .14, 9, 3, 1.4, -.8],
+  [T6 + .9, .45, .2, 20, 0, 2.4, -3], [99, .5, .2, 20, 0, 2.4, -3],
+];
+const S = LP.init(), P = LP.P, FX = LP.FX;
+const X0 = -3.5, X1 = 3.5, Z0 = -7, Z1 = -2;
+function house(stage) {
+  if (stage > 0) S.box(X0, X1, 0, .5 * Math.min(1, stage), Z0, Z1, P.concrete, { shadow: true });
+  if (stage > 1) { const h = .5 + 2.8 * Math.min(1, stage - 1); S.box(X0, X1, .5, h, Z0, Z1, '#d9cbb3', { shadow: true }); for (const x of [-2.5, .5]) if (stage > 1.9) S.poly([[x, 1.3, Z1 + .02], [x + 1.2, 1.3, Z1 + .02], [x + 1.2, 2.5, Z1 + .02], [x, 2.5, Z1 + .02]], '#2e3b45', { two: true, bias: -.1 }); }
+  if (stage > 2) { const k = Math.min(1, stage - 2), c = [0, 4, (Z0 + Z1) / 2], yr = 3.3 + 1.8 * k; S.poly([[X0 - .3, 3.3, Z1 + .3], [X1 + .3, 3.3, Z1 + .3], [X1 + .3, yr, (Z0 + Z1) / 2], [X0 - .3, yr, (Z0 + Z1) / 2]], '#8b4a3a', { center: c, shadow: true }); S.poly([[X0 - .3, yr, (Z0 + Z1) / 2], [X1 + .3, yr, (Z0 + Z1) / 2], [X1 + .3, 3.3, Z0 - .3], [X0 - .3, 3.3, Z0 - .3]], '#8b4a3a', { center: c, shadow: true }); }
+}
+function van(x) { S.box(x - 1.2, x + 1.2, .35, 1.8, -.9, .3, '#f8f9fa', { shadow: true }); S.box(x + .6, x + 1.2, 1.0, 1.6, -.92, .32, '#2e3b45'); for (const dx of [-.7, .7]) for (const z of [-.9, .3]) S.cyl('z', [x + dx, .35, z], .3, .1, '#212529', { seg: 12 }); }
+window.render = function (t) {
+  LP.sky.clouds = true; LP.sky.t = t; LP.sky(); LP.cam(CAM, t);
+  LP.backdrop({ fenceZ: -12 });
+  LP.ground({ x0: -16, x1: 16, zBack: -12 });
+  const bad = t < T1;
+  let stage = 0;
+  if (bad) stage = clamp((t - 3.6) / 1.5);
+  else stage = t < T2 ? 0 : t < T3 ? 1 + clamp((t - T2 - .6) / 1.6) : t < T4 ? 2 + clamp((t - T3 - .6) / 1.6) : 3;
+  house(stage);
+  if (bad) { const vx = t < 6.4 ? 4.6 : lerp(4.6, 16, ease((t - 6.4) / 2)); van(vx); if (t < 6.4) LP.person(3.6, 0, -.6, -.3, t, 'stand', {}); }
+  else LP.person(4.4, 0, -.9, -.5, t, 'stand', {});
+  LP.person(-4.6, 0, -.8, .5, t, bad && t > 7 ? 'up' : 'stand', { helmet: false, hair: '#3b2a20', shirt: '#748ffc' });
+  // шкала оплат
+  const bar = (i, a, col) => S.box(-3 + i * 2.05, -1.1 + i * 2.05, 5.4, 5.7, -2, -1.95, col, { alpha: a, bias: -3 });
+  if (bad) { const k = clamp((t - 3.2) / .6); for (let i = 0; i < 3; i++) bar(i, k, '#e03131'); }
+  else for (let i = 0; i < 3; i++) { const paid = (i === 0 && t > T1 + .6) || (i === 1 && t > T3 + 2.4) || (i === 2 && t > T4 - .4); bar(i, 1, paid ? '#40c057' : '#ced4da'); }
+  S.render();
+  LP.label('100% оплачено', [0, 5.7, -1.95], 0, -60, win(t, 3.8, T1 - .2), 'r');
+  LP.label('Аванс: материалы + этап 1', [-2.05, 5.7, -1.95], 0, -60, win(t, T1 + .8, T2 - .2), 'g', 18);
+  LP.label('Фундамент · Стены · Крыша', [0, 5.7, -1.95], 0, -60, win(t, T2 + .6, T3 - .2), 'w', 18);
+  LP.label('Акт ✓ → оплата', [0, 5.7, -1.95], 0, -60, win(t, T3 + .6, T4 - .2), 'g');
+  LP.label('Сдал этап — получил деньги', [4.4, 1.9, -.9], -60, -100, win(t, T4 + .6, T5 - .2), 'g', 18);
+  LP.label('Договор · объекты · отзывы', [4.4, 1.9, -.9], -60, -100, win(t, T5 + .6, T6 - .2), 'o', 18);
+  LP.post(t);
+  LP.hook(t, 'Заплатил 100% вперёд —<br><b>мастер ушёл в ретрит</b>', 3.0);
+  LP.chip(t, STEPS, TE - .1);
+  renderSubs(t, SUBS);
+  renderEnd(t, TE);
+};
+document.fonts.ready.then(() => { window.render(0); window.OK = true; });
+</script>
+</body></html>
