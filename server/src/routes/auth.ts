@@ -121,7 +121,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/api/me', async (req) => meView(req.user));
 
   // шаги «Первой сметы за 3 шага» — только счётчики для воронки (/funnel), без содержимого
-  const EV = ['fw_open', 'fw_job', 'fw_result', 'fw_pdf', 'fw_link', 'fw_offer', 'fw_skip'] as const;
+  const EV = ['fw_open', 'fw_job', 'fw_result', 'fw_pdf', 'fw_link', 'fw_offer', 'fw_skip', 'fw_video'] as const;
   app.post('/api/ev', async (req) => {
     const b = z.object({ e: z.enum(EV), job: z.string().max(40).optional() }).parse(req.body);
     await audit(req.user.id, 'wizard', req.user.id, b.e, b.job ? { job: b.job } : undefined);

@@ -66,7 +66,7 @@ export function startFunnel(bot: any, log: { error: (o: any, m?: string) => void
         const job = jobsFor(t?.id)[0];
         const ex = job.name(jobDefaults(job).sizes);
         await sendTo(u, `👷 <b>Первая смета — за 2 минуты.</b>\nНапример: <b>${ex}</b>. Нажмите кнопку — размеры уже подставлены, поменяйте под свой объект и нажмите «Показать смету». Работы, материалы и цены посчитаются сами — останется переслать PDF заказчику.`,
-          { reply_markup: appUrl ? { inline_keyboard: [[{ text: `${job.icon} Посчитать: ${job.title.toLowerCase()}`, web_app: { url: `${appUrl}/?job=${job.id}` } }], [{ text: 'Выбрать другую работу', web_app: { url: `${appUrl}/${t ? `?t=${t.id}` : ''}` } }]] } : undefined });
+          { reply_markup: appUrl ? { inline_keyboard: [[{ text: `${job.icon} Посчитать: ${job.title.toLowerCase()}`, web_app: { url: `${appUrl}/?job=${job.id}` } }], [{ text: 'Выбрать другую работу', web_app: { url: `${appUrl}/${t ? `?t=${t.id}` : ''}` } }], [{ text: '▶️ Видеоинструкция — 1 минута', callback_data: 'guidevideo' }]] } : undefined });
       }
       // A. смета сделана час назад, но заказчику не ушла (ни PDF, ни ссылки) — PDF прямо в чат одной кнопкой
       for (const e of await prisma.estimate.findMany({

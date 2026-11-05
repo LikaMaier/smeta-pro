@@ -6,7 +6,7 @@ import { Icon, useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import Hero from '../components/Hero';
 import IgBonus from '../components/IgBonus';
-import FirstEstimate from './FirstEstimate';
+import FirstEstimate, { GuideVideo } from './FirstEstimate';
 
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const MONTH_NAME = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString('ru-RU', { month: 'long' });
@@ -64,6 +64,7 @@ function HomeMain() {
       </Link>
 
       <IgBonus />
+      <GuideVideo label="▶️ Видеоинструкция: как пользоваться" />
 
       {last.length > 0 && (
         <>

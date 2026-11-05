@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { get, patch, post } from '../api';
 import { useMe } from '../App';
-import { Icon, useLoad, useToast } from '../components/ui';
+import { Icon, Sheet, useLoad, useToast } from '../components/ui';
 import { rub0, n } from '../format';
 import { haptic, tg } from '../tg';
 import {
@@ -121,6 +121,7 @@ export default function FirstEstimate({ onSkip }: { onSkip?: () => void }) {
     return (
       <div className="fw">
         <Progress at={1} />
+        <GuideVideo />
         <h2>Что будем считать?</h2>
         <p className="lead">Нажмите на работу. Дальше — один вопрос про размер, и смета готова: работы, материалы и цены.</p>
         <div className="dir-grid">
@@ -335,5 +336,18 @@ function Offer({ onGo }: { onGo: () => void }) {
         </>
       )}
     </div>
+  );
+}
+
+/** «Как это работает — видео за минуту»: та же видеоинструкция, что присылает бот (/guide) */
+export function GuideVideo({ label = '▶️ Как это работает — видео, 1 минута' }: { label?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="fw-video" onClick={() => { setOpen(true); ev('fw_video'); }}>{label}</button>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Видеоинструкция">
+        <video className="fw-video-player" src="/guide.mp4" controls autoPlay playsInline preload="metadata" />
+      </Sheet>
+    </>
   );
 }

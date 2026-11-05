@@ -65,6 +65,7 @@ export function createBot() {
       return ctx.reply(newcomerText(u), { parse_mode: 'HTML', reply_markup: newcomerKb() });
     }
     const wkb = appKb();
+    wkb?.row().text('▶️ Видеоинструкция', 'guidevideo');
     if (wkb && u && !(await bonusDone(u.id)) && !accessOf(u).mode.match(/subscription|team|admin/)) wkb.row().text(`🎁 +${IG_BONUS_DAYS} дней бесплатно`, 'igbonus');
     await ctx.reply(welcomeText(u), { parse_mode: 'HTML', reply_markup: wkb });
   });
@@ -72,7 +73,7 @@ export function createBot() {
   const newcomerKb = () => {
     const kb = new InlineKeyboard().webApp('🧾 Сделать первую смету — 2 минуты', `${env.PUBLIC_URL}/`).row();
     TRADES.forEach((t, i) => { kb.webApp(t.label, `${env.PUBLIC_URL}/?t=${t.id}`); if (i % 2 === 1) kb.row(); });
-    return kb;
+    return kb.text('▶️ Видеоинструкция — 1 минута', 'guidevideo');
   };
   // PDF сметы прямо в чат — кнопка под напоминанием «смета готова, но заказчику не ушла»
   bot.callbackQuery(/^pdf:([\w-]{10,40})$/, async (ctx) => {
@@ -100,21 +101,20 @@ export function createBot() {
     }).catch(() => {});
   });
   bot.command(['guide', 'kak'], (ctx) => sendGuide(ctx).catch(() => ctx.reply('Не получилось отправить инструкцию, попробуйте ещё раз.')));
-  bot.hears(/^(как начать|инструкция|как пользоваться)\??$/i, (ctx) => sendGuide(ctx).catch(() => {}));
+  bot.hears(/^(как начать|инструкция|видео|видеоинструкция|как пользоваться)\??$/i, (ctx) => sendGuide(ctx).catch(() => {}));
 
   /** «Как сделать первую смету — 4 шага»: альбом с настоящими экранами; file_id кэшируем после первой отправки */
+  /** Видеоинструкция (48 с): от «Сделать первую смету» до PDF заказчику и калькулятора; file_id кэшируем после первой отправки */
   async function sendGuide(ctx: any) {
-    const cached = await prisma.appKV.findUnique({ where: { key: 'guide:fileids' } }).catch(() => null);
-    const ids: string[] | null = cached ? JSON.parse(cached.value) : null;
-    const caption = '📖 <b>Как сделать первую смету — 4 шага</b>\n\n1. «Новая смета»\n2. Что делаете: например, плитка → санузел\n3. Площадь — работы и материалы с ценами посчитаются сами\n4. «PDF клиенту» — и смета у заказчика\n\nВопрос? Просто напишите его сюда — ответим.';
-    const media = [1, 2, 3, 4].map((n, i) => ({ type: 'photo' as const, media: ids?.[i] || new InputFile(path.join(GUIDE_DIR, `guide-${n}.jpg`)), ...(i === 0 ? { caption, parse_mode: 'HTML' as const } : {}) }));
-    const sent = await ctx.replyWithMediaGroup(media);
-    if (!ids) {
-      const fresh = sent.map((m: any) => m.photo?.[m.photo.length - 1]?.file_id).filter(Boolean);
-      if (fresh.length === 4) await prisma.appKV.upsert({ where: { key: 'guide:fileids' }, create: { key: 'guide:fileids', value: JSON.stringify(fresh) }, update: { value: JSON.stringify(fresh) } }).catch(() => {});
-    }
-    await ctx.reply('Попробуйте прямо сейчас — первая смета займёт пару минут 👇', { reply_markup: appKb() });
+    const KEY = 'guide:video:v1';
+    const cached = await prisma.appKV.findUnique({ where: { key: KEY } }).catch(() => null);
+    const caption = '▶️ <b>Как пользоваться СМЕТА PRO — за минуту</b>\n\n1. «Сделать первую смету»\n2. Выберите работу\n3. Размер — цифры уже стоят\n4. Выберите материалы: эконом, стандарт или премиум\n5. PDF придёт в чат — перешлите заказчику\n6. Калькулятор для заказчиков — заявки с готовой сметой\n\nВопрос? Просто напишите его сюда — ответим.';
+    const kb = env.PUBLIC_URL ? new InlineKeyboard().webApp('🧾 Сделать смету', `${env.PUBLIC_URL}/`) : undefined;
+    const sent = await ctx.replyWithVideo(cached?.value || new InputFile(path.join(GUIDE_DIR, 'guide.mp4')), { caption, parse_mode: 'HTML', width: 1080, height: 1920, duration: 48, supports_streaming: true, reply_markup: kb });
+    const id = sent?.video?.file_id;
+    if (!cached && id) await prisma.appKV.upsert({ where: { key: KEY }, create: { key: KEY, value: id }, update: { value: id } }).catch(() => {});
   }
+  bot.callbackQuery('guidevideo', async (ctx) => { await ctx.answerCallbackQuery().catch(() => {}); await sendGuide(ctx).catch(() => ctx.reply('Не получилось отправить видео, попробуйте /guide')); });
 
   // ID для настройки администратора
   // Сводка для администратора: /stats — за сегодня, /stats 7 — за 7 дней
@@ -317,7 +317,7 @@ export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказч
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);
   if (me?.username) botInfo.username = me.username;
-  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }, { command: 'guide', description: 'Как сделать первую смету' }, { command: 'calc', description: 'Калькулятор для заказчиков' }, { command: 'help', description: 'Поддержка' }]);
+  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }, { command: 'guide', description: 'Видеоинструкция: как пользоваться' }, { command: 'calc', description: 'Калькулятор для заказчиков' }, { command: 'help', description: 'Поддержка' }]);
   // Тексты, которые видно до нажатия «Старт» и в профиле бота
   await bot.api.setMyDescription(BOT_DESCRIPTION).catch(() => {});
   await bot.api.setMyShortDescription(BOT_SHORT).catch(() => {});
