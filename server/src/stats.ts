@@ -22,6 +22,25 @@ export const REPORT_HOURS = [9, 14, 20];
 /** Получатели: ADMIN_TG_IDS, иначе — владелец */
 export const reportTo = () => (env.ADMIN_TG_IDS.length ? env.ADMIN_TG_IDS : ['503303776']);
 
+/**
+ * Наблюдатели: видят только статистику (/stats, /funnel, /users, /user, /smety, /top, /blocked и сводку 3 раза в день).
+ * Не админы: без бесплатного доступа, поддержки, Instagram и действий. Добавляет владелец: /viewer <ID>.
+ */
+const VKEY = 'stats:viewers';
+export async function statsViewers(): Promise<string[]> {
+  const r = await prisma.appKV.findUnique({ where: { key: VKEY } }).catch(() => null);
+  try { return r ? (JSON.parse(r.value) as string[]).filter((x) => /^\d{3,15}$/.test(x)) : []; } catch { return []; }
+}
+export async function setStatsViewers(ids: string[]) {
+  const v = JSON.stringify([...new Set(ids)]);
+  await prisma.appKV.upsert({ where: { key: VKEY }, create: { key: VKEY, value: v }, update: { value: v } });
+}
+/** Кто видит статистику: админы и наблюдатели */
+export async function canSeeStats(id?: number | string | null) {
+  if (id == null) return false;
+  return reportTo().includes(String(id)) || (await statsViewers()).includes(String(id));
+}
+
 async function adminUserIds() {
   const ids = reportTo().filter((x) => /^\d+$/.test(x)).map((x) => BigInt(x));
   return (await prisma.user.findMany({ where: { tgId: { in: ids } }, select: { id: true } })).map((u) => u.id);
@@ -116,7 +135,7 @@ export function startAdminReports(bot: any, log: { error: (o: any, m?: string) =
         try { await prisma.appKV.create({ data: { key: KEY, value: String(cur) } }); } catch { return; }
       }
       const text = await buildReport(new Date(prev), now);
-      for (const id of reportTo()) await bot.api.sendMessage(Number(id), text, { parse_mode: 'HTML' }).catch((e: any) => log.error({ err: e }, 'admin report send'));
+      for (const id of [...new Set([...reportTo(), ...(await statsViewers())])]) await bot.api.sendMessage(Number(id), text, { parse_mode: 'HTML' }).catch((e: any) => log.error({ err: e }, 'admin report send'));
     } catch (e) { log.error({ err: e }, 'admin report'); }
   };
   setInterval(tick, 60000);

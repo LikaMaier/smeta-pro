@@ -9,7 +9,7 @@
  */
 import type { Bot } from 'grammy';
 import { prisma } from './util';
-import { reportTo } from './stats';
+import { canSeeStats, statsViewers, setStatsViewers, reportTo } from './stats';
 import { activationText } from './activation';
 
 const MSK = 3 * 3600e3;
@@ -21,6 +21,8 @@ const num = (v: any) => Number(v) || 0;
 const BLK = 'blocked:';
 
 const isAdmin = (id?: number) => !!id && reportTo().includes(String(id));
+/** статистику видят и наблюдатели (/viewer), действия — только админы */
+const canSee = (id?: number) => canSeeStats(id);
 
 async function adminIds() {
   const ids = reportTo().filter((x) => /^\d+$/.test(x)).map((x) => BigInt(x));
@@ -75,7 +77,7 @@ export function attachAdminStats(bot: Bot) {
   });
 
   bot.command('users', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) return;
+    if (!(await canSee(ctx.from?.id))) return;
     const skip = await adminIds();
     const [users, blocked] = await Promise.all([
       prisma.user.findMany({
@@ -102,7 +104,7 @@ export function attachAdminStats(bot: Bot) {
   });
 
   bot.command('user', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) return;
+    if (!(await canSee(ctx.from?.id))) return;
     const u = await findUser(String(ctx.match || ''));
     if (!u) return ctx.reply('Напишите: /user 123456789 или /user @ник (ID есть в /users)');
     const [ests, days, pays, blocked, src, trade] = await Promise.all([
@@ -128,7 +130,7 @@ export function attachAdminStats(bot: Bot) {
   });
 
   bot.command('smety', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) return;
+    if (!(await canSee(ctx.from?.id))) return;
     const days = Math.min(90, Math.max(1, Number(String(ctx.match || '').trim()) || 7));
     const skip = await adminIds();
     const ests = await prisma.estimate.findMany({
@@ -146,7 +148,7 @@ export function attachAdminStats(bot: Bot) {
   });
 
   bot.command('top', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) return;
+    if (!(await canSee(ctx.from?.id))) return;
     const days = Math.min(365, Math.max(1, Number(String(ctx.match || '').trim()) || 30));
     const skip = await adminIds();
     const since = new Date(Date.now() - days * 864e5);
@@ -171,13 +173,13 @@ export function attachAdminStats(bot: Bot) {
 
   // /funnel [дни] — воронка активации: пришёл → открыл → смета → отправил → оплатил
   bot.command('funnel', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) return;
+    if (!(await canSee(ctx.from?.id))) return;
     const days = Math.min(365, Math.max(1, Number(String(ctx.match || '').trim()) || 30));
     await sendLong(ctx, await activationText(days));
   });
 
   bot.command('blocked', async (ctx) => {
-    if (!isAdmin(ctx.from?.id)) return;
+    if (!(await canSee(ctx.from?.id))) return;
     const b = await blockedMap();
     const users = b.size ? await prisma.user.findMany({ where: { tgId: { in: [...b.keys()].map((x) => BigInt(x)) } }, select: { firstName: true, username: true, tgId: true, createdAt: true, _count: { select: { estimates: true } } } }) : [];
     const total = await prisma.user.count();
@@ -187,6 +189,22 @@ export function attachAdminStats(bot: Bot) {
     }
     L.push('', '<i>Новые блокировки бот видит сам. Для тех, кто заблокировал раньше, нажмите «Проверить всех» — бот тихо проверит каждого.</i>');
     await sendLong(ctx, L.join('\n'), { reply_markup: { inline_keyboard: [[{ text: '🔎 Проверить всех', callback_data: 'adm:probe' }]] } });
+  });
+
+  // Наблюдатели статистики: /viewer 123456789 — добавить, /viewer del 123456789 — убрать, /viewers — список
+  bot.command(['viewer', 'viewers'], async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) return;
+    const [a, b] = String(ctx.match || '').trim().split(/\s+/);
+    let list = await statsViewers();
+    const id = /^\d{3,15}$/.test(a || '') ? a : /^\d{3,15}$/.test(b || '') ? b : '';
+    if (id && /^(del|удалить|-)$/i.test(a || '')) { list = list.filter((x) => x !== id); await setStatsViewers(list); }
+    else if (id) {
+      list = [...list, id]; await setStatsViewers(list);
+      await ctx.api.sendMessage(Number(id), '📊 Вам открыта статистика СМЕТА PRO.\n/stats — сводка за сегодня (/stats 7 — за неделю)\n/funnel — воронка: пришли → смета → отправили → оплатили\n/users · /smety · /top · /blocked\nСводка приходит сама в 9, 14 и 20 часов по Москве.').catch(() => ctx.reply('⚠️ Не смогла написать этому человеку: пусть сначала откроет бота и нажмёт «Старт».'));
+    } else if (a) return ctx.reply('Нужен Telegram ID цифрами. Человек может узнать его в боте командой /id.');
+    const names = await prisma.user.findMany({ where: { tgId: { in: list.map((x) => BigInt(x)) } }, select: { tgId: true, firstName: true, username: true } });
+    const who = (x: string) => { const u = names.find((n) => String(n.tgId) === x); return u ? `${u.firstName || ''}${u.username ? ` @${u.username}` : ''}`.trim() : 'ещё не заходил в бота'; };
+    await ctx.reply(`📊 <b>Видят статистику</b> (без прав администратора):\n${list.length ? list.map((x) => `• <code>${x}</code> — ${who(x)}`).join('\n') : '— пока никого'}\n\nДобавить: /viewer ID\nУбрать: /viewer del ID\nID человек узнаёт в боте командой /id.`, { parse_mode: 'HTML' });
   });
 
   // Разовая проверка всех: «печатает…» на секунду; если бот заблокирован, Telegram ответит ошибкой 403
