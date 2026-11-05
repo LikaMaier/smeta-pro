@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { get } from '../api';
 import { useMe } from '../App';
-import { Icon, useLoad } from '../components/ui';
+import { useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import Hero from '../components/Hero';
 import IgBonus from '../components/IgBonus';
@@ -22,9 +22,8 @@ export default function Home() {
 }
 
 /**
- * Главная — одно главное действие и четыре раздела:
- *  «Новая смета» (большая кнопка) → последние сметы → Объекты · Календарь · 3D и расчёты · Справочник и ещё.
- * Всё остальное — внутри разделов, чтобы новичок не терялся.
+ * Главная — просто: «Новая смета» (большая кнопка) → последняя смета → четыре плитки
+ *  Мои сметы · Объекты · Мои цены · Ещё. Календарь, финансы, 3D и прочее — внутри «Ещё».
  */
 function HomeMain() {
   const { me, refreshMe } = useMe();
@@ -57,18 +56,12 @@ function HomeMain() {
       </button>
 
 
-      <Link to="/calc-link" className="list-item panel mc-card">
-        <span style={{ fontSize: 24, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">🔥</span>
-        <div className="grow"><div className="title">Калькулятор для заказчиков</div><div className="xs muted">заказчик считает сам по вашим ценам — вам приходит заявка с готовой сметой</div></div>
-        <Icon.chevron className="chev" width={18} />
-      </Link>
-
       <IgBonus />
       <GuideVideo label="▶️ Видеоинструкция: как пользоваться" />
 
       {last.length > 0 && (
         <>
-          <div className="row between home-sec"><span>Продолжить</span><Link to="/estimates" className="xs">Все сметы →</Link></div>
+          <div className="row between home-sec"><span>Последняя смета</span></div>
           <div className="list">
             {last.map((e: any) => (
               <Link key={e.id} to={`/estimates/${e.id}`} className="list-item">
@@ -81,10 +74,10 @@ function HomeMain() {
       )}
 
       <div className="tiles" style={{ marginTop: 10 }}>
-        <Link className="tile" to="/projects">🏗 Объекты<small>{active ? `в работе: ${active}` : 'деньги, долги, контакты'}</small></Link>
-        <Link className="tile" to="/calendar">📅 Календарь<small>{remToday ? `напоминаний сегодня: ${remToday}` : 'фото, журнал, напоминания'}</small></Link>
-        <Link className="tile" to="/tools">📐 3D и расчёты<small>постройки, заборы, электрика, мастера</small></Link>
-        <Link className="tile" to="/more">📚 Справочник и ещё<small>цены, финансы, контакты, настройки</small></Link>
+        <Link className="tile" to="/estimates">📋 Мои сметы<small>все сметы и шаблоны</small></Link>
+        <Link className="tile" to="/projects">🏗 Объекты<small>{active ? `в работе: ${active}` : 'деньги и долги по объекту'}</small></Link>
+        <Link className="tile" to="/catalog">💰 Мои цены<small>расценки на работы и материалы</small></Link>
+        <Link className="tile" to="/more">☰ Ещё<small>{remToday ? `напоминаний сегодня: ${remToday}` : 'календарь, 3D, настройки'}</small></Link>
       </div>
     </>
   );

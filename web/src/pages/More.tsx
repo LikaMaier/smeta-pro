@@ -5,12 +5,12 @@ import { useMe } from '../App';
 import { tg } from '../tg';
 
 const ITEMS = [
-  { to: '/catalog', icon: Icon.book, title: 'Справочник цен', text: 'Мои расценки на работы и материалы' },
-  { to: '/finance', icon: Icon.money, title: 'Финансы', text: 'Прибыль и долги по всем объектам' },
-  { to: '/contacts', icon: Icon.book, title: 'Записная книжка', text: 'Все телефоны: заказчики, техника, рабочие' },
-  { to: '/reminders', icon: Icon.history, title: 'Напоминания', text: 'Бот напишет в нужное время' },
-  { to: '/tools', icon: Icon.calc, title: '3D и расчёты', text: 'Постройки, заборы, электрика, мастера, калькуляторы' },
-  { to: '/settings', icon: Icon.gear, title: 'Настройки и подписка', text: 'Тариф, оформление, логотип, реквизиты' },
+  { to: '/calendar', icon: '📅', title: 'Календарь', text: 'Что сделано за день, фото, деньги' },
+  { to: '/reminders', icon: '⏰', title: 'Напоминания', text: 'Бот напишет в нужное время' },
+  { to: '/finance', icon: '💵', title: 'Финансы', text: 'Прибыль и долги по всем объектам' },
+  { to: '/contacts', icon: '📒', title: 'Записная книжка', text: 'Телефоны заказчиков, техники, рабочих' },
+  { to: '/tools', icon: '📐', title: '3D и расчёты', text: 'Постройки, заборы, электрика, калькуляторы' },
+  { to: '/settings', icon: '⚙️', title: 'Настройки и подписка', text: 'Тариф, логотип, реквизиты' },
 ];
 
 export default function More() {
@@ -21,18 +21,18 @@ export default function More() {
   };
   return (
     <>
-      <h1 className="page-title">Справочник и ещё</h1>
+      <h1 className="page-title">Ещё</h1>
       <div className="list">
         {ITEMS.map((i) => (
           <Link key={i.to} to={i.to} className="list-item">
-            <i.icon width={24} style={{ color: 'var(--accent)', flex: 'none' }} />
+            <span style={{ fontSize: 22, width: 24, textAlign: 'center', flex: 'none' }} aria-hidden="true">{i.icon}</span>
             <div className="grow"><div className="title">{i.title}</div><div className="xs muted">{i.text}</div></div>
             <Icon.chevron className="chev" width={18} />
           </Link>
         ))}
         <button className="list-item" onClick={() => { const u = (me.supportLink || 'https://t.me/CMETA_Pro_bot?start=help').replace(/start=help$/, 'start=guide'); if (tg?.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank'); }} style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}>
           <span style={{ fontSize: 22, width: 24, textAlign: 'center', flex: 'none' }} aria-hidden="true">📖</span>
-          <div className="grow"><div className="title">Как сделать первую смету</div><div className="xs muted">Инструкция в 4 картинках — придёт в чат с ботом</div></div>
+          <div className="grow"><div className="title">Видеоинструкция</div><div className="xs muted">Как сделать смету — 1 минута, придёт в чат с ботом</div></div>
           <Icon.chevron className="chev" width={18} />
         </button>
         <button className="list-item" onClick={support} style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}>

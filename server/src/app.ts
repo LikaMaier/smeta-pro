@@ -27,7 +27,7 @@ import { designerRoutes } from './routes/designer';
 import { teamRoutes } from './routes/team';
 import { promoRoutes } from './routes/promo';
 import { materialsRoutes } from './routes/materials';
-import { calcRoutes } from './routes/calc';
+import { botLink } from './botInfo';
 
 declare module 'fastify' {
   interface FastifyRequest { user: User }
@@ -81,7 +81,8 @@ export async function buildApp(opts: { bot?: any; logger?: boolean } = {}): Prom
   await app.register(teamRoutes, { bot: opts.bot });
   await app.register(promoRoutes);
   await app.register(materialsRoutes);
-  await app.register(calcRoutes, { bot: opts.bot }); // калькулятор для заказчиков: /k/<ссылка мастера>
+  // калькулятор для заказчиков убран (05.11.2026): старые ссылки /k/… ведут в бота
+  app.get('/k/*', async (_req, reply) => reply.redirect(botLink()));
 
   // Telegram webhook
   if (opts.bot && env.PUBLIC_URL) {

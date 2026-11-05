@@ -73,7 +73,7 @@ export function createBot() {
   const newcomerKb = () => {
     const kb = new InlineKeyboard().webApp('🧾 Сделать первую смету — 2 минуты', `${env.PUBLIC_URL}/`).row();
     TRADES.forEach((t, i) => { kb.webApp(t.label, `${env.PUBLIC_URL}/?t=${t.id}`); if (i % 2 === 1) kb.row(); });
-    return kb.text('▶️ Видеоинструкция — 1,5 минуты', 'guidevideo');
+    return kb.text('▶️ Видеоинструкция — 1 минута', 'guidevideo');
   };
   // PDF сметы прямо в чат — кнопка под напоминанием «смета готова, но заказчику не ушла»
   bot.callbackQuery(/^pdf:([\w-]{10,40})$/, async (ctx) => {
@@ -104,13 +104,13 @@ export function createBot() {
   bot.hears(/^(как начать|инструкция|видео|видеоинструкция|как пользоваться)\??$/i, (ctx) => sendGuide(ctx).catch(() => {}));
 
   /** «Как сделать первую смету — 4 шага»: альбом с настоящими экранами; file_id кэшируем после первой отправки */
-  /** Видеоинструкция (86 с, на примере штукатурки): от «Сделать первую смету» до PDF заказчику и калькулятора; file_id кэшируем после первой отправки */
+  /** Видеоинструкция (75 с, на примере штукатурки): от «Сделать первую смету» до PDF заказчику; file_id кэшируем после первой отправки */
   async function sendGuide(ctx: any) {
-    const KEY = 'guide:video:v2';
+    const KEY = 'guide:video:v3';
     const cached = await prisma.appKV.findUnique({ where: { key: KEY } }).catch(() => null);
-    const caption = '▶️ <b>Как пользоваться СМЕТА PRO — на примере штукатурки стен</b>\n\n1. «Сделать первую смету» → «Штукатурка стен»\n2. Размер комнаты — цифры уже стоят\n3. Галочки: откосы, машинная, шпаклёвка\n4. Смета готова → «Поменять цены и позиции»\n5. «Часто забывают» — забытая работа одним нажатием\n6. Своя работа или свой материал: «Пустая строка» → «⋯» → название, количество, цена\n7. «PDF в Telegram» — и перешлите заказчику\n8. Калькулятор для заказчиков — заявки с готовой сметой\n\nВопрос? Просто напишите его сюда — ответим.';
+    const caption = '▶️ <b>Как пользоваться СМЕТА PRO — на примере штукатурки стен</b>\n\n1. «Сделать первую смету» → «Штукатурка стен»\n2. Размер комнаты — цифры уже стоят\n3. Галочки: откосы, машинная, шпаклёвка\n4. Смета готова → «Поменять цены и позиции»\n5. «Часто забывают» — забытая работа одним нажатием\n6. Своя работа или свой материал: «Пустая строка» → «⋯» → название, количество, цена\n7. «PDF в Telegram» — и перешлите заказчику\n\nВопрос? Просто напишите его сюда — ответим.';
     const kb = env.PUBLIC_URL ? new InlineKeyboard().webApp('🧾 Сделать смету', `${env.PUBLIC_URL}/`) : undefined;
-    const sent = await ctx.replyWithVideo(cached?.value || new InputFile(path.join(GUIDE_DIR, 'guide.mp4')), { caption, parse_mode: 'HTML', width: 1080, height: 1920, duration: 86, supports_streaming: true, reply_markup: kb });
+    const sent = await ctx.replyWithVideo(cached?.value || new InputFile(path.join(GUIDE_DIR, 'guide.mp4')), { caption, parse_mode: 'HTML', width: 1080, height: 1920, duration: 75, supports_streaming: true, reply_markup: kb });
     const id = sent?.video?.file_id;
     if (!cached && id) await prisma.appKV.upsert({ where: { key: KEY }, create: { key: KEY, value: id }, update: { value: id } }).catch(() => {});
   }
@@ -139,10 +139,6 @@ export function createBot() {
   });
 
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
-  // калькулятор для заказчиков: личная ссылка мастера — заявки с готовой сметой
-  bot.command(['calc', 'kalk'], (ctx) => ctx.reply('🔥 <b>Калькулятор для ваших заказчиков</b>\nЗаказчик по ссылке сам выбирает работу и размер, видит цену по вашим ценам и оставляет телефон. Вам — заявка сюда и готовая смета в приложении.', {
-    parse_mode: 'HTML', reply_markup: env.PUBLIC_URL ? new InlineKeyboard().webApp('Получить мою ссылку', `${env.PUBLIC_URL}/calc-link`) : undefined,
-  }));
   // бонус за подписку на Instagram: +12 дней «Про»
   const sendBonus = async (ctx: any) => {
     if (!ctx.from) return;
@@ -317,7 +313,7 @@ export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказч
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);
   if (me?.username) botInfo.username = me.username;
-  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }, { command: 'guide', description: 'Видеоинструкция: как пользоваться' }, { command: 'calc', description: 'Калькулятор для заказчиков' }, { command: 'help', description: 'Поддержка' }]);
+  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }, { command: 'guide', description: 'Видеоинструкция: как пользоваться' }, { command: 'help', description: 'Поддержка' }]);
   // Тексты, которые видно до нажатия «Старт» и в профиле бота
   await bot.api.setMyDescription(BOT_DESCRIPTION).catch(() => {});
   await bot.api.setMyShortDescription(BOT_SHORT).catch(() => {});

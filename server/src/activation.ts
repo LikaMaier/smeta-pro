@@ -88,7 +88,6 @@ export async function activationText(days = 30) {
     `👷 Специальности: ${Object.entries(s.trades).sort((a: any, b: any) => b[1] - a[1]).map(([k, v]) => `${k} — ${v}`).join(', ') || '—'}`,
     `Пустых смет: ${s.emptyEstimates} из ${s.estimatesTotal}`];
   const w = s.wizard;
-  if (s.calc?.views) L.push('', `🔥 <b>Калькулятор для заказчиков</b>: у ${s.calc.builders} мастеров открыли ${s.calc.views} раз, заявок — ${s.calc.leads}`);
   if (w?.opened) L.push('', `🪄 <b>Первая смета за 3 шага</b>: открыли ${w.opened} → выбрали работу ${w.picked} → увидели смету ${w.result} → PDF ${w.pdf} · ссылкой ${w.link} · тарифы ${w.offer} · пропустили ${w.skip}`);
   return L.join('\n');
 }

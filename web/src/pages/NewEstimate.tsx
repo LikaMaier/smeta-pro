@@ -59,19 +59,10 @@ export default function NewEstimate() {
     const t = TRADES.find((x) => x.dir === fromBot);
     return <Navigate to={t ? `/?t=${t.id}` : '/'} replace />;
   }
-  const quick = (
-    <Link to="/first" className="list-item panel fw-quick">
-      <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">⚡</span>
-      <div className="grow"><div className="title">Быстро: работа → размер → смета</div><div className="xs muted">3 шага, крупно и без лишних вопросов</div></div>
-      <Icon.chevron className="chev" width={18} />
-    </Link>
-  );
-
   // ---------- шаг 1: направление ----------
   if (!dir) {
     return (
       <>
-        {quick}
         <p className="muted" style={{ marginTop: 0 }}>Чем занимаетесь? Выберите направление — дальше вид работы и готовая смета с ценами.</p>
         <SearchBox value={q} onChange={setQ} placeholder="Или найдите: септик, стяжка, кровля…" />
         {qs.length >= 2 && (

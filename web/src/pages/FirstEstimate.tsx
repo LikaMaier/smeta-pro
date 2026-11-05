@@ -236,10 +236,6 @@ export default function FirstEstimate({ onSkip }: { onSkip?: () => void }) {
       {sent && <button className="btn primary block lg" onClick={() => (tg?.close ? tg.close() : nav(`/estimates/${made!.id}`))}>💬 Открыть чат с PDF</button>}
       <button className={`btn block${sent ? '' : ' primary lg'}`} disabled={busy} onClick={shareLink}>🔗 Отправить ссылкой — заказчик согласует одной кнопкой</button>
       <button className="btn block" onClick={() => nav(`/estimates/${made!.id}`)}>✏️ Открыть смету: заказчик, цены, договор</button>
-      <button className="fw-calc" onClick={() => nav('/calc-link')}>
-        <span className="i" aria-hidden="true">🔥</span>
-        <span><span className="t">Бонус: калькулятор для ваших заказчиков</span><br /><span className="s">Ссылка в объявление или WhatsApp: заказчик сам посчитает по вашим ценам и оставит телефон — заявка придёт сюда</span></span>
-      </button>
       <Offer onGo={() => { ev('fw_offer', job.id); nav('/settings'); }} />
       <button className="fw-more" onClick={() => { setStep('job'); setMade(null); setSent(false); }}>+ Посчитать ещё одну работу</button>
     </div>
@@ -340,7 +336,7 @@ function Offer({ onGo }: { onGo: () => void }) {
 }
 
 /** «Как это работает — видео за минуту»: та же видеоинструкция, что присылает бот (/guide) */
-export function GuideVideo({ label = '▶️ Как это работает — видео, 1,5 минуты' }: { label?: string }) {
+export function GuideVideo({ label = '▶️ Как это работает — видео, 1 минута' }: { label?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
