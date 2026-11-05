@@ -29,6 +29,7 @@ import SitePlan from './pages/SitePlan';
 import MepDesigner from './pages/MepDesigner';
 import Tools from './pages/Tools';
 import NewEstimate from './pages/NewEstimate';
+import FirstEstimate from './pages/FirstEstimate';
 import Contacts from './pages/Contacts';
 import { applyTheme } from './theme';
 import { Offers } from './components/Pay';
@@ -36,6 +37,8 @@ import { PRICES } from '../../shared/plans';
 
 export interface Me {
   id: string; firstName?: string; companyName?: string | null; contacts?: string | null; requisites?: Record<string, any> | null;
+  /** смет за всё время (0 — первый вход: «Первая смета за 3 шага»); специальность из бота */
+  estimatesTotal?: number; trade?: string | null;
   aiEnabled: boolean; aiAvailable: boolean; aiWish?: boolean; promo?: { code: string; discountPct: number } | null; isAdmin: boolean; supportLink?: string; refLink?: string; igBonus?: { days: number; done: boolean; code: string | null; ig: string; url: string } | null; theme?: string; designPrices?: Record<string, number> | null; pay?: { yookassa: boolean; receipt: boolean };
   access: { active: boolean; mode: 'trial' | 'subscription' | 'team' | 'expired' | 'free' | 'admin'; tier?: 'free' | 'lite' | 'pro' | 'team'; until: string; daysLeft: number; freeEstimateLeft: boolean; freeLeft?: number; freeLimit?: number; freeEstimateIds?: string[]; paidEstimateIds?: string[]; estimateCount?: number };
   plan?: { tier: 'free' | 'lite' | 'pro' | 'team'; label: string; aiLimit: number; aiUsed: number; extraDesigns: number; extraUntil?: string | null; studioUntil?: string | null; offer?: { pct: number; until: string } | null; team: 'owner' | 'member' | null };
@@ -51,7 +54,7 @@ function titleOf(path: string): string {
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
     estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', new: 'Новая смета', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D', admin: 'Статистика',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', new: 'Новая смета', first: 'Смета за 3 шага', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D', admin: 'Статистика',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[2] === 'acts') return 'Акты';
@@ -96,7 +99,8 @@ function TgBack() {
   const nav = useNavigate();
   useEffect(() => {
     if (!tg?.BackButton) return;
-    const back = () => nav(-1);
+    // открыли сразу вложенный экран (кнопка бота) — истории нет, «Назад» ведёт на главную, а не в никуда
+    const back = () => ((window.history.state?.idx ?? 0) > 0 ? nav(-1) : nav('/', { replace: true }));
     if (ROOTS.includes(loc.pathname)) tg.BackButton.hide(); else tg.BackButton.show();
     tg.BackButton.onClick(back);
     return () => tg.BackButton.offClick(back);
@@ -180,6 +184,7 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/more" element={<More />} />
               <Route path="/tools" element={<Tools />} />
               <Route path="/new" element={<NewEstimate />} />
+              <Route path="/first" element={<FirstEstimate />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/reminders" element={<Reminders />} />
               <Route path="/contacts" element={<Contacts />} />

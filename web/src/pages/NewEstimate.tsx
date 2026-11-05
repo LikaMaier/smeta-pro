@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
 import { useMe } from '../App';
 import { Fold, Icon, SearchBox, useLoad, useToast } from '../components/ui';
@@ -7,6 +7,7 @@ import { rub0 } from '../format';
 import { DIRECTIONS, getDirection, searchKinds, type WorkKind } from '../../../shared/directions';
 import { TEMPLATES, TEMPLATE_GROUPS } from '../../../shared/templates';
 import { ImportButton } from './Estimates';
+import { TRADES } from '../../../shared/trades';
 
 const DIR_KEY = 'smeta_dir';
 const readDir = () => { try { return localStorage.getItem(DIR_KEY); } catch { return null; } };
@@ -52,10 +53,25 @@ export default function NewEstimate() {
   const openKind = (k: WorkKind) => (k.template ? create({ templateId: k.template }) : nav(k.to!));
   const own = () => create({ title: dir ? `${dir.title}: смета` : 'Новая смета' }, '?add=1');
 
+  // старые кнопки бота (/new?dir=…) у того, кто ещё не сделал ни одной сметы — в простой мастер на 3 шага
+  const fromBot = new URLSearchParams(location.search).get('dir');
+  if (fromBot && me.estimatesTotal === 0) {
+    const t = TRADES.find((x) => x.dir === fromBot);
+    return <Navigate to={t ? `/?t=${t.id}` : '/'} replace />;
+  }
+  const quick = (
+    <Link to="/first" className="list-item panel fw-quick">
+      <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">⚡</span>
+      <div className="grow"><div className="title">Быстро: работа → размер → смета</div><div className="xs muted">3 шага, крупно и без лишних вопросов</div></div>
+      <Icon.chevron className="chev" width={18} />
+    </Link>
+  );
+
   // ---------- шаг 1: направление ----------
   if (!dir) {
     return (
       <>
+        {quick}
         <p className="muted" style={{ marginTop: 0 }}>Чем занимаетесь? Выберите направление — дальше вид работы и готовая смета с ценами.</p>
         <SearchBox value={q} onChange={setQ} placeholder="Или найдите: септик, стяжка, кровля…" />
         {qs.length >= 2 && (

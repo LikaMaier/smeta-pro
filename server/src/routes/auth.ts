@@ -4,7 +4,7 @@ import { FREE_ESTIMATES } from '../../../shared/access';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { env } from '../env';
-import { prisma, plain, accessOf, HttpError, freeCtx } from '../util';
+import { prisma, plain, accessOf, HttpError, freeCtx, audit } from '../util';
 import { TIERS, monthKey } from '../../../shared/plans';
 import { applyPromo, findPromo } from './promo';
 import { verifyInitData, signSession } from '../auth';
@@ -16,6 +16,7 @@ import { brandUrl } from './brand';
 const THEME_IDS = ['blueprint', 'brick', 'concrete', 'rebar', 'wood', 'topo', 'hazard', 'paving'];
 import { botLink } from '../botInfo';
 import { mskDay } from '../stats';
+import { tradeOf } from '../../../shared/trades';
 
 /** Кто пригласил: payload вида ref_<id пользователя> из /start или startapp */
 async function referrerId(payload?: string | null) {
@@ -66,10 +67,15 @@ export async function meView(user: any) {
   const free = await freeCtx(user.id, user.extraEstimates);
   const acc = accessOf(user);
   const aiWish = Boolean(await prisma.auditLog.findFirst({ where: { userId: user.id, entity: 'ai', action: { in: ['wish', 'wish_notified'] } }, select: { id: true } }));
+  // для первого входа: смет ещё не было (за всё время, а не за месяц) → «Первая смета за 3 шага»; специальность — из бота
+  const [estimatesTotal, tradeKV] = await Promise.all([
+    prisma.estimate.count({ where: { userId: user.id, isTemplate: false } }),
+    prisma.appKV.findUnique({ where: { key: `trade:${user.tgId}` } }).catch(() => null),
+  ]);
   return plain({
     id: user.id, tgId: user.tgId, firstName: user.firstName, username: user.username,
     companyName: user.companyName, contacts: user.contacts, requisites: (user as any).requisites || null, aiEnabled: user.aiEnabled, theme: user.themeChosen && THEME_IDS.includes(user.theme) ? user.theme : 'blueprint',
-    aiAvailable: Boolean(env.AI_PROVIDER), aiWish,
+    aiAvailable: Boolean(env.AI_PROVIDER), aiWish, estimatesTotal, trade: tradeKV?.value || null,
     promo: user.promoCode ? await findPromo(user.promoCode).then((p) => (p ? { code: p.code, discountPct: p.discountPct } : null)) : null,
     access: { ...acc, freeEstimateLeft: free.estimateCount < free.limit, freeLeft: Math.max(0, free.limit - free.estimateCount), freeLimit: free.limit, freeEstimateIds: free.freeEstimateIds, paidEstimateIds: free.paidEstimateIds, estimateCount: free.estimateCount },
     plan: {
@@ -114,6 +120,14 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get('/api/me', async (req) => meView(req.user));
 
+  // шаги «Первой сметы за 3 шага» — только счётчики для воронки (/funnel), без содержимого
+  const EV = ['fw_open', 'fw_job', 'fw_result', 'fw_pdf', 'fw_link', 'fw_offer', 'fw_skip'] as const;
+  app.post('/api/ev', async (req) => {
+    const b = z.object({ e: z.enum(EV), job: z.string().max(40).optional() }).parse(req.body);
+    await audit(req.user.id, 'wizard', req.user.id, b.e, b.job ? { job: b.job } : undefined);
+    return { ok: true };
+  });
+
   // «Приведи друга»: сколько пришло и сколько оплатили
   app.get('/api/referrals', async (req) => {
     const [invited, paid] = await Promise.all([
@@ -139,8 +153,13 @@ export async function authRoutes(app: FastifyInstance) {
         head: z.string().max(120).optional(), vat: z.boolean().optional(),
       }).nullable().optional(),
       designPrices: z.record(z.string().max(40), z.number().positive().max(1e8)).nullable().optional(),
+      trade: z.string().max(20).optional(), // «Чем занимаетесь?» — кнопка в боте открыла приложение сразу
     }).parse(req.body);
-    const { designPrices, requisites, ...rest } = body;
+    const { designPrices, requisites, trade, ...rest } = body;
+    if (trade && tradeOf(trade)) {
+      const key = `trade:${req.user.tgId}`;
+      await prisma.appKV.upsert({ where: { key }, create: { key, value: trade }, update: { value: trade } }).catch(() => {});
+    }
     const user = await prisma.user.update({ where: { id: req.user.id }, data: { ...rest, ...(requisites !== undefined ? { requisites: requisites === null ? Prisma.DbNull : requisites } : {}), ...(body.theme ? { themeChosen: true } : {}), ...(designPrices !== undefined ? { designPrices: designPrices === null ? Prisma.DbNull : designPrices } : {}) } });
     return meView(user);
   });

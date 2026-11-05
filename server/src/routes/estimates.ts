@@ -7,6 +7,7 @@ import { runImport, pdfData, renderPdf, renderXlsx, fileLink, checkSig, fileName
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { getTemplate } from '../../../shared/templates';
 import { compositionFor } from '../../../shared/compositions';
+import { normName } from '../../../shared/names';
 
 const STATUSES = ['draft', 'sent', 'approved', 'rejected', 'archived'] as const;
 const nonneg = z.coerce.number().min(0, 'не может быть отрицательным');
@@ -128,35 +129,51 @@ export async function estimateNumber(userId: string, e: any) {
   return prisma.estimate.count({ where: { userId, isTemplate: false, createdAt: { lte: e.createdAt } } });
 }
 
+// ---- Файлы: PDF сметы, акт выполненных работ, Excel (для заказчика и для себя) ----
+const KINDS = ['pdf', 'act', 'contract', 'xlsx', 'xlsxown'] as const;
+type EKind = typeof KINDS[number];
+const PAID: EKind[] = ['act', 'contract', 'xlsx', 'xlsxown']; // бесплатно — только PDF первой сметы
+async function buildFile(e: any, user: any, kind: EKind, actDate?: string) {
+  const number = await estimateNumber(user.id, e);
+  if (kind === 'xlsx' || kind === 'xlsxown') {
+    return { buf: await renderXlsx(xlsxEstimateData(e, user, number, kind === 'xlsxown')), name: fileName(kind === 'xlsxown' ? `${e.title} (для себя)` : e.title, 'xlsx'),
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+  }
+  const free = !accessOf(user).active && !e.paidAt && !(await freeCtx(user.id)).paidEstimateIds.includes(e.id); // пометка — только у бесплатных смет
+  const data: any = pdfData(e, user, number, free, await estimatePaid(e));
+  if (kind === 'act') Object.assign(data, { docType: 'act', actDate: actDate || new Date().toISOString().slice(0, 10) });
+  if (kind === 'contract') Object.assign(data, { docType: 'contract', contractDate: actDate || new Date().toISOString().slice(0, 10) });
+  const title = kind === 'act' ? `Акт — ${e.title}` : kind === 'contract' ? `Договор — ${e.title}` : e.title;
+  return { buf: await renderPdf(data), name: fileName(title, 'pdf'), type: 'application/pdf' };
+}
+const CAPTION: Record<EKind, (e: any) => string> = {
+  pdf: (e) => `Смета «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Перешлите заказчику.`,
+  act: (e) => `Акт выполненных работ по смете «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Распечатайте в 2 экземплярах и подпишите с заказчиком.`,
+  contract: (e) => `Договор подряда по смете «${e.title}» — смета приложена. Проверьте условия, распечатайте в 2 экземплярах и подпишите с заказчиком.`,
+  xlsx: (e) => `Смета «${e.title}» в Excel — для заказчика (без себестоимости).`,
+  xlsxown: (e) => `Смета «${e.title}» в Excel — для себя: себестоимость и прибыль. Заказчику не пересылайте.`,
+};
+
+/**
+ * PDF сметы — в чат с ботом по кнопке под сообщением бота (без входа в приложение).
+ * Правила те же, что в приложении: без подписки — только сметы из бесплатного лимита.
+ * Возвращает false, если смета не входит в бесплатные (нужен тариф).
+ */
+export async function sendEstimatePdf(bot: any, user: any, estimateId: string): Promise<boolean> {
+  const e = await loadEstimate(user.id, estimateId);
+  if (!accessOf(user).active && !(await freeCtx(user.id, user.extraEstimates)).freeEstimateIds.includes(e.id)) return false;
+  const f = await buildFile(e, user, 'pdf');
+  const { InputFile } = await import('grammy');
+  await bot.api.sendDocument(Number(user.tgId), new InputFile(f.buf, f.name), { caption: CAPTION.pdf(e) });
+  await audit(user.id, 'estimate', e.id, 'pdf_sent', { via: 'bot' });
+  return true;
+}
+
 export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } = {}) {
   app.get('/api/templates', async () => (await import('../../../shared/templates')).TEMPLATES.map((t) => ({ id: t.id, title: t.title, description: t.description, lines: t.lines.length })));
 
-  // ---- Файлы: PDF сметы, акт выполненных работ, Excel (для заказчика и для себя) ----
-  const KINDS = ['pdf', 'act', 'contract', 'xlsx', 'xlsxown'] as const;
-  type EKind = typeof KINDS[number];
-  const PAID: EKind[] = ['act', 'contract', 'xlsx', 'xlsxown']; // бесплатно — только PDF первой сметы
   const needPaid = (user: any, kind: EKind) => {
     if (PAID.includes(kind)) needDocs(user);
-  };
-  async function buildFile(e: any, user: any, kind: EKind, actDate?: string) {
-    const number = await estimateNumber(user.id, e);
-    if (kind === 'xlsx' || kind === 'xlsxown') {
-      return { buf: await renderXlsx(xlsxEstimateData(e, user, number, kind === 'xlsxown')), name: fileName(kind === 'xlsxown' ? `${e.title} (для себя)` : e.title, 'xlsx'),
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
-    }
-    const free = !accessOf(user).active && !e.paidAt && !(await freeCtx(user.id)).paidEstimateIds.includes(e.id); // пометка — только у бесплатных смет
-    const data: any = pdfData(e, user, number, free, await estimatePaid(e));
-    if (kind === 'act') Object.assign(data, { docType: 'act', actDate: actDate || new Date().toISOString().slice(0, 10) });
-    if (kind === 'contract') Object.assign(data, { docType: 'contract', contractDate: actDate || new Date().toISOString().slice(0, 10) });
-    const title = kind === 'act' ? `Акт — ${e.title}` : kind === 'contract' ? `Договор — ${e.title}` : e.title;
-    return { buf: await renderPdf(data), name: fileName(title, 'pdf'), type: 'application/pdf' };
-  }
-  const CAPTION: Record<EKind, (e: any) => string> = {
-    pdf: (e) => `Смета «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Перешлите заказчику.`,
-    act: (e) => `Акт выполненных работ по смете «${e.title}» — ${estimateTotals(e).total.toLocaleString('ru-RU')} ₽. Распечатайте в 2 экземплярах и подпишите с заказчиком.`,
-    contract: (e) => `Договор подряда по смете «${e.title}» — смета приложена. Проверьте условия, распечатайте в 2 экземплярах и подпишите с заказчиком.`,
-    xlsx: (e) => `Смета «${e.title}» в Excel — для заказчика (без себестоимости).`,
-    xlsxown: (e) => `Смета «${e.title}» в Excel — для себя: себестоимость и прибыль. Заказчику не пересылайте.`,
   };
   const kindParam = z.object({ kind: z.enum(KINDS) });
 
@@ -257,6 +274,9 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       fromId: z.string().optional(), templateId: z.string().optional(),
       // «Быстрая смета»: строки из описания работ — цены свои из справочника, иначе примерные
       quick: z.array(z.object({ name: z.string().trim().min(1).max(300), qty: nonneg.max(1e9), unit: z.string().trim().min(1).max(30), category: z.string().max(100).nullable().optional() })).max(300).optional(),
+      // готовые строки («Первая смета за 3 шага»): смета создаётся сразу со строками — без пустых смет при обрыве связи
+      lines: z.array(lineSchema).min(1).max(500).optional(),
+      wizard: z.string().trim().max(40).optional(),
     }).parse(req.body);
     await checkProject(req.user.id, body.projectId);
     if (body.templateId) {
@@ -284,6 +304,25 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       await audit(req.user.id, 'estimate', e.id, 'create', { quick: body.quick.length });
       return view(e);
     }
+    if (body.lines?.length) {
+      // свои цены из справочника важнее расчётных (как в «Добавить в смету» у мастера)
+      const items = await prisma.catalogItem.findMany({ where: { userId: req.user.id, deletedAt: null, active: true } });
+      const own = new Map(items.map((i) => [normName(i.name), i]));
+      const e = await prisma.estimate.create({
+        data: {
+          userId: req.user.id, title: body.title || 'Новая смета', source: body.wizard ? 'wizard' : 'manual', projectId: body.projectId || null, customer: body.customer || null,
+          lines: {
+            create: body.lines.map(({ id: _i, ...l }, i) => {
+              const it = own.get(normName(l.name));
+              return it ? { ...l, price: num(it.price), costPrice: it.costPrice == null ? l.costPrice ?? null : num(it.costPrice), catalogItemId: it.id, note: null, unconfirmed: false, position: i } : { ...l, position: i };
+            }),
+          },
+        },
+        include: { lines: { orderBy: { position: 'asc' } } },
+      });
+      await audit(req.user.id, 'estimate', e.id, 'create', { wizard: body.wizard || null, lines: body.lines.length });
+      return view(e);
+    }
     if (body.fromId) {
       // создать из шаблона или копии другой сметы
       const src = await loadEstimate(req.user.id, body.fromId);
@@ -295,7 +334,7 @@ export async function estimateRoutes(app: FastifyInstance, opts: { bot?: any } =
       await audit(req.user.id, 'estimate', e.id, 'create', { fromId: src.id });
       return view(e);
     }
-    const { fromId, templateId, ...data } = body;
+    const { fromId, templateId, quick: _q, lines: _l, wizard: _w, ...data } = body;
     const e = await prisma.estimate.create({ data: { ...jsonFields(data), title: data.title || 'Новая смета', userId: req.user.id }, include: { lines: true } });
     await audit(req.user.id, 'estimate', e.id, 'create');
     return view(e);

@@ -19,6 +19,8 @@ import { attachInstagram } from './instagram';
 import { attachThreads } from './threads';
 import { attachAdminStats } from './adminStats';
 import { bonusCode, bonusDone, bonusHowTo, igUrl, igUsername, IG_BONUS_DAYS } from './igBonus';
+import { sendEstimatePdf } from './routes/estimates';
+import { FREE_ESTIMATES } from '../../shared/access';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -57,17 +59,32 @@ export function createBot() {
         return ctx.reply(r.already ? `Вы уже в бригаде «${esc(r.owner)}».` : `👷 Вы в бригаде «${esc(r.owner)}». Доступ уровня «Бригада» и общий справочник цен уже у вас.`, { parse_mode: 'HTML', reply_markup: appKb() });
       } catch (e: any) { await ctx.reply(`Не получилось вступить в бригаду: ${e.message}`); }
     }
+    // новичку — одно короткое сообщение: каждая кнопка сразу открывает «Первую смету за 3 шага» (без лишнего шага в чате)
+    if (u && env.PUBLIC_URL && Date.now() - new Date(u.createdAt).getTime() < 5 * 60e3) {
+      await prisma.appKV.create({ data: { key: `guide:${ctx.from!.id}`, value: '1' } }).catch(() => {});
+      return ctx.reply(newcomerText(u), { parse_mode: 'HTML', reply_markup: newcomerKb() });
+    }
     const wkb = appKb();
     if (wkb && u && !(await bonusDone(u.id)) && !accessOf(u).mode.match(/subscription|team|admin/)) wkb.row().text(`🎁 +${IG_BONUS_DAYS} дней бесплатно`, 'igbonus');
     await ctx.reply(welcomeText(u), { parse_mode: 'HTML', reply_markup: wkb });
-    // новичку — один вопрос «Чем занимаетесь?»: по ответу сразу открываем нужного мастера (инструкция — позже, если не начал)
-    if (u && ctx.from && Date.now() - new Date(u.createdAt).getTime() < 5 * 60e3) {
-      const first = await prisma.appKV.create({ data: { key: `guide:${ctx.from.id}`, value: '1' } }).then(() => true).catch(() => false);
-      if (first) {
-        const kb = new InlineKeyboard();
-        TRADES.forEach((t, i) => { kb.text(t.label, `trade:${t.id}`); if (i % 2 === 1) kb.row(); });
-        await ctx.reply('👷 <b>Чем вы занимаетесь?</b>\nВыберите — сразу открою нужный расчёт, первая смета будет готова за пару минут.', { parse_mode: 'HTML', reply_markup: kb }).catch(() => {});
-      }
+  });
+  /** «Сделать смету» во всю ширину + специальности по две в ряд — всё открывает приложение одним нажатием */
+  const newcomerKb = () => {
+    const kb = new InlineKeyboard().webApp('🧾 Сделать первую смету — 2 минуты', `${env.PUBLIC_URL}/`).row();
+    TRADES.forEach((t, i) => { kb.webApp(t.label, `${env.PUBLIC_URL}/?t=${t.id}`); if (i % 2 === 1) kb.row(); });
+    return kb;
+  };
+  // PDF сметы прямо в чат — кнопка под напоминанием «смета готова, но заказчику не ушла»
+  bot.callbackQuery(/^pdf:([\w-]{10,40})$/, async (ctx) => {
+    const user = ctx.from ? await prisma.user.findUnique({ where: { tgId: BigInt(ctx.from.id) } }).catch(() => null) : null;
+    if (!user) return ctx.answerCallbackQuery({ text: 'Сначала откройте приложение командой /start' }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: 'Готовлю PDF…' }).catch(() => {});
+    try {
+      const ok = await sendEstimatePdf(bot, user, ctx.match![1]);
+      if (ok) await ctx.reply('☝️ Вот смета. Нажмите на файл → «Переслать» → выберите заказчика.\nИли отправьте ссылкой — заказчик откроет без Telegram и нажмёт «Согласовать».', { reply_markup: env.PUBLIC_URL ? new InlineKeyboard().webApp('🔗 Отправить ссылкой', `${env.PUBLIC_URL}/estimates/${ctx.match![1]}`) : undefined });
+      else await ctx.reply(`Эта смета — сверх бесплатных ${FREE_ESTIMATES} в месяц. «Лайт» — сметы без ограничений и без пометки: первый месяц ${PRICES.liteFirst} ₽.`, { reply_markup: env.PUBLIC_URL ? new InlineKeyboard().webApp('Выбрать тариф', `${env.PUBLIC_URL}/settings`) : undefined });
+    } catch (e: any) {
+      await ctx.reply(`Не получилось: ${e?.message || 'ошибка'}. Откройте смету в приложении — там кнопка «PDF клиенту».`).catch(() => {});
     }
   });
   // ответ на «Чем занимаетесь?»: запоминаем и открываем мастера этого направления
@@ -76,7 +93,7 @@ export function createBot() {
     await ctx.answerCallbackQuery().catch(() => {});
     if (!t || !ctx.from) return;
     await prisma.appKV.upsert({ where: { key: `trade:${ctx.from.id}` }, create: { key: `trade:${ctx.from.id}`, value: t.id }, update: { value: t.id } }).catch(() => {});
-    const url = env.PUBLIC_URL ? `${env.PUBLIC_URL}/new${t.dir ? `?dir=${t.dir}` : ''}` : '';
+    const url = env.PUBLIC_URL ? `${env.PUBLIC_URL}/?t=${t.id}` : '';
     const ex = TRADE_EXAMPLE[t.id];
     await ctx.editMessageText(`👍 ${t.label.replace(/^\S+\s/, '')} — понял.${ex ? `\n\nНапример: <b>${ex}</b>.` : ''}\nВпишите размеры — работы, материалы и цены посчитаются сами. Любую цену можно поменять на свою.`, {
       parse_mode: 'HTML', reply_markup: url ? new InlineKeyboard().webApp('🧾 Сделать первую смету', url) : undefined,
@@ -247,6 +264,15 @@ export function createBot() {
 
   bot.catch((err) => console.error('Ошибка бота:', err.error));
   return bot;
+}
+
+/** Новичку — коротко: что будет и что нажать (длинный список возможностей не читают — уходят, не открыв приложение) */
+export function newcomerText(u: any) {
+  const name = esc(u?.firstName || 'мастер');
+  return `👷 <b>${name}, здесь смета делается за 2 минуты.</b>\n` +
+    'Выберите работу и размер — работы, материалы и цены посчитаются сами. PDF для заказчика — одной кнопкой.\n\n' +
+    `🎁 ${env.PRO_TRIAL_DAYS === 1 ? 'Сегодня' : `${env.PRO_TRIAL_DAYS} дн.`} всё открыто бесплатно, карта не нужна.\n\n` +
+    'Чем вы занимаетесь? Нажмите — откроется нужный расчёт 👇';
 }
 
 /** Приветствие после «Старт»: новичку — что умеем, вернувшемуся — коротко и его статус */

@@ -5,7 +5,7 @@ import { useToast } from './ui';
 
 /** Карточка «+12 дней за подписку на Instagram»: личный код и кнопка открыть аккаунт */
 export default function IgBonus() {
-  const me = useMe();
+  const { me } = useMe();
   const toast = useToast();
   const b = me.igBonus;
   if (!b || b.done || !b.code) return null;

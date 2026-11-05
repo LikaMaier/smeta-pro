@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { get } from '../api';
 import { useMe } from '../App';
@@ -6,16 +6,27 @@ import { useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import Hero from '../components/Hero';
 import IgBonus from '../components/IgBonus';
+import FirstEstimate from './FirstEstimate';
 
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const MONTH_NAME = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString('ru-RU', { month: 'long' });
+
+/**
+ * Главная. Первый вход (смет ещё не было) или кнопка из бота (?t=, ?job=) — «Первая смета за 3 шага»:
+ * один путь к первой смете без меню и разделов. Остальное приложение откроется после неё (или по «Пропустить»).
+ */
+export default function Home() {
+  const { me } = useMe();
+  const [firstRun, setFirstRun] = useState(() => (me.estimatesTotal ?? 1) === 0 || /[?&](t|job)=/.test(location.search));
+  return firstRun ? <FirstEstimate onSkip={() => setFirstRun(false)} /> : <HomeMain />;
+}
 
 /**
  * Главная — одно главное действие и четыре раздела:
  *  «Новая смета» (большая кнопка) → последние сметы → Объекты · Календарь · 3D и расчёты · Справочник и ещё.
  * Всё остальное — внутри разделов, чтобы новичок не терялся.
  */
-export default function Home() {
+function HomeMain() {
   const { me, refreshMe } = useMe();
   useEffect(() => { refreshMe().catch(() => {}); }, []); // eslint-disable-line
   const nav = useNavigate();

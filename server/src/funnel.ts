@@ -1,8 +1,9 @@
 /**
  * Воронка: сообщения бота в нужный момент (каждое — один раз на человека, только днём по Москве).
- * День 0 — «Чем занимаетесь?» (в bot.ts, сразу после старта).
- * 0. Сутки без сметы — пример по его специальности и кнопка в нужного мастера.
- * A. Смета есть, но заказчику не отправлена — «отправьте ссылку, увидите, когда откроет».
+ * День 0 — короткое приветствие с кнопками специальностей (в bot.ts): одно нажатие открывает «Первую смету за 3 шага».
+ * 0. Час без сметы — готовый пример по его специальности: кнопка открывает мастер сразу на шаге «Размер».
+ *    (Пробный период — один день: напоминать через сутки уже поздно.)
+ * A. Через час после сметы она так и не ушла заказчику — «Прислать PDF сюда» прямо из чата или ссылкой.
  * (Заказчик согласовал — предложение тарифа прямо в уведомлении, routes/share.ts.)
  * W. 7-й день — итог недели: сметы, суммы, что видел заказчик.
  * 1. За 2 дня до конца пробного — что останется бесплатно, первый месяц со скидкой.
@@ -12,14 +13,15 @@
  * 4. Две оплаты помесячно — предложение перейти на год.
  * 5. Через 30 дней после окончания подписки — персональная скидка на 72 часа.
  */
-import { bonusCode, bonusDone, bonusHowTo, igUrl, igUsername } from './igBonus';
+import { bonusDone, IG_BONUS_DAYS } from './igBonus';
 import { prisma } from './util';
 import { env } from './env';
 import { PRICES } from '../../shared/plans';
 import { estimateTotals } from './routes/estimates';
 import { NOT_SUB } from './routes/billing';
-import { tradeOf, TRADE_EXAMPLE } from '../../shared/trades';
+import { tradeOf } from '../../shared/trades';
 import { FREE_ESTIMATES } from '../../shared/access';
+import { jobsFor, jobDefaults } from '../../shared/firstJobs';
 
 const H = 3600e3, D = 24 * H;
 const rub = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₽';
@@ -56,22 +58,26 @@ export function startFunnel(bot: any, log: { error: (o: any, m?: string) => void
     if (mskHour < 10 || mskHour >= 21) return; // не будим людей
     try {
       const noSub = { OR: [{ subscriptionUntil: null }, { subscriptionUntil: { lte: now } }] };
-      // 0. первая смета: прошли сутки после входа, а смет нет — пример по специальности
-      for (const u of await prisma.user.findMany({ where: { activateAt: null, createdAt: { lte: new Date(now.getTime() - 20 * H), gt: new Date(now.getTime() - 4 * D) }, estimates: { none: {} } }, take: 50 })) {
+      // 0. первая смета: прошёл час после входа, а смет нет — готовый пример по специальности, кнопка сразу на шаг «Размер»
+      for (const u of await prisma.user.findMany({ where: { activateAt: null, createdAt: { lte: new Date(now.getTime() - H), gt: new Date(now.getTime() - 4 * D) }, estimates: { none: {} } }, take: 50 })) {
         if (isAdmin(u) || !(await claim(u.id, 'activateAt'))) continue;
         const t = await tradeFor(u.tgId);
-        const ex = t ? TRADE_EXAMPLE[t.id] : null;
-        await sendTo(u, `👷 <b>Первая смета — за 2 минуты.</b>\n${ex ? `Попробуйте на примере: <b>${ex}</b>.\n` : ''}Нажмите кнопку → ответьте на 2–3 вопроса (размеры) → работы, материалы и цены посчитаются сами. Останется отправить заказчику.`,
-          { reply_markup: appUrl ? { inline_keyboard: [[{ text: '🧾 Сделать смету', web_app: { url: `${appUrl}/new${t?.dir ? `?dir=${t.dir}` : ''}` } }], [{ text: '🏗 Постройка в 3D', web_app: { url: `${appUrl}/designer` } }]] } : undefined });
+        const job = jobsFor(t?.id)[0];
+        const ex = job.name(jobDefaults(job).sizes);
+        await sendTo(u, `👷 <b>Первая смета — за 2 минуты.</b>\nНапример: <b>${ex}</b>. Нажмите кнопку — размеры уже подставлены, поменяйте под свой объект и нажмите «Показать смету». Работы, материалы и цены посчитаются сами — останется переслать PDF заказчику.`,
+          { reply_markup: appUrl ? { inline_keyboard: [[{ text: `${job.icon} Посчитать: ${job.title.toLowerCase()}`, web_app: { url: `${appUrl}/?job=${job.id}` } }], [{ text: 'Выбрать другую работу', web_app: { url: `${appUrl}/${t ? `?t=${t.id}` : ''}` } }]] } : undefined });
       }
-      // A. смета сделана (сутки назад), но заказчику ссылку не отправляли
+      // A. смета сделана час назад, но заказчику не ушла (ни PDF, ни ссылки) — PDF прямо в чат одной кнопкой
       for (const e of await prisma.estimate.findMany({
-        where: { isTemplate: false, deletedAt: null, sharedAt: null, createdAt: { lte: new Date(now.getTime() - 20 * H), gt: new Date(now.getTime() - 5 * D) }, lines: { some: {} }, user: { createdAt: { gt: new Date(now.getTime() - 20 * D) } } },
-        include: { user: true }, orderBy: { createdAt: 'asc' }, take: 50,
+        where: { isTemplate: false, deletedAt: null, sharedAt: null, createdAt: { lte: new Date(now.getTime() - H), gt: new Date(now.getTime() - 5 * D) }, lines: { some: {} }, user: { createdAt: { gt: new Date(now.getTime() - 20 * D) } } },
+        include: { user: true, lines: true }, orderBy: { createdAt: 'asc' }, take: 50,
       })) {
-        if (isAdmin(e.user) || !(await once(`fn:share:${e.userId}`))) continue;
-        await sendTo(e.user, `📨 Смета «${e.title.slice(0, 60)}» готова — отправьте её заказчику <b>ссылкой</b>, а не только PDF.\nЗаказчик откроет без Telegram, нажмёт «Согласовать» или задаст вопрос — а вы сразу увидите, что он смотрел смету. Так заказ закрывается быстрее.`,
-          btn('🔗 Отправить ссылку', `/estimates/${e.id}`));
+        if (isAdmin(e.user)) continue;
+        const sent = await prisma.auditLog.count({ where: { userId: e.userId, entity: 'estimate', action: { in: ['pdf_sent', 'share', 'contract_sent', 'xlsx_sent'] } } });
+        if (sent || !(await once(`fn:share:${e.userId}`))) continue;
+        const total = estimateTotals(e as any).total;
+        await sendTo(e.user, `📨 Смета «${e.title.slice(0, 60)}»${total > 0 ? ` на <b>${rub(total)}</b>` : ''} готова — осталось отправить заказчику.\nНажмите «Прислать PDF сюда» — файл придёт в этот чат, перешлите его заказчику. Или ссылкой: заказчик откроет без Telegram и нажмёт «Согласовать», а вы увидите, что он смотрел.`,
+          { reply_markup: { inline_keyboard: [[{ text: '📄 Прислать PDF сюда', callback_data: `pdf:${e.id}` }], ...(appUrl ? [[{ text: '🔗 Отправить ссылкой', web_app: { url: `${appUrl}/estimates/${e.id}` } }]] : [])] } });
       }
       // W. итог первой недели
       for (const u of await prisma.user.findMany({ where: { createdAt: { lte: new Date(now.getTime() - 7 * D), gt: new Date(now.getTime() - 9 * D) } }, take: 100 })) {
@@ -93,14 +99,13 @@ export function startFunnel(bot: any, log: { error: (o: any, m?: string) => void
       for (const u of await prisma.user.findMany({ where: { trialEndAt: null, trialEndsAt: { lte: now, gt: new Date(now.getTime() - 3 * D) }, ...noSub }, take: 50 })) {
         if (isAdmin(u) || (await hadSub(u.id)) || !(await claim(u.id, 'trialEndAt'))) continue;
         const d = await done(u.id);
-        // бонус за Instagram ещё не брали — сначала предлагаем его: +12 дней бесплатно
-        if (!(await bonusDone(u.id))) {
-          const url = await igUrl();
-          await sendTo(u, `🔓 <b>Пробный день закончился.</b>${d ? `\nВы успели: ${d}. Всё сохранено.` : ''}\n\n${bonusHowTo(await bonusCode(u.id), await igUsername(), url)}`,
-            { link_preview_options: { is_disabled: true }, reply_markup: { inline_keyboard: [[{ text: '📸 Открыть Instagram', url }]] } });
-          continue;
-        }
-        await send(u, `🔓 <b>Пробный период закончился.</b>\n${d ? `Вы успели: ${d}. Всё сохранено. ` : ''}${FREE_LINE}\n\n${OFFER_LINE}`, `Лайт за ${PRICES.liteFirst} ₽ / Про за ${PRICES.proFirst} ₽`);
+        // тариф и бонус за Instagram — в одном сообщении: раньше здесь был только Instagram, и тариф впервые предлагали через 6 дней
+        const ig = !(await bonusDone(u.id));
+        await sendTo(u, `🔓 <b>Пробный период закончился.</b>\n${d ? `Вы успели: ${d}. Всё сохранено. ` : ''}${FREE_LINE}\n\n${OFFER_LINE}${ig ? `\n\n🎁 Или ещё <b>${IG_BONUS_DAYS} дней бесплатно</b> — за подписку на наш Instagram (кнопка ниже).` : ''}`,
+          { reply_markup: { inline_keyboard: [
+            ...(appUrl ? [[{ text: `Лайт за ${PRICES.liteFirst} ₽ / Про за ${PRICES.proFirst} ₽`, web_app: { url: `${appUrl}/settings` } }]] : []),
+            ...(ig ? [[{ text: `🎁 +${IG_BONUS_DAYS} дней за Instagram`, callback_data: 'igbonus' }]] : []),
+          ] } });
       }
       // 3. напоминание через 5 дней после окончания пробного
       for (const u of await prisma.user.findMany({ where: { firstRemindAt: null, trialEndAt: { lte: new Date(now.getTime() - 5 * D), gt: new Date(now.getTime() - 60 * D) }, ...noSub }, take: 50 })) {

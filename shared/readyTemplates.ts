@@ -35,9 +35,14 @@ export function masterLines(id: string, values: Record<string, any> = {}): Ready
 const ONCE = ['Монтаж люстры', 'Опрессовка системы'];
 /** Несколько мастеров подряд: одинаковые позиции складываются, доставка — не больше 3 рейсов */
 function combo(parts: [string, Record<string, any>][], extra: ReadyLine[] = []): ReadyLine[] {
+  return mergeLines(parts.map(([id, v]) => masterLines(id, v)), extra);
+}
+
+/** Сложить строки нескольких расчётов в одну смету (готовые сметы, «Первая смета за 3 шага») */
+export function mergeLines(lists: ReadyLine[][], extra: ReadyLine[] = []): ReadyLine[] {
   const out: ReadyLine[] = [];
-  for (const [id, v] of parts) {
-    for (const l of masterLines(id, v)) {
+  for (const list of lists) {
+    for (const l of list) {
       const same = out.find((x) => x.name === l.name && x.unit === l.unit && x.type === l.type && x.price === l.price && x.category === l.category);
       if (same) same.qty = Math.round((same.qty + l.qty) * 100) / 100;
       else out.push({ ...l });

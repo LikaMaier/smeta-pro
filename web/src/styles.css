@@ -547,3 +547,66 @@ button.dz-warn { display: block; background: none; border-top: 0; border-right: 
 .igb-t { font-weight: 800; font-size: 17px; margin-bottom: 6px; }
 .igb-code { display: block; width: 100%; margin: 8px 0 6px; padding: 10px; border-radius: 12px; border: 2px dashed var(--gold); background: var(--surface); color: var(--text); font-family: inherit; font-weight: 800; font-size: 26px; line-height: 1; letter-spacing: 4px; cursor: pointer; }
 .igb-code .xs { letter-spacing: 0; font-weight: 400; color: var(--muted); }
+
+/* ===== «Первая смета за 3 шага»: один вопрос на экран, крупно ===== */
+.fw { padding-bottom: 8px; }
+.fw h2 { font-size: 25px; line-height: 1.2; margin: 4px 0 6px; font-weight: 800; letter-spacing: -0.01em; }
+.fw .lead { color: var(--muted); margin: 0 0 14px; font-size: 15px; line-height: 1.4; }
+.fw-prog { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 0 0 12px; }
+.fw-prog > div { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); text-align: center; }
+.fw-prog i { display: block; height: 6px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--line); }
+.fw-prog .done i { background: var(--accent); border-color: var(--accent); }
+.fw-prog .cur i { background: linear-gradient(90deg, var(--accent) 35%, var(--surface-2) 35%); border-color: var(--accent); }
+.fw-prog .done span, .fw-prog .cur span { color: var(--text); font-weight: 600; }
+.fw-job { min-height: 112px; }
+.fw-job .dir-ico { font-size: 32px; }
+.fw-job .dir-t { font-size: 17px; line-height: 1.2; }
+.fw-other { margin-top: 10px; }
+.fw-group { margin: 16px 0 6px; color: var(--muted); font-size: 14px; font-style: italic; }
+.fw-li-ico { font-size: 22px; width: 30px; text-align: center; flex: none; }
+.fw-more { display: block; width: 100%; margin: 14px 0 0; padding: 10px 0; text-align: center; font-size: 15px; color: var(--amber); background: none; border: 0; cursor: pointer; }
+.fw-back { background: none; border: 0; color: var(--muted); font-size: 15px; padding: 4px 0 6px; cursor: pointer; }
+.fw-lbl { font-weight: 700; margin: 16px 0 6px; font-size: 16px; }
+.fw-size .fw-lbl { margin-top: 12px; }
+.fw-num { display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; gap: 8px; align-items: center; }
+.fw-num button { height: 56px; border-radius: 12px; border: 1px solid var(--tile-border); background: var(--surface-2); font-size: 30px; font-weight: 700; line-height: 1; cursor: pointer; }
+.fw-num button:active { background: var(--tile-press, var(--surface)); }
+.fw-num button:disabled { opacity: .35; }
+.fw-num .val { position: relative; }
+.fw-num input { width: 100%; height: 56px; padding: 0 44px 0 12px; text-align: center; font-size: 26px; font-weight: 800; border-radius: 12px; border: 1.5px solid var(--tile-border); background: var(--surface); outline: none; font-variant-numeric: tabular-nums; }
+.fw-num input:focus { border-color: var(--accent); }
+.fw-num .u { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 15px; pointer-events: none; }
+.fw-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.fw-chips button { min-height: 38px; padding: 0 14px; border-radius: 19px; border: 1px solid var(--line); background: var(--surface); font-size: 15px; cursor: pointer; }
+.fw-chips button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+.fw-opt { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin-bottom: 6px; font-size: 16px; line-height: 1.3; cursor: pointer; }
+.fw-opt input[type=checkbox] { width: 24px; height: 24px; flex: none; }
+.fw-live { margin: 16px 0 4px; padding: 12px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--tile-border); text-align: center; }
+.fw-live b { display: block; font-size: 28px; color: var(--accent); line-height: 1.2; }
+.fw-total { text-align: center; padding: 16px 12px; border-radius: 14px; border: 1.5px solid var(--gold); background: var(--surface); }
+.fw-total .sum { font-size: 40px; font-weight: 800; color: var(--accent); line-height: 1.1; margin: 4px 0; }
+.fw-total .sub { color: var(--muted); font-size: 14px; }
+.fw-tier { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.fw-tier button { min-height: 56px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; }
+.fw-tier button small { font-weight: 500; color: var(--muted); font-size: 12px; }
+.fw-tier button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.fw-tier button.on small { color: var(--on-accent); opacity: .85; }
+.fw-sec { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin-bottom: 6px; overflow: hidden; }
+.fw-sec > button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 48px; padding: 10px 12px; background: none; border: 0; font-size: 15px; text-align: left; cursor: pointer; }
+.fw-sec ul { list-style: none; margin: 0; padding: 0 12px 8px; }
+.fw-sec li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-top: 1px solid var(--line); color: var(--muted); }
+.fw-sec li span:last-child { flex: none; color: var(--text); }
+.fw-note { font-size: 13px; color: var(--muted); text-align: center; margin: 10px 0 0; line-height: 1.35; }
+.fw-cta { position: sticky; bottom: 0; margin: 14px -12px 0; padding: 12px 12px calc(12px + var(--safe-b)); background: linear-gradient(180deg, transparent, var(--bg) 22%); display: grid; gap: 8px; z-index: 3; }
+.fw-cta .btn.lg { min-height: 60px; font-size: 18px; }
+.fw-done { text-align: center; }
+.fw-done .btn { margin-top: 8px; white-space: normal; text-align: center; line-height: 1.25; padding-top: 8px; padding-bottom: 8px; }
+.fw-done .btn.lg { min-height: 60px; font-size: 18px; }
+.fw-party { font-size: 64px; line-height: 1; margin: 8px 0 4px; animation: fw-pop .5s ease-out; }
+@keyframes fw-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.fw-offer { margin-top: 18px; padding: 14px; border-radius: 14px; border: 1.5px solid var(--gold); background: var(--surface); text-align: left; }
+.fw-offer b { font-size: 16px; }
+.fw-offer p { margin: 6px 0 0; font-size: 14px; line-height: 1.4; }
+.fw-offer .btn { margin-top: 10px; }
+.fw-skip { margin-top: 0; color: var(--muted); font-size: 14px; }
+.fw-quick { margin-bottom: 12px; border: 1px solid var(--gold); }
