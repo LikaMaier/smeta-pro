@@ -139,6 +139,10 @@ export function createBot() {
   });
 
   bot.command('app', (ctx) => ctx.reply('Открыть приложение:', { reply_markup: appKb() }));
+  // калькулятор для заказчиков: личная ссылка мастера — заявки с готовой сметой
+  bot.command(['calc', 'kalk'], (ctx) => ctx.reply('🔥 <b>Калькулятор для ваших заказчиков</b>\nЗаказчик по ссылке сам выбирает работу и размер, видит цену по вашим ценам и оставляет телефон. Вам — заявка сюда и готовая смета в приложении.', {
+    parse_mode: 'HTML', reply_markup: env.PUBLIC_URL ? new InlineKeyboard().webApp('Получить мою ссылку', `${env.PUBLIC_URL}/calc-link`) : undefined,
+  }));
   // бонус за подписку на Instagram: +12 дней «Про»
   const sendBonus = async (ctx: any) => {
     if (!ctx.from) return;
@@ -313,7 +317,7 @@ export const BOT_SHORT = 'Смета за 2 минуты, 3D для заказч
 export async function setupBot(bot: Bot) {
   const me = await bot.api.getMe().catch(() => null);
   if (me?.username) botInfo.username = me.username;
-  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }, { command: 'guide', description: 'Как сделать первую смету' }, { command: 'help', description: 'Поддержка' }]);
+  await bot.api.setMyCommands([{ command: 'start', description: 'Начать' }, { command: 'app', description: 'Открыть приложение' }, { command: 'guide', description: 'Как сделать первую смету' }, { command: 'calc', description: 'Калькулятор для заказчиков' }, { command: 'help', description: 'Поддержка' }]);
   // Тексты, которые видно до нажатия «Старт» и в профиле бота
   await bot.api.setMyDescription(BOT_DESCRIPTION).catch(() => {});
   await bot.api.setMyShortDescription(BOT_SHORT).catch(() => {});

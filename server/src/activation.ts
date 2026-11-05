@@ -18,7 +18,7 @@ export async function activationStats(days = 30) {
   const [daysRows, ests, audits, pays, trades, blocked, igb] = await Promise.all([
     prisma.userDay.findMany({ where: { userId: { in: ids } }, select: { userId: true, day: true, firstAt: true } }),
     prisma.estimate.findMany({ where: { userId: { in: ids }, isTemplate: false }, select: { id: true, userId: true, createdAt: true, sharedAt: true, viewedAt: true, approvedAt: true, source: true, deletedAt: true, _count: { select: { lines: true } } }, orderBy: { createdAt: 'asc' } }),
-    prisma.auditLog.findMany({ where: { userId: { in: ids }, entity: { in: ['estimate', 'checkout', 'design', 'wizard'] } }, select: { userId: true, entity: true, entityId: true, action: true, data: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.auditLog.findMany({ where: { userId: { in: ids }, entity: { in: ['estimate', 'checkout', 'design', 'wizard', 'calc'] } }, select: { userId: true, entity: true, entityId: true, action: true, data: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
     prisma.payment.findMany({ where: { userId: { in: ids }, status: 'paid' }, select: { userId: true, planCode: true } }),
     prisma.appKV.findMany({ where: { key: { in: users.map((u) => `trade:${u.tgId}`) } }, select: { value: true } }),
     prisma.appKV.count({ where: { key: { in: users.map((u) => `blocked:${u.tgId}`) } } }),
@@ -43,7 +43,7 @@ export async function activationStats(days = 30) {
   for (const [uid, e] of firstEst) {
     const cr = audits.find((a) => a.entity === 'estimate' && a.entityId === e.id && a.action === 'create');
     const d: any = cr?.data || {};
-    let p = d.wizard ? 'мастер 3 шага' : d.template ? 'шаблон' : d.quick ? 'быстрая' : d.fromId || d.duplicateOf ? 'копия' : d.source === 'ai' ? 'ИИ' : d.lines ? 'готовые строки' : 'пустая';
+    let p = d.lead ? 'заявка с калькулятора' : d.wizard ? 'мастер 3 шага' : d.template ? 'шаблон' : d.quick ? 'быстрая' : d.fromId || d.duplicateOf ? 'копия' : d.source === 'ai' ? 'ИИ' : d.lines ? 'готовые строки' : 'пустая';
     if (p === 'пустая' && audits.some((a) => a.entityId === e.id && a.action === 'add_lines' && a.createdAt.getTime() - e.createdAt.getTime() < 120e3)) p = 'мастер/калькулятор';
     if (p === 'пустая' && e._count.lines === 0) p = 'пустая (без строк)';
     path[p] = (path[p] || 0) + 1;
@@ -52,6 +52,8 @@ export async function activationStats(days = 30) {
   const ttf = [...firstEst.values()].map((e) => (e.createdAt.getTime() - (born.get(e.userId) || 0)) / 60e3).filter((m) => m >= 0);
   const wz = (a: string) => new Set(audits.filter((x) => x.entity === 'wizard' && x.action === a).map((x) => x.userId)).size;
   const wizard = { opened: wz('fw_open'), picked: wz('fw_job'), result: wz('fw_result'), pdf: wz('fw_pdf'), link: wz('fw_link'), offer: wz('fw_offer'), skip: wz('fw_skip') };
+  const calcA = audits.filter((x) => x.entity === 'calc');
+  const calc = { builders: new Set(calcA.filter((x) => x.action === 'view').map((x) => x.userId)).size, views: calcA.filter((x) => x.action === 'view').length, leads: calcA.filter((x) => x.action === 'lead').length };
   const tradeBy: Record<string, number> = {};
   for (const t of trades) tradeBy[t.value] = (tradeBy[t.value] || 0) + 1;
   const plans: Record<string, number> = {};
@@ -62,7 +64,7 @@ export async function activationStats(days = 30) {
     designers: designers.size, blocked, igBonusTotal: igb, estimatesTotal: ests.length, estimatesDeleted: ests.filter((e) => e.deletedAt).length,
     emptyEstimates: ests.filter((e) => e._count.lines === 0).length,
     firstPath: path, minutesToFirstEstimate: { median: median(ttf), within10: ttf.filter((m) => m <= 10).length, within60: ttf.filter((m) => m <= 60).length },
-    trades: tradeBy, plans, wizard,
+    trades: tradeBy, plans, wizard, calc,
   };
 }
 
@@ -86,6 +88,7 @@ export async function activationText(days = 30) {
     `👷 Специальности: ${Object.entries(s.trades).sort((a: any, b: any) => b[1] - a[1]).map(([k, v]) => `${k} — ${v}`).join(', ') || '—'}`,
     `Пустых смет: ${s.emptyEstimates} из ${s.estimatesTotal}`];
   const w = s.wizard;
+  if (s.calc?.views) L.push('', `🔥 <b>Калькулятор для заказчиков</b>: у ${s.calc.builders} мастеров открыли ${s.calc.views} раз, заявок — ${s.calc.leads}`);
   if (w?.opened) L.push('', `🪄 <b>Первая смета за 3 шага</b>: открыли ${w.opened} → выбрали работу ${w.picked} → увидели смету ${w.result} → PDF ${w.pdf} · ссылкой ${w.link} · тарифы ${w.offer} · пропустили ${w.skip}`);
   return L.join('\n');
 }

@@ -159,7 +159,7 @@ export function attachAdminStats(bot: Bot) {
     ]);
     const totals = ests.map((e) => estTotal(e.lines)).filter((x) => x > 0).sort((a, b) => a - b);
     const med = totals.length ? totals[Math.floor(totals.length / 2)] : 0;
-    const SRC: Record<string, string> = { manual: 'вручную/мастер', template: 'из шаблона', quick: 'быстрая смета', ai: 'ИИ', wizard: 'первая смета за 3 шага', import: 'из Excel' };
+    const SRC: Record<string, string> = { manual: 'вручную/мастер', template: 'из шаблона', quick: 'быстрая смета', ai: 'ИИ', wizard: 'первая смета за 3 шага', import: 'из Excel', lead: 'заявка с калькулятора' };
     const L = [`🏆 <b>Что делают за ${days} дн.</b>`, '',
       `Смет: ${ests.length} · отправлено заказчику ${ests.filter((e) => e.sharedAt).length} · согласовано ${ests.filter((e) => e.approvedAt).length}`,
       `Средняя смета (медиана): ${rub(med)}${totals.length ? ` · самая крупная ${rub(totals[totals.length - 1])}` : ''}`,

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { get } from '../api';
 import { useMe } from '../App';
-import { useLoad } from '../components/ui';
+import { Icon, useLoad } from '../components/ui';
 import { rub0 } from '../format';
 import Hero from '../components/Hero';
 import IgBonus from '../components/IgBonus';
@@ -56,6 +56,12 @@ function HomeMain() {
         <small>{!me.access.active && me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'сметы бесплатно — без ограничений' : `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}`) : 'выберите направление — смета соберётся сама'}</small>
       </button>
 
+
+      <Link to="/calc-link" className="list-item panel mc-card">
+        <span style={{ fontSize: 24, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">🔥</span>
+        <div className="grow"><div className="title">Калькулятор для заказчиков</div><div className="xs muted">заказчик считает сам по вашим ценам — вам приходит заявка с готовой сметой</div></div>
+        <Icon.chevron className="chev" width={18} />
+      </Link>
 
       <IgBonus />
 

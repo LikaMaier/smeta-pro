@@ -30,6 +30,7 @@ import MepDesigner from './pages/MepDesigner';
 import Tools from './pages/Tools';
 import NewEstimate from './pages/NewEstimate';
 import FirstEstimate from './pages/FirstEstimate';
+import MyCalc from './pages/MyCalc';
 import Contacts from './pages/Contacts';
 import { applyTheme } from './theme';
 import { Offers } from './components/Pay';
@@ -54,7 +55,7 @@ function titleOf(path: string): string {
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
     estimates: 'Сметы', projects: 'Объекты', catalog: 'Справочник цен', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', new: 'Новая смета', first: 'Смета за 3 шага', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D', admin: 'Статистика',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Справочник и ещё', tools: '3D и расчёты', new: 'Новая смета', first: 'Смета за 3 шага', 'calc-link': 'Калькулятор для заказчиков', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D', admin: 'Статистика',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[2] === 'acts') return 'Акты';
@@ -185,6 +186,7 @@ function Shell({ me, setMe }: { me: Me; setMe: (m: Me) => void }) {
               <Route path="/tools" element={<Tools />} />
               <Route path="/new" element={<NewEstimate />} />
               <Route path="/first" element={<FirstEstimate />} />
+              <Route path="/calc-link" element={<MyCalc />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/reminders" element={<Reminders />} />
               <Route path="/contacts" element={<Contacts />} />

@@ -4,6 +4,7 @@
  * 0. Час без сметы — готовый пример по его специальности: кнопка открывает мастер сразу на шаге «Размер».
  *    (Пробный период — один день: напоминать через сутки уже поздно.)
  * A. Через час после сметы она так и не ушла заказчику — «Прислать PDF сюда» прямо из чата или ссылкой.
+ * K. Через 3 часа после первой сметы — «калькулятор для заказчиков» (если ещё не открывал): заявки с готовой сметой.
  * (Заказчик согласовал — предложение тарифа прямо в уведомлении, routes/share.ts.)
  * W. 7-й день — итог недели: сметы, суммы, что видел заказчик.
  * 1. За 2 дня до конца пробного — что останется бесплатно, первый месяц со скидкой.
@@ -78,6 +79,17 @@ export function startFunnel(bot: any, log: { error: (o: any, m?: string) => void
         const total = estimateTotals(e as any).total;
         await sendTo(e.user, `📨 Смета «${e.title.slice(0, 60)}»${total > 0 ? ` на <b>${rub(total)}</b>` : ''} готова — осталось отправить заказчику.\nНажмите «Прислать PDF сюда» — файл придёт в этот чат, перешлите его заказчику. Или ссылкой: заказчик откроет без Telegram и нажмёт «Согласовать», а вы увидите, что он смотрел.`,
           { reply_markup: { inline_keyboard: [[{ text: '📄 Прислать PDF сюда', callback_data: `pdf:${e.id}` }], ...(appUrl ? [[{ text: '🔗 Отправить ссылкой', web_app: { url: `${appUrl}/estimates/${e.id}` } }]] : [])] } });
+      }
+      // K. первая смета была 3+ часа назад, калькулятор для заказчиков ещё не открывал — рассказать один раз
+      for (const e of await prisma.estimate.findMany({
+        where: { isTemplate: false, createdAt: { lte: new Date(now.getTime() - 3 * H), gt: new Date(now.getTime() - 3 * D) }, user: { createdAt: { gt: new Date(now.getTime() - 10 * D) } } },
+        include: { user: true }, orderBy: { createdAt: 'asc' }, distinct: ['userId'], take: 50,
+      })) {
+        if (isAdmin(e.user)) continue;
+        if (await prisma.appKV.findUnique({ where: { key: `kcalc:u:${e.userId}` } })) continue; // уже открывал
+        if (!(await once(`fn:kcalc:${e.userId}`))) continue;
+        await sendTo(e.user, `🔥 <b>Пусть заказчики считают сами</b>\nУ вас есть личный калькулятор: ссылку ставите в объявление на Авито, в статус WhatsApp или в группу ВК. Заказчик выбирает работу и размер, видит цену по <b>вашим</b> ценам и оставляет телефон.\nВам — заявка сюда, а в приложении — уже готовая смета. Работает круглосуточно, даже когда вы на объекте.`,
+          btn('🔥 Получить мою ссылку', '/calc-link'));
       }
       // W. итог первой недели
       for (const u of await prisma.user.findMany({ where: { createdAt: { lte: new Date(now.getTime() - 7 * D), gt: new Date(now.getTime() - 9 * D) } }, take: 100 })) {
