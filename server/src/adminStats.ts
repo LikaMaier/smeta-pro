@@ -10,6 +10,7 @@
 import type { Bot } from 'grammy';
 import { prisma } from './util';
 import { reportTo } from './stats';
+import { activationText } from './activation';
 
 const MSK = 3 * 3600e3;
 const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -166,6 +167,13 @@ export function attachAdminStats(bot: Bot) {
       '<b>Разделы:</b>', ...cats.map((c) => `   ${esc(c.category || 'без раздела')} — ${c._count._all}`), '',
       '<b>Чаще всего добавляют:</b>', ...names.map((n, i) => `   ${i + 1}. ${esc(n.name)} — ${n._count._all}`)];
     await sendLong(ctx, L.join('\n'));
+  });
+
+  // /funnel [дни] — воронка активации: пришёл → открыл → смета → отправил → оплатил
+  bot.command('funnel', async (ctx) => {
+    if (!isAdmin(ctx.from?.id)) return;
+    const days = Math.min(365, Math.max(1, Number(String(ctx.match || '').trim()) || 30));
+    await sendLong(ctx, await activationText(days));
   });
 
   bot.command('blocked', async (ctx) => {

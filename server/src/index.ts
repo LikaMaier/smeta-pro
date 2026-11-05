@@ -6,6 +6,7 @@ import { prisma } from './util';
 import { startReminderLoop } from './routes/organizer';
 import { startAdminReports } from './stats';
 import { startFunnel } from './funnel';
+import { activationStats } from './activation';
 import { startInstagram } from './instagram';
 import { startTenders } from './tenders';
 import { startThreads } from './threads';
@@ -73,6 +74,8 @@ async function main() {
     startReminderLoop(bot, app.log, env.PUBLIC_URL);
     startAdminReports(bot, app.log);
     startFunnel(bot, app.log, env.PUBLIC_URL);
+    // агрегаты воронки активации — одной строкой в лог (без имён), для разбора онбординга
+    setTimeout(() => { for (const d of [7, 30, 90]) activationStats(d).then((s) => app.log.info(`ACTIVATION ${JSON.stringify(s)}`)).catch((e) => app.log.error({ err: e }, 'activation stats')); }, 30e3);
     startInstagram(bot, app.log);
     startTenders(bot, app.log);
     startThreads(bot, app.log);
