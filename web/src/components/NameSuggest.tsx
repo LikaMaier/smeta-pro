@@ -120,13 +120,16 @@ export default function NameSuggest({ value, onChange, onPick, index, className,
     else if (e.key === 'Escape') setClosed(true);
   };
 
+  // название целиком: поле растёт по тексту, длинные названия не обрезаются
+  const ta = React.useRef<HTMLTextAreaElement>(null);
+  React.useLayoutEffect(() => { const el = ta.current; if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }, [value]);
   return (
     <div ref={box} className="ns">
       <div className={rowClassName}>
-        <input className={className} value={value} placeholder={placeholder} readOnly={readOnly} aria-label={ariaLabel}
-          autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="done"
+        <textarea ref={ta} rows={1} className={className} value={value} placeholder={placeholder} readOnly={readOnly} aria-label={ariaLabel}
+          autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="done" style={{ resize: 'none', overflow: 'hidden', fontFamily: 'inherit', display: 'block' }}
           role="combobox" aria-expanded={list.length > 0} aria-autocomplete="list"
-          onChange={(e) => { onChange(e.target.value); setClosed(false); }}
+          onChange={(e) => { onChange(e.target.value.replace(/[\r\n]+/g, ' ')); setClosed(false); }}
           onFocus={() => { window.clearTimeout(blurT.current); setFocus(true); setClosed(false); }}
           onBlur={() => { blurT.current = window.setTimeout(() => setFocus(false), 180); }}
           onKeyDown={onKey} />

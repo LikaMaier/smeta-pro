@@ -339,7 +339,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       {lines.length === 0 ? (
         <div className="panel"><State title="В смете пока нет позиций" text="Добавьте работы и материалы из своего справочника или пустой строкой." /></div>
       ) : (
-        <div className="list">
+        <div className={`list ${simple ? 'slist' : ''}`}>
           {order.map((g) => (
             <React.Fragment key={g.cat || 'all'}>
               {g.cat && (
@@ -349,20 +349,26 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
                     <span>{folded.has(g.cat) ? '▸' : '▾'} {g.cat}{h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!] ? ` · ×${n(h.sectionCoefs[g.cat === 'Без раздела' ? '' : g.cat!])}` : ''}<span className="muted" style={{ fontWeight: 400 }}> · {g.items.length}</span></span>
                     <span className="num">{rub(g.items.reduce((a, l) => a + totals.lineAmounts[idx.get(l.k)!], 0))}</span>
                   </button>
-                  {!readOnly && <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Настройки раздела" onClick={() => setSecEdit(g.cat)}><Icon.more /></button>}
+                  {!readOnly && !simple && <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Настройки раздела" onClick={() => setSecEdit(g.cat)}><Icon.more /></button>}
                 </div>
               )}
               {!(g.cat && folded.has(g.cat)) && g.items.map((l) => (
-                <div key={l.k} className={`line ${l.unconfirmed ? 'unconfirmed' : ''}`}>
+                <div key={l.k} className={`line ${l.unconfirmed ? 'unconfirmed' : ''} ${simple ? 'sline' : ''}`}>
                   <NameSuggest rowClassName="line-top" className="line-name" value={l.name} placeholder="Название позиции" readOnly={readOnly} ariaLabel="Название"
                     index={suggestIx} onChange={(v) => setName(l, v)} onPick={(s) => pickItem(l, s)}
                     after={<button className="icon-btn" style={{ width: 32, height: 32 }} aria-label="Подробнее" onClick={() => { setEditLine(l.k); setSheet('line'); }}><Icon.more /></button>} />
-                  {l.composition.trim() && (
+                  {!simple && l.composition.trim() && (
                     <button className="line-comp" onClick={() => { setEditLine(l.k); setSheet('line'); }}>
                       в составе: {l.composition.split('\n').map((x) => x.replace(/^[-–•\s]+/, '').trim()).filter(Boolean).join('; ')}
                     </button>
                   )}
-                  {simple && <div className="line-grid line-labels"><span>Сколько</span><span>Ед.</span><span>Цена за {l.unit || 'ед.'}</span></div>}
+                  {simple ? (
+                    <div className="sline-row">
+                      <NumInput value={l.qty} onChange={(v) => setLine(l.k, { qty: v })} unit={l.unit} placeholder="0" aria-label={`Количество, ${l.unit}`} readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
+                      <span className="sline-x" aria-hidden="true">×</span>
+                      <NumInput value={l.price} onChange={(v) => setLine(l.k, { price: v })} unit="₽" aria-label={l.matPrice !== '' ? 'Цена работы' : 'Цена'} placeholder="цена" readOnly={readOnly} invalid={parseNum(l.price) < 0} />
+                    </div>
+                  ) : (<>
                   <div className="line-grid">
                     <NumInput value={l.qty} onChange={(v) => setLine(l.k, { qty: v })} placeholder="Кол-во" aria-label="Количество" readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
                     <select className="select" style={{ minHeight: 40, padding: '6px 4px' }} value={l.unit} onChange={(e) => setLine(l.k, { unit: e.target.value })} disabled={readOnly} aria-label="Единица">
@@ -370,6 +376,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
                     </select>
                     <NumInput value={l.price} onChange={(v) => setLine(l.k, { price: v })} unit="₽" aria-label={l.matPrice !== '' ? 'Цена работы' : 'Цена'} placeholder={l.matPrice !== '' ? 'Работа' : 'Цена'} readOnly={readOnly} invalid={parseNum(l.price) < 0} />
                   </div>
+                  </>)}
                   {l.matPrice !== '' && (
                     <div className="line-grid mat">
                       <span className="xs muted" style={{ alignSelf: 'center' }}>+ материал</span>
@@ -377,7 +384,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
                       <NumInput value={l.matPrice} onChange={(v) => setLine(l.k, { matPrice: v })} unit="₽" aria-label="Цена материала" readOnly={readOnly} />
                     </div>
                   )}
-                  <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.coef !== '' && parseNum(l.coef) !== 1 ? ` · ×${l.coef}` : ''}{l.unconfirmed ? ' · цена примерная — проверьте' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>
+                  {simple ? <div className="sline-foot"><span className="sline-note">{l.unconfirmed ? 'цена примерная — проверьте' : ''}</span><b className="sline-sum num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div> : <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.coef !== '' && parseNum(l.coef) !== 1 ? ` · ×${l.coef}` : ''}{l.unconfirmed ? ' · цена примерная — проверьте' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>}
                   {l.matPrice !== '' && totals.lineMat[idx.get(l.k)!] > 0 && <div className="xs muted" style={{ textAlign: 'right' }}>работа {rub(totals.lineWork[idx.get(l.k)!])} + материал {rub(totals.lineMat[idx.get(l.k)!])}</div>}
                 </div>
               ))}
@@ -389,12 +396,12 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       {!readOnly && tips.length > 0 && (
         <div className="panel" style={{ marginTop: 12 }}>
           <div className="row between"><b>💡 Часто забывают</b><span className="xs muted">нажмите, чтобы добавить</span></div>
-          <div className="row wrap" style={{ marginTop: 8, gap: 6 }}>
+          <div style={{ marginTop: 6 }}>
             {tips.map((t) => (
-              <span key={t.name} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingRight: 4 }}>
-                <button style={{ background: 'none', border: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', padding: 0, textAlign: 'left' }} onClick={() => addTip(t)} title={t.why}>+ {t.name} <span className="muted">· {rub(t.price)}/{t.unit}</span></button>
-                <button aria-label={`Скрыть: ${t.name}`} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: '0 4px', fontSize: 16 }} onClick={() => setHiddenTips((x) => new Set(x).add(t.name))}>×</button>
-              </span>
+              <div key={t.name} className="tip-row">
+                <button className="tip-add" onClick={() => addTip(t)} title={t.why}><span className="tip-plus" aria-hidden="true">+</span><span className="grow">{t.name}</span><span className="muted num" style={{ whiteSpace: 'nowrap' }}>{rub(t.price)}/{t.unit}</span></button>
+                <button className="tip-x" aria-label={`Скрыть: ${t.name}`} onClick={() => setHiddenTips((x) => new Set(x).add(t.name))}>×</button>
+              </div>
             ))}
           </div>
         </div>
@@ -471,8 +478,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         <button className="btn primary block lg" style={{ marginTop: 12 }} disabled={pdfBusy || !lines.length} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 Отправить заказчику'}</button>
         <p className="xs muted" style={{ margin: '6px 0 0', textAlign: 'center' }}>Красивый PDF придёт вам в чат с ботом — перешлите его заказчику</p>
         <div className="grid2" style={{ marginTop: 8 }}>
-          <button className="btn sm" disabled={pdfBusy} onClick={() => guard(openPdf)}>👀 Посмотреть PDF</button>
-          <button className="btn sm" disabled={pdfBusy} onClick={() => guard(openShare)}>🔗 Отправить ссылкой</button>
+          <button className="btn sm" disabled={pdfBusy} onClick={() => guard(openPdf)}>👀 Посмотреть</button>
+          <button className="btn sm" disabled={pdfBusy} onClick={() => guard(openShare)}>🔗 Ссылкой</button>
         </div>
       </> : <>
       <div className="grid2" style={{ marginTop: 12 }}>
