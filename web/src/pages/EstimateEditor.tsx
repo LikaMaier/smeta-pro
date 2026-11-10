@@ -56,7 +56,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [lines, setLines] = useState<L[]>(() => initial.lines.map(toL));
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved');
-  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract' | 'pay' | 'check' | 'prices' | 'clean'>(null);
+  const [sheet, setSheet] = useState<null | 'head' | 'params' | 'add' | 'more' | 'history' | 'line' | 'share' | 'contract' | 'pay' | 'check' | 'prices' | 'clean' | 'sent'>(null);
   const [share, setShare] = useState<any>(() => ({ url: null, sharedAt: initial.sharedAt, viewedAt: initial.viewedAt, approvedAt: initial.approvedAt, customerComment: initial.customerComment }));
   const [editLine, setEditLine] = useState<string | null>(null);
   const [secEdit, setSecEdit] = useState<string | null>(null);
@@ -250,7 +250,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   };
   const sendFile = async (kind: 'pdf' | 'act' | 'contract' | 'xlsx' | 'xlsxown') => {
     setPdfBusy(true);
-    try { if (dirty) await save(); await post(`/estimates/${initial.id}/file/${kind}/send`); haptic('success'); toast(FILE_OK[kind]); }
+    try { if (dirty) await save(); await post(`/estimates/${initial.id}/file/${kind}/send`); haptic('success'); if (kind === 'pdf' && simple) setSheet('sent'); else toast(FILE_OK[kind]); }
     catch (e: any) { if (e.code !== 'subscription_required') toast(e.message, true); } finally { setPdfBusy(false); }
   };
   const issues = useMemo(() => checkEstimate({
@@ -260,7 +260,9 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     params: { delivery: parseNum(h.delivery), lossReservePct: parseNum(h.lossReservePct), taxPct: parseNum(h.taxPct), extraCosts: parseNum(h.extraCosts) },
   }), [h, lines, totals.total]);
   /** Перед отправкой заказчику — проверка; при замечаниях показываем их и даём отправить всё равно */
-  const guard = (fn: () => void) => { if (issues.length) { setPending(() => fn); setSheet('check'); } else fn(); };
+  // в простом виде останавливаем только на настоящих ошибках (нет цены, нет количества); советы не мешают отправить
+  const blocking = simple ? issues.filter((i) => i.level === 'error') : issues;
+  const guard = (fn: () => void) => { if (blocking.length) { setPending(() => fn); setSheet('check'); } else fn(); };
   const sendPdf = () => guard(() => sendFile('pdf'));
   const openFile = async (kind: 'pdf' | 'act' | 'contract') => {
     setPdfBusy(true);
@@ -326,7 +328,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       <div className="row between" style={{ marginBottom: 8 }}>
         <span className="xs muted">{readOnly ? 'Только просмотр' : saveState === 'saving' ? 'Сохраняю…' : saveState === 'error' ? 'Не сохранено' : dirty ? 'Есть изменения' : 'Сохранено'}</span>
         <div className="row">
-          {simple ? <button className="chip" onClick={() => setSimple(false)}>Все возможности</button> : <>
+          {!simple && <>
             <button className="chip" onClick={() => setSimple(true)}>Простой вид</button>
             <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По разделам</button>
           </>}
@@ -360,6 +362,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
                       в составе: {l.composition.split('\n').map((x) => x.replace(/^[-–•\s]+/, '').trim()).filter(Boolean).join('; ')}
                     </button>
                   )}
+                  {simple && <div className="line-grid line-labels"><span>Сколько</span><span>Ед.</span><span>Цена за {l.unit || 'ед.'}</span></div>}
                   <div className="line-grid">
                     <NumInput value={l.qty} onChange={(v) => setLine(l.k, { qty: v })} placeholder="Кол-во" aria-label="Количество" readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
                     <select className="select" style={{ minHeight: 40, padding: '6px 4px' }} value={l.unit} onChange={(e) => setLine(l.k, { unit: e.target.value })} disabled={readOnly} aria-label="Единица">
@@ -374,7 +377,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
                       <NumInput value={l.matPrice} onChange={(v) => setLine(l.k, { matPrice: v })} unit="₽" aria-label="Цена материала" readOnly={readOnly} />
                     </div>
                   )}
-                  <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.coef !== '' && parseNum(l.coef) !== 1 ? ` · ×${l.coef}` : ''}{l.unconfirmed ? ' · требует уточнения' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>
+                  <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.coef !== '' && parseNum(l.coef) !== 1 ? ` · ×${l.coef}` : ''}{l.unconfirmed ? ' · цена примерная — проверьте' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>
                   {l.matPrice !== '' && totals.lineMat[idx.get(l.k)!] > 0 && <div className="xs muted" style={{ textAlign: 'right' }}>работа {rub(totals.lineWork[idx.get(l.k)!])} + материал {rub(totals.lineMat[idx.get(l.k)!])}</div>}
                 </div>
               ))}
@@ -398,8 +401,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       )}
       {!readOnly && (
         <div className="grid2" style={{ marginTop: 12 }}>
-          <button className="btn primary" onClick={() => setSheet('add')}><Icon.book width={18} />Из справочника</button>
-          <button className="btn" onClick={() => addLines([{}])}><Icon.plus width={18} />Пустая строка</button>
+          <button className="btn primary" onClick={() => setSheet('add')}><Icon.plus width={18} />Добавить работу</button>
+          <button className="btn" onClick={() => addLines([{}])}>✏️ Своя строка</button>
         </div>
       )}
       {!simple && !readOnly && fresh.length > 0 && (
@@ -455,7 +458,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
         <Icon.chevron className="chev" width={20} />
       </button>}
-      {issues.length > 0 && <button className="xs" style={{ background: 'none', border: 0, padding: '8px 0 0', color: issues.some((i) => i.level === 'error') ? 'var(--bad)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={() => { setPending(null); setSheet('check'); }}>⚠️ Проверка сметы: замечаний {issues.length} — посмотреть</button>}
+      {blocking.length > 0 && <button className="xs" style={{ background: 'none', border: 0, padding: '8px 0 0', color: issues.some((i) => i.level === 'error') ? 'var(--bad)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={() => { setPending(null); setSheet('check'); }}>⚠️ {simple ? 'Не везде указана цена или количество — посмотреть' : `Проверка сметы: замечаний ${issues.length} — посмотреть`}</button>}
 
       {!readOnly && !me.access.active && !initial.paidAt && !(me.access.paidEstimateIds || []).includes(initial.id) && (
         <button className="banner" style={{ display: 'block', width: '100%', textAlign: 'left', marginTop: 12, cursor: 'pointer' }} onClick={() => setSheet('clean')}>
@@ -464,11 +467,20 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </button>
       )}
       {simple && <h2 className="section-title">Отправить заказчику</h2>}
+      {simple ? <>
+        <button className="btn primary block lg" style={{ marginTop: 12 }} disabled={pdfBusy || !lines.length} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 Отправить заказчику'}</button>
+        <p className="xs muted" style={{ margin: '6px 0 0', textAlign: 'center' }}>Красивый PDF придёт вам в чат с ботом — перешлите его заказчику</p>
+        <div className="grid2" style={{ marginTop: 8 }}>
+          <button className="btn sm" disabled={pdfBusy} onClick={() => guard(openPdf)}>👀 Посмотреть PDF</button>
+          <button className="btn sm" disabled={pdfBusy} onClick={() => guard(openShare)}>🔗 Отправить ссылкой</button>
+        </div>
+      </> : <>
       <div className="grid2" style={{ marginTop: 12 }}>
         <button className="btn primary" disabled={pdfBusy} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 PDF в Telegram'}</button>
         <button className="btn" disabled={pdfBusy} onClick={() => guard(openPdf)}>Открыть PDF</button>
       </div>
       <button className="btn block" style={{ marginTop: 8 }} disabled={pdfBusy} onClick={() => guard(openShare)}>🔗 Ссылка для заказчика</button>
+      </>}
       {(share.approvedAt || share.viewedAt || share.sharedAt) && (
         <button className="xs" style={{ background: 'none', border: 0, padding: '6px 0 0', color: share.approvedAt ? 'var(--ok)' : 'var(--muted)', cursor: 'pointer', textAlign: 'left' }} onClick={openShare}>
           {share.approvedAt ? `✓ Согласована заказчиком ${date(share.approvedAt)}` : share.viewedAt ? `👀 Заказчик открыл ${date(share.viewedAt)}, ещё не согласовал` : 'Ссылка отправлена, заказчик ещё не открывал'}
@@ -506,15 +518,29 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       {simple && (
         <button className="list-item panel" style={{ marginTop: 14 }} onClick={() => setSimple(false)}>
           <span style={{ fontSize: 22, width: 30, textAlign: 'center', flex: 'none' }} aria-hidden="true">⚙️</span>
-          <div className="grow"><div className="title">Все возможности</div><div className="xs muted">скидки и наценка, график оплаты, договор, акты и КС, прибыль, шаблоны</div></div>
+          <div className="grow"><div className="title">Дополнительно</div><div className="xs muted">скидка и наценка, договор, акты, прибыль — если нужно</div></div>
           <Icon.chevron className="chev" width={20} />
         </button>
       )}
 
       <div className="totalbar"><div className="in">
         <div className="grow"><div className="xs muted">Итого</div><div className="sum num">{rub(totals.total)}</div></div>
-        {!readOnly && <button className="btn primary" onClick={save} disabled={!dirty || saveState === 'saving'}>{saveState === 'saving' ? 'Сохраняю…' : dirty ? 'Сохранить' : 'Сохранено'}</button>}
+        {!readOnly && (simple
+          ? <button className="btn primary" disabled={pdfBusy || !lines.length} onClick={() => sendPdf()}>{pdfBusy ? 'Готовлю…' : '📄 Отправить'}</button>
+          : <button className="btn primary" onClick={save} disabled={!dirty || saveState === 'saving'}>{saveState === 'saving' ? 'Сохраняю…' : dirty ? 'Сохранить' : 'Сохранено'}</button>)}
       </div></div>
+      <Sheet open={sheet === 'sent'} onClose={() => setSheet(null)} title="✅ Смета готова">
+        <div className="stack">
+          <p style={{ margin: 0 }}>PDF уже у вас <b>в чате с ботом</b>. Осталось переслать его заказчику:</p>
+          <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.5 }}>
+            <li>Нажмите кнопку ниже — откроется чат с ботом.</li>
+            <li>Нажмите на файл и держите → «Переслать».</li>
+            <li>Выберите заказчика.</li>
+          </ol>
+          <button className="btn primary block lg" onClick={() => { setSheet(null); if (tg?.close) tg.close(); }}>Открыть чат с ботом</button>
+          <button className="btn block" onClick={() => setSheet(null)}>Остаться в смете</button>
+        </div>
+      </Sheet>
       <div style={{ height: 80 }} />
 
       {/* ---- Ссылка для заказчика ---- */}
@@ -692,16 +718,16 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
               <Field label="Количество"><NumInput value={current.qty} onChange={(v) => setLine(current.k, { qty: v })} unit={current.unit} readOnly={readOnly} /></Field>
               <Field label="Единица"><input className="input" value={current.unit} onChange={(e) => setLine(current.k, { unit: e.target.value })} readOnly={readOnly} /></Field>
               <Field label={current.matPrice !== '' ? 'Цена работы за ед.' : 'Цена за ед.'}><NumInput value={current.price} onChange={(v) => setLine(current.k, { price: v })} unit="₽" readOnly={readOnly} /></Field>
-              <Field label="Цена материала за ед." hint="Если работа с материалом — в одной строке"><NumInput value={current.matPrice} onChange={(v) => setLine(current.k, { matPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>
-              <Field label="Коэффициент" hint="Зима, высота, стеснённо: 1,15"><NumInput value={current.coef} onChange={(v) => setLine(current.k, { coef: v })} unit="×" readOnly={readOnly} placeholder="1" /></Field>
-              <Field label="Закупочная / себестоимость" hint="Не видна заказчику"><NumInput value={current.costPrice} onChange={(v) => setLine(current.k, { costPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>
+              {(!simple || current.matPrice !== '') && <Field label="Цена материала за ед." hint="Если работа с материалом — в одной строке"><NumInput value={current.matPrice} onChange={(v) => setLine(current.k, { matPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>}
+              {!simple && <Field label="Коэффициент" hint="Зима, высота, стеснённо: 1,15"><NumInput value={current.coef} onChange={(v) => setLine(current.k, { coef: v })} unit="×" readOnly={readOnly} placeholder="1" /></Field>}
+              {!simple && <Field label="Закупочная / себестоимость" hint="Не видна заказчику"><NumInput value={current.costPrice} onChange={(v) => setLine(current.k, { costPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>}
             </div>
-            <Field label="В составе" hint="Каждый пункт с новой строки — в смете будет списком под названием">
+            {!simple && <Field label="В составе" hint="Каждый пункт с новой строки — в смете будет списком под названием">
               <textarea className="textarea" style={{ minHeight: 96 }} value={current.composition} onChange={(e) => setLine(current.k, { composition: e.target.value })} readOnly={readOnly} placeholder={'сетка Гиттер 1,73 м\nстолбы 60×60×3000 мм\nметод монтажа — бутование'} />
-            </Field>
+            </Field>}
             <Field label="Примечание"><input className="input" value={current.note} onChange={(e) => setLine(current.k, { note: e.target.value })} readOnly={readOnly} /></Field>
             <datalist id="sections">{[...new Set(lines.map((x) => x.category).filter(Boolean))].map((c) => <option key={c} value={c} />)}</datalist>
-            {!readOnly && (
+            {!readOnly && !simple && (
               <button className={`btn sm block ${isOptionalSection(current.category) ? '' : 'ghost'}`} onClick={() => setLine(current.k, { category: isOptionalSection(current.category) ? current.category.replace(/^\s*по желанию:?\s*/i, '') : `${OPTIONAL_SECTION}${current.category ? `: ${current.category}` : ''}` })}>
                 {isOptionalSection(current.category) ? '↩ Вернуть в основную смету' : '☑ Сделать «по желанию» — заказчик решит сам, в итог не входит'}
               </button>

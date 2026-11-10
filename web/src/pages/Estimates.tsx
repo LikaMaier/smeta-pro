@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { get, post, del } from '../api';
 import { confirmDialog, haptic } from '../tg';
-import { Chips, Icon, Load, SearchBox, State, useDebounced, useLoad, useToast } from '../components/ui';
+import { Chips, Fold, Icon, Load, SearchBox, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, date, EST_STATUS } from '../format';
 
 export default function Estimates() {
@@ -45,14 +45,15 @@ export default function Estimates() {
   return (
     <>
       <div className="page-head">
-        <h1 className="page-title">Мои сметы</h1>
+        <h1 className="page-title">Сметы</h1>
         <div className="row" style={{ gap: 6 }}>
           {(list.data?.length ?? 0) > 0 && <button className="btn sm" onClick={() => setSel((x) => (x ? null : new Set()))}>{sel ? 'Отмена' : 'Выбрать'}</button>}
-          {!sel && <button className="btn primary sm" onClick={() => nav('/new')}><Icon.plus width={18} />Смета</button>}
+          {!sel && <button className="btn primary sm" onClick={() => nav('/new')}><Icon.plus width={18} />Новая</button>}
         </div>
       </div>
+      <SearchBox value={q} onChange={setQ} placeholder="Найти: название или заказчик" />
+      <Fold id="est-filter" title="Фильтр и шаблоны" summary={tab === 'templates' ? 'шаблоны' : status ? EST_STATUS[status] : 'все сметы'}>
       <Chips value={tab} onChange={setTab} options={[{ value: 'list', label: 'Сметы' }, { value: 'templates', label: 'Шаблоны' }]} />
-      <SearchBox value={q} onChange={setQ} placeholder="Поиск по названию, заказчику, позициям" />
       {tab === 'list' && (
         <>
           <Chips value={status} onChange={setStatus} options={[{ value: '', label: 'Все' }, ...Object.entries(EST_STATUS).map(([value, label]) => ({ value, label }))]} />
@@ -62,9 +63,11 @@ export default function Estimates() {
           </div>
         </>
       )}
+      </Fold>
+      <div style={{ height: 10 }} />
       <Load state={list} empty={(d) => (d.length ? null : (
         <State title={tab === 'templates' ? 'Шаблонов нет' : q || status ? 'Ничего не найдено' : 'Смет пока нет'}
-          text={tab === 'templates' ? 'Откройте любую смету и сохраните её как шаблон.' : q || status ? 'Измените поиск или фильтр.' : 'Создайте первую смету.'} />
+          text={tab === 'templates' ? 'Откройте любую смету и сохраните её как шаблон.' : q || status ? 'Измените поиск или фильтр.' : 'Нажмите «Новая» — выберите работу, введите размер, и смета готова.'} />
       ))}>
         {(items) => (
           <div className="list">

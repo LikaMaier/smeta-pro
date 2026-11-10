@@ -53,8 +53,8 @@ function titleOf(path: string): string {
   const seg = path.split('/').filter(Boolean);
   if (!seg.length) return 'СМЕТА PRO';
   const map: Record<string, string> = {
-    estimates: 'Сметы', projects: 'Объекты', catalog: 'Мои цены', calculators: 'Расчёты', finance: 'Финансы',
-    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Ещё', tools: '3D и расчёты', new: 'Новая смета', first: 'Смета за 3 шага', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D', admin: 'Статистика',
+    estimates: 'Сметы', projects: 'Объекты', catalog: 'Расценки', calculators: 'Расчёты', finance: 'Финансы',
+    notes: 'Заметки', assistant: 'ИИ-сметчик', settings: 'Настройки', more: 'Ещё', tools: '3D и расчёты', new: 'Расчёт объекта', first: 'Смета за 3 шага', calendar: 'Календарь и деньги', reminders: 'Напоминания', contacts: 'Записная книжка', masters: 'Мастера', designer: 'Постройки 3D', landscape: 'Благоустройство', fence: 'Заборы и ворота 3D', site: 'План участка', mep: 'Электрика и сантехника 3D', admin: 'Статистика',
   };
   if (seg[0] === 'calculators' && seg[1]) return (getCalculator(seg[1])?.short || getCalculator(seg[1])?.title || 'Расчёт');
   if (seg[0] === 'estimates' && seg[2] === 'acts') return 'Акты';

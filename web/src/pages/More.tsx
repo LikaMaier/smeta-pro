@@ -5,6 +5,7 @@ import { useMe } from '../App';
 import { tg } from '../tg';
 
 const ITEMS = [
+  { to: '/projects', icon: '🏗', title: 'Объекты', text: 'Деньги, долги и документы по объекту' },
   { to: '/calendar', icon: '📅', title: 'Календарь', text: 'Что сделано за день, фото, деньги' },
   { to: '/reminders', icon: '⏰', title: 'Напоминания', text: 'Бот напишет в нужное время' },
   { to: '/finance', icon: '💵', title: 'Финансы', text: 'Прибыль и долги по всем объектам' },

@@ -26,7 +26,7 @@ export default function NewEstimate() {
     const sp = new URLSearchParams(location.search);
     const d = sp.get('dir');
     if (d && getDirection(d)) { try { localStorage.setItem(DIR_KEY, d); } catch { /* */ } return d; }
-    return sp.get('pick') ? null : readDir();
+    return sp.get('pick') ? null : readDir() || TRADES.find((t) => t.id === me.trade)?.dir || null;
   });
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
@@ -63,7 +63,7 @@ export default function NewEstimate() {
   if (!dir) {
     return (
       <>
-        <p className="muted" style={{ marginTop: 0 }}>Чем занимаетесь? Выберите направление — дальше вид работы и готовая смета с ценами.</p>
+        <p className="muted" style={{ marginTop: 0 }}>Что считаем? Выберите — дальше введёте размеры, и смета с ценами готова.</p>
         <SearchBox value={q} onChange={setQ} placeholder="Или найдите: септик, стяжка, кровля…" />
         {qs.length >= 2 && (
           <div className="list" style={{ marginBottom: 12 }}>
@@ -107,9 +107,9 @@ export default function NewEstimate() {
   // ---------- шаг 2: вид работы ----------
   return (
     <>
-      <button className="linklike small" onClick={() => choose(null)} style={{ marginBottom: 6 }}>← Все направления</button>
+      <button className="btn sm" onClick={() => choose(null)} style={{ marginBottom: 10 }}>← Другие работы: кровля, плитка, электрика…</button>
       <div className="dir-head"><span aria-hidden="true">{dir.icon}</span>{dir.title}</div>
-      <p className="muted" style={{ marginTop: 0 }}>Что делаем? Ответьте на 2–3 вопроса — работы и материалы посчитаются сами, материалы можно взять эконом, стандарт или премиум.</p>
+      <p className="muted" style={{ marginTop: 0 }}>Что делаем? Введите размеры — работы и материалы посчитаются сами.</p>
       <div className="list">
         {dir.kinds.map((k) => (
           <button key={k.id} className="list-item" disabled={busy} onClick={() => openKind(k)}>

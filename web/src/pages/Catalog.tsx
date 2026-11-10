@@ -3,7 +3,7 @@ import ShopLink from '../components/ShopLink';
 import { get, post, patch, del } from '../api';
 import { useMe } from '../App';
 import MaterialBase, { baseCategory, baseNote } from '../components/MaterialBase';
-import { Chips, Field, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
+import { Chips, Field, Fold, Icon, Load, NumInput, SearchBox, Sheet, State, useDebounced, useLoad, useToast } from '../components/ui';
 import { rub, date, parseNum, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog } from '../tg';
 import { STARTER_PRICES, STARTER_CATEGORIES } from '../../../shared/starterPrices';
@@ -39,10 +39,12 @@ export default function Catalog() {
   return (
     <>
       <div className="page-head">
-        <h1 className="page-title">Работы и материалы</h1>
-        <button className="btn primary sm" disabled={ro || !listId} onClick={() => setEdit({ ...empty, priceListId: listId })}><Icon.plus width={18} />Позиция</button>
+        <h1 className="page-title">Расценки</h1>
+        <button className="btn primary sm" disabled={ro || !listId} onClick={() => setEdit({ ...empty, priceListId: listId })}><Icon.plus width={18} />Своя</button>
       </div>
-
+      <p className="muted" style={{ marginTop: 0 }}>Нажмите на работу и поставьте <b>свою цену</b> — она сама подставится во все новые сметы.</p>
+      <SearchBox value={q} onChange={setQ} placeholder="Найти работу или материал" />
+      <Fold id="cat-more" title="Дополнительно" summary="материалы «Петрович», цены под ваш город, прайс поставщика">
       <button className="list-item panel" style={{ marginBottom: 12 }} onClick={() => setListsOpen(true)}>
         <div className="grow"><div className="xs muted">Прайс-лист</div><div className="title">{currentList?.name || '…'}</div></div>
         <span className="small muted">{currentList?.itemsCount ?? ''} поз.</span><Icon.chevron className="chev" width={18} />
@@ -66,7 +68,6 @@ export default function Catalog() {
           </div>
         </>
       )}
-      <SearchBox value={q} onChange={setQ} placeholder="Поиск по названию" />
       <Chips value={type} onChange={setType} options={[{ value: '', label: 'Все' }, ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))]} />
       <select className="select" style={{ marginBottom: 12 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Категория">
         <option value="">Все категории</option>
@@ -74,12 +75,14 @@ export default function Catalog() {
       </select>
 
       <div className="row between" style={{ marginBottom: 8 }}>
-        <span className="xs muted">Цена копируется в смету при добавлении. Изменения здесь не меняют сохранённые сметы.</span>
+        <span className="xs muted">Изменения здесь не меняют уже сохранённые сметы.</span>
         {!ro && <button className="btn ghost sm" onClick={() => { setSelecting(!selecting); setSelected(new Set()); }}>{selecting ? 'Отмена' : 'Выбрать'}</button>}
       </div>
+      </Fold>
+      <div style={{ height: 10 }} />
 
       <Load state={items} empty={(d) => (d.length ? null : (
-        <State title={q || type || category ? 'Ничего не найдено' : 'Справочник пуст'}
+        <State title={q || type || category ? 'Ничего не найдено' : 'Расценок пока нет'}
           text={q || type || category ? 'Измените поиск или фильтр.' : 'Добавьте работы и материалы с вашими ценами — они будут подставляться в новые сметы.'}
           action={!ro && !q ? <div className="stack"><button className="btn primary" onClick={() => setStarterOpen(true)}>Заполнить примерными ценами</button><button className="btn" onClick={() => setEdit({ ...empty, priceListId: listId })}>Добавить свою позицию</button></div> : undefined} />
       ))}>

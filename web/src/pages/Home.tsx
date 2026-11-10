@@ -22,8 +22,8 @@ export default function Home() {
 }
 
 /**
- * Главная — просто: «Новая смета» (большая кнопка) → последняя смета → четыре плитки
- *  Мои сметы · Объекты · Мои цены · Ещё. Календарь, финансы, 3D и прочее — внутри «Ещё».
+ * Главная — три вещи: «Расчёт объекта» (большая кнопка) · «Сметы» · «Расценки».
+ *  Ниже — последняя смета и одна строка «Ещё» (объекты, календарь, финансы, 3D, настройки).
  */
 function HomeMain() {
   const { me, refreshMe } = useMe();
@@ -51,13 +51,17 @@ function HomeMain() {
 
       <button className="tile wide home-new" onClick={() => nav(canCreate ? '/new' : '/settings')}>
         <span className="home-new-plus" aria-hidden="true">+</span>
-        Новая смета
-        <small>{!me.access.active && me.access.freeEstimateLeft ? ((me.access.freeLeft ?? 0) > 1000 ? 'сметы бесплатно — без ограничений' : `бесплатно в этом месяце: ещё ${me.access.freeLeft ?? 3}`) : 'выберите направление — смета соберётся сама'}</small>
+        Расчёт объекта
+        <small>{!me.access.active && me.access.freeEstimateLeft && (me.access.freeLeft ?? 0) <= 1000 ? `выберите работу, введите размер — смета готова · бесплатно ещё ${me.access.freeLeft ?? 3}` : 'выберите работу, введите размер — смета готова'}</small>
       </button>
 
 
+      <div className="tiles" style={{ marginTop: 3 }}>
+        <Link className="tile" to="/estimates">📋 Сметы<small>{(recent.data || []).length ? 'открыть, поправить, отправить' : 'здесь будут ваши сметы'}</small></Link>
+        <Link className="tile" to="/catalog">💰 Расценки<small>ваши цены на работы</small></Link>
+      </div>
+
       <IgBonus />
-      <GuideVideo label="▶️ Видеоинструкция: как пользоваться" />
 
       {last.length > 0 && (
         <>
@@ -73,12 +77,13 @@ function HomeMain() {
         </>
       )}
 
-      <div className="tiles" style={{ marginTop: 10 }}>
-        <Link className="tile" to="/estimates">📋 Мои сметы<small>все сметы и шаблоны</small></Link>
-        <Link className="tile" to="/projects">🏗 Объекты<small>{active ? `в работе: ${active}` : 'деньги и долги по объекту'}</small></Link>
-        <Link className="tile" to="/catalog">💰 Мои цены<small>расценки на работы и материалы</small></Link>
-        <Link className="tile" to="/more">☰ Ещё<small>{remToday ? `напоминаний сегодня: ${remToday}` : 'календарь, 3D, настройки'}</small></Link>
+      <div className="list" style={{ marginTop: 12 }}>
+        <Link to="/more" className="list-item">
+          <span style={{ fontSize: 20, width: 26, textAlign: 'center', flex: 'none' }} aria-hidden="true">☰</span>
+          <div className="grow"><div className="title">Ещё</div><div className="xs muted">{remToday ? `напоминаний сегодня: ${remToday} · ` : ''}объекты{active ? ` (в работе: ${active})` : ''}, календарь, 3D, настройки</div></div>
+        </Link>
       </div>
+      <GuideVideo label="▶️ Как пользоваться — видео, 1 минута" />
     </>
   );
 }
