@@ -6,6 +6,7 @@ import { NumInput, useLoad, useToast } from './ui';
 import { n, rub, parseNum, TYPE_LABEL } from '../format';
 import { haptic } from '../tg';
 import { normName } from '../../../shared/names';
+import { isApproxItem } from '../../../shared/notes';
 import { materialVariants, TIER_LABEL, type Tier } from '../../../shared/materialTiers';
 
 /**
@@ -65,7 +66,9 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
     const mine = cat.get(normName(s.name));
     const remembered = myPrices[s.name];
     const defPrice = mine ? String(mine.price) : remembered ?? (s.price != null ? String(s.price) : '');
-    const src: 'own' | 'store' | 'none' = mine ? 'own' : remembered != null ? 'own' : s.price != null ? 'store' : 'none';
+    // «мой прайс» — только цена, которую исполнитель поставил сам; стартовая из справочника — «средняя по рынку»
+    const approx = isApproxItem(mine);
+    const src: 'own' | 'avg' | 'store' | 'none' = mine && !approx ? 'own' : mine ? 'avg' : remembered != null ? 'own' : s.price != null ? 'store' : 'none';
     const price = o.price ?? defPrice;
     const qty = o.qty ?? String(s.qty);
     const on = !o.off;
@@ -118,7 +121,7 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
   return (
     <div className="calc-result">
       <div className="csection">Работы и материалы — можно менять</div>
-      <p className="xs muted" style={{ margin: '4px 0 8px' }}>Цена: <span className="src own">мой прайс</span> — из вашего справочника, <span className="src store">цена магазина</span> / <span className="src store">примерная</span> — ориентировочно по рынку. Меняйте количество и цену — итог пересчитается.</p>
+      <p className="xs muted" style={{ margin: '4px 0 8px' }}>Цена: <span className="src own">мой прайс</span> — цена, которую вы поставили сами; <span className="src store">средняя по рынку</span> / <span className="src store">цена магазина</span> — ориентир, поправьте под себя. Меняйте количество и цену — итог пересчитается.</p>
       {rows.some((r) => r.variants.length) && (
         <div className="tier-all">
           <span className="small">Материалы:</span>
@@ -156,7 +159,7 @@ export default function CalcResult({ calcId, suggestions, estimateTitle, onAdded
                 <NumInput value={r.price} onChange={(v) => set(r.key, { price: v })} unit={`₽/${r.unit}`} placeholder="цена" aria-label={`Цена: ${r.name}`} invalid={false} />
               </div>
               <div className="cr-meta xs">
-                {r.edited || r.qtyEdited ? <span className="src edited">изменено</span> : r.src === 'own' ? <span className="src own">мой прайс</span> : r.src === 'store' ? <span className="src store">{r.type === 'material' ? 'цена магазина' : 'примерная'}</span> : <span className="src none">нет цены</span>}
+                {r.edited || r.qtyEdited ? <span className="src edited">изменено</span> : r.src === 'own' ? <span className="src own">мой прайс</span> : r.src === 'avg' ? <span className="src store">средняя по рынку</span> : r.src === 'store' ? <span className="src store">{r.type === 'material' ? 'цена магазина' : 'примерная'}</span> : <span className="src none">нет цены</span>}
                 {r.type === 'material' && <ShopLink name={r.name} />}
                 {r.qtyEdited && <button className="linklike" onClick={() => set(r.key, { qty: undefined })}>вернуть расчётное: {n(r.baseQty)} {r.unit}</button>}
                 {r.edited && <button className="linklike" onClick={() => set(r.key, { price: undefined })}>вернуть цену</button>}

@@ -7,6 +7,7 @@ import { Chips, Field, Fold, Icon, Load, NumInput, SearchBox, Sheet, State, useD
 import { rub, date, parseNum, TYPE_LABEL, UNITS } from '../format';
 import { confirmDialog } from '../tg';
 import { STARTER_PRICES, STARTER_CATEGORIES } from '../../../shared/starterPrices';
+import { isApproxItem } from '../../../shared/notes';
 
 const empty = { name: '', type: 'work', category: '', unit: 'м²', price: '', costPrice: '', description: '', notes: '', active: true };
 
@@ -20,6 +21,7 @@ export default function Catalog() {
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [category, setCategory] = useState('');
+  const [mineOnly, setMineOnly] = useState(false); // только цены, которые исполнитель поставил сам
   const dq = useDebounced(q);
   const items = useLoad(() => (listId ? get<any[]>('/items', { priceListId: listId, q: dq, type, category, includeInactive: '1' }) : Promise.resolve([])), [listId, dq, type, category]);
   const cats = useLoad(() => get<string[]>('/categories'), []);
@@ -43,7 +45,13 @@ export default function Catalog() {
         <button className="btn primary sm" disabled={ro || !listId} onClick={() => setEdit({ ...empty, priceListId: listId })}><Icon.plus width={18} />Своя</button>
       </div>
       <p className="muted" style={{ marginTop: 0 }}>Нажмите на работу и поставьте <b>свою цену</b> — она сама подставится во все новые сметы.</p>
-      <SearchBox value={q} onChange={setQ} placeholder="Найти работу или материал" />
+      <SearchBox value={q} onChange={setQ} placeholder="Найти: плитка пол, розетки, ламинат…" />
+      {/* разделы — на виду: в справочнике сотни работ, листать их подряд долго */}
+      <div className="seg" role="tablist" aria-label="Раздел">
+        <button role="tab" aria-selected={!category && !mineOnly} className={`chip ${!category && !mineOnly ? 'on' : ''}`} onClick={() => { setCategory(''); setMineOnly(false); }}>Все</button>
+        <button role="tab" aria-selected={mineOnly} className={`chip ${mineOnly ? 'on' : ''}`} onClick={() => { setMineOnly(!mineOnly); setCategory(''); }}>✓ Мои цены</button>
+        {(cats.data || []).map((c) => <button key={c} role="tab" aria-selected={category === c} className={`chip ${category === c ? 'on' : ''}`} onClick={() => { setCategory(category === c ? '' : c); setMineOnly(false); }}>{c}</button>)}
+      </div>
       <Fold id="cat-more" title="Дополнительно" summary="материалы «Петрович», цены под ваш город, прайс поставщика">
       <button className="list-item panel" style={{ marginBottom: 12 }} onClick={() => setListsOpen(true)}>
         <div className="grow"><div className="xs muted">Прайс-лист</div><div className="title">{currentList?.name || '…'}</div></div>
@@ -69,10 +77,6 @@ export default function Catalog() {
         </>
       )}
       <Chips value={type} onChange={setType} options={[{ value: '', label: 'Все' }, ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))]} />
-      <select className="select" style={{ marginBottom: 12 }} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Категория">
-        <option value="">Все категории</option>
-        {(cats.data || []).map((c) => <option key={c}>{c}</option>)}
-      </select>
 
       <div className="row between" style={{ marginBottom: 8 }}>
         <span className="xs muted">Изменения здесь не меняют уже сохранённые сметы.</span>
@@ -81,19 +85,21 @@ export default function Catalog() {
       </Fold>
       <div style={{ height: 10 }} />
 
-      <Load state={items} empty={(d) => (d.length ? null : (
+      <Load state={items} empty={(d) => ((mineOnly ? d.filter((i: any) => !isApproxItem(i)) : d).length ? null : mineOnly ? (
+        <State title="Своих цен пока нет" text="Нажмите на любую работу и поставьте свою цену — она появится здесь и будет подставляться в новые сметы." action={<button className="btn" onClick={() => setMineOnly(false)}>Показать все работы</button>} />
+      ) : (
         <State title={q || type || category ? 'Ничего не найдено' : 'Расценок пока нет'}
           text={q || type || category ? 'Измените поиск или фильтр.' : 'Добавьте работы и материалы с вашими ценами — они будут подставляться в новые сметы.'}
           action={!ro && !q ? <div className="stack"><button className="btn primary" onClick={() => setStarterOpen(true)}>Заполнить примерными ценами</button><button className="btn" onClick={() => setEdit({ ...empty, priceListId: listId })}>Добавить свою позицию</button></div> : undefined} />
       ))}>
         {(list) => (
           <div className="list">
-            {list.map((it) => (
+            {(mineOnly ? list.filter((i: any) => !isApproxItem(i)) : list).map((it) => (
               <button key={it.id} className="list-item" onClick={() => (selecting ? toggle(it.id) : setEdit({ ...it, price: String(it.price), costPrice: it.costPrice == null ? '' : String(it.costPrice) }))} style={{ opacity: it.active ? 1 : 0.5 }}>
                 {selecting && <input type="checkbox" readOnly checked={selected.has(it.id)} aria-label="Выбрать" />}
                 <div className="grow">
-                  <div className="title ellipsis">{it.name}</div>
-                  <div className="xs muted">{it.category} · {TYPE_LABEL[it.type]}{!it.active ? ' · неактивна' : ''} {it.params?.starter && <span className="badge accent">примерная</span>}</div>
+                  <div className="title">{it.name}</div>
+                  <div className="xs muted">{it.category} · {TYPE_LABEL[it.type]}{!it.active ? ' · неактивна' : ''} {isApproxItem(it) ? <span className="badge accent">примерная</span> : <span className="badge ok">моя цена</span>}</div>
                 </div>
                 <div className="right"><div className="num" style={{ fontWeight: 700 }}>{rub(it.price)}</div><div className="xs muted">за {it.unit}</div></div>
               </button>

@@ -3,7 +3,7 @@ import ShopLink from '../components/ShopLink';
 import { materialVariants, currentTier } from '../../../shared/materialTiers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { get, post, put, del } from '../api';
-import { calcEstimate, variantTotals, isOptionalSection, OPTIONAL_SECTION } from '../../../shared/estimate';
+import { calcEstimate, variantTotals, isOptionalSection, OPTIONAL_SECTION, TAX_PRESETS } from '../../../shared/estimate';
 import { checkEstimate } from '../../../shared/estimateCheck';
 import { forgottenFor, WORK_COEFS, coefTag, PACK_UNIT } from '../../../shared/forgotten';
 import { payStages, DEFAULT_SCHEDULE } from '../../../shared/payments';
@@ -16,6 +16,7 @@ import { rub, n, pct, date, dateInput, parseNum, EST_STATUS, TYPE_LABEL, UNITS }
 import { confirmDialog, haptic, tg } from '../tg';
 import { normName } from '../../../shared/names';
 import { compositionFor } from '../../../shared/compositions';
+import { clearServiceNote, hasServiceNote } from '../../../shared/notes';
 import NameSuggest, { useSuggestIndex, type SuggestItem } from '../components/NameSuggest';
 
 type L = { k: string; id?: string; name: string; qty: string; unit: string; price: string; matPrice: string; coef: string; composition: string; costPrice: string; type: string; category: string; note: string; catalogItemId?: string | null; unconfirmed?: boolean };
@@ -62,6 +63,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const [secEdit, setSecEdit] = useState<string | null>(null);
   const [pending, setPending] = useState<null | (() => void)>(null);
   const [raise, setRaise] = useState({ pct: '', scope: 'all' });
+  const [taxPick, setTaxPick] = useState(''); // какая кнопка налога нажата (у «Самозанятый 6%» и «УСН 6%» процент одинаковый)
   const [grouped, setGrouped] = useState(() => initial.lines.some((l: any) => l.category));
   const [restore, setRestore] = useState<any>(null);
   const [savedTpl, setSavedTpl] = useState(false);
@@ -88,6 +90,15 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
   const change = useCallback(() => setDirty(true), []);
   const setHead = (patch: Partial<H>) => { setH((x) => ({ ...x, ...patch })); change(); };
   const setLine = (k: string, patch: Partial<L>) => { setLines((ls) => ls.map((l) => (l.k === k ? { ...l, ...patch } : l))); change(); };
+  /** Исполнитель сам поправил цену или количество — служебная пометка («примерная цена — проверьте») про них больше не нужна */
+  const setChecked = (k: string, what: 'price' | 'qty', patch: Partial<L>) => {
+    setLines((ls) => ls.map((l) => {
+      if (l.k !== k) return l;
+      const note = clearServiceNote(l.note, what);
+      return { ...l, ...patch, note, unconfirmed: Boolean(l.unconfirmed) && hasServiceNote(note) };
+    }));
+    change();
+  };
 
   // ---- Мои расценки: справочник для подстановки и «запомнить цены из сметы»
   const cat = useLoad(() => get<any[]>('/items').catch(() => []), []);
@@ -131,6 +142,9 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     }).map((l) => ({ l, it: catMap.get(normName(l.name)) as any }));
   }, [lines, catMap, cat.data]);
   const [skip, setSkip] = useState<Set<string>>(new Set());
+  // «Добавить работу»: сначала разделы справочника, из которых уже есть работы в этой смете
+  const relatedCats = useMemo(() => [...new Set(lines.map((l) => (catMap.get(normName(l.name)) as any)?.category).filter(Boolean))] as string[], [lines, catMap]);
+  const haveNames = useMemo(() => new Set(lines.map((l) => normName(l.name))), [lines]);
   const savePrices = async () => {
     const pick = fresh.filter((x) => !skip.has(x.l.k));
     if (!pick.length) return toast('Ничего не выбрано', true);
@@ -296,6 +310,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
     return [...m.entries()].map(([cat, items]) => ({ cat, items }));
   }, [lines, grouped]);
   const idx = new Map(lines.map((l, i) => [l.k, i]));
+  const curTax = parseNum(h.taxPct);
+  const activeTax = TAX_PRESETS.find((t) => t.pct === curTax && t.label === taxPick) || TAX_PRESETS.find((t) => t.pct === curTax);
   const current = lines.find((l) => l.k === editLine);
 
   return (
@@ -325,9 +341,10 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
         </div>
       )}
 
-      <div className="row between" style={{ marginBottom: 8 }}>
-        <span className="xs muted">{readOnly ? 'Только просмотр' : saveState === 'saving' ? 'Сохраняю…' : saveState === 'error' ? 'Не сохранено' : dirty ? 'Есть изменения' : 'Сохранено'}</span>
-        <div className="row">
+      {/* на узком экране подпись + две кнопки + «⋯» не помещались в строку и растягивали страницу вширь — разрешаем перенос */}
+      <div className="row between" style={{ marginBottom: 8, flexWrap: 'wrap', rowGap: 6 }}>
+        <span className="xs muted" style={{ minWidth: 0 }}>{readOnly ? 'Только просмотр' : saveState === 'saving' ? 'Сохраняю…' : saveState === 'error' ? 'Не сохранено' : dirty ? 'Есть изменения' : 'Сохранено'}</span>
+        <div className="row" style={{ marginLeft: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {!simple && <>
             <button className="chip" onClick={() => setSimple(true)}>Простой вид</button>
             <button className={`chip ${grouped ? 'on' : ''}`} onClick={() => setGrouped(!grouped)}>По разделам</button>
@@ -364,27 +381,27 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
                   )}
                   {simple ? (
                     <div className="sline-row">
-                      <NumInput value={l.qty} onChange={(v) => setLine(l.k, { qty: v })} unit={l.unit} placeholder="0" aria-label={`Количество, ${l.unit}`} readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
+                      <NumInput value={l.qty} onChange={(v) => setChecked(l.k, 'qty', { qty: v })} unit={l.unit} placeholder="0" aria-label={`Количество, ${l.unit}`} readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
                       <span className="sline-x" aria-hidden="true">×</span>
-                      <NumInput value={l.price} onChange={(v) => setLine(l.k, { price: v })} unit="₽" aria-label={l.matPrice !== '' ? 'Цена работы' : 'Цена'} placeholder="цена" readOnly={readOnly} invalid={parseNum(l.price) < 0} />
+                      <NumInput value={l.price} onChange={(v) => setChecked(l.k, 'price', { price: v })} unit="₽" aria-label={l.matPrice !== '' ? 'Цена работы' : 'Цена'} placeholder="цена" readOnly={readOnly} invalid={parseNum(l.price) < 0} />
                     </div>
                   ) : (<>
                   <div className="line-grid">
-                    <NumInput value={l.qty} onChange={(v) => setLine(l.k, { qty: v })} placeholder="Кол-во" aria-label="Количество" readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
+                    <NumInput value={l.qty} onChange={(v) => setChecked(l.k, 'qty', { qty: v })} placeholder="Кол-во" aria-label="Количество" readOnly={readOnly} invalid={parseNum(l.qty) < 0} />
                     <select className="select" style={{ minHeight: 40, padding: '6px 4px' }} value={l.unit} onChange={(e) => setLine(l.k, { unit: e.target.value })} disabled={readOnly} aria-label="Единица">
                       {[...new Set([l.unit, ...UNITS])].map((u) => <option key={u}>{u}</option>)}
                     </select>
-                    <NumInput value={l.price} onChange={(v) => setLine(l.k, { price: v })} unit="₽" aria-label={l.matPrice !== '' ? 'Цена работы' : 'Цена'} placeholder={l.matPrice !== '' ? 'Работа' : 'Цена'} readOnly={readOnly} invalid={parseNum(l.price) < 0} />
+                    <NumInput value={l.price} onChange={(v) => setChecked(l.k, 'price', { price: v })} unit="₽" aria-label={l.matPrice !== '' ? 'Цена работы' : 'Цена'} placeholder={l.matPrice !== '' ? 'Работа' : 'Цена'} readOnly={readOnly} invalid={parseNum(l.price) < 0} />
                   </div>
                   </>)}
                   {l.matPrice !== '' && (
                     <div className="line-grid mat">
                       <span className="xs muted" style={{ alignSelf: 'center' }}>+ материал</span>
                       <span />
-                      <NumInput value={l.matPrice} onChange={(v) => setLine(l.k, { matPrice: v })} unit="₽" aria-label="Цена материала" readOnly={readOnly} />
+                      <NumInput value={l.matPrice} onChange={(v) => setChecked(l.k, 'price', { matPrice: v })} unit="₽" aria-label="Цена материала" readOnly={readOnly} />
                     </div>
                   )}
-                  {simple ? <div className="sline-foot"><span className="sline-note">{l.unconfirmed ? 'цена примерная — проверьте' : ''}</span><b className="sline-sum num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div> : <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.coef !== '' && parseNum(l.coef) !== 1 ? ` · ×${l.coef}` : ''}{l.unconfirmed ? ' · цена примерная — проверьте' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>}
+                  {simple ? <div className="sline-foot"><span className="sline-note">{l.unconfirmed ? (hasServiceNote(clearServiceNote(l.note, 'qty')) ? 'цена примерная — проверьте' : 'проверьте количество') : ''}</span><b className="sline-sum num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div> : <div className="line-sum"><span className="muted">{TYPE_LABEL[l.type]}{l.category && !grouped ? ` · ${l.category}` : ''}{l.coef !== '' && parseNum(l.coef) !== 1 ? ` · ×${l.coef}` : ''}{l.unconfirmed ? ' · цена примерная — проверьте' : ''}</span><b className="num">{rub(totals.lineAmounts[idx.get(l.k)!])}</b></div>}
                   {l.matPrice !== '' && totals.lineMat[idx.get(l.k)!] > 0 && <div className="xs muted" style={{ textAlign: 'right' }}>работа {rub(totals.lineWork[idx.get(l.k)!])} + материал {rub(totals.lineMat[idx.get(l.k)!])}</div>}
                 </div>
               ))}
@@ -645,11 +662,24 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             <Field label="Наценка" hint="На подытог и резерв"><NumInput value={h.markupPct} onChange={(v) => setHead({ markupPct: v })} unit="%" /></Field>
             <Field label="Скидка" hint="После наценки"><NumInput value={h.discountPct} onChange={(v) => setHead({ discountPct: v })} unit="%" /></Field>
             <Field label="Резерв на потери" hint="От суммы материалов"><NumInput value={h.lossReservePct} onChange={(v) => setHead({ lossReservePct: v })} unit="%" /></Field>
-            <Field label="Налог" hint="Сверху. Самозанятый — 4% (физлица) или 6% (фирмы); НДС 20% — только на ОСН"><NumInput value={h.taxPct} onChange={(v) => setHead({ taxPct: v })} unit="%" /></Field>
+            <Field label="Налог" hint="Начисляется сверху. Готовые ставки — ниже"><NumInput value={h.taxPct} onChange={(v) => setHead({ taxPct: v })} unit="%" /></Field>
             <Field label="Доставка"><NumInput value={h.delivery} onChange={(v) => setHead({ delivery: v })} unit="₽" /></Field>
             <Field label="Доп. расходы"><NumInput value={h.extraCosts} onChange={(v) => setHead({ extraCosts: v })} unit="₽" /></Field>
           </div>
           <p className="xs muted">Порядок: подытог → резерв → наценка → скидка → доставка и доп. расходы → налог. Коэффициенты строк и разделов применяются к ценам.</p>
+          <div className="panel stack">
+            <div className="title" style={{ fontWeight: 700 }}>Налог — готовые ставки</div>
+            <div className="row wrap" style={{ gap: 6 }}>
+              {TAX_PRESETS.map((t) => <button key={t.label} className={`chip ${activeTax === t ? 'on' : ''}`} disabled={readOnly} onClick={() => { setTaxPick(t.label); setHead({ taxPct: String(t.pct) }); }}>{t.label}</button>)}
+            </div>
+            {(() => {
+              const cur = curTax, p = activeTax;
+              if (!cur) return <div className="xs muted">Налог в смету не добавляется: вы закладываете его в свои цены или платите сами.</div>;
+              if (p?.rate) return <div className="xs muted">Сверху {pct(cur)}, а не {p.rate}%: налог {p.rate}% берут со всей полученной суммы, вместе с этой надбавкой. Так после уплаты налога ({rub(Math.round(totals.total * p.rate) / 100)}) у вас останется ровно {rub(Math.round((totals.total - Math.round(totals.total * p.rate) / 100) * 100) / 100)}.</div>;
+              if (p?.vat) return <div className="xs muted">НДС {pct(cur)} начисляется на сумму без налога: {rub(totals.tax)}. С 2026 года основная ставка — 22%, на УСН — 5% или 7%. Самозанятые и УСН без НДС его не выставляют.</div>;
+              return <div className="xs muted">Своя ставка {pct(cur)} — прибавляется к сумме сметы: {rub(totals.tax)}.</div>;
+            })()}
+          </div>
           <div className="panel stack">
             <div className="row between"><div className="title" style={{ fontWeight: 700 }}>Три варианта для заказчика</div>
               <input type="checkbox" id="showVariants" checked={h.showVariants} disabled={readOnly || !variants} onChange={(e) => setHead({ showVariants: e.target.checked })} aria-label="Показать заказчику три варианта" style={{ width: 22, height: 22 }} /></div>
@@ -722,10 +752,10 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
             <div className="grid2">
               <Field label="Тип"><select className="select" value={current.type} onChange={(e) => setLine(current.k, { type: e.target.value })} disabled={readOnly}>{Object.entries(TYPE_LABEL).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></Field>
               <Field label="Раздел"><input className="input" value={current.category} onChange={(e) => setLine(current.k, { category: e.target.value })} readOnly={readOnly} placeholder="Напр. Фундамент" list="sections" /></Field>
-              <Field label="Количество"><NumInput value={current.qty} onChange={(v) => setLine(current.k, { qty: v })} unit={current.unit} readOnly={readOnly} /></Field>
+              <Field label="Количество"><NumInput value={current.qty} onChange={(v) => setChecked(current.k, 'qty', { qty: v })} unit={current.unit} readOnly={readOnly} /></Field>
               <Field label="Единица"><input className="input" value={current.unit} onChange={(e) => setLine(current.k, { unit: e.target.value })} readOnly={readOnly} /></Field>
-              <Field label={current.matPrice !== '' ? 'Цена работы за ед.' : 'Цена за ед.'}><NumInput value={current.price} onChange={(v) => setLine(current.k, { price: v })} unit="₽" readOnly={readOnly} /></Field>
-              {(!simple || current.matPrice !== '') && <Field label="Цена материала за ед." hint="Если работа с материалом — в одной строке"><NumInput value={current.matPrice} onChange={(v) => setLine(current.k, { matPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>}
+              <Field label={current.matPrice !== '' ? 'Цена работы за ед.' : 'Цена за ед.'}><NumInput value={current.price} onChange={(v) => setChecked(current.k, 'price', { price: v })} unit="₽" readOnly={readOnly} /></Field>
+              {(!simple || current.matPrice !== '') && <Field label="Цена материала за ед." hint="Если работа с материалом — в одной строке"><NumInput value={current.matPrice} onChange={(v) => setChecked(current.k, 'price', { matPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>}
               {!simple && <Field label="Коэффициент" hint="Зима, высота, стеснённо: 1,15"><NumInput value={current.coef} onChange={(v) => setLine(current.k, { coef: v })} unit="×" readOnly={readOnly} placeholder="1" /></Field>}
               {!simple && <Field label="Закупочная / себестоимость" hint="Не видна заказчику"><NumInput value={current.costPrice} onChange={(v) => setLine(current.k, { costPrice: v })} unit="₽" readOnly={readOnly} placeholder="—" /></Field>}
             </div>
@@ -739,7 +769,7 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
                 {isOptionalSection(current.category) ? '↩ Вернуть в основную смету' : '☑ Сделать «по желанию» — заказчик решит сам, в итог не входит'}
               </button>
             )}
-            {current.unconfirmed && <label className="row small"><input type="checkbox" checked={!current.unconfirmed} onChange={() => setLine(current.k, { unconfirmed: false })} />Позиция уточнена</label>}
+            {current.unconfirmed && <label className="row small"><input type="checkbox" checked={!current.unconfirmed} onChange={() => setLine(current.k, { unconfirmed: false, note: clearServiceNote(clearServiceNote(current.note, 'price'), 'qty') })} />Цена и количество проверены</label>}
             {!readOnly && (
               <div className="row wrap">
                 <button className="btn sm" onClick={() => move(current.k, -1)}><Icon.up width={16} />Выше</button>
@@ -753,8 +783,8 @@ function Editor({ initial, reload }: { initial: any; reload: () => void }) {
       </Sheet>
 
       {/* ---- Добавить из справочника ---- */}
-      <Sheet open={sheet === 'add'} onClose={() => setSheet(null)} title="Добавить из справочника">
-        {sheet === 'add' && <CatalogPicker onPick={(it) => addLines([{ name: it.name, unit: it.unit, price: String(it.price), matPrice: Number(it.params?.matPrice) > 0 ? String(it.params.matPrice) : '', composition: it.description || '', costPrice: it.costPrice == null ? '' : String(it.costPrice), type: it.type, category: it.category, catalogItemId: it.id }])} />}
+      <Sheet open={sheet === 'add'} onClose={() => setSheet(null)} title="Добавить работу">
+        {sheet === 'add' && <CatalogPicker related={relatedCats} have={haveNames} onPick={(it) => addLines([{ name: it.name, unit: it.unit, price: String(it.price), matPrice: Number(it.params?.matPrice) > 0 ? String(it.params.matPrice) : '', composition: it.description || '', costPrice: it.costPrice == null ? '' : String(it.costPrice), type: it.type, category: it.category, catalogItemId: it.id }])} />}
       </Sheet>
 
       {/* ---- Действия ---- */}
@@ -851,13 +881,20 @@ function HeadForm({ h, setHead, readOnly }: { h: H; setHead: (p: Partial<H>) => 
   );
 }
 
-export function CatalogPicker({ onPick }: { onPick: (item: any) => void }) {
+export function CatalogPicker({ onPick, related = [], have }: { onPick: (item: any) => void; related?: string[]; have?: Set<string> }) {
   const toast = useToast();
   const lists = useLoad(() => get<any[]>('/pricelists'), []);
+  const cats = useLoad(() => get<string[]>('/categories').catch(() => []), []);
   const [listId, setListId] = useState('');
   const [q, setQ] = useState('');
+  // '*' — «к этой смете»: разделы, из которых в смете уже есть работы; '' — все
+  const [cat, setCat] = useState<string>(related.length ? '*' : '');
   const dq = useDebounced(q, 250);
-  const items = useLoad(() => get<any[]>('/items', { priceListId: listId, q: dq }), [listId, dq]);
+  const searching = dq.trim().length >= 2;
+  const items = useLoad(() => get<any[]>('/items', { priceListId: listId, q: dq, category: searching || cat === '*' ? '' : cat }), [listId, dq, searching ? '' : cat]);
+  const [added, setAdded] = useState<Set<string>>(new Set());
+  const pick = (it: any) => { onPick(it); setAdded((x) => new Set(x).add(it.id)); toast(`Добавлено: ${it.name}`); };
+  const view = (list: any[]) => (!searching && cat === '*' ? list.filter((i) => related.includes(i.category)) : list);
   return (
     <>
       {(lists.data?.length || 0) > 1 && (
@@ -865,17 +902,27 @@ export function CatalogPicker({ onPick }: { onPick: (item: any) => void }) {
           {lists.data!.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
       )}
-      <SearchBox value={q} onChange={setQ} placeholder="Найти работу или материал" />
-      <Load state={items} empty={(d) => (d.length ? null : dq.trim().length >= 2 ? <div className="xs muted" style={{ margin: '4px 0' }}>В вашем справочнике не нашлось — смотрите прайс ниже.</div> : <State title="Справочник пуст" text="Добавьте свои работы и материалы с ценами в разделе «Справочник» или найдите материал в прайсе «Петровича»." />)}>
+      <SearchBox value={q} onChange={setQ} placeholder="Найти: плитка пол, розетки, грунтовка…" />
+      {!searching && (
+        <div className="seg" role="tablist" aria-label="Раздел">
+          {related.length > 0 && <button role="tab" aria-selected={cat === '*'} className={`chip ${cat === '*' ? 'on' : ''}`} onClick={() => setCat('*')}>К этой смете</button>}
+          <button role="tab" aria-selected={cat === ''} className={`chip ${cat === '' ? 'on' : ''}`} onClick={() => setCat('')}>Все</button>
+          {[...related, ...(cats.data || []).filter((c) => !related.includes(c))].map((c) => <button key={c} role="tab" aria-selected={cat === c} className={`chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c}</button>)}
+        </div>
+      )}
+      <Load state={items} empty={(d) => (view(d).length ? null : dq.trim().length >= 2 ? <div className="xs muted" style={{ margin: '4px 0' }}>В вашем справочнике не нашлось — смотрите прайс ниже.</div> : <State title="Справочник пуст" text="Добавьте свои работы и материалы с ценами в разделе «Справочник» или найдите материал в прайсе «Петровича»." />)}>
         {(list) => (
           <div className="list">
-            {list.map((it) => (
-              <button key={it.id} className="list-item" onClick={() => { onPick(it); toast(`Добавлено: ${it.name}`); }}>
-                <div className="grow"><div className="title ellipsis">{it.name}</div><div className="xs muted">{it.category} · {TYPE_LABEL[it.type]}</div></div>
-                <div className="num right small">{rub(it.price)}<div className="xs muted">за {it.unit}</div></div>
-                <Icon.plus width={18} style={{ color: 'var(--accent)' }} />
-              </button>
-            ))}
+            {view(list).map((it) => {
+              const inEst = added.has(it.id) || Boolean(have?.has(normName(it.name)));
+              return (
+                <button key={it.id} className="list-item" onClick={() => pick(it)}>
+                  <div className="grow"><div className="title">{it.name}</div><div className="xs muted">{it.category} · {TYPE_LABEL[it.type]}{inEst ? <span style={{ color: 'var(--ok)' }}> · ✓ уже в смете</span> : ''}</div></div>
+                  <div className="num right small" style={{ flex: 'none' }}>{rub(it.price)}<div className="xs muted">за {it.unit}</div></div>
+                  <Icon.plus width={18} style={{ color: 'var(--accent)', flex: 'none' }} />
+                </button>
+              );
+            })}
           </div>
         )}
       </Load>

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CALCULATORS, CALC_GROUPS, getCalculator, runCalc } from '../../../shared/calculators';
+import { CALCULATORS, CALC_GROUPS, getCalculator, runCalc, visibleFields, type CalcField } from '../../../shared/calculators';
+import { evalExpr, isExpr } from '../../../shared/expr';
 import { get, post } from '../api';
 import { useMe } from '../App';
-import { Field, Icon, NumInput, Sheet, State, useLoad, useToast } from '../components/ui';
+import { Field, Fold, Icon, NumInput, Sheet, State, useLoad, useToast } from '../components/ui';
 import { n, rub, parseNum, TYPE_LABEL } from '../format';
 import CalcResult from '../components/CalcResult';
 import { parseSet } from '../../../shared/directions';
@@ -34,6 +35,37 @@ export function CalculatorPage() {
     try { return runCalc(calc, values); } catch (e: any) { return { errors: { _: e.message }, output: null }; }
   }, [calc, values]);
   if (!calc) return <State title="Калькулятор не найден" />;
+  // Показываем только поля, которые относятся к выбранной работе; редкие — в «Дополнительно»
+  const shown = visibleFields(calc, values);
+  const main = shown.filter((f) => !f.adv);
+  const adv = shown.filter((f) => f.adv);
+  const short = (f: CalcField) => f.label.replace(/\s*\(.*\)$/, '').toLowerCase();
+  const advChanged = adv.filter((f) => String(values[f.key] ?? '') !== String(f.default ?? '') && !(f.type !== 'select' && !Number(String(values[f.key]).replace(',', '.')) && !Number(f.default)))
+    .map((f) => (f.type === 'select' ? `${short(f)}: ${f.options?.find((o) => o.value === String(values[f.key]))?.label ?? ''}` : `${short(f)}: ${values[f.key]}`));
+  const advHint = adv.slice(-3).map(short).join(', ');
+  const row = (f: CalcField) => {
+    const err = touched || values[f.key] !== '' ? res?.errors[f.key] : undefined;
+    const set = (v: any) => { setValues((x) => ({ ...x, [f.key]: v })); setTouched(true); };
+    return (
+      <div className="crow" key={f.key}>
+        <label className="lbl" htmlFor={`f_${f.key}`}>{f.label}</label>
+        {f.type === 'select' ? (
+          <select id={`f_${f.key}`} className="cinput" value={values[f.key]} onChange={(e) => set(e.target.value)} style={{ gridColumn: 'span 2' }}>
+            {f.options!.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        ) : f.type === 'text' ? (
+          <input id={`f_${f.key}`} className={`cinput ${err ? 'invalid' : ''}`} style={{ gridColumn: 'span 2', fontSize: 20 }} value={values[f.key]} onChange={(e) => set(e.target.value)} />
+        ) : (
+          // можно считать прямо в поле: 3,2*4,1 — при выходе подставится результат
+          <input id={`f_${f.key}`} className={`cinput ${err ? 'invalid' : ''}`} inputMode="decimal" value={String(values[f.key] ?? '').replace(/(\d)\.(?=\d)/g, '$1,')} placeholder={f.optional ? '—' : ''}
+            onChange={(e) => set(e.target.value.replace(/[^\d.,\-+*/()×xх ]/gi, ''))}
+            onBlur={(e) => { if (isExpr(e.target.value)) { const v = evalExpr(e.target.value); if (v != null) set(String(v)); } }} />
+        )}
+        {f.type !== 'select' && f.type !== 'text' && <span className="unit" style={(f.unit?.length || 0) > 3 ? { fontSize: 13 } : undefined}>{f.unit || ''}</span>}
+        {err ? <div className="cerr">{err}</div> : f.hint ? <div className="chint">{f.hint}</div> : null}
+      </div>
+    );
+  };
   const out = res?.output;
   const priceIdx = calc.priceRow ?? Math.max(0, out?.rows.findIndex((r) => r.primary) ?? 0);
   const priceRow = out?.rows[priceIdx];
@@ -45,27 +77,12 @@ export function CalculatorPage() {
     <>
       <div className="box" style={{ marginBottom: 4 }}>{calc.title}</div>
       {COVERED_BY_MASTER[calc.id] && <Link to={`/calculators/${COVERED_BY_MASTER[calc.id]}`} className="panel" style={{ display: 'block', padding: 10, margin: '6px 0', color: 'inherit' }}><b>👷 Полный расчёт — у мастера</b><div className="xs muted">Работы, материалы и цены одной сметой</div></Link>}
-      {calc.fields.map((f) => {
-        const err = touched || values[f.key] !== '' ? res?.errors[f.key] : undefined;
-        const set = (v: any) => { setValues((x) => ({ ...x, [f.key]: v })); setTouched(true); };
-        return (
-          <div className="crow" key={f.key}>
-            <label className="lbl" htmlFor={`f_${f.key}`}>{f.label}</label>
-            {f.type === 'select' ? (
-              <select id={`f_${f.key}`} className="cinput" value={values[f.key]} onChange={(e) => set(e.target.value)} style={{ gridColumn: 'span 2' }}>
-                {f.options!.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            ) : f.type === 'text' ? (
-              <input id={`f_${f.key}`} className={`cinput ${err ? 'invalid' : ''}`} style={{ gridColumn: 'span 2', fontSize: 20 }} value={values[f.key]} onChange={(e) => set(e.target.value)} />
-            ) : (
-              <input id={`f_${f.key}`} className={`cinput ${err ? 'invalid' : ''}`} inputMode="decimal" value={values[f.key] ?? ''} placeholder={f.optional ? '—' : ''}
-                onChange={(e) => set(e.target.value.replace(/[^\d.,\-]/g, ''))} />
-            )}
-            {f.type !== 'select' && f.type !== 'text' && <span className="unit" style={(f.unit?.length || 0) > 3 ? { fontSize: 13 } : undefined}>{f.unit || ''}</span>}
-            {err ? <div className="cerr">{err}</div> : f.hint ? <div className="chint">{f.hint}</div> : null}
-          </div>
-        );
-      })}
+      {main.map(row)}
+      {adv.length > 0 && (
+        <Fold id={`calc-adv-${calc.id}`} title="Дополнительно" summary={advChanged.length ? <b style={{ color: 'var(--accent)' }}>{advChanged.join(', ')}</b> : advHint}>
+          {adv.map(row)}
+        </Fold>
+      )}
 
       {priceRow && priceUnit !== '₽' && (
         <div className="crow">

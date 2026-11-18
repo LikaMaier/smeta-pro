@@ -20,6 +20,25 @@ export const OPTIONAL_SECTION = 'По желанию';
  * Себестоимость (прямые затраты) = Σ кол-во × закупочная цена.
  * Плановая прибыль = (итого − налог) − себестоимость. Маржа = прибыль / (итого − налог), если выручка > 0.
  */
+/**
+ * Налог «сверху» для тех, кто платит его со всей полученной суммы (самозанятый 4/6 %, УСН «доходы» 6 %).
+ * Если просто прибавить 4 %, налог возьмут и с этой прибавки — исполнитель недополучит.
+ * Чтобы после налога rate % осталась полная сумма сметы, сверху нужно rate / (100 − rate):
+ *   4 % → 4,17 %;  6 % → 6,38 %.
+ * НДС считается иначе — от суммы без налога, поэтому для него процент ставится как есть (5, 7, 22 %).
+ */
+export const grossUpPct = (rate: number) => (rate > 0 && rate < 100 ? Math.round((rate / (100 - rate)) * 10000) / 100 : 0);
+/** Готовые ставки (РФ, 2026): НДС 22 % — основная, 5 и 7 % — для УСН с НДС */
+export const TAX_PRESETS: { label: string; pct: number; rate?: number; vat?: boolean }[] = [
+  { label: 'Без налога', pct: 0 },
+  { label: 'Самозанятый 4%', pct: grossUpPct(4), rate: 4 },
+  { label: 'Самозанятый 6%', pct: grossUpPct(6), rate: 6 },
+  { label: 'УСН 6%', pct: grossUpPct(6), rate: 6 },
+  { label: 'НДС 5%', pct: 5, vat: true },
+  { label: 'НДС 7%', pct: 7, vat: true },
+  { label: 'НДС 22%', pct: 22, vat: true },
+];
+
 export type LineType = 'work' | 'material' | 'equipment' | 'service' | 'other';
 
 export interface LineInput {

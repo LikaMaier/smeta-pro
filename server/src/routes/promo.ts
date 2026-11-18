@@ -45,6 +45,14 @@ export async function priceFor(user: PriceUser, plan: { code: string; months: nu
     const sp = founder && sub ? FOUNDER.design1_sub : Infinity;
     return sp < base.rub ? { ...base, rub: sp, stars: rubToStars(sp), note: 'цена основателя' } : base;
   }
+  // «Про навсегда»: остаток действующей подписки засчитывается по её цене в день
+  if (plan.code === 'pro_life') {
+    const left = user.subscriptionUntil && user.subscriptionUntil > now ? (user.subscriptionUntil.getTime() - now.getTime()) / 864e5 : 0;
+    const dayRub = (user.plan === 'lite' ? PRICES.lite : user.plan === 'pro' ? PRICES.pro : 0) / 30;
+    const credit = Math.min(plan.rubPrice - 1, Math.floor(left * dayRub));
+    if (credit > 0) return { ...base, rub: plan.rubPrice - credit, stars: rubToStars(plan.rubPrice - credit), note: `с учётом остатка подписки (−${credit} ₽)` };
+    return base;
+  }
   if (plan.months === 0 || plan.code === 'studio_m') return base;
   const options = [base];
   const first = !(await hadSubscription(user.id));

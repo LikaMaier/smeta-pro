@@ -94,7 +94,7 @@ const tile: Master = {
   fields: [
     sel('obj', 'Что облицовываем', [['bath', 'санузел целиком (пол + стены)'], ['floor', 'только пол'], ['walls', 'только стены'], ['apron', 'кухонный фартук'], ['steps', 'ступени / крыльцо']], 'bath'),
     num('floor', 'Площадь пола', 'м²', 4), num('walls', 'Площадь стен (за вычетом двери)', 'м²', 22),
-    num('apron', 'Площадь фартука', 'м²', 0), num('steps', 'Ступени (длина всех)', 'пог. м', 0),
+    num('apron', 'Площадь фартука', 'м²', 3), num('steps', 'Ступени (длина всех)', 'пог. м', 5),
     sel('fmt', 'Формат плитки', [['mosaic', 'мозаика'], ['small', 'до 30×30'], ['mid', '30×60 / 40×40'], ['big', '60×60'], ['xl', 'крупный 60×120 и больше']], 'mid'),
     sel('lay', 'Раскладка', [['straight', 'прямая'], ['diag', 'диагональ (+20% к работе)'], ['herring', 'ёлочка / сложная (+30%)']], 'straight'),
     sel('prep', 'Подготовка основания', [['none', 'основание ровное'], ['primer', 'только грунтовка'], ['plaster', 'штукатурка стен по маякам'], ['screed', 'стяжка пола'], ['both', 'штукатурка стен и стяжка пола']], 'primer'),
@@ -108,8 +108,9 @@ const tile: Master = {
     const b = new Builder('Подготовка'); common(b, v);
     const floor = ['bath', 'floor'].includes(v.obj) ? v.floor : 0;
     const walls = ['bath', 'walls'].includes(v.obj) ? v.walls : 0;
-    const apron = v.obj === 'apron' ? v.apron || v.walls : v.apron;
-    const steps = v.obj === 'steps' ? v.steps || 5 : v.steps;
+    // размер берётся только из своего поля: раньше фартук с площадью 0 молча считался по «площади стен» (22 м²)
+    const apron = v.obj === 'apron' ? v.apron : 0;
+    const steps = v.obj === 'steps' ? v.steps : 0;
     const kLay = v.lay === 'diag' ? 1.2 : v.lay === 'herring' ? 1.3 : 1;
     const waste = (v.lay === 'straight' ? 0.1 : 0.15) + (v.fmt === 'xl' ? -0.03 : 0);
     const glue = { mosaic: 3, small: 4, mid: 5, big: 6, xl: 7.5 }[v.fmt as string] || 5;
@@ -140,6 +141,8 @@ const tile: Master = {
     if (v.hatch) b.mat('Люк невидимка под плитку', v.hatch, 'шт', 3500);
     if (v.drain === 'yes') b.mat('Трап душевой с гидрозатвором', 1, 'шт', 4500);
     b.sum('Площадь облицовки', area, 'м²');
+    if (v.obj === 'apron' && !apron) b.warn('Укажите площадь фартука — обычно 2–4 м²');
+    if (v.obj === 'steps' && !steps) b.warn('Укажите общую длину ступеней');
     if (v.fmt === 'xl' && v.prep === 'none') b.warn('Крупный формат требует идеально ровного основания — проверьте перепады правилом 2 м');
     return finish(b, v);
   },
@@ -1662,3 +1665,68 @@ const interior: Master = {
 };
 
 export const MASTERS: Master[] = [tile, roof, finishM, floors, electric, plumbing, gkl, foundation, mason, facade, septic, well, heating, paving, windowsM, demolition, balcony, stretch, climate, houseM, metal, yardM, handy, insulIn, interior];
+
+/**
+ * Какие поля нужны при каком выборе. Раньше мастер показывал всё сразу: «Толщина стяжки» при готовом основании,
+ * «Паркет: финиш» при ламинате, «Ширина ленты» при плите. Теперь поле видно, только когда оно влияет на расчёт.
+ * Скрытое поле считается по значению по умолчанию (см. normalizeValues) — то, чего не видно, не меняет итог.
+ * Правило безопасности (проверяется тестом): скрытое поле либо не влияет на расчёт, либо по умолчанию равно 0.
+ */
+const is = (key: string, ...vals: string[]) => (v: Record<string, any>) => vals.includes(String(v[key]));
+const not = (key: string, ...vals: string[]) => (v: Record<string, any>) => !vals.includes(String(v[key]));
+const pos = (key: string) => (v: Record<string, any>) => Number(v[key]) > 0;
+const SHOW: Record<string, Record<string, (v: Record<string, any>) => boolean>> = {
+  'm-tile': { floor: is('obj', 'bath', 'floor'), walls: is('obj', 'bath', 'walls'), apron: is('obj', 'apron'), steps: is('obj', 'steps'), hydro: is('obj', 'bath', 'floor') },
+  'm-roof': { wallH: is('gutter', 'yes') },
+  'm-finish': { accent: pos('accentA'), pmat: is('level', 'plaster'), pt: is('level', 'plaster'), slopes: (v) => Number(v.windows) > 0 && v.walls !== 'none' },
+  'm-floor': { thick: is('base', 'cps', 'semi', 'float', 'keramzit'), selfT: is('base', 'self'), mesh: is('base', 'cps', 'semi', 'keramzit'), wfin: is('cover', 'massive', 'piece', 'herring', 'chevron'), plinth: not('cover', 'microcement', 'polymer', 'none') },
+  'm-gkl': { h: not('kind', 'box'), sound: is('kind', 'part', 'wall', 'ceil1', 'ceil2'), doors: is('kind', 'part') },
+  'm-found': { bw: is('type', 'strip', 'pile'), bh: is('type', 'strip'), slab: is('type', 'slab'), step: is('type', 'pile', 'screw'), pump: not('type', 'screw'), hydro: not('type', 'screw'), ins: not('type', 'screw') },
+  'm-mason': { t: not('mat', 'brick1', 'brick15') },
+  'm-facade': { ins: not('sys', 'paint') },
+  'm-septic': { depth: not('type', 'rings') },
+  'm-heat': { buffer: not('src', 'solid', 'hp'), chimney: not('src', 'gasfloor', 'solid') },
+  'm-windows': { wn: is('kind', 'windows', 'all'), wa: is('kind', 'windows', 'all'), bb: is('kind', 'windows', 'all'), slopes: is('kind', 'windows', 'all'), sill: is('kind', 'windows', 'all'), drip: is('kind', 'windows', 'all'), net: is('kind', 'windows', 'all'),
+    di: is('kind', 'interior', 'all'), dobor: is('kind', 'interior', 'all'), de: is('kind', 'entrance', 'all') },
+  'm-demo': { wallsTile: not('obj', 'room'), floorTile: not('obj', 'room'), wallpaper: not('obj', 'bath'), cover: not('obj', 'bath') },
+  'm-balcony': { roof: not('glaze', 'none') },
+  'm-house': { ins: not('type', 'bathb'), clad: not('type', 'bathb'), stove: not('type', 'house') },
+  'm-gates': { gw: not('gate', 'none'), auto: not('gate', 'none'), fill: not('gate', 'none'), lock: is('wicket', 'yes') },
+  'm-yard': { trayType: pos('trays'), lawnA: not('lawn', 'none'), soil: not('lawn', 'none'), cable: pos('lamps') },
+  'm-insul': { aHeat: not('sys', 'none'), t: not('sys', 'none'), anti: not('sys', 'none'), aSound: not('snd', 'none') },
+  'm-interior': { partMat: pos('part'), ins: not('stage', 'rough'), extWall: (v) => v.stage !== 'rough' && v.ins !== 'none', walls: not('stage', 'rough'), ceil: not('stage', 'rough'), cover: is('stage', 'full'), warmFloor: is('stage', 'full') },
+};
+/** Редкие параметры — в блок «Дополнительно», чтобы на экране оставалось главное: размеры и вид работы */
+const ADV: Record<string, string[]> = {
+  'm-tile': ['grout', 'cut45', 'corners', 'hatch', 'drain', 'demo'],
+  'm-roof': ['soffit', 'windows', 'chimney', 'wallH', 'demo'],
+  'm-finish': ['rooms', 'accentA', 'accent', 'base', 'ceilDemo', 'cornice', 'slopes', 'demo'],
+  'm-floor': ['insul', 'sound', 'mesh', 'demo'],
+  'm-electric': ['led', 'street', 'lan', 'bath', 'protect', 'flush', 'demo', 'measure', 'input', 'ground'],
+  'm-plumb': ['collector', 'drains', 'dish', 'boiler', 'filters', 'demo'],
+  'm-gkl': ['niches', 'hatches'],
+  'm-found': ['pump', 'drain', 'blind'],
+  'm-mason': ['parts', 'facing'],
+  'm-facade': ['slopes', 'sills', 'plinth'],
+  'm-septic': ['revisions', 'pump'],
+  'm-well': ['heat', 'filter', 'pumpst'],
+  'm-heat': ['buffer', 'chimney'],
+  'm-paving': ['drain', 'lawn'],
+  'm-windows': ['net', 'dobor'],
+  'm-demo': ['brick', 'gkl', 'wins', 'rads', 'floorN'],
+  'm-balcony': ['out', 'roof', 'outside', 'lights', 'heatfloor'],
+  'm-stretch': ['lines', 'level2', 'bath', 'profile', 'pipes', 'niche', 'track', 'demo'],
+  'm-ac': ['pump', 'height', 'fans', 'demo'],
+  'm-gates': ['visors', 'stairs', 'rails', 'weld'],
+  'm-yard': ['trees', 'irrig', 'border'],
+  'm-insul': ['ceilS', 'floorS', 'slopes', 'corners', 'anti', 'putty'],
+  'm-interior': ['part', 'partMat', 'ins', 'extWall', 'warmFloor'],
+};
+for (const m of MASTERS) {
+  for (const f of m.fields) {
+    const show = SHOW[m.id]?.[f.key];
+    if (show) f.showIf = show;
+    if (ADV[m.id]?.includes(f.key) || f.key === 'cx' || f.key === 'debris') f.adv = true;
+  }
+}
+

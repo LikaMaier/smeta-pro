@@ -4,7 +4,7 @@ import { prisma, plain, notFound, HttpError, DEFAULT_CATEGORIES, num } from '../
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { compositionFor } from '../../../shared/compositions';
 import { runImport, renderXlsx, fileName } from '../pdf';
-import { normName } from '../../../shared/names';
+import { normName, matchesSearch, searchRank } from '../../../shared/names';
 
 const ITEM_TYPES = ['work', 'material', 'equipment', 'service', 'other'] as const;
 const money = z.coerce.number().min(0, 'не может быть отрицательной').max(1e11);
@@ -151,11 +151,12 @@ export async function catalogRoutes(app: FastifyInstance, opts: { bot?: any } = 
         ...(q.includeInactive ? {} : { active: true }),
         ...(q.type ? { type: q.type } : {}),
         ...(q.category ? { category: q.category } : {}),
-        ...(q.q ? { name: { contains: q.q, mode: 'insensitive' as const } } : {}),
       },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     });
-    return plain(items);
+    // поиск по словам без окончаний и в любом порядке: «плитка пол» находит «Укладка плитки на пол», «е» = «ё».
+    // Справочник одного пользователя — до нескольких тысяч строк, поэтому отбираем здесь, а не в базе.
+    return plain(q.q?.trim() ? items.filter((i) => matchesSearch(i.name, q.q!)).sort((a, b) => searchRank(b.name, q.q!) - searchRank(a.name, q.q!)) : items);
   });
 
   // Запомнить цены из мастера/калькулятора: обновить позиции с таким же названием или добавить новые
@@ -233,7 +234,9 @@ export async function catalogRoutes(app: FastifyInstance, opts: { bot?: any } = 
       where: { id }, data: {
         ...body,
         // своя цена вместо примерной — снимаем пометку «примерная»
-        ...(priceChanged ? { priceUpdatedAt: new Date(), ...((prev.params as any)?.starter ? { params: { ...(prev.params as any), starter: false } } : {}) } : {}),
+        ...(priceChanged ? { priceUpdatedAt: new Date(), ...((prev.params as any)?.starter ? { params: { ...(prev.params as any), starter: false } } : {}),
+          // и заметку «Примерная цена — проверьте»: цена теперь своя
+          ...(/^Примерная цена/.test(body.notes ?? prev.notes ?? '') ? { notes: null } : {}) } : {}),
       },
     });
     // Изменение цены НЕ затрагивает сохранённые сметы: в строках сметы хранится копия цены.

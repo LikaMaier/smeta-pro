@@ -3,3 +3,4 @@ web/dist
 .git
 *.log
 .env
+scripts/preview

@@ -23,6 +23,8 @@ export const DEFAULT_PLANS = [
   P('lite_y', 'Лайт на 12 месяцев (−30%)', 'lite', 12, PRICES.liteYear, 2),
   P('pro_m', 'Про на 1 месяц', 'pro', 1, PRICES.pro, 3, { aiLimit: 300 }),
   P('pro_y', 'Про на 12 месяцев (−30%)', 'pro', 12, PRICES.proYear, 4, { aiLimit: 300 }),
+  // «Про навсегда»: 1200 месяцев = 100 лет, чтобы доступ не истекал ни в каком расчёте
+  P('pro_life', 'Про навсегда', 'pro', 1200, PRICES.proLife, 7, { aiLimit: 300 }),
   ...[3, 5, 10].flatMap((n, i) => [
     P(n === 3 ? 'team_m' : `team${n}_m`, `Бригада до ${n} чел. на 1 месяц`, 'team', 1, teamMonthRub(n), 5 + i * 2, { aiLimit: 1000, seats: n }),
     P(n === 3 ? 'team_y' : `team${n}_y`, `Бригада до ${n} чел. на 12 месяцев (−30%)`, 'team', 12, year(teamMonthRub(n)), 6 + i * 2, { aiLimit: 1000, seats: n }),

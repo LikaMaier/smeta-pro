@@ -2,6 +2,7 @@ import { roundTo } from './money';
 import { fenceEstimate, FENCE_TYPES, MOUNTS } from './fence';
 import { MASTERS } from './masters';
 import { guessPrice } from './priceGuess';
+import { evalExpr, isExpr } from './expr';
 
 /**
  * Реестр строительных калькуляторов.
@@ -22,6 +23,10 @@ export interface CalcField {
   integer?: boolean;
   options?: { value: string; label: string }[];
   optional?: boolean;
+  /** Поле нужно только при таком выборе (толщина стяжки — когда есть стяжка). Скрытое поле считается по значению по умолчанию */
+  showIf?: (v: Record<string, any>) => boolean;
+  /** Редкий параметр — на экране в сворачиваемом блоке «Дополнительно» */
+  adv?: boolean;
 }
 
 export interface CalcResultRow {
@@ -70,9 +75,33 @@ const r = roundTo;
 const ceil = Math.ceil;
 
 /** Валидация значений по описанию полей. Возвращает ошибки по ключам. */
+/** Число из поля: «3,2», «3.2» или выражение «3,2*4,1» (NaN — не число) */
+export function fieldNumber(raw: any): number {
+  const str = String(raw ?? '').trim();
+  if (isExpr(str)) { const v = evalExpr(str); return v == null ? NaN : v; }
+  return Number(str.replace(/\s/g, '').replace(',', '.'));
+}
+
+/** Значения для проверки условий showIf: числа — числами, пустое — по умолчанию */
+function plainValues(calc: Calculator, values: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const f of calc.fields) {
+    const raw = values[f.key] ?? f.default;
+    if (f.type === 'select' || f.type === 'text') out[f.key] = raw;
+    else { const n = raw === '' || raw == null ? 0 : fieldNumber(raw); out[f.key] = Number.isFinite(n) ? n : 0; }
+  }
+  return out;
+}
+/** Поля, которые сейчас нужны: без тех, что не относятся к выбранному варианту */
+export function visibleFields(calc: Calculator, values: Record<string, any>): CalcField[] {
+  if (!calc.fields.some((f) => f.showIf)) return calc.fields;
+  const pv = plainValues(calc, values);
+  return calc.fields.filter((f) => !f.showIf || f.showIf(pv));
+}
+
 export function validateCalc(calc: Calculator, values: Record<string, any>): Record<string, string> {
   const errors: Record<string, string> = {};
-  for (const f of calc.fields) {
+  for (const f of visibleFields(calc, values)) {
     const raw = values[f.key];
     if (f.type === 'select') continue;
     if (f.type === 'text') {
@@ -83,7 +112,7 @@ export function validateCalc(calc: Calculator, values: Record<string, any>): Rec
       if (!f.optional) errors[f.key] = 'Заполните поле';
       continue;
     }
-    const n = Number(String(raw).replace(',', '.'));
+    const n = fieldNumber(raw);
     if (!Number.isFinite(n)) { errors[f.key] = 'Введите число'; continue; }
     if (f.min != null && n < f.min) errors[f.key] = `Не меньше ${f.min}`;
     else if (f.max != null && n > f.max) errors[f.key] = `Не больше ${f.max}`;
@@ -97,10 +126,12 @@ export function validateCalc(calc: Calculator, values: Record<string, any>): Rec
 
 export function normalizeValues(calc: Calculator, values: Record<string, any>): Record<string, any> {
   const out: Record<string, any> = {};
+  const shown = new Set(visibleFields(calc, values).map((f) => f.key));
   for (const f of calc.fields) {
-    const raw = values[f.key] ?? f.default;
+    // скрытое поле (не относится к выбранному варианту) считаем по умолчанию: то, чего не видно, не должно менять итог
+    const raw = shown.has(f.key) ? values[f.key] ?? f.default : f.default;
     if (f.type === 'select' || f.type === 'text') out[f.key] = raw;
-    else out[f.key] = raw === '' || raw == null ? 0 : Number(String(raw).replace(',', '.'));
+    else out[f.key] = raw === '' || raw == null ? 0 : fieldNumber(raw);
   }
   return out;
 }
@@ -1014,9 +1045,9 @@ export const CALCULATORS: Calculator[] = [
       { key: 'slideGates', label: 'Откатные ворота', unit: 'шт', min: 0, default: 1, integer: true },
       { key: 'swingGates', label: 'Распашные ворота', unit: 'шт', min: 0, default: 0, integer: true },
       { key: 'wickets', label: 'Калитки', unit: 'шт', min: 0, default: 1, integer: true },
-      { key: 'slideW', label: 'Ширина откатных ворот', unit: 'м', min: 2, max: 8, default: 4 },
+      { key: 'slideW', label: 'Ширина откатных ворот', unit: 'м', min: 2, max: 8, default: 4, showIf: (v) => v.slideGates > 0 },
       { key: 'demolish', label: 'Демонтаж старого забора', unit: 'м', min: 0, default: 0 },
-      { key: 'automation', label: 'Автоматика ворот', type: 'select', default: 'no', options: [{ value: 'no', label: 'нет' }, { value: 'yes', label: 'да' }] },
+      { key: 'automation', label: 'Автоматика ворот', type: 'select', default: 'no', options: [{ value: 'no', label: 'нет' }, { value: 'yes', label: 'да' }], showIf: (v) => v.slideGates + v.swingGates > 0 },
       { key: 'caps', label: 'Колпаки на столбы', type: 'select', default: 'yes', options: [{ value: 'yes', label: 'да' }, { value: 'no', label: 'нет' }] },
       { key: 'slope', label: 'Участок на склоне (ступенями)', type: 'select', default: 'no', options: [{ value: 'no', label: 'нет' }, { value: 'yes', label: 'да, +15% к работам' }] },
     ],

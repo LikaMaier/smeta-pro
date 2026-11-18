@@ -89,12 +89,13 @@ export default function Estimates() {
             ) : (
               <Link key={e.id} to={`/estimates/${e.id}`} className="list-item">
                 <div className="grow">
-                  <div className="title ellipsis">{e.title}</div>
-                  <div className="xs muted ellipsis">{[e.customer, e.project?.name, date(e.date), `${e.linesCount} поз.`].filter(Boolean).join(' · ')}</div>
+                  <div className="title">{e.title}</div>
+                  <div className="xs muted">{[e.customer, e.project?.name, date(e.date)].filter(Boolean).join(' · ')}</div>
                 </div>
-                <div className="right">
+                <div className="right" style={{ flex: 'none' }}>
                   <div className="num" style={{ fontWeight: 700 }}>{rub(e.total)}</div>
-                  {!e.isTemplate && <span className="badge">{EST_STATUS[e.status]}</span>}
+                  {/* видно, дошла ли смета: заказчик открыл ссылку / согласовал */}
+                  {!e.isTemplate && <span className={`badge ${e.approvedAt ? 'ok' : e.status === 'sent' && e.viewedAt ? 'accent' : ''}`}>{e.approvedAt ? '✓ Согласована' : e.status === 'sent' && e.viewedAt ? '👀 Заказчик открыл' : EST_STATUS[e.status]}</span>}
                 </div>
               </Link>
             ))}

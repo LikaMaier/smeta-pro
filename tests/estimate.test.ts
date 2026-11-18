@@ -100,3 +100,20 @@ test('позиции «по желанию» не входят в итог, но
   assert.equal(v!.std, 11000);
   assert.equal(variantTotals([{ name: 'Укладка', qty: 1, price: 100, type: 'work' }]), null);
 });
+
+test('налог самозанятого сверху: после уплаты остаётся полная сумма сметы', async () => {
+  const { grossUpPct, TAX_PRESETS, calcEstimate } = await import('../shared/estimate');
+  assert.equal(grossUpPct(4), 4.17);
+  assert.equal(grossUpPct(6), 6.38);
+  assert.equal(grossUpPct(0), 0);
+  for (const rate of [4, 6]) {
+    const t = calcEstimate([{ qty: 1, price: 100000, type: 'work' }], { taxPct: grossUpPct(rate) });
+    const left = t.total - (t.total * rate) / 100; // заплатили налог со всей полученной суммы
+    assert.ok(Math.abs(left - 100000) < 10, `ставка ${rate}%: осталось ${left}`);
+    // а при простых «+4%» исполнитель недополучает
+    const naive = calcEstimate([{ qty: 1, price: 100000, type: 'work' }], { taxPct: rate });
+    assert.ok(naive.total - (naive.total * rate) / 100 < 100000 - 100);
+  }
+  assert.ok(TAX_PRESETS.some((p) => p.vat && p.pct === 22), 'НДС 22% с 2026 года');
+  assert.ok(!TAX_PRESETS.some((p) => p.pct === 20), 'ставки 20% больше нет');
+});

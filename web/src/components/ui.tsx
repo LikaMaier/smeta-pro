@@ -97,7 +97,8 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 
 export function NumInput({ value, onChange, unit, invalid, onBlur, ...rest }: { value: any; onChange: (v: string) => void; unit?: string; invalid?: boolean } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'>) {
   // можно вводить формулу: 6*4+2 — при выходе из поля подставится результат
-  const el = <input className={`input num ${invalid ? 'invalid' : ''}`} inputMode="decimal" value={value ?? ''}
+  // показываем по-русски, с запятой: 19,6 (в данных и при вводе допустимы и точка, и запятая)
+  const el = <input className={`input num ${invalid ? 'invalid' : ''}`} inputMode="decimal" value={String(value ?? '').replace(/(\d)\.(?=\d)/g, '$1,')}
     onChange={(e) => onChange(e.target.value.replace(/[^\d.,\-+*/()×xх ]/gi, ''))}
     onBlur={(e) => { if (isExpr(e.target.value)) { const v = evalExpr(e.target.value); if (v != null) onChange(String(v)); } onBlur?.(e); }}
     {...rest} />;

@@ -8,9 +8,9 @@ test('проверка: нулевые цены, количество, прим�
     { name: 'Забор', qty: 10, price: 0, matPrice: 500, unit: 'м', note: 'Примерная цена — проверьте' },
   ], paySchedule: [{ title: 'Аванс', pct: 50 }] });
   const t = r.map((x) => x.text).join(' | ');
-  assert.match(t, /Нет цены: позиции 2/);
-  assert.match(t, /Не указано количество: позиции 1/);
-  assert.match(t, /Примерные цены.*3/);
+  assert.match(t, /Нет цены: «Монтаж»/);
+  assert.match(t, /Не указано количество: «Бетон»/);
+  assert.match(t, /Примерные цены.*«Забор»/);
   assert.match(t, /50%/);
   assert.match(t, /Не указан заказчик/);
 });

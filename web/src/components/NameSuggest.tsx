@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
+import { isApproxItem } from '../../../shared/notes';
 import { normName } from '../../../shared/names';
 import { rub } from '../format';
 
@@ -8,7 +9,7 @@ export type SuggestItem = { id?: string; name: string; unit: string; price: numb
 
 const nrm = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
 const split = (s: string) => nrm(s).split(/[^a-zа-я0-9]+/).filter(Boolean);
-const isStarterNote = (it: any) => typeof it?.notes === 'string' && it.notes.startsWith('Примерная цена');
+const isStarterNote = (it: any) => isApproxItem(it);
 
 /** Индекс поиска: свои позиции + общий справочник (без дублей по названию) */
 export function useSuggestIndex(own: any[] | undefined) {

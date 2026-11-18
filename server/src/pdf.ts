@@ -9,6 +9,7 @@ import { estimateTotals } from './routes/estimates';
 import { brandPath } from './brand';
 import { payStages } from '../../shared/payments';
 import { variantTotals } from '../../shared/estimate';
+import { publicNote } from '../../shared/notes';
 
 const DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../pdf');
 const SCRIPT = path.join(DIR, 'estimate_pdf.py');
@@ -42,7 +43,7 @@ export function pdfData(e: any, user: any, number: number, free = false, paid: n
       name: l.name, category: l.category, qty: num(l.qty), unit: l.unit, type: l.type,
       price: Math.round((t.lineUnit[i].work + t.lineUnit[i].mat) * 100) / 100, // цена за единицу с коэффициентами
       unitWork: l.type === 'material' ? 0 : t.lineUnit[i].work, unitMat: l.type === 'material' ? t.lineUnit[i].work + t.lineUnit[i].mat : t.lineUnit[i].mat,
-      work: t.lineWork[i], mat: t.lineMat[i], amount: t.lineAmounts[i], note: l.note,
+      work: t.lineWork[i], mat: t.lineMat[i], amount: t.lineAmounts[i], note: publicNote(l.note), // служебные пометки («примерная цена — проверьте») заказчику не показываем
       composition: (l.composition || '').split('\n').map((x: string) => x.replace(/^[-–•\s]+/, '').trim()).filter(Boolean),
     })),
     totals: {
@@ -120,7 +121,8 @@ export function xlsxEstimateData(e: any, user: any, number: number, own: boolean
   const t = estimateTotals(e) as any;
   return {
     ...base, kind: 'estimate',
-    lines: base.lines.map((l: any, i: number) => ({ ...l, costPrice: own && e.lines[i].costPrice != null ? num(e.lines[i].costPrice) : null })),
+    // «для себя» — с полными примечаниями (в т. ч. «примерная цена — проверьте»), заказчику — без служебных
+    lines: base.lines.map((l: any, i: number) => ({ ...l, note: own ? e.lines[i].note : l.note, costPrice: own && e.lines[i].costPrice != null ? num(e.lines[i].costPrice) : null })),
     own: own ? { total: t.total, directCost: t.directCost, profit: t.plannedProfit, marginPct: t.marginPct } : false,
   };
 }

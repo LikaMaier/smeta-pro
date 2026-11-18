@@ -11,17 +11,22 @@ export interface CheckIssue { level: 'error' | 'warn'; text: string; lines?: num
 export function checkEstimate(e: CheckInput): CheckIssue[] {
   const out: CheckIssue[] = [];
   const idx = (f: (l: CheckLine) => boolean) => e.lines.map((l, i) => (f(l) ? i + 1 : 0)).filter(Boolean);
+  /** Позиции по именам, а не по номерам: в приложении строки не пронумерованы — «позиции 3» ни о чём не говорит */
+  const named = (nums: number[]) => {
+    const names = nums.slice(0, 3).map((n) => `«${(e.lines[n - 1].name || '').trim().slice(0, 48) || `позиция ${n}`}»`);
+    return `${names.join(', ')}${nums.length > 3 ? ` и ещё ${nums.length - 3}` : ''}`;
+  };
   if (!e.lines.length) out.push({ level: 'error', text: 'В смете нет позиций' });
   const zeroPrice = idx((l) => !(Number(l.price) > 0) && !(Number(l.matPrice) > 0));
-  if (zeroPrice.length) out.push({ level: 'error', text: `Нет цены: позиции ${zeroPrice.join(', ')}`, lines: zeroPrice });
+  if (zeroPrice.length) out.push({ level: 'error', text: `Нет цены: ${named(zeroPrice)}`, lines: zeroPrice });
   const zeroQty = idx((l) => !(Number(l.qty) > 0));
-  if (zeroQty.length) out.push({ level: 'error', text: `Не указано количество: позиции ${zeroQty.join(', ')}`, lines: zeroQty });
+  if (zeroQty.length) out.push({ level: 'error', text: `Не указано количество: ${named(zeroQty)}`, lines: zeroQty });
   const unconf = idx((l) => Boolean(l.unconfirmed) || /Примерная цена|типовое — уточните/i.test(l.note || ''));
-  if (unconf.length) out.push({ level: 'warn', text: `Примерные цены или типовые объёмы — проверьте: позиции ${unconf.join(', ')}`, lines: unconf });
+  if (unconf.length) out.push({ level: 'warn', text: `Примерные цены или типовые объёмы — проверьте: ${named(unconf)}`, lines: unconf });
   const names = new Map<string, number[]>();
   e.lines.forEach((l, i) => { const k = `${l.name.trim().toLowerCase()}|${l.unit || ''}`; names.set(k, [...(names.get(k) || []), i + 1]); });
   const dups = [...names.values()].filter((v) => v.length > 1);
-  if (dups.length) out.push({ level: 'warn', text: `Одинаковые позиции: ${dups.map((d) => d.join(' и ')).join('; ')}` });
+  if (dups.length) out.push({ level: 'warn', text: `Одинаковые позиции: ${dups.slice(0, 3).map((d) => `«${e.lines[d[0] - 1].name.trim().slice(0, 48)}» — ${d.length} раза`).join('; ')}` });
   if (!e.customer?.trim()) out.push({ level: 'warn', text: 'Не указан заказчик' });
   if (!e.address?.trim()) out.push({ level: 'warn', text: 'Не указан адрес объекта' });
   if (!e.title?.trim() || /^новая смета$/i.test(e.title.trim())) out.push({ level: 'warn', text: 'Дайте смете понятное название — заказчик увидит его первым' });
@@ -36,7 +41,7 @@ export function practiceChecks(lines: CheckLine[], p: CheckParams): CheckIssue[]
   const out: CheckIssue[] = [];
   const has = (re: RegExp) => lines.some((l) => re.test(`${l.name} ${l.note || ''}`));
   const withMat = lines.some((l) => Number(l.matPrice) > 0 || /материал/i.test(l.note || ''));
-  if (Number(p.taxPct) === 20) out.push({ level: 'warn', text: 'Налог 20% — это ставка НДС. Её начисляют только на общей системе налогообложения. На УСН и самозанятости НДС заказчику не выставляют: поставьте свой налог или уберите его.' });
+  if (Number(p.taxPct) === 20) out.push({ level: 'warn', text: 'Налог 20% — это прежняя ставка НДС. С 2026 года основная ставка НДС — 22%, для УСН с НДС — 5% или 7%. Самозанятые и УСН без НДС его заказчику не выставляют: поставьте свою ставку или уберите налог.' });
   if (withMat && !(Number(p.lossReservePct) > 0) && !has(/запас|отход|подрезк|резерв|бой/i)) out.push({ level: 'warn', text: 'Нет запаса материала на подрезку и бой (обычно 5–10%). Поставьте «Резерв на потери» в «Скидка, наценка, налог», иначе докупать придётся за свой счёт.' });
   if (lines.length >= 3 && !has(/вывоз|мусор|контейнер|уборк/i)) out.push({ level: 'warn', text: 'Нет вывоза мусора и уборки — заказчики часто спрашивают про это. Добавьте строку или напишите в примечании, что это не входит.' });
   if (withMat && !(Number(p.delivery) > 0) && !(Number(p.extraCosts) > 0) && !has(/доставк|подъ[её]м|разгрузк|занос|погрузк/i)) out.push({ level: 'warn', text: 'Не учтены доставка и подъём материалов на этаж — частая причина «доплат», которых заказчик не ждал.' });

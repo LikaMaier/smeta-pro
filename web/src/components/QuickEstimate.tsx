@@ -7,6 +7,7 @@ import { rub, parseNum } from '../format';
 import { STARTER_PRICES } from '../../../shared/starterPrices';
 import { parseQuick, quickIndex, QUICK_EXAMPLES, type QuickItem } from '../../../shared/quick';
 import { normName } from '../../../shared/names';
+import { isApproxItem } from '../../../shared/notes';
 
 type Row = { k: number; text: string; qty: string; pick: number; alts: QuickItem[]; off: boolean };
 
@@ -24,7 +25,7 @@ export default function QuickEstimate({ onBusy }: { onBusy?: (b: boolean) => voi
   const own = useLoad(() => get<any[]>('/items').catch(() => []), []);
   const ix = useMemo(() => {
     const mine: QuickItem[] = (own.data || []).filter((i: any) => i.active !== false && Number(i.price) > 0)
-      .map((i: any) => ({ name: i.name, unit: i.unit, price: Number(i.price), category: i.category || undefined, own: !/^Примерная цена/.test(i.notes || '') }));
+      .map((i: any) => ({ name: i.name, unit: i.unit, price: Number(i.price), category: i.category || undefined, own: !isApproxItem(i) }));
     const have = new Set(mine.map((i) => normName(i.name)));
     return quickIndex([...mine, ...STARTER_PRICES.filter((p) => !have.has(normName(p.name)))]);
   }, [own.data]);
